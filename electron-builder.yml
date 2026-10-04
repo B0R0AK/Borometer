@@ -1,0 +1,116 @@
+# Packaging. Three Windows downloads from one build:
+#
+#   Borometer-Setup-<version>.exe       the installer (Start menu, desktop
+#                                       shortcut, uninstall from Windows
+#                                       settings; saved files go to
+#                                       Documents\Borometer)
+#   Borometer-<version>-portable.exe    one file, runs from anywhere; saved
+#                                       files go next to it
+#   Borometer-<version>-win-x64.zip     the same portable app as a folder. The
+#                                       single portable exe unpacks itself to a
+#                                       temp folder at every start, which is a
+#                                       common antivirus heuristic; the folder
+#                                       does not.
+#
+# Settings live in %APPDATA%\Borometer for all three, so switching between
+# them - or from the old Python build - keeps everything that was set.
+
+appId: de.boro.borometer
+productName: Borometer
+copyright: Copyright (C) 2026 B0R0AK
+
+directories:
+  output: release
+  buildResources: build
+
+files:
+  - package.json
+  - dist/main/**/*.js
+  - "!**/*.map"
+
+extraResources:
+  - from: dist/renderer
+    to: renderer
+  - from: build/icon.ico
+    to: icon.ico
+  - from: build/icon.png
+    to: icon.png
+  # the taskbar's live dot and the preview's two buttons (src/main/taskbar.ts)
+  - from: build/taskbar
+    to: taskbar
+  - from: LICENSE
+    to: LICENSE
+  - from: licenses
+    to: licenses
+
+# Electrons Sicherungen, in der gepackten Exe umgelegt (Spezifikation
+# Live-Leistung 4): die Exe startet nicht als blankes Node
+# (ELECTRON_RUN_AS_NODE), nimmt kein NODE_OPTIONS und kein --inspect, und
+# sie fuehrt nur die App aus ihrem eigenen app.asar aus, geprueft gegen den
+# Hash, den der Build in die Exe schreibt. Borometer braucht nichts davon;
+# es sind Wege hinein fuer jemand anderen.
+electronFuses:
+  runAsNode: false
+  enableNodeOptionsEnvironmentVariable: false
+  enableNodeCliInspectArguments: false
+  enableEmbeddedAsarIntegrityValidation: true
+  onlyLoadAppFromAsar: true
+
+# Only the two languages the app speaks; Chromium ships ~50 otherwise.
+electronLanguages:
+  - en-US
+  - de
+
+win:
+  icon: build/icon.ico
+  # the zip; the installer and the portable exe name themselves below
+  artifactName: ${productName}-${version}-win-x64.${ext}
+  target:
+    - target: nsis
+      arch: x64
+    - target: portable
+      arch: x64
+    - target: zip
+      arch: x64
+
+nsis:
+  artifactName: ${productName}-Setup-${version}.${ext}
+  oneClick: false
+  perMachine: false
+  allowToChangeInstallationDirectory: true
+  createDesktopShortcut: true
+  createStartMenuShortcut: true
+  shortcutName: Borometer
+  # No license page: the GPL asks nobody to accept anything before using the
+  # program. The text still ships with the app (extraResources above).
+  # Settings and saved fights belong to the person, not to this install.
+  deleteAppDataOnUninstall: false
+  # The installer speaks the app's two languages: German on a German
+  # Windows, English everywhere else. No picker - it asks nothing it can
+  # read off the system. Every page, installer and uninstaller, wears the
+  # app's dark theme; only the buttons stay Windows buttons. Look and words:
+  # build/installer.nsh and the three BMPs beside it (drawn by
+  # scripts/build-installer-art.mjs).
+  installerLanguages:
+    - en_US
+    - de_DE
+
+portable:
+  artifactName: ${productName}-${version}-portable.${ext}
+  # The single exe unpacks itself to a temp folder at every start, which takes
+  # a few seconds before Borometer runs at all. This picture stands there
+  # meanwhile, so a double click answers at once. Drawn by
+  # scripts/build-installer-art.mjs like the installer's pictures.
+  splashImage: build/portableSplash.bmp
+
+linux:
+  icon: build/icon.png
+  category: Game
+  target:
+    - target: AppImage
+      arch: x64
+  artifactName: ${productName}-${version}-${arch}.${ext}
+
+# No auto-update: the app makes no network call of its own. Releases are
+# uploaded by the GitHub workflow.
+publish: null

@@ -1,0 +1,1975 @@
+BOROMETER — CHANGELOG
+=====================
+
+v1.9
+----
+  - Fight now shows the damage as a glowing ring. Each skill is an arc around
+    the big number, sized by its share of the damage, with the hit types on a
+    thin outer rim and the names outside. Point at an arc or a row and both are
+    highlighted, while the middle gives that skill's damage, hits, crit rate and
+    biggest hit
+  - Click an arc and the list beside the ring opens that skill with its hit
+    types and closes the one that was open. A second click closes it again
+  - “Replay the fight” lets the skills race each other in the ring: the whole
+    fight in about ten seconds, at 1×, 2× or 4×, and you can scrub. Mechanics
+    show up on the way, and at the end the first three places stand with one
+    sentence
+  - In a party the ring shows the members inside and their skills outside, your
+    rank in the middle and the share per member below. A click opens a member's
+    ring; Esc or “‹ Group” goes back
+  - Critical heavy is ember orange now and easy to tell from critical (gold)
+    everywhere, also with colour blindness
+  - Borometer recognises mechanics: stretches of a boss fight where you keep
+    hitting but your hits do hardly any damage, at about the same time in at
+    least 80 % of five or more of your pulls. The Analysis lists them as a
+    finding of their own, the curve shows them hatched, and those seconds no
+    longer count as your gap or your weakest stretch. Borometer does not guess
+    the cause
+  - King Khanzaizin: after 20 seconds without a hit a new fight begins, so wipes
+    are no longer glued into one fight. Other bosses are unchanged
+  - Records, the trophy in the icon bar, is an album: the highest hit overall at
+    the top, then pages for raid, practice dummy, field bosses and dungeons by
+    stars. Each boss has a medallion with best DPS, strongest hit and first
+    fight, and bosses you have not fought yet stand as empty outlines. The first
+    time you open it, Borometer reads the 60 newest logs in your log folder;
+    stopping loses nothing
+  - Below the big number, a neutral line compares this pull with the last one,
+    such as “+8 % vs. last pull”. When all fights fall on one day or two days in
+    a row, History lines the pulls up one after another with their time. The
+    fight picker puts fights in a row at the same place under one header, and
+    Party shows the board first
+  - On first start the app shows a tour: six short steps, from the log folder to
+    “Report a bug”. You can skip it, and “Show the tour” in the settings brings
+    it back, also in the browser
+  - New in Settings › Info: “Check for a new version at start”. The switch stays
+    off until you turn it on. Then Borometer asks GitHub once per start, and if
+    a newer version is out, a quiet note in the status bar and in Info links to
+    the release page. Nothing is downloaded or installed; GitHub sees your IP
+    address and the time
+  - Borometer is open source under the GPL. Code, downloads and issues are on
+    GitHub at B0R0AK/Borometer, and the license notes are in English too
+  - Where a game image is missing, Borometer draws its own mark instead of an
+    empty circle. In the compact window, rows without an icon now line up with
+    the others
+
+v1.8
+----
+  - Weeklies in a new look: the week as a band from Thursday 10:00 to Thursday
+    10:00 with a line for now, the raid as a 3×3 grid with the bosses of its
+    three wings, every merchant item with its in-game icon and a ring that
+    fills, and a progress ring on every character
+  - The compact window follows the full view: it shows the fight you have open
+    there and changes with it. If it cannot follow, it says why instead of “No
+    log”
+  - The compact window stays compact: it has a maximum size, and the ⋯ menu,
+    dialogs and notices show in full – the window grows for them and shrinks
+    back. See-through only tints the ground; skills, names and numbers stay
+    solid
+  - Vegamor is recognised: no more control codes in the fight name, the whole
+    boss event is one run with each part as its own fight, and Vegamor has its
+    own picture
+  - Damage at the practice dummy is right again: a skill id is never read as
+    damage any more
+  - “Report a bug” sits in the status bar at the bottom right instead of the
+    settings
+  - New icons for the practice dummy and for Falling Flower
+
+v1.7
+----
+  - Borometer looks and works like a companion app: an icon bar on the left, the
+    fight picker in the title bar (‹ › and Ctrl K), a status bar at the bottom
+    and the content as one calm surface. Nothing is stretched on a large screen
+  - Fight: every skill with its bar under its name, the curve and a verdict with
+    two reasons beside the table, and the in-game icon of the skill core (34 of
+    35 cores)
+  - Rotation: the whole fight as a timeline to play at 1×, 2× or 4×, as a bar or
+    as a sequence, and the stacked damage over time right under it on the same
+    axis – one playhead runs through both. In a party, the rotation of each
+    member
+  - Earlier days: the fight picker turns back to earlier log files in the game's
+    log folder. While you look at an older day, live logging pauses; “Today”
+    picks it up again. On Start, “Recently opened” opens the file
+  - Compact is its own small window over the game on Windows 11, and the big
+    window stays where it is – on a second screen, say. A normal Windows window
+    over the game, not an overlay in it: Borometer never touches the game
+  - Builds keep your Questlog links with a small overview from your own logs:
+    fights, best pull and median per build. One click opens the build on
+    Questlog
+  - Weeklies: a checklist for up to six characters with the weekly and daily
+    tasks. It resets on Thursday at 10:00 and every day at 10:00 German time,
+    and every character can hide, rename or add points
+  - Settings are one scrolling page with a jump bar; “Show in Explorer” opens
+    the game's log folder
+  - The rotation trainer, the evening and the “All casts” canvas are gone.
+    Everything you saved stays where it was
+
+v1.6
+----
+  - A new tab, Progress, answers one question: are you getting better, and
+    where does it come from? Everything in it stays on your PC
+  - Against your best pull: one click in the fight header compares this fight
+    with your best on the same boss – at the practice dummy with your best of
+    the same length, 60, 120 or 180 seconds. If this fight is your best, it is
+    set against your second best. Numbers, skills and the rotation side by
+    side
+  - Your builds: Borometer recognises a build by its weapon pair and the
+    skills that make 80 % of your damage, and shows per boss the median of
+    every fight with it. You name a build once and may add a planner link;
+    there is nothing else to enter
+  - Rotation trainer: after each pull, up to three sentences on where your
+    first 30, 45 or 60 seconds went differently from your best pull – fewer
+    casts, a later first cast, another order, a pause. Where the boss could
+    not be hit, it says so and names nothing there. In Rotation, “Best pull as
+    outline” draws your best pull over your own casts
+  - Evening: the bosses of a raid night, the best pull per boss, the
+    difference to last week and who improved – from the party logs, or from
+    your own fights without a party. Nobody is named from the bottom
+  - Share as image: a fight, the party board or the evening as a PNG to save
+    or to copy to the clipboard. Borometer draws it from its own numbers – no
+    screenshot, no game art – and says whose names are in it before you copy
+
+v1.5.1
+------
+  - The installer wears the app's dark look on every page, not only on the
+    first and the last. It no longer asks for whom to install – Borometer
+    always goes into your own user folder, without admin rights – and it skips
+    the license page
+  - Running a newer installer over Borometer updates it in place. Uninstalling
+    says what it removes and that your settings and saved fights stay where
+    they are
+
+v1.5
+----
+  - Live logging is one switch: “● Live” while it runs, “○ Live off” when it
+    doesn't, and a click turns it on or off. It keeps its label at every
+    width, in compact mode and at 200%, and the taskbar button toggles it too
+  - The damage table grows with the fight instead of scrolling in a third of
+    the window. When the window is narrow or zoomed, the header plate gets
+    smaller first, so the table stays in view
+  - The strongest skill no longer wears gold: gold is for the number and for
+    what you selected. In the light theme nothing glows any more, and a bar
+    that fills the whole column fades out so it doesn't look like a selected
+    row
+  - The Analysis starts with one verdict: what cost you the most in this
+    fight, or that nothing did. “Weakest three seconds” no longer points at
+    the last seconds of the kill
+  - Every action has one place: “Save fight” only next to the fight, the
+    rail's footer is “Filter and fight file”, and the tab is called Party like
+    the button. How-to text sits behind a “? Help” button instead of above the
+    charts
+  - Compact mode without a fight shrinks the window to a strip again. Notices
+    no longer cover a button, follow the language switch, and an Undo notice
+    stays for its full time
+
+v1.4
+----
+  - Borometer wears the real Windows frame. Minimise, maximise with its snap
+    layouts, close, the border to resize by, the corners and the shadow come
+    from Windows; the header is the title bar. The buttons follow the theme
+    and the UI size
+  - Compact sits on Acrylic on Windows 11: the game shows blurred behind the
+    overlay while the figures, names and gold stay solid. See-through now sets
+    how much of the game shows through the ground, not how faded the numbers
+    are. On older Windows it fades as before
+  - The taskbar knows Borometer: a gold dot on the icon while live logging
+    runs, and two buttons in the preview, Compact and Live logging
+  - A maximised window is maximised again after compact mode instead of
+    running past the edge of the screen
+  - The app's own local server only answers the app itself. A web page in a
+    browser can no longer send it commands or change the log folder
+
+v1.3
+----
+  - Click-through overlay: Ctrl+Shift+D lets the mouse pass through the
+    compact window into the game, and the same keys take it back. From the
+    full view it makes the whole overlay at once — compact, on top,
+    click-through. The strip says so with an amber edge and the key
+    combination
+  - Narrow windows and 200 % zoom: the fight list folds into one line with a
+    button to open it, so the big number stays at the top. Clicking a fight
+    folds it again
+  - The installer and the portable exe look like the app: dark pages, the word
+    mark, their own words in German or English. The portable exe shows a start
+    image while it unpacks. Switching tabs fades in 140 instead of 260 ms
+  - One word for one thing: “Live logging on/off” everywhere instead of “Live
+    log”, “LIVE OFF” in the compact strip instead of a bare “OFF”, and “fights
+    file” instead of “runs file”
+  - Comparing two different bosses no longer paints the difference red or
+    green, and the breakdown of where it came from starts folded. Hit counts
+    are grouped (1,201) and differences in the comparison are in k form like
+    every rate beside them
+  - The light theme reaches readable contrast on the selected fight and on the
+    click-through note. The sticky table header covers the rows under it, the
+    compact focus ring no longer lies on the neighbouring numbers, and compact
+    prints the damage as 32.54M
+  - The analysis questions stand one step above their answers, and every
+    figure stands once — “Eye of Ventius” over “91% of damage” instead of the
+    91 twice. “Own peak” in the timeline no longer blows a lane with almost no
+    damage up to full height
+  - The start page carries “Open logs” and “Live logging” once instead of
+    twice, and the setup steps are numbered quietly instead of with four
+    glowing buttons. Opening compact mode folds open table rows
+
+v1.2
+----
+  - Compact mode reads the fight too. Under the big number stands a short
+    line – which skill carried it – and how this pull did against the last
+    one on the same target, with its sign and in green or red
+  - Compare Fights says what it measures against, and one button swaps the
+    reference. Two different bosses get no winner, because every boss takes
+    damage differently
+  - Hosting a party says what it opens, right under the button: a port on
+    this PC that answers party traffic only and only with the code – or
+    nothing at all when a party server is set. A button that cannot be
+    pressed yet no longer glows
+  - The timeline has a key for its two bands: seconds with no hit, and the
+    weakest three seconds
+  - The analysis questions stand above their rows, and the verdict number is
+    set in the same face as every other big number
+  - The table header is one tab stop; the arrow keys walk the columns and go
+    into the rows. The switches above the table tell a screen reader which
+    one is on
+  - Switching tabs after scrolling down lands at the top of the new tab.
+    Rows in compact mode are 24 points tall, big enough to hit
+  - German reads like German again: “2 Kämpfe aus dem Beispiel gelesen”
+    instead of the button's label, and the fight list heading is one
+    sentence
+
+v1.1
+----
+  - Borometer runs on Electron now instead of Python. It brings its own
+    window and needs neither WebView2 nor an installed browser; what you see
+    and click is the same as in 1.0
+  - Every release comes three ways: an installer with Start menu entry and
+    uninstall, a portable exe, and a zip to unpack. Installed, your saved
+    fights go to Documents\Borometer; portable, next to the exe
+  - Your settings stay where they are. All three read the same file in
+    %APPDATA%\Borometer as the Python version did, so nothing needs to be
+    set up again
+  - The version in the window was stuck at v0.64. It now comes from the
+    build itself
+
+v1.0
+----
+  - The interface is new. A type scale with real steps, quieter surfaces,
+    denser rows, and one set of controls instead of eight kinds that only
+    looked alike
+  - Skills have icons now, 313 of them, with the weapon behind each one. You
+    recognise what you used by the picture instead of the name
+  - The timeline is a curve. Instead of 168 columns, one area with a lane per
+    skill — a click takes a lane out
+  - The rotation has a bar of its own: what you used and when, on a time
+    axis, with the hit ranges next to it
+  - Analysis has a head and sections, and tells you where your weakest window
+    was
+  - Compact mode became an overlay: a narrow strip over the game that fades
+    while you are not looking at it
+  - Compare fights, Host party and the start screen have been reworked
+  - Bosses stand in the fight list with their picture
+  - Both charts can be driven from the keyboard
+  - In the light theme gold is gold again. On a light surface it used to turn
+    brown
+  - Skill cores have a mark of their own. A skill core is not a skill but an
+    item that replaces one
+  - Two Borometers no longer take the same port. The second window used to
+    show the first one's page
+  - The saved theme comes back after a restart, TnL included
+  - In compact mode the sort column sat on the wrong row, and the damage
+    total was cut off
+  - Ramus is Ramux, Grimturg and Exodus are field bosses, and Tevent's Hunger
+    (Enraged) does not replace a skill after all
+  - Borometer is under the GPL v3 from now on. The source comes with it
+
+v0.64
+-----
+  - The name on the party board comes from your log now. What you type when
+    you join is the starting value — once your log is running, your
+    character stands there. It follows a character switch too
+  - The table shows how deep you are. Player, skill and hit type each step
+    in by one level, and so does the bar behind them. Your own damage steps
+    the same way
+  - The left rail stops leaving space empty. The fight list gets whatever
+    the saved fights do not need, instead of being held to a fixed height
+
+v0.63
+-----
+  - The fight list folds trash away. Under a dungeon you see the bosses and
+    one entry, Trash, with a count — one click shows them. On a raid evening
+    that is 4 visible rows instead of 18
+  - Click a boss fight on the left and the whole party for it stands at the
+    top: each with their own fight against that boss. Fights the party
+    reported on carry a Party tag in the list
+  - A party row now opens two levels deep: the skills, then their hit types
+    — normal, critical, heavy, critical heavy — with damage, hits and
+    biggest hit
+  - Save party log writes every boss fight of the loaded log, not just the
+    moment you pressed it
+  - Switch character and keep logging, and the party board follows the new
+    name
+  - The TnL theme did not come back after a restart. The window frame was
+    blue and the app dark: the check at startup did not know about the third
+    theme
+  - In the party view the history line from the last single fight stayed on
+    screen, under a different boss's name
+  - Calanthia of Destruction is Calanthia's second phase, not an enemy of
+    its own. Both phases are one fight now
+
+v0.62
+-----
+  - The fight header now says “Your best of 8 fights on this boss” or “20%
+    worse than usual”. It used to say “best of 8” and “below your median of
+    5”, which left open what the eight were and named the arithmetic instead
+    of the point
+  - A fight that lands right in the middle says “The same as usual” instead
+    of “0% better than usual”
+
+v0.61
+-----
+  - The History tab shows how you do against each boss: how often you have
+    fought it, your best rate, the median, and every single fight with date,
+    DPS, damage and length
+  - It counts only what Borometer has seen itself, and starts at zero with
+    this version. Old logs, or someone else's on the same machine, do not
+    count
+  - The fight header says how the loaded fight sits against your earlier
+    ones on the same boss: “Your best of 8 on this target” or “20 % below
+    your median of 5”
+  - History and the fight header are for bosses only. Trash and the practice
+    dummy are not in there
+  - Switching the game's language no longer lists one boss twice. 0.58 said
+    this could not be solved — that was wrong
+  - The ⋯ menu ran off the window in compact view. It now hangs off the
+    right edge, and the buttons fit on one line
+  - Under the Timeline it says what a click does: a click shows only the
+    stretch you clicked on, another click shows the whole fight
+
+v0.60
+-----
+  - History now counts for itself instead of reading your log folder. It
+    records what Borometer has seen, from this version on. Old logs, or
+    someone else's on the same machine, no longer count
+  - History lists bosses only — no trash, no practice dummy. Measured over
+    89 logs: 98 targets down to 14, 254 fights down to 54. On a dummy the
+    line in the fight header still compares you to your earlier runs
+  - Switching the game's language no longer lists one boss twice. 0.58 said
+    this could not be solved — that was wrong. The dungeon table carries
+    both spellings, and the name shown is the one your client writes
+  - The ⋯ menu ran off the window in compact view. It now hangs off the
+    right edge, and the buttons fit on one line
+  - Under the Timeline the footnote says what a click does without talking
+    about a burst: a click shows only the stretch you clicked on, another
+    click shows the whole fight
+
+v0.59
+-----
+  - There is a second download: a folder instead of a single file. The
+    single file unpacks itself into a temp folder every time it starts, and
+    that is one of the commonest reasons an antivirus flags it — the code
+    has nothing to do with it. In the folder version nothing unpacks. Unzip
+    it somewhere and run BoroMeter.exe inside. Same app, 150 files instead
+    of one
+  - Under the Timeline it says what a click does again: click a burst to
+    zoom to it, click it once more to come back. The control has been there
+    all along — the text was trimmed in 0.56 and it went with it
+  - The dark theme carries exactly the opacities it had before the light
+    theme was rebuilt. Nine alpha steps had ended up on three settings, and
+    the drift measured 5 of 255 on 1px hairlines. There are 25 settings now,
+    one per original value. Checked across all 674 rules: none differ. The
+    light and TnL themes were not touched — 0 of 4,561,200 pixel channels
+
+v0.58
+-----
+  - New tab: History. Every combat log in your folder, read once. On this
+    machine that is 482 fights across 176 targets, 61 of them fought more
+    than twice. Pick a target and every fight you had with it is there, one
+    bar each in the order you fought them, best in gold. Fellinex sat
+    between 150k and 481k and the app never showed it
+  - Under the fight header, one line: where this fight stands among your
+    others on that target. “Your best of 8 on this target”, or “20 % below
+    your median of 5”. Gold only when it is the best. Nothing at all under
+    two fights — “your best of one” is not information
+  - The history does not do its own maths. Every file goes through the same
+    four steps as loading one, and the numbers come out of the same
+    function, so a fight has one number and not two. Checked by reading the
+    same file both ways: 13 fights against 13, names and rates identical to
+    three decimals
+  - The gold button was below AA where its descenders sit. A label occupies
+    22 % to 85 % of a button's height, and the g in “Open logs” reached into
+    the dark foot of the gradient: 3.92:1. The amber stop moved from 62 % to
+    85 %, so the worst point under the text now reads 5.66:1. Same shape of
+    mistake as the blue button in 0.57, this time on the main button
+  - 23 lines of stylesheet that matched nothing are gone, all of them left
+    over from 0.56. Each one was checked on its own first, and two
+    candidates survived that check: “.org” and “.w3” were www.w3.org inside
+    the select arrows, and “.wbar” is alive in the weapons table
+  - One limit worth knowing: switch the game's language and the same enemy
+    turns up twice in the History, once per spelling. Skills are matched by
+    their id, but a target in the log has only a name
+
+v0.57
+-----
+  - The blue “Join with this code” button read 2.79:1 in the light theme,
+    below AA, right where the label sits. Its middle gradient stop followed
+    the theme; the ink on it did not. All three stops are fixed now: 10.34 /
+    7.34 / 5.14 in either theme. The “5.14:1” in the 0.56 changelog was the
+    foot of the button, not the part the label is on
+  - The light theme has colours of its own instead of the dark ones turned
+    around. Page, cards, buttons and bars all sat within nine degrees of one
+    hue, so only light against dark was left to tell them apart. The ground
+    is verdigris now, 121 degrees off the gold. Gold, amber and the twelve
+    skill colours did not change
+  - Light surfaces are flat, a hairline replaces the lit top edge, and only
+    what floats casts a shadow. A button under the mouse darkens instead of
+    paling. White is kept for data
+  - 67 colours in the stylesheet were hardcoded to the dark theme's gold, so
+    the light theme could never repaint them — hence a gold hairline round
+    every input and a pitch-black shadow under every menu. 35 are settings
+    now. Gold that means something stays gold; gold that is only an edge
+    turns grey
+  - A third theme: TnL, after the game's own interface. Indigo ground,
+    magenta for what is selected, gold for numbers — the game keeps those
+    two apart and so does this. Pick it in the ⋯ menu under Colours
+  - Three of the twelve skill colours are one step brighter in TnL. On
+    indigo they fell below 3:1; the hue is the same, so a skill keeps its
+    colour when you switch themes
+  - The dark and light themes came through unchanged: 0 of 4,561,200 pixel
+    channels differ. The one thing you will see in all three is a wider ⋯
+    menu, because a fourth button had to fit
+
+v0.56
+-----
+  - A practice target is never merged into one fight any more, whatever the
+    checkbox says. It is known by name: Practice Dummy, Übungspuppe and
+    Arkeum Statue for Training — 14,300, 6,091 and 236 rows across the 89
+    logs on this machine. Measured on a built file, the same dummy twice
+    with a 20-second pause between the runs: one fight of 43.9 s in two
+    parts before, two fights of 11.9 s each now. The rate was already right,
+    because a non-boss only counts the seconds actually fought; what changes
+    is the row. Every attempt stands on its own, and the dummy is the one
+    target people use to read attempts against each other
+  - The hint under “Connect boss phases” no longer recommends something that
+    stopped being true in 0.53. It said: turn this off to keep every attempt
+    on a practice dummy separate. Since 0.53 a merged fight that is not a
+    boss divides by the time actually fought — only the row is merged, not
+    the rate. Following that advice put a different number on screen from
+    the one on the party board: one Deluzhnoa pull fell into 594k and 545k
+    instead of the 360k standing there. The new text names what the box does
+    in both positions, and the minute that is really behind it
+  - The “Attackers” button and the “Your character” field only appear when
+    the loaded log really holds more than one attacker. A Throne log is one
+    player's data: counted over the 89 logs on this machine, 89 times
+    exactly one attacker and never two, so both controls offered a choice of
+    one. They are not gone — load a whole party's log files together and
+    there are several, and both come back. A table left on “Attackers” when
+    the button goes switches to “Your Damage”
+  - The Analysis tab answers the questions it asks. “Damage consistency”
+    read “145% variation” — that is the coefficient of variation, and it
+    reads like “45% above average”: 100 looks like normal and there is no
+    upper bound. Where the number stood there is now the reading it was
+    supposed to carry, Burst, Cooldown rotation or Steady. “How many hits
+    were critical?” was answered with “87% of the damage”; now the value
+    answers the question and the damage share sits in the line below. Four
+    findings are gone — cast rhythm, opener against the rest, strongest
+    three seconds, damage per cast — and so are the fifteen-second windows.
+    Downtime says something when there was none, where it used to print
+    nothing, and nothing reads like “not measured”
+  - In the filter every field carries its own hint, in its own column. Both
+    hints used to run the full width under both fields, so reading “Default
+    3” left you guessing which of the two numbers it was about. The fields
+    are called “Split fights after (s)” and “Minimum fight length (s)” now.
+    The long paragraph about the bug report is out of the filter; the report
+    itself is still in the ⋯ menu. The button in the rail summarised itself
+    as “Everyone in log | 8s / 3s” — the first half says the same thing in
+    almost every log, the second repeats two numbers that sit one click away
+    in their own fields. It says “Filter” now, with a line above it naming
+    what is behind it
+  - “Open logs” in the header is a menu with two entries: Throne logs and
+    party logs. A saved party log used to be loaded at the foot of the party
+    tab, where nobody went looking for it, and both are files you open.
+    Saving a party log stays on the party tab. The pill beside the menu says
+    “Live log off” instead of “not watching”
+  - No party can be started or joined without a character name. Both buttons
+    used to run into nothing and answer with a message; now they take a
+    press only once the name is there, and Join once the code is there as
+    well. Spaces do not count as a name. Join carries a colour of its own so
+    the two paths do not look alike — gold leads, blue accompanies, the role
+    --info already has in this app. The foot of that gradient started at
+    #31628c, where the ink on it measured 2.89:1; it is #4e8cbb now, at
+    5.14:1
+  - A “Developer mode” checkbox in the ⋯ menu, off by default. It brings
+    back three things that stand where they always stood and are merely
+    switched off: the Log setup tab, “Export CSV” in the fight header, and
+    “Paste a list instead” on the Weapons tab. Hiding them outright was the
+    worse answer — for the one per cent who need them they were then not
+    there at all. The tick survives a restart: “devMode” is on the
+    launcher's list of what it will write, the same list that swallowed
+    “splitAfter” for half a year, and all eleven settings were checked
+    against the running launcher. Log setup also shows itself whenever a
+    column it is needed for is missing, developer mode off or not, because
+    several messages in the app point at that tab
+  - A fight is what you save and a run file is what collects them, and the
+    labels finally say so in the same words. “Save as run” is “Save fight”
+    on both buttons, the list in the rail is “Saved fights”, and the two
+    buttons in the filter are “Save run” and “Load run”. The dialog asks
+    “Give this fight a name:” instead of suggesting you name it after your
+    build. The Compare tab is called “Compare Fights”, and its heading no
+    longer says “Compare two runs” on a tab that takes two to four
+  - The Timeline and the Rotation have no headings over them any more, and
+    no tally under them. Under the Timeline stands what you can do with it:
+    Ctrl and the mouse wheel zoom, and once you are zoomed in you drag the
+    bar with the left button. Under the Rotation stands the count and
+    nothing else
+  - In German the app says “Fähigkeiten” where it said “Skills”, which is
+    what the game calls them — 22 texts, from the button above the table to
+    the column roles in Log setup. German tables and chips say “Kritisch”
+    instead of “Krit”. Real mistakes turned up on the way: “%P” does not
+    exist in German and percentage points are written out; a one-star
+    dungeon is a “1-Stern-Dungeon” and not a “1-Sterne-Dungeon”; the miss
+    note says that the number it quotes is casts; the percentage on the
+    weapons card says that it is a share of damage; and the German label of
+    the shield finding had the wrong verb in it. Small numbers carry a comma
+    in the German window too — “0.0 DPS” used to stand beside “1.234” out of
+    the same function
+  - The one big damage number has a typeface of its own. “Archivo Black”
+    stood first in its stack and is a Google font: it is on no Windows
+    machine, and this app deliberately fetches nothing, so what was drawn
+    was always the next entry down, Arial Black. Sixteen candidates were
+    measured against monospace — a font that is not installed measures
+    exactly like the fallback — and the one now in use is the variable
+    display face Windows ships, set to weight 800. It touches that number
+    and nothing else: --display carries half the app and sits at weight 400
+    there
+
+v0.55
+-----
+  - The timeline names the same twelve skills the table and the rotation do,
+    so one skill wears one colour everywhere. It used to name only those
+    worth 2% or more of the whole fight, at most six — and the thought
+    behind that was right, but the denominator was not: the chart shows
+    seconds, not the fight. Measured on a real pull, nine of eleven skills
+    fell into the grey “everything else” band, and eight of them own more
+    than a quarter of at least one second. Mother Nature's Protest is 0.4%
+    of that fight and 100% of the second at 0:03. The band means “a mixture
+    of small things”, and there it was one skill saying so. Rank thirteen
+    and beyond keeps the band, where that reading is true again
+  - Under one percent the legend carries a decimal. Rounded to whole
+    percent, five skills in that same fight read “0%” — the largest of them
+    had done 149,495 damage
+
+v0.54
+-----
+  - “Split after (s)” is saved. It never was: the page sends that setting
+    under one name and the launcher's list of what it will write still
+    carried the old one, so every save was dropped on the floor while the
+    page got an “ok” back and believed it had landed. Measured against the
+    running launcher: of the ten settings the page sends, it was the only
+    one that never reached the file
+  - And it is read as the number it says. A settings file written before
+    0.53 carries the old key, and 0.53 turned that number into three times
+    itself on every start — an 8 came back as 24, which put a twenty-minute
+    raid log into 10 fights instead of 19. That multiplication was
+    preserving the bug, not the setting: the field always said what was
+    meant. The value is written back under the new name once, so the old key
+    is out of the way for good
+  - On the party board the same boss under two spellings is one boss. The
+    board compares the names clients send, and clients name the boss in
+    their own language: with two German and two English readers on one pull,
+    the shared target flipped three times in three seconds and half the
+    group was marked as fighting something else — including the strongest
+    player in it, who was then sorted below people with a fifth of his
+    damage. Every reader now compares what the app already knew, and the key
+    rides along with each report so the server can do the same
+  - Twelve chart colours instead of seven. Seven left five of a twelve-skill
+    raid rotation drawn as grey hatch. What twelve costs is measured, not
+    hoped: neighbouring ranks — the order the table shows them in — clear
+    every threshold at 13.1 under colour-blindness simulation and 24.5 with
+    full vision. Across all 66 pairs they no longer do, at 7.3 of 8 and 13.8
+    of 15, so two ranks far apart can resemble each other. Every colour
+    carries its name beside it, so nothing rests on colour alone. Grey hatch
+    starts at rank thirteen
+  - The filter is a panel in the middle of the window instead of a block
+    inside the left rail. It never fitted: 678 pixels of content in a 631
+    pixel rail, which squeezed the fight list and the saved runs to 9 and 0
+    pixels while both kept drawing — so the filter's fields lay on top of
+    them
+  - A table too long for the window stops at 62% of its height and scrolls,
+    with the header row staying put. A skill list never reaches that; an
+    attacker list with twenty names would otherwise run off the bottom
+  - The bug report writes “Column 1” where a column has no header of its
+    own. It used to write the marker the app keeps internally, control
+    character and all
+
+v0.53
+-----
+  - Chart colours are down to seven, and they were checked the way colour
+    has to be checked. The twelve before were measured with normal vision
+    only; run through a colour-blindness simulation, the biggest and
+    second-biggest skill of every fight came out 1.2 apart on a scale where
+    8 is the target — the same colour for roughly one man in twelve. Seven
+    hold 10.8 under simulation and 19.5 with full vision across every pair,
+    and eight cannot
+  - Rank eight and beyond wear no colour at all now, but a hatch, which says
+    what is true: not one of the seven the chart is tracking. Cycling would
+    have handed the eighth skill the first skill's colour, and over every
+    log on this machine that put two rows of a real size in one colour in
+    23% of fights
+  - The light theme carries its own seven. The same hues, re-stepped: on the
+    light card the old values sat at 2.6:1 against the warm end of the
+    gradient, which is where the foot of every bar stands
+  - A fight built out of several stretches divides its rate by the time
+    actually fought — unless it is a boss, where the pause between parts is
+    the boss's phase and counts. A practice dummy hit for five seconds, left
+    alone for a minute and hit again used to read 1,885 per second where
+    21.7k was landed
+  - Blocks follow the place rather than the clock. A raid runs its parts
+    back to back with less quiet between them than a dungeon has inside it,
+    so six fights of the last Altar part were filed under the Corridor of
+    Anguish. Trash belongs to the boss it leads to
+  - Two bosses fought at once are both in the name: Zairos · Vulkan, not
+    Zairos
+  - A strip under the clock shows what each second was made of, at full
+    height. Only a third of the second-bars are tall enough to read a split
+    inside them — the bars say how much, the strip says of what
+  - "The rest of the fight ran 61% hotter" was really 155%. The figure came
+    out of the wrong direction, and the further apart the two halves were
+    the worse it got: one fight said 88% where the rest ran 753% hotter
+  - The miss rate is asked against the skill that missed. It used to count
+    every damage row of the fight as a swing, which read 0.1% where 6.3%
+    went past
+  - Eye of Ventius is counted by its shape rather than a time window. In a
+    dungeon the button comes round faster than the window is wide, so 146
+    presses were counted as 127 and damage per cast read up to 50% too high
+  - "Split after (s)" splits after that many seconds. It multiplied by three
+    behind your back — set to 5, it cut after fifteen. The default is 8,
+    which is how long the game keeps you in combat after your last hit
+  - A fight too short for the list still counts in its block's clock and
+    sum, and the heading says how many are missing from it. One heading
+    claimed "cut here after 1m 48s of quiet" about a pause holding 22 hits
+  - A log from a single dungeon says which dungeon. With only one block the
+    heading was suppressed, and with it the name, the stars, the length and
+    the total
+  - Deluzhnoa is recognised under her German name, and a boss carrying a
+    state in brackets — Ascended Aridus [Undead] — is recognised at all
+
+v0.52
+-----
+  - A healer who plays Eye of Ventius reads as DPS on the party board.
+    Ventius is a longbow skill and the only healer build carrying a longbow
+    is the Seeker, so a Seeker on Ventius is not healing. Healers only — a
+    Warden brings the same longbow and is still the tank
+  - How that is known, in order: a flag every client now sends beside its
+    two weapons, otherwise the skill list in their fight report, otherwise
+    what an earlier poll showed. So the role is right for clan mates on an
+    older build too, only from their first reported pull rather than while
+    they are still waiting. Report a pull without it and the row reads
+    healer again
+  - Whose build the flag describes is decided carefully, because getting it
+    wrong would publish somebody else's spec under your name: the character
+    you joined the party as, and only when the loaded log actually holds it.
+    A log with several attackers and no filter set says nothing rather than
+    guessing, and the sample fight is never you
+v0.51
+-----
+  - Borometer remembers the best Eye of Ventius cast it has ever seen on
+    each target. Until now the finding measured you against your own best
+    cast of that pull, so standing badly on every cast read as 10 of 10 and
+    looked perfect. It can now say that more was possible. A ceiling only
+    one cast has ever reached stays silent — it is kept in the bug report,
+    where it can be checked
+  - In a party log the Ventius finding vanished whenever two people shot the
+    same boss: their volleys folded into one cast, whose waves held six hits
+    instead of three, and the shape test threw it out as unreadable. Casts
+    are now kept apart by shooter as well as by target
+  - Damage per cast, in German, read „liefertStorm Current“ — a missing
+    space, and a skill name that was never translated
+
+v0.50
+-----
+  - Attacks that went past are counted. The log writes a miss as a hit worth
+    nothing, so it fell out with everything else worth zero and the app
+    never knew they happened — 13 of them in one four-minute fight. The
+    Analysis tab states the rate when there were any
+  - Field and arch bosses are known by name, 25 of them. A stretch spent on
+    one says “field boss, not a dungeon” rather than reporting an
+    unrecognised dungeon, and Manticus is named as the one encounter it is,
+    not as whichever of its two bosses took more damage
+  - Every hit type the log used is tallied into the bug report, including
+    the rows worth nothing. That is how kMiss turned up at all
+  - Settings live in one place per user (%APPDATA%\Borometer) instead of
+    beside the exe, and the first run carries the old file over. They used
+    to start blank in every new version folder — which is where a weapon
+    assignment, and with it the class beside your name, kept going missing.
+    Swapping the exe is now all a new version takes
+  - Clearing the list clears the Analysis tab with it. The branch that
+    empties the table and the charts returned before the Analysis panel was
+    reached, so a full set of fifteen-second windows sat there under a rail
+    saying no fights were loaded
+  - Compact opens small again. Its width was measured off a container that
+    stretches to the window, so switching to it asked for a window 1271px
+    wide — and the second, correcting pass was thrown away by a guard that
+    compared heights only
+  - A dungeon heading shows a chevron, open or closed. It had one in the
+    markup but no character in it, so it drew a 10px box of nothing
+  - The rating is stars, and it says dungeon: ★★★★ Dungeon rather than “4
+    stars”
+  - Compact can be seen through, 0 to 55% in whole steps. The window's own
+    alpha, not pywebview's transparency — that one only made the page clear
+    onto a grey host window. Measured through the built app: at 50% it lands
+    exactly on the blend
+  - A dungeon folds away. Press its heading and its fights fold under it;
+    the heading keeps the count, the time and the damage. The fight you are
+    looking at stays
+  - Fights are grouped into dungeon runs, named by their boss — all 23
+    dungeons and the Altar raid with its three parts. Both spellings of
+    every boss, so a German and an English client both get named
+  - Eye of Ventius has its own finding: the arrow, then an aftershock that
+    hits up to three times. How many aftershocks a target takes is its size,
+    so the ceiling is read off the target you shot most, not off the fight
+  - Every Ventius press counts as one cast. The general 400 ms window split
+    it in two, which doubled the cast count and halved the damage per cast —
+    on the skill carrying 80% of a fight
+  - Class and role beside your name and beside every name on the party
+    board: Oracle · Healer, Crusader · Tank. The weapon pair travels, so
+    each client names it in its own language
+  - Clearing the list and opening an older log used to show nothing at all,
+    with no way back in the app. The cutoff now ends with the file
+  - Compact keeps the column the list is sorted by. Ranking by Crit and then
+    hiding Crit left an order with nothing on screen to explain it
+  - A party hosted from your own PC now shows everyone's build, not just
+    yours
+  - Clearing the list clears the Weapons tab with it
+  - “Only Beschuss was landing” is only printed when one skill really was
+    alone; otherwise it names the one that led and how many others landed
+  - Shield hits are their own category, with their own colour and their own
+    finding
+  - A light theme, chosen or taken from Windows. Every bar, button and
+    figure measured in both: the worst case on a bar is 4.5:1
+  - Boss phases stay one fight, and the switch for it is remembered now
+  - A block with no target column is named by its clock instead of by an em
+    dash, and states no pause on a log with no clock
+  - The version in the title bar is right even where scripts do not run — it
+    had said v0.11 for forty releases
+  - Three folders beside the exe: logs, party logs and bug reports, made the
+    first time you save that kind of file
+  - The safety audit covers the new see-through: it only sets this window's
+    own opacity, and comes nowhere near the screen, a frame, or the game
+v0.49
+-----
+  - The party board says who is tanking. Every row carries the build and its
+    role — Oracle · Healer, Crusader · Tank — which the app worked out from
+    the two weapons it already knew and never had anywhere to put. What
+    travels between clients is the pair of weapons, not a name, so an
+    English client and a German one reading the same board each get it in
+    their own language
+  - A member who has not finished a pull yet still shows their build. The
+    weapons ride beside the fight report rather than inside it, because a
+    party wants to see what it is made of BEFORE the pull, and a row with no
+    fight has no report to put anything in — which is exactly the row a host
+    is looking at while counting heads
+  - A client too old to send its weapons gets a row with no build rather
+    than a guessed one, and a board from a server too old to relay them
+    leaves every row without one. Neither breaks: the field is simply
+    absent, and nothing else on the row depends on it
+
+v0.48
+-----
+  - The 45 builds the game names are in the reader's own language now. The
+    table held the English name only, so a German client that calls the
+    Longbow and Crossbow pair Späher was handed Scout — the one place in the
+    app where a German player got an English word for something the game had
+    already named for them
+  - A build says what it is for. Tank, DPS or Healer sits beside the name,
+    quieter than it and on the same line, because the role is what the other
+    eleven people in a raid want to know about a build and the app already
+    knew the two weapons it takes to work it out
+  - Verqueres Labor, not Verworrenes — the German name of Twisted Laboratory
+    was a guess in the dungeon table and is now the one the game uses
+
+v0.47
+-----
+  - Every dungeon in the game is in the table now, not the three that
+    happened to be in one log: 23 dungeons across the four star tiers, the
+    three level dungeons, and the twelve-player Altar of Calanthia as its
+    three parts. A block heading names the dungeon and the difficulty the
+    game puts on it — Frostbreath Cave, 4 stars — and a raid part names the
+    raid under it
+  - Both spellings of a boss are held, because the log writes whatever the
+    game client was set to: a clan running a German client writes Grauauge
+    where an English one writes Grayeye, and Magna-Fürst where the other
+    writes Duke Magna. A table that knew one spelling would have named half
+    a clan's logs and left the other half unnamed
+  - A raid runs its parts back to back, so one block can hold two of them:
+    measured on an Altar log, a single block held Zairos, Calanthia and
+    Vulkan, which is the Corridor of Anguish and the Altar of Rebirth
+    together. Naming it after whichever boss took the most damage would have
+    picked one and said nothing about the other, so a block that spans parts
+    is named after the raid and lists the parts under it
+  - The boss names the block wherever it sits in it, not only when it took
+    the most damage. A run can end on a boss the trash before it out-
+    damaged, and the first block of a log can open in the middle of a pull —
+    the dungeon is looked up against every enemy in the block, biggest
+    first, and the first one the table knows wins
+
+v0.46
+-----
+  - The Eye of Ventius finding appeared on no fight at all in a night of
+    dungeons. It asked whether a cast landed exactly four or exactly seven
+    hits, which is what a cast does on a practice dummy — measured over 193
+    casts in three dungeons, six landed four and 37 landed seven, while 79
+    landed ten and 36 landed thirteen, so the gate never opened once. Seven
+    is not the ceiling, it is the dummy's ceiling: read per target, Vulcanus
+    never gives more than three waves, Deus Chimaerus runs at four, ordinary
+    trash and a dummy at two. The question is asked against the best this
+    fight itself reached, which on a dummy still says seven hits and in a
+    dungeon says something true as well
+  - What a Ventius cast is, read hit by hit: one opening hit, then a pause
+    of 900 to 990 ms, then a wave of three landing in the same millisecond,
+    then about 106 ms, the next wave of three, and so on. So the hit count
+    is one plus three times the number of waves, which fits 86% of every
+    cast in that log, and the waves are what the distance moves. The
+    target's size sets how many it can take; where you stand decides how
+    often you reach it, so the finding compares pulls on the same target and
+    says so
+  - Two casts running together divide as neatly as one — nineteen hits is
+    one plus three sixes — so working the waves out from the hit count let a
+    single merged pair on a trash mob set a six-wave ceiling no real cast
+    could reach, and the fight beneath it read 1 of 4. The waves are counted
+    as waves now, and a merged pair gives itself away, because the second
+    cast's opening hit sits in the middle as a wave of one. Such a cast is
+    simply unreadable and is left out rather than rounded off
+  - A log of a whole evening was one flat list, so three dungeons in it read
+    as twenty-four pulls in a row. The rail groups fights into blocks now,
+    each headed by its dungeon — Fellinex is Stone Grave Cradle, Vulcanus is
+    Frostbreath Cave, Deus Chimaerus is Hellfire Crucible — with the fights
+    in it, the time they took and the damage they did. Nothing is collapsed:
+    the heading is added above the rows, never in place of them
+  - A block ends where the log goes quiet for a minute. Measured on a night
+    of three dungeons: every pause inside a run was 15 to 51 seconds and
+    every pause between two runs was 112, 224, 441, 452 or 927, so nothing
+    at all lands near the cut. It is its own number rather than a multiple
+    of Split after — at a setting of four that field would have put the
+    boundary at 48 seconds, under the measured 51, and halved a run without
+    saying so. Each heading prints the pause that caused its own cut, so the
+    number is arguable on screen
+  - A block whose biggest enemy is not one of the three known bosses is
+    named after that enemy, and says under the name that this is what it
+    did. A log that holds a single block — one pull, an evening at the dummy
+    — gets no headings at all rather than one heading over everything
+
+v0.45
+-----
+  - The start screen opened with the Throne and Liberty logo as a 170 kB
+    base64 PNG — 17% of the whole file, spent on a name the line beside it
+    already said. The game's name is typeset now, in a humanist serif next
+    to “A DPS meter for”, and 170 kB of the file went with it
+  - Gold was on eleven things at once, so it told the eye nothing in
+    particular. It is three now — the hero number, the sorted column and the
+    active tab — which is the live figure, the order the table stands in,
+    and the view that is open
+  - A party in which nobody has finished a pull says “Everyone is connected.
+    Numbers appear as soon as someone finishes a pull.” — and under that
+    sentence the app drew a 28 pixel column header over zero rows, a note
+    promising rows that open up, and three chips reading 0, 0 and 0.0. The
+    solo path has hidden all of that for as long as there has been nothing
+    to show; a party counts as a loaded fight, so the rule never reached it.
+    It does now
+  - Without a time column the parser stamps 200 ms per line, which the order
+    and the x axis need — and around fifteen places divided by that invented
+    clock and printed the result as a measurement: a fight length of 9m 29s,
+    “570 of 570 seconds with hits”, a table of five fifteen-second windows,
+    a 24.8× swing, all while Log setup says in words that there are no
+    seconds. The missing clock is a state the app knows now: Zeitverlauf and
+    Rotation put the reason and the fix where the canvas was, and the tab
+    stays open — a locked tab cannot explain itself
+  - The bars drew damage whichever column the table was sorted by. Sorted by
+    hits, rank 1 at 0.4% of the damage drew an invisible line above a full-
+    width rank 2; measured, 373/287/286 hits now come out at
+    1.000/0.769/0.767 of the bar. Name and Rank keep the damage bar on
+    purpose
+  - Borometer had one set of colours, and near-black is the wrong screen for
+    a bright room. There is a light theme now — a single block of colour
+    values sharing every rule, every type size, every spacing and radius
+    with the dark one. It is not an inversion: dark is heated metal in a
+    dark room, light is the same material in daylight, beeswax and paper.
+    The page itself is the darkest thing on the screen at #e9dfcd and the
+    cards lift towards white, so a card still has something to stand out
+    from
+  - kDamageShieldHit was read out of the log into the event and then used
+    nowhere, so shield damage counted silently as ordinary damage. It is
+    read from that exact token in the hit-type column now, with no pattern
+    matching: on a log without a header row the columns are mapped by
+    position, and anything at all can be sitting in the one that was
+    guessed. In the sample that is 67 hits, all of them on Zairos, 1,178,179
+    damage, 11.3% of that fight, inside about four seconds
+  - Decisive Sniping and Decisive Bombardment are the same base skill under
+    two specializations that cannot both be slotted, and the log writes the
+    base name whichever one is on the bar. More than one hit on the same
+    target inside 20 ms is Eye of Ventius, and a specialization belongs to
+    the build rather than to the single cast: as soon as that signature
+    appears anywhere in a fight, every cast of the family in that fight is
+    that skill and it stays one row, single-hit casts included — the same
+    button press split over two rows would hand each a damage-per-cast that
+    describes neither. The window is 20 ms per target, not the app's 400 ms;
+    from 120 ms on, real casts merge and threes become twelves
+  - A fight with shield hits gets its own finding on the Analysis tab: the
+    total, the target it all went into, and the skill that put the most
+    damage there. Ranked by absolute shield damage and not by its own share
+    — on the reference fight Beschuss put 42% of its own damage into the
+    shield and Eye of Ventius 11%, but that is 98,188 against 982,449, and
+    the second number is the answer to what went in. It is also the one
+    place where the load-bearing sentence, that nothing is deducted from the
+    total, stands on screen instead of inside a tooltip
+  - Ventius was asked once per log, on the argument that a specialization
+    belongs to the build and a build does not change inside one file. A
+    dummy log with one test of each, 33,5 s apart, says otherwise: the first
+    fight has 35 volleys, the second fifteen casts and not one of them lands
+    twice, and asked once for the whole file both came back as Eye of
+    Ventius. The pass runs inside segment() now, once per fight and before
+    stats(), because it renames events and every figure downstream is
+    counted off those names
+  - That rule is right for a boss that goes untargetable and comes back, and
+    wrong for two attempts on a practice dummy, and the log cannot tell the
+    two apart — so it is a switch rather than a guess. “Keep boss phases
+    together” sits in the filter, on by default, re-segments the night when
+    it is changed and survives a restart. Without it, build-testing at the
+    dummy was impossible as soon as two tests fell less than a minute apart,
+    and no setting could prevent it
+  - Eye of Ventius lands seven hits from 2, 5, 8, 11, 14 or 17 metres and
+    four from anywhere else, so the log needs no distance column to say
+    where somebody stood — the hit count per cast is the evidence. Counting
+    a cast takes a second, much wider window than spotting one: a cast is an
+    opening hit, about a second later a wave of three, about 100 ms later
+    another, the longest gap inside a cast 1051 ms and the shortest between
+    two casts 1344 ms, so the cast window is 1200 ms. At the dummy every
+    cast then comes out as exactly seven or exactly four, 14 to 7, and
+    “Where you stood” names the share
+  - Two headlines at almost one size, ninety pixels apart, so neither of
+    them led: “Drop a combat log here” was 24px under a 26px wordmark. The
+    instruction is the largest thing on the start screen now — 30px, against
+    24 for BOROMETER and 21 for the game's name
+  - The readout sat in a gold bevel. The hero number inside it is 46px of
+    gradient with a glow behind it, so the frame was a second claim on the
+    same attention, and the cut corner reads perfectly well in one dim line.
+    It is a 1px hairline now, amber fading into the card's own ridge
+  - A radial wash lit the middle of the readout, under the one thing on the
+    screen that already lights itself. The head is a plain gradient surface
+    now — the brightness in that panel comes from the number, not from the
+    panel
+  - The five measurements under the number were ruled apart with hairlines,
+    each in its own box, and read as five small cards competing with the
+    figure above them. They stand on a 34px gap now, and the hairline over
+    the strip is the only rule left — the one that says these belong to that
+  - Twelve gold plaques ran down the left edge of the table, one behind
+    every rank — twelve claims on the eye for an order the rows already
+    stand in. The rank is a numeral now, on no plate and in no gold, and the
+    sub-rows lost theirs with it
+  - Biggest Damage was gold in the header and gold all the way down the
+    column, so a reference column looked like the sorted one — and gold in
+    this readout means the column the table is ordered by. The column stays;
+    it is a number like the six beside it
+  - Save as run and Export CSV sat in the head's top row: measured at 1060px
+    the row was handing 262px to the hero number, 261px to two export
+    buttons and 166px to the target's name, so the subject of the readout
+    was the first thing squeezed, by the two least urgent controls on it.
+    They ride at the right end of the measurements strip now, where there
+    was nothing but air
+  - One skill carrying 91% of a fight drew a full-width wash across row one,
+    which reads as selected rather than largest, while rows three to twelve
+    got two to eight pixels. The dark theme's resting bar went .5 → .34, and
+    every bar has a 2px floor, so the small ones are a mark rather than
+    nothing
+  - The grouping switch floated between the readout and the list, forty
+    pixels from the tabs and styled like them, so the screen carried two
+    bars that looked alike and did different jobs. Skills, Weapons, Targets
+    and Attackers — plus Party when a group is open — are the table's own
+    top edge now, one surface with the rows they sort
+  - The Rotation tab put its zoom pair, Whole fight and the from/to fields
+    above the chart, while the Zeitverlauf it is paired with puts them
+    underneath — two cards doing one job in two orders. Rotation now runs
+    element for element like its sibling: heading, sentence, picture,
+    controls, footnote
+  - The Rotation tab's heading and subtitle were written in a voice of their
+    own and said nothing about the fight in front of them. “When you used
+    what” stands beside the Zeitverlauf's “When the damage landed” now, and
+    the line under it counts what the view holds: 233 casts from 12 skills,
+    and the longest wait between two casts of one skill — 7.2 s from 0:14
+  - The Rotation legend named a red gap band on a fight that has no stall
+    over 1.5 s at all, and gave “one mark per cast” a gold swatch that stood
+    for nothing. It is gone, and the sentence over the chart counts what the
+    picture actually draws
+  - The Weapons card opened with 380 characters of prose above its two
+    dropdowns, and the last clause explained that assignments are stored
+    against the skill id — how the thing is built, which nobody acts on. The
+    intro is one sentence now, “Pick both and every skill below gets a
+    button for each”, and the Passive explanation moved down to the card
+    that actually holds the Passive button
+  - With no weapons picked, two of the three buttons on every skill row were
+    empty spans — a Passive button with two gaps beside it, which reads as
+    broken rather than as not set up yet. The card's line now says to pick
+    the two weapons above first, and turns into the assignment text the
+    moment both are chosen
+  - Log setup had a red notice for a missing Damage column and nothing at
+    all for a missing Time column — yet without one every DPS figure in the
+    app draws as a dash, and this is the page anybody would come to in order
+    to fix it. There is an amber notice now, saying what is lost and what
+    still holds: no seconds and so no DPS, damage and hits still add up
+  - A log without a header row of its own made the preview print “Column 1
+    Time”, repeating a position that the mapping row's index column already
+    carries. An unnamed column's cell names the role and nothing else now; a
+    log that does name its columns keeps the name and gains the role beside
+    it
+  - The mapping rows capped at 660 px inside a card wide enough for more,
+    which left 360 px of empty board beside sample values that were being
+    ellipsised to fit. The cap is 920 px, and the notices above the rows
+    measure to the same width, so that column of text has one edge
+  - Six of the stylesheet's gold text rules sat on the party card, among
+    them the two states a host is trying to tell apart while counting heads:
+    somebody is elsewhere and fine, somebody is here and has sent nothing.
+    The state is carried by a 3 px left edge now — amber where the host is
+    needed, the blue that already means “different from live, not a problem”
+    where somebody is elsewhere, nothing where there is nothing to do
+  - The headcount said “3 players reporting” over a list of five rows and
+    left the gap between the two numbers for the host to work out. While
+    anybody is missing it says “3 of 5 players reporting”, and it drops back
+    to the plain form the moment everybody is in
+  - Gold on the start screen was audited rule by rule instead of one surface
+    being picked by feel: seven objects carried it, and “Drop a combat log
+    here” — the line that should lead — was the only large element without
+    it, leading on size alone. Inside the card gold is the BOROMETER
+    wordmark and the button you press; the game's name, the four setup steps
+    and the log folder path are ordinary text
+  - The four steps that name the path inside the game — Settings, Shortcuts,
+    Ring Menu, Add Combat Meter — were gold, which gave a list of
+    instructions the same colour as the button at the end of them and set
+    the two competing. They read in the ordinary text colour now; the
+    chevrons in front of them keep their deep gold, so the list still reads
+    as a list
+  - The same state drew an em dash where the hero number goes — the readout
+    renders one whenever there is no figure, and at 46 pixels in Archivo
+    Black an em dash is a solid gold bar, the largest thing on screen in the
+    one state that has nothing to report. The hero number stays out until
+    somebody's first pull lands
+  - And the sentence itself was cut off. It sits in the line built for a
+    target name, which is held to one line, so what stood there was
+    “Everyone is connected. Numbers appear as soon as someone…”, clipped
+    mid-word at the edge of the card. In the empty party state that line
+    wraps and the sentence is read whole
+  - The app's first contrast pass found its real risk where a generic check
+    cannot look: text sitting on a bar, which is a sibling of that text and
+    not its background. Measured against all twelve series colours, the four
+    reference columns — Hits, Biggest Damage, Crit, Heavy — were dimmed to
+    3.06:1 over row one's bar. The dimming is gone, they read in the colour
+    the Share column beside them already used, and the table carries one
+    grey fewer
+  - The rank numeral in compact was drawn at 78% alpha and measured 3.37:1
+    against the bar behind it. It is at full strength now and keeps its dark
+    halo, which does nothing for the ratio and a great deal for the eye. A
+    dark numeral was the obvious alternative and is a trap: it holds on a
+    strong bar and falls to 1.04:1 on bare glass, which is where a short row
+    puts it
+  - In compact the bar ran the full width of the row and the number columns
+    were printed on top of it; row one's DPS cell measured 2.33:1 that way,
+    the worst figure in the app, in the view left open while playing. The
+    track stops where the name column ends now, at every window width, so
+    nothing is ever drawn on a bar but the skill name and the rank — a bar
+    chart's track length is arbitrary, so the lengths stay comparable
+    between rows
+  - Switching to the compact mode no longer slides the bars. Every redraw
+    builds the bars fresh, so a width never animated — except on that one
+    toggle, where the element survives and only the track under it changes:
+    the bar spent 420 ms travelling out from under the numbers and drew, on
+    the way, the very overlap the shortened track exists to prevent. Width
+    is off the transition, the fade and the saturation stay
+  - Sub-row bars draw at one opacity instead of a graded four. The scale
+    gave crit and heavy the same value, so it never told the categories
+    apart — the hue does that, and the same swatch is repeated on the tick
+    before every name — while the brightest of them left its own label at
+    1.38:1, which no ink fixes: pure white measures 3.48:1 on that bar. One
+    figure per colour setting now, 0.27 dark and 0.38 light, and swept
+    across every colour, grouping and row depth the worst case on a bar
+    measures 4.56:1 in the light theme and 4.50:1 in the dark
+  - In the full view the bar starts where the name starts. The rank numeral
+    stood on the head of row one's bar — the widest, brightest thing the
+    table draws — at 2.9:1, and brightening the numerals would have made
+    them louder than the skill names they rank. The track is inset past the
+    rank column instead, measured from that column's own width, which is 24
+    px rather than 26 at one of the three breakpoints: the rank sits on the
+    card at 6.22:1, and the four percent of track it costs is four percent
+    every bar loses alike, so the lengths still compare
+  - The sort headers can be reached without a mouse. Sixteen elements of the
+    readout carried a click and nothing a keyboard can take hold of; fifteen
+    of them were these heads and the expandable rows, the two controls the
+    table is actually operated with. A head takes focus now and states the
+    sort it holds — ascending, descending or none — where the arrow only
+    showed it. The rank head stays out of the tab order, because its click
+    returns and a dead control is not worth a stop
+  - A row that opens is a control the keyboard can hold. The expandable rows
+    take focus and carry their state with them, so a screen reader hears an
+    open or a shut row rather than a name and a number; a row with nothing
+    behind it stays out of the tab order, since there is nothing there to
+    open. The focus ring has existed the whole time — these elements could
+    simply never receive it
+  - Enter and the space bar do what the click does. One handler sits behind
+    the heads and the rows alike, so a focus stop is never a thing that
+    looks operable and answers to nothing, and the press is swallowed rather
+    than passed on, which keeps the space bar from scrolling the page out
+    from under the row it has just opened. Measured after: Enter on DPS re-
+    sorts and the head reports descending, space on a row opens it — of the
+    sixteen unreachable elements three are left, and those are delegating
+    containers with real buttons inside
+  - Keyboard operation of the main table survived exactly one render. Both
+    lists are rebuilt through innerHTML and the browser drops focus onto the
+    page body, so Enter on a sort head sorted once and then answered
+    nothing. The focused element is remembered by its data attribute and
+    handed to the node that replaced it — sort head, expanded row, fight in
+    the rail
+  - The sentence over the Zeitverlauf counted the whole fight while the
+    canvas under it draws only the zoom window — the house rule for these
+    two tabs, broken by the tab that set it. It counts the window now:
+    zoomed into the last third it reads 6 of 24 seconds where it used to say
+    21 of 70, and the golden peak bracket is named only when it falls inside
+    what is drawn
+  - The Rotation sentence counted the same way — the whole fight, under a
+    strip that draws the window. It counts the marks actually drawn now: 69
+    casts from 10 skills is exactly what the strip holds, and the rhythm gap
+    it quotes is measured from the casts inside the window
+  - Hovering a row bleached the name on it. Measured against the real row
+    ground #060402, the dark theme's hover fill at .58 put the skill name at
+    4.29:1 — it is .50 now, 5.34:1. The compact window brightens on hover no
+    longer: the row already lights up under the pointer, and its resting
+    fill is per theme, .52 in the dark, where the name on the brightest bar
+    crosses AA at .53
+  - The expander chevron sits on the brightest part of the bar and had
+    nothing holding it apart from it. It is #fff8ee with a shadow now —
+    9.41:1 at rest, 5.93:1 under the pointer — and the open state no longer
+    takes gold: open is a state, not a live number
+  - The snapshot badge lost a specificity fight to the header's own span
+    rule and drew the dim ink on the info ground: 1.27:1, caption-sized and
+    unreadable. Written as the badge inside the header it measures 8.04:1
+  - Analysis keeps what is true without a clock and prints nothing else:
+    damage concentration, crit share, the shield and the target split. The
+    fifteen-second window table, the swing sentence and every finding that
+    needs seconds — the longest pause, the opener, the weakest stretch — are
+    left out rather than computed from a 200 ms stamp
+  - A run saved from a clockless log carries that with it, so the invention
+    does not launder itself into the night's list: the sidebar line prints
+    damage where it would print a rate, and the fight rail prints an em dash
+    for DPS and drops the length
+  - In Vergleich, a pick without a clock drops DPS, length and idle time out
+    of the metrics list, the column header shows an em dash where a length
+    would stand, and the two matrices under it are titled “Damage, skill by
+    skill” and “Damage, weapon by weapon” instead of damage per second
+  - Party sub-rows printed 0.0, 0% and 0% for the biggest hit, the crit rate
+    and the heavy rate — three figures the sending client never reports,
+    printed as though they had been measured at zero. All three print an em
+    dash now
+  - A log with a skill-ID column but no skill column has exactly one
+    nameless row, and it used to carry the name of whatever skill the ID
+    table offered. It is called “—” now, and Log setup has a third notice
+    beside the ones for damage and for time, naming the missing Skill column
+  - The zoom window belonged to the chart rather than to the fight it was
+    drawn on. 1:15–1:25 of an 85-second fight folded into half a second past
+    the end of a 69-second one when the fight changed under it; the window
+    hangs on the fight's start now and resets with it — one fix covering
+    Zeitverlauf and Rotation both
+  - “Minimum length” was dropped in silence as soon as it would have
+    filtered everything out — and dropped back to the raw segments rather
+    than the merged ones, which undid the boss-phase merge and counted hits
+    twice. The fallback keeps the merge now, and the rail says the setting
+    was ignored
+  - A single 7,000 hit in a fight that lasted a blink read as 7.00M, because
+    the rate divided by a duration shorter than a second. The denominator is
+    floored at one second; the duration printed beside it stays the real one
+  - A loaded party snapshot offered “Save party log” and refused every click
+    with “nobody has reported yet”, because the check asked for a live
+    board. A frozen board counts now, and saving it again keeps the hour the
+    fight happened instead of stamping it with the moment the button was
+    pressed
+  - The run-file check read five fields where the compare table reads the
+    lot, so a thin file came through, was written into the config and killed
+    the Vergleich tab — while the message said the file had been rejected.
+    It gates on everything the table reads now: the name, the three arrays
+    and every number the table prints
+  - Escape in the compact window closed the menu and the overlay at once,
+    which mid-raid means the window growing back over the game. It closes
+    the top thing only — the ⋯ menu, a modal, the filter panel or the
+    changelog first, the compact window when nothing is over it
+  - The changelog was a panel whose own Close button was the 61st tab stop.
+    It is a dialog now — focus lands on Close when it opens, Tab is held
+    inside it, and focus goes back to the ⋯ button that opened it
+  - The file modal put focus nowhere, let Tab walk into the page behind it,
+    and its Escape was dead as soon as you left the text field — the global
+    handler only listens while that field is hidden. It focuses the first
+    file in the list, holds Tab, takes Escape itself and gives focus back
+    where it came from
+  - Nine buttons carried hardcoded English tooltips under a German UI —
+    minimise, maximise and close on the window, and the zoom pairs on the
+    window, the Zeitverlauf and the Rotation. They come out of the
+    dictionary now, in both languages
+  - The state edge on the party list — the only thing an “away” or “waiting”
+    row shows — was 0 px wide and painted nothing. The header rule it shares
+    carries an automatic right margin, an auto margin cancels the grid
+    stretch, and stretched nothing is nothing
+  - The Log-setup notices lost colour, size, measure and margin to the
+    card's own paragraph rule, so the colour meant to make a notice louder
+    did nothing and a notice read as body copy. They win on their own now,
+    and the amber warning still wins over them rather than being repainted
+  - A border of none leaves the border width at medium, so the dashed ring
+    on the Passive button came back 3 px thick and stood it 6 px taller than
+    the weapon buttons beside it. All of them carry a transparent 1 px
+    border now, dashed in the ridge tone for Passive — and the border colour
+    of a selected weapon button is visible for the first time
+  - Measured on screen: the Zeitverlauf wrote “carried 88 % of the damage”,
+    Analysis one click later “145% swing” and “normally 1.9s apart”, and the
+    compare verdict said “4.2 % apart” directly above a cell reading
+    “31.4%”. The helpers existed — Analysis went around them with a bare
+    toFixed. The percentages and the seconds go through one set of them now,
+    German keeps the protected space before the percent sign, and a duration
+    under a minute prints one decimal
+  - Card 1 of Analysis said “96% from the three strongest skills / X alone
+    was 91%”, card 2 three hundred pixels below said “91% of X / the three
+    strongest carry 96% of the fight” — the same two numbers with the
+    heading and the note swapped. The concentration tile is gone, the swing
+    number is said once under the window table, and the opener tile is left
+    only on fights too short for the opener finding to fire
+  - The tie verdict rounded the same number differently from the chip
+    beneath it — “3.7% apart” standing over a “+4%”. It rounds once now, and
+    the 5% threshold reads against the figure that is actually printed
+  - The Analysis window table scaled its bars over every window while the
+    sentence under it compares only the full ones: a trailing part-window
+    measured over 10.6 s took the longest bar, and the line below called a
+    window “the best” that the table drew at 69%. Both work off the full
+    windows now, and the part row keeps every number and its “part” tag —
+    just not a bar on a scale it does not belong to
+  - The compact column head ran on opacity .7, and opacity composites the
+    whole group — the black band behind the text faded with it, and the pair
+    measured 4.38:1 at 9.5 px. Written with the dim ink instead of opacity:
+    6.44:1, and gold at 9.55:1
+  - The count of ticked runs on the Compare button was the only dark-on-
+    light pair in the app and sat at 3.75:1. It takes #180d02, the ink every
+    other dark-on-gold chip uses: 11.4:1
+  - Delta chips had a transparent ground, so the winner column's tint and
+    the row hover stacked underneath them and pushed 10.5 px text to 3.96:1.
+    The ground is opaque now, one tone per state
+  - Ghost mode came back to full opacity on hover only, so a keyboard user
+    drove the overlay — and their own focus ring — at 55%. Focus inside it
+    counts as well now
+  - The animations that had no reduced-motion exit have one, the status
+    pulse that runs the whole raid among them
+  - Everything the app saved went into one folder called saves beside the
+    exe — runs, party logs and bug reports in the same pile. There are three
+    now, each named for what is in it: Logs, Party-Logs and Bug-Reports
+  - The bug report went out through the route that saves a run, so it landed
+    among the saved fights and turned up afterwards in “Load runs file” as a
+    file that will not load. It has a route of its own now, and a folder of
+    its own, and the list of saved runs holds runs
+  - On the first start saves becomes Logs and party-logs becomes Party-Logs
+    — renamed, not copied, so nobody is left holding two folders with half
+    the contents each. Where both names already exist the files move across
+    one at a time, and a name already taken on the other side is left where
+    it is
+  - “Open folder” sits in the file pickers for runs and for party logs, in
+    the slot the hidden OK button leaves free — the rows are the choice, so
+    OK had nothing to do there, and the moment somebody is hunting for a
+    file is the moment its folder is worth a button. It does not close the
+    dialog, the pick is still open, and it stands on the “Nothing saved yet”
+    state as well. A ⋯-menu entry for folders that may not exist yet would
+    have been a list of places instead of an action, and was struck
+  - Gold does two jobs and only one of them survives daylight: as a fill
+    honey works on paper, as text it is the weakest thing in the palette.
+    Gold-as-text is a colour of its own now and turns bronze in the light
+    set, in over twenty places
+  - The bar lives by being brighter than its ground, and on paper honey is
+    as bright as the paper: measured, #eca948 at 70% opacity still comes to
+    1.29:1 against the page, so turning the opacity up leads nowhere. In the
+    light set the fill is painted with multiply, so the same colour sinks
+    into the page instead of lying on it, and it runs far denser — .34
+    against .62 at rest, .50 against .76 under the pointer. The legend tick
+    beside the name keeps the unblended colour, so row and legend still read
+    as one thing
+  - The switcher is in the ⋯ menu, three buttons under “Colours”: Dark,
+    Light, Auto. The one in force is marked, and the choice is kept between
+    starts
+  - Auto is resolved in the page and always stamps an explicit theme onto
+    it, so a media query never argues with a setting. A change to the system
+    theme takes effect live, and the charts are repainted with it — the
+    canvases paint with colours read out of the stylesheet, so they have to
+    be asked again
+  - The hit categories read the crit and heavy flags, so a shield hit was
+    filed under whatever those happened to say — in the sample fight 47 of
+    the 67 stood under Heavy Attack and 20 under Normal, sub-rows claiming a
+    hit type the log never reported. Shield is a fifth category and is
+    tested before the flags, because the log writes one hit type per line
+    and wrote shield instead of crit
+  - A sixth chip appears on a fight that had shield hits and on no other. It
+    stands there as a hit rate, because Crit and Heavy beside it are hit
+    rates and a damage share in that slot would be read as the same kind of
+    figure; the damage and its share of the fight are in the title
+  - The shield mark sits on the row whose shield damage opening it would not
+    reveal — grouped by target that is the target row — and never under
+    Waffen. On the skill rows it would rank against the very table it stands
+    in: by its own share Beschuss (42% of its own damage, 98,188) would come
+    out above Entschlossener Scharfschuss (11%, 982,449)
+  - Nothing is deducted, and every title says so in both languages. The log
+    records the damage dealt; it does not say what the shield did with it,
+    so deducting would be the invention and counting it unchanged is not
+  - The Analysis tab has a card for it: what went into a shield, over how
+    many hits, its share of the fight, the target all of it landed on and
+    the skill that put the most of it there — picked by shield damage rather
+    than by its own share, so the card names the skill that mattered to the
+    fight
+  - Renaming the row by its name alone undid itself: skillLabel resolves the
+    id before the name, so the row asked for as Eye of Ventius with the
+    logged id 964500434 came back as Decisive Sniping — and clearing the id
+    instead dropped it to Nicht zugewiesen, because weaponFor then has
+    nothing to look up. The row carries its own id, boro:ventius, in the
+    dictionary and in SKILL_WEAPON as a Longbow like all five family ids, so
+    the translated name holds and the row sits under Longbow in the Weapons
+    grouping; the logged id moves to baseSid for the bug report
+  - The game writes skill names in the client's own language, so a family
+    test against the raw English string would never have fired on a German
+    client, which logs “Entschlossener Scharfschuss”. The test asks
+    skillEntry instead, because the dictionary is the only thing that knows
+    the two spellings are one skill — on a German log the row is recognised
+    exactly as it is on an English one
+  - The numbers on the row are the log's and the name is the app's reading,
+    so the row wears a mark that says so — a drawn eye rather than the word
+    “derived” or an exclamation mark, because the skill is called Eye of
+    Ventius and a mark that names the row beats one that only warns about
+    it. Inline SVG at 13 px, almond and pupil, since no font this app can
+    count on carries an eye, on an 18 px amber disc with dark ink at 5,66:1
+    in both themes; amber and not gold, because gold is the live number, the
+    sorted column and the active tab. It has role=“img” and the aria-label
+    “Borometer worked this name out” for anything that never sees a tooltip
+  - The mark's tooltip recited both skills the specialization can sit on and
+    the 20 ms window, 290 characters of rule for a row that has one answer.
+    It names the skill this log actually wrote instead — “The log says
+    Decisive Sniping. Only Eye of Ventius lands several hits per cast on one
+    target.”, 106 characters, shorter and more exact — and the base name is
+    kept per fight, so two builds in one log each keep their own
+  - The shield mark hung on the target grouping, so the attacker row stayed
+    silent about damage that went into a shield. It hangs on the row itself
+    now — shield damage present and no shield among the sub-rows — which
+    marks a row exactly when opening it would not show the shield, and
+    covers the skill whose hits were all shield hits, where the one-category
+    cull takes the expander away with the sub-row. Under Waffen it stays
+    off: a weapon is not a thing that has a shield, and the mark read there
+    as if the Longbow had one
+  - The light category colours were composed over --pitch, the page — but
+    behind a sub-row fill sits --well-deep over the .table surface, which is
+    a good deal lighter. Measured against the ground they actually have, the
+    name in --dim reads 4,74 / 5,14 / 4,90 / 5,19 on the four warm
+    categories at .27 through multiply, so they keep their band instead of
+    buying contrast nobody was short of. Shield is #74959f, which holds more
+    of the band than a paler slate at 4,92 for the name: the fill still has
+    to read as a length, not only as legible
+  - segment() re-runs on the same event objects whenever Gap, Min length or
+    the character filter changes — buildEvents does not — and the rename is
+    destructive, so the second pass found no family left, answered “no
+    Ventius” and left the renamed rows standing anyway. The pass puts skill
+    and id back from baseSkill and baseSid before it asks again; measured
+    over four switches back and forth
+  - Why two dummy tests arrived as one fight: Gap 5 s means a hard gap of 15
+    s, so the pause did split them, and the boss-phase rule joined them
+    again — 33,5 s is under the boss gap of 5 × 12 = 60 s and both parts
+    have the same main target. The rule worked correctly and left no trace
+    of having worked, which was the whole surprise; the rail says “2 parts”
+    now when a fight is made of more than one segment
+  - In a raid that reading falls apart: casts land closer together than the
+    window can separate and come out as tens and thirteens, and a share read
+    off those would be fiction. The finding appears only on at least 5 casts
+    of which at least 80% land exactly four or exactly seven hits —
+    measured, 100% at the dummy and 1 of 11 fights in the raid log, so
+    everywhere else it stays quiet instead of inventing a proportion
+  - A theme switch changes custom properties and nothing else, and an
+    element with a transition on a property that reads one does not re-
+    evaluate it: measured, the tab labels and the grouping buttons kept
+    painting the old theme's ink on the new ground, 1,9:1, until something
+    re-rendered them or the pointer went over them. applyTheme hangs
+    html.nofade on for two frames, which turns transitions and animations
+    off across the swap, with a 120 ms fallback because rAF is throttled to
+    a halt in a background tab
+  - The bars carried one set of fixed opacities for both themes, and the
+    number behind them was a contrast ratio, which throws away the hue
+    difference that makes a bar visible in the first place. Measured as dE76
+    the dark bar sits 34,7 from its ground at .34, while the light one
+    reached only 17,1 at the same figure — half as clear. Multiply keeps the
+    band light while the ink on it stays dark, so the light theme has room
+    the dark one does not: four tokens instead of four numbers, light
+    .62/.76/.38/.78 and dark .34/.50/.27/.52
+  - Each of those figures was measured at the name, and the name is not the
+    palest thing standing on a bar. The sub-row stops at .38 because its own
+    text is the limit — it reads 4,46:1 at .40 and crosses AA at .38, which
+    costs 1,2 of dE — and dark compact stops at .52, with the name on the
+    brightest bar at 4,22:1 at .56 and the limit at .53. On hover the ink
+    comes up instead of the opacity going back down, because dialling it
+    back would cost the hover its step: the plain columns of the row under
+    the pointer read at full text colour, which is the row being read. Sub-
+    rows are unchanged
+  - Gradient text reports 1:1 to a naive measurement, because the colour
+    itself is transparent and the gradient is the background — measured
+    properly, the top stop of the light hero number sat at 3,09 against the
+    3,0 large text needs, which is no margin at all. --grad-hero and --grad-
+    mark start at #8c5008 in the light theme now, every stop at 4,9 or
+    better; the dark theme's honey ramp is untouched
+  - The measurements strip carried a “This fight” caption ahead of its
+    numbers. Every figure in the readout is this fight — picking another one
+    is what the sidebar is for — so the cell named the default, and it is
+    gone
+  - The wheel and drag hint was a right-aligned line floating between the
+    controls and the picture, belonging to neither. It is the card's last
+    line now, a footnote under the controls it describes
+  - A stall was a sentence in the Zeitverlauf and a legend swatch in
+    Rotation, two wordings for one tint. Both tabs print the same string now
+    — “Tinted fields are stalls: nothing landed for more than 1.5 s.” — and
+    only when a band is actually inside the view
+  - The status line above the split also reported the share marked Passive —
+    which the table below states as a row of its own, and at a different
+    rounding. That half is gone, and the unassigned share the line still
+    names is printed to one decimal, the same as the table cell it is
+    talking about
+  - The skill rows set a middle dot between the damage figure and the id by
+    hand, in an app that has a helper for exactly that pairing. The dot is
+    out of the dictionary string and the rows go through factLine, so the
+    separator between two facts is one rule everywhere instead of a
+    character typed into an entry
+  - In the share column the figure and its bar began at different places, so
+    three bars under one another started at three x positions and could not
+    be read against each other. Both sit on the cell's left edge now — the
+    track is 110 to 120 px wide, and the only thing that varies down the
+    column is the fill
+  - The preview marked all eleven role labels in gold, on a page where no
+    number is live and no column is sorted. Gold in this app is the hero
+    figure, the sorted column and the tab you are in — a role printed under
+    a column name is none of those, so the labels read dim
+  - The game's name under the wordmark was gold, so the head of the card
+    held two gold marks stacked on each other and “Throne and Liberty” read
+    as a second badge rather than as the game it names. It is set in the
+    ordinary text colour now, flat warm white, and the wordmark is the only
+    thing up there that glows
+  - The log folder path was gold as well. A path is something to copy and
+    check, not something to announce, and gold is how this app says “here is
+    the figure that matters” — the path is plain mono text in its dark well
+    now, and only the hairline around the box stays gold, because that edge
+    is the control and not the ink
+  - In compact view the skill name is printed on its bar instead of beside
+    it, and over the palest of the twelve series colours it measured 3.99:1
+    — under the AA floor, in the view that stays open during a fight. The
+    bar is dimmed until every one of the twelve clears that floor, and by
+    the least that does it, so the ranking still lands at a glance
+  - A compact bar in a very narrow window still stands for something. The
+    track is what is left of the row once the two number columns have taken
+    theirs, and below a row of about 134 px — under the 136 px those columns
+    alone occupy — the subtraction went negative and every bar clamped to
+    its 2 px floor, encoding nothing. The track floors at 16% now, bit-exact
+    from 364 px down to 136 px, and reachable at all only at 175–200% size
+    with a hand-dragged minimum window
+  - Hovering a category sub-row no longer brightens its bar. A parent row
+    brightens because the row under the pointer is the row being read; the
+    same rule took a sub-row's fill to 0.46 and pushed its label back under
+    the line the sub-row opacity had just been set to hold. Sub-rows keep
+    their one figure, pointer or no pointer
+  - The expander chevron is legible on every colour a bar can take. It sits
+    in the name field, which in the full view means on the widest, brightest
+    part of the row's own bar, and it carried the row's dim ink at around
+    3:1 — the lighter dim ink used for the figures beside it measured no
+    better there. It is light with a dark halo when the colours are dark and
+    dark ink with a light halo when they are light, same job and opposite
+    materials, and open is still a quarter turn rather than a colour
+  - Expanded sub-rows kept the order they were built in while the column
+    above them was sorted. They sort along now — under Rank they do not,
+    because the built order is what Rank means
+  - The weapon hint explained the “Unassigned” row whether or not that row
+    was in the table; it appears with the row now
+  - Closing the ⋯ menu threw focus to the page body, so the next Tab started
+    at the top of the document. The menu hands focus back to the ⋯ button
+    before it hides the panel
+  - Two entries in the English changelog named their tab in German — the one
+    place where the English build spoke German
+  - A hint or a chart footnote inside a card read as the card's own body
+    text: both were one-class rules against a two-class one, so the
+    distinction the design draws stood in the stylesheet and nowhere on
+    screen
+  - The height caps for narrow windows never applied — the saved-runs cap
+    was a two-class rule against a three-class base one, and the fight list
+    beside it was dead for the same reason. Both cap at 190 px again under
+    900 px wide
+  - The unit is written DPS everywhere, including the three places that had
+    “dps” wired past the dictionary
+  - The shorten/full-length toggle swapped its button class when pressed, so
+    the control changed size under the pointer that had just hit it
+  - The same colour mark stood in two geometries a card apart — 3×12 at a 2
+    px radius in the skill assignment, 3×13 at 1 px in the weapon table
+    above it. The assignment takes the weapon table's mark
+  - In German the party board went by more than one name — “Gruppen-Ranking”
+    as the heading, “Board” in the line under it. It is the Ranking in every
+    German string now
+  - Old boro-bug-*.json files that landed in saves back when the bug report
+    shared the run route are moved once into Bug-Reports, each of them only
+    where nothing of that name is sitting there already
+  - Folders are made when something is written to them, not at start-up: a
+    fresh install has none, Logs appears with the first saved run, Bug-
+    Reports with the first report. Listing a folder that is not there is an
+    empty list, and that is the true answer. The renaming of the two old
+    ones runs on every start instead, so whatever is already there is found
+    under its current name even where nothing may be written
+  - The four fill colours keep their dark values in the light theme. The
+    ramp from lite through amber to deep has to fall for a button to look
+    lit from above — turning deep around with the rest once made the tick in
+    the ring menu invisible and the button ramp flat. Only gold itself goes
+    a shade deeper on paper, because it also draws the 1px rings and the 2px
+    underlines, and a hairline needs more separation from the page than a
+    fill does
+  - Nothing glows on paper: the halos behind the hero number and the party
+    code and the pale outlines on their digits are off in the light set,
+    where on dark letters they read as blur rather than as light
+  - The launcher paints the window frame before the page exists, so Light
+    opened for a moment on near-black. The page writes its resolved theme
+    into the config and the frame colour is read from it at the next start —
+    the first start after a switch still opens on the old frame once
+  - The focus ring has a colour of its own rather than taking gold: honey
+    against paper comes to 2.30:1 and WCAG asks 3:1 of a control’s outline.
+    All three focus rules go through that one value, measured at 6.0–9.5:1
+    on every surface, so no outline is left standing on a raw colour
+  - On the shield sub-row the crit cell stays empty and the heavy rate is
+    shown. The crit column is not separate information — across all 8,485
+    rows of the sample it is exactly the critical hit type, without a single
+    exception either way — so a shield hit cannot crit and a crit rate there
+    would be a definition printed as a measurement. Heavy is an independent
+    flag that crosses every hit type, so that one is a real figure
+  - Three states are kept apart instead of collapsing into a zero: no hit-
+    type column at all is unknown, a column with no shield hits in it is a
+    measured zero, and shield hits are drawn. On screen the first two both
+    draw nothing; the difference is what a saved run carries
+  - It is called “Shield hit” and not “On shield”: the first names what the
+    log recorded, the second claims where the damage went. In German that is
+    “Schildtreffer” — “Schild” on its own was out in any case, the weapon
+    aliases map it to Sword and Shield
+  - The shield category has a colour of its own, the one cool thing on a
+    warm table, defined in both themes and kept clear of the blue in the
+    chart series, so a row cannot end up wearing the same colour as the mark
+    on it
+  - Two shield tooltips repeated what the mark beside them already said: the
+    chip ran 164 characters, the row mark 152. The load-bearing half-
+    sentence stays everywhere and the rest is gone — the chip is 64
+    characters now, “1,178,179 damage, 11.3% of the fight. Nothing is
+    deducted.”, and the row mark about sixty
+  - One colour really was under AA, and an older one: --cat-critheavy in the
+    dark theme sat at 4,44 against the row ground. A shade down puts it at
+    4,57 and costs almost none of the band — it is #e9b944 now, with the
+    light twin at #e0a017 untouched
+  - The shield mark is text on a card, not a fill on a row, so it has its
+    own ink instead of borrowing the fill's: --shield-ink, #9fc3cd dark and
+    #2c5762 light — the same split as --gold against --gold-ink
+
+v0.44
+-----
+  - The Zeitverlauf said “stacked by skill” and drew one colour. One skill
+    carries 91% of that fight, so eight equal swatches under the chart
+    promised a split the bars do not contain. There is a strip now,
+    segmented by what each skill actually did, and the list under it still
+    names every skill — with its share beside it
+  - The chart has a line to be read against. An axis running 0 to 2.5M
+    cannot say whether a spike was good, so “tall stacks are your burst
+    windows” was an adjective with nothing to be tall against. The fight's
+    own rate is drawn across the plot, the same figure the readout above
+    shows, and the sentence over the chart counts the seconds that beat it
+    and what they were worth
+  - The chart is as tall as the window allows. It was 240 pixels inside a
+    page that is not fixed at anything, which left about as much again empty
+    underneath it and put a 400k second eight pixels from a 600k one
+  - Stretches where nothing landed are drawn and measured, in the same tint
+    and out of the same scan as the Rotation tab, so a stall is one thing
+    with one look wherever you meet it. They are rarer than expected: of the
+    two real fights in the sample, one has no pause over 1.5 s at all and
+    the other has a single 1.8 s one
+  - The Vergleich tab now says which run won, in a sentence, above two bars
+    whose lengths are the two figures. It used to open with a heading, three
+    lines explaining how to use the page you were already using, and an
+    unticked checkbox — and it never stated the verdict anywhere. Under 5%
+    apart it names no winner and says why
+  - The fairness of a comparison is stated where the comparison is. Two runs
+    of different lengths get an amber line above the table with the fix as a
+    button, not a sentence below the table it invalidates. Cutting them no
+    longer means sixty seconds but the shorter run's own length, and the
+    rows that a saved run cannot recompute for a shorter window — the rates,
+    the biggest hit, idle time — say so on the row
+
+v0.43
+-----
+  - The Analysis tab told one story three times. The swing between the best
+    and weakest stretch was a number in a box at the top, a table in the
+    middle, and a finding at the bottom — all three out of the same five
+    rows. The windows are the page now, and the weakest one is marked in the
+    table instead of described underneath it
+  - The facts above it read as statements rather than four numbers on
+    plinths. They were a row of equal boxes holding 100%, 627.1k and 96% — a
+    rate, a damage figure and a proportion, all at one size, so none of them
+    led
+  - A column in which every cell held the same skill name is gone. One skill
+    leading every window is the normal case for a build test, and it printed
+    its own name five times down the right-hand side; it is said once, under
+    the table
+  - The three-second stretches are called that. “Weakest window” sat next to
+    a table of fifteen-second windows naming a different span, which is one
+    word doing two jobs badly
+
+v0.42
+-----
+  - The sidebar shows the night's pulls as a list. It was a dropdown — one
+    fight visible, the rest behind a chevron, with two thirds of the column
+    empty underneath. The list was collapsed to save a space that was never
+    short. It scrolls when the night gets long, and the fight you are
+    looking at is marked by its edge
+  - Saved runs say what a run is in one line instead of four. An empty
+    section does not need a paragraph selling the feature that is empty — a
+    heading, the count and the button that starts one are the whole
+    invitation
+
+v0.41
+-----
+  - The party tab is built around what actually happens there: somebody
+    reads four characters out loud. The code stands apart, one character at
+    a time, because “XMLF” read as a word gets spelled wrong by whoever is
+    typing it
+  - The list of who is in the room is ordered by what needs attention, not
+    by damage: whoever has sent nothing yet is at the top and marked,
+    whoever is on another fight has it named, and everybody who is fine is
+    quiet. Damage ranking is the table above; here the question is who is
+    missing
+  - Two ways in, given the same shape: open the board, or join one. As a
+    button beside a field-and-button they never lined up, and the empty code
+    field sat there looking mandatory to somebody about to host, who will
+    never have a code to type
+  - Remove appears on the row under the pointer and on the rows that have
+    sent nothing, instead of down the whole list. Five copies of that verb
+    beside the names of your own clan is an invitation nobody asked for
+  - A button that shows the party numbers, where three lines of prose used
+    to explain where to find them
+
+v0.40
+-----
+  - The size setting shrinks the window and the page together. At 75% the
+    window was already 75% but the page inside it was not: a vh is a
+    hundredth of the window, and the zoom multiplies the result without
+    dividing the unit — measured, 100vh came out 525px in a 700px window, so
+    everything meaning “fill the window” filled three quarters and left the
+    rest black. Every viewport unit is a number the setting moves now, and
+    the header's height is measured rather than assumed, so a header that
+    wraps no longer pushes the page off the bottom
+  - Bug reports carry what it takes to fix what people actually hit:
+    anything that threw while the app was running, the skill-name pairs
+    learned from mixed-language parties, and for each party member their
+    share, their own target and the language their skill names are in. Also
+    what the layout thinks it has — not the same as the window size once the
+    size setting is in play, and twice now the gap between those two was the
+    bug
+  - The download holds the exe and nothing else. The changelog is in the
+    app, under ⋯
+
+v0.39
+-----
+  - The size setting resizes the window with it. Setting 150% used to fit
+    less of the app into the same frame; now the window grows by the same
+    factor, up to whatever the screen allows. A saved size is applied to the
+    window at every start, from the size it opens at — not from wherever it
+    was last time, which would have multiplied on every launch
+  - Somebody removed from a party can walk straight back in. They are held
+    out for twenty seconds rather than two minutes, and the code is already
+    waiting in their join field: removing somebody is mostly how you un-
+    stick them, so the way back has to be as short as the way out
+  - Borometer learns skill translations from the party instead of guessing
+    them. The game names skills in each client's own language, so a mixed
+    party puts the same skill id on the board under both spellings — which
+    is exactly the evidence the built-in dictionary demands before it will
+    translate an id. What one raid teaches it, it still knows next week
+
+v0.38
+-----
+  - Share and the party's dps count everyone on the board. They counted only
+    members whose target name matched the majority's, and in a raid people
+    are rarely on the same pull in the same second. From a real one: four
+    rows of six read 0.0%, and the headline showed 113M of the 215M sitting
+    in the list below it. Party logs saved before this come out right too
+  - Clearing the fight list tells the party. It used to just fall silent, so
+    the board held your last fight until it timed out — “Fighting Ramux, 1
+    player reporting” with nothing loaded and nobody fighting anything
+  - Party setup lists who is in the room right now, what each of them is
+    doing, and who has not sent anything yet. The history under it says who
+    arrived and when, which is a different question
+  - The host can remove someone from the party. They stay out for two
+    minutes: every client re-posts every three seconds, so a removal without
+    a pause lasts exactly until the next one
+  - Somebody in the party who has never sent a fight is named, with the
+    logging steps as text you can copy — in the language you are reading,
+    ready to paste where the party is talking
+
+v0.37
+-----
+  - Party setup no longer offers you the sample's character. Loading the
+    sample put “Demo” in the name field, so anyone who pressed Host a party
+    without looking hosted as Demo — and a board of Demos tells you nothing.
+    A real log still fills the field in, spelled the way the log spells it
+  - A size setting, 10% to 200%, in the ⋯ menu — or Ctrl with plus, minus
+    and zero. Everything scales with it, the layout included: at 150% the
+    app rearranges as though the window were smaller, because for the
+    content it is. In compact the window itself grows and shrinks too, so
+    the overlay can be as small or as readable as you want
+  - The window can be resized by dragging its edges. It never could: Windows
+    gives a frameless window no resize border, and the app had been telling
+    people to drag the edge for several versions. All four edges and all
+    four corners now
+
+v0.36
+-----
+  - Compact wears the app's own colours now, solid like full view. The see-
+    through surface it had been chasing since 0.33 was never possible: the
+    window does not let the desktop through, it lets a light grey sheet
+    through, so every level of transparency was being mixed over that.
+    Measured with the app's own window settings, a fully clear pixel comes
+    out at 240,240,240 instead of what is actually behind the window — which
+    is why the harder it tried, the more bleached it looked
+  - Compact is smaller: 364 x 222 instead of 396 x 258, a fifth less of the
+    screen. Nothing was given up for it — the name column is still wider
+    than the longest German skill name, by 80 pixels
+  - One strip of window chrome instead of two, in both views. Minimise,
+    maximise and close sit in the header and the title bar is gone. Full
+    view had been printing “Borometer” twice, one line above itself
+  - The see-through window setting has left the ⋯ menu. There was no
+    position of it that made the app look better
+
+v0.35
+-----
+  - Compact's surface was darkened again, to 82% opaque. 0.34 had left it
+    too pale
+
+v0.34
+-----
+  - Compact dropped a blur filter that had been painting its own surface
+    near-black
+
+v0.33
+-----
+  - Compact's surface was lightened from 88–92% opaque to 70%. Two rules had
+    been setting it, and the one you could edit was the one being overridden
+  - Clearing the fight list keeps the meter on screen. The start screen used
+    to come back over it, which answered a question nobody asked; it now
+    says the next fight will appear here
+  - The sample is two real fights — 86 seconds on Dragaryle and 70 on Ramux
+    — instead of one built out of random numbers. Real rotation, real crit
+    rates, real skill ids
+  - The party name field no longer suggests somebody else's character to you
+  - Fixed: a byte-order mark in boro-config.json made every setting, saved
+    run and weapon assignment vanish without a word. Windows Notepad writes
+    one by default, and this is a file people are told they may edit
+
+v0.32
+-----
+  - The app calls itself Borometer everywhere. Forty places said just "Boro"
+  - A German label said the wrong thing: "Never crits" had been translated
+    to a word that means "never complains". Corrected, along with German
+    quotation marks and a "1 rows" that should have read "1 row"
+
+v0.31
+-----
+  - When somebody joins the party, everyone is told who — by name, wherever
+    they are in the app. Borometer already noticed, but only ever wrote it
+    to the party log
+  - The party server status line follows a language switch straight away
+    instead of keeping the old wording
+
+v0.30
+-----
+  - Dropping the wrong file no longer clears the fights you had loaded. A
+    file that is not a combat log is refused and nothing changes
+  - A combat log whose columns could not be read now opens Log setup so you
+    can map them. The start screen used to cover that very tab
+  - A runs file is checked before it is loaded. Foreign JSON with a "runs"
+    key used to fill the sidebar with NaN rows and save them to your
+    settings
+  - Borometer remembers what you set: split after, min length, and compact's
+    fade. Only the pin survived a restart before
+  - The changelog opens on the newest version and folds the rest to one row
+    each, with how much changed in it
+  - A see-through window switch in the ⋯ menu, for when the window renders
+    badly. It used to mean editing a file by hand
+  - Hosting on a party server shows the code once instead of twice
+  - Party server: an abandoned room frees its code after half an hour
+    instead of three hours. A party in use is never dropped
+
+v0.29
+-----
+  - Dropdowns now give you the name you clicked. Under Filter, "Your
+    character" re-sorts itself during a fight, so the click could land on
+    whoever had moved into that spot
+  - While a dropdown is open, nothing else can change the selection. A
+    letter key, PageUp/PageDown or F4 used to change it out of sight, behind
+    the open list
+  - Tab closes an open dropdown. It used to stay on screen and swallow every
+    key you pressed afterwards
+  - Right-click no longer opens a dropdown. Holding the button down and
+    dragging to a name now picks it when you let go
+
+v0.28
+-----
+  - Dropdowns look like the rest of the app. Windows used to draw them, and
+    they came up grey
+  - Every scrollbar is in the app's colours — before, only two of them were
+
+v0.27
+-----
+  - An expanded skill no longer repeats itself. The "Critical Hit" row also
+    said 100% crit, which its name already says
+  - Compact no longer opens at the size of your monitor
+  - The language switch in the ⋯ menu looks like the other items in it again
+  - The bug report hint says where to find it, in both languages
+  - Hover a long boss name to read all of it
+
+v0.26
+-----
+  - The figures under the big dps number say what they cover: "This fight",
+    or "This party"
+
+v0.25
+-----
+  - The two rows of tabs look different, because they do different things
+  - Timeline and Rotation use the full window width again. The table keeps
+    its own
+  - The smallest text in the app is lighter, and easier to read for it
+
+v0.24
+-----
+  - Readout, tabs, table and charts are the same width and line up as one
+    column
+  - Chart axes step on round numbers, so you can compare two fights by eye
+  - The time grid sits behind the bars instead of cutting through them
+  - Skill colours: the more damage, the lighter the colour
+  - Compact: bars run the full height of a row, and the dps number is larger
+  - Long skill names are no longer cut off in compact or in Rotation
+  - Saved runs fill the sidebar instead of a small box
+  - When something fails, the message has a red edge — it used to look like
+    a success
+  - In Compare, the colour says whether a change is good or bad, not whether
+    the number went up. Crit and heavy count in percentage points
+  - The top bar no longer overlaps itself on a narrow window
+  - Fixed: Analysis said "a hit landed in 58 of 57 seconds"
+  - Rows of figures are separated by hairlines instead of dots
+
+v0.23
+-----
+  - Analysis no longer repeats the fight length and hits — they are already
+    above it
+  - Your class name on the Weapons tab sits in a labelled field
+  - Compact: a clearer icon for fade. Fade and pin now say briefly what
+    happened
+  - Party setup: host and join are at the top
+
+v0.22
+-----
+  - All 45 class names confirmed. Crusader is Greatsword & Sword and Shield,
+    Paladin is Greatsword & Wand and Tome
+
+v0.21
+-----
+  - Confirmed the German name for Gauntlet: "Panzerhandschuhe"
+
+v0.20
+-----
+  - The Weapons tab names your class once your main and second weapon are
+    set
+  - Fixed: Gauntlet and Orb were missing from the weapon list entirely
+  - Fixed: Wand and Tome skills were filed under "Wand" internally and could
+    slip past weapon matching
+
+v0.19
+-----
+  - Fixed: skill names were cut off in compact mode — most often in German,
+    where the names run longer
+  - Fixed: the "Crit" and "×2" badges ran into the damage column
+  - The name column in compact takes the space that is left, so long names
+    fit
+  - Compact readout rebuilt: the dps number on its own ground, the target in
+    a labelled field
+
+v0.18
+-----
+  - Live logging is about twice as fast on long sessions. It only reads what
+    is new
+  - New start screen
+
+v0.17
+-----
+  - Fixed: joining a party sent along fights from hours earlier. Only what
+    happens after you join counts now
+  - Compact is a real translucent overlay on top of the game, not a small
+    window
+  - New in compact: a fade button, so you never have to move the overlay
+    mid-fight
+  - Analysis opens with "This fight, in facts": uptime, opener,
+    concentration, swing, and the split per enemy
+  - A narrow window drops columns cleanly instead of squeezing them together
+
+v0.16
+-----
+  - You can save a snapshot of the party and load it later, without still
+    being connected
+  - Fixed: the Me/Party switch in compact jumped back to your own numbers on
+    a loaded snapshot
+  - Fixed: "Export CSV" wrote the wrong breakdown in the party view
+  - Compact: the header sat too low and the buttons were not on one line
+
+v0.15
+-----
+  - The update notice is out again, completely. It should never have shipped
+  - Fixed: someone vanished from the party board as soon as their target
+    briefly differed from everyone else's
+  - Fixed: one oversized icon made the compact button strip taller than it
+    needed to be
+  - The readout is two rows now, instead of everything crammed into one line
+  - The dps number counts up to a new value instead of jumping
+  - One set of font sizes and corner radii across the whole app
+  - Dictionary: 6 more confirmed skill IDs
+
+v0.14
+-----
+  - Party is a button in the top bar now, not a tab of its own
+  - Party damage shows what everyone did to the same target, together
+  - Compact mode rebuilt: one flat overlay, one readout line
+  - Timeline and Rotation share a zoom and a time window. Zoom into a burst
+    and you see it in both
+  - Cast marks widen and show their damage as you zoom in
+
+v0.13
+-----
+  - Party summary: the fourth figure is the party's combined damage, not one
+    player's biggest hit
+  - The party table has its own "Biggest Damage" column, per player
+  - The compact party summary no longer wraps onto three ragged lines
+  - Compact shows "Pdps" instead of the full label
+  - Added this changelog, in English and German
+
+v0.12
+-----
+  - The Party tab moved to the front
+  - "Biggest" is now "Biggest Damage", and highlighted
+  - ⋯ menu reordered: language, sample, bug report
+  - Fixed: a boss fight with adds was cut into several fights at every
+    target change
+  - Fixed: a skill that exists on two weapons had all its damage credited to
+    one of them
+  - The party server no longer logs crashes when someone disconnects
+    normally
+
+v0.11
+-----
+  - Cast timeline rebuilt: one mark per cast, zoomable, scrollable, with a
+    time filter
+  - Weapons are assigned automatically from 270+ measured skill IDs
+  - Settings sit in a Filter menu now, and Compare in the sidebar
+  - Party: host before loading a log, members appear as they join, party
+    total, server status
+  - The start screen says plainly when your log folder was not found
+  - Compact rebuilt: real window resizing, fixed columns, status as a dot
+    only
+  - Added a safety audit and a one-click bug report
+  - Version badge, and a ⋯ menu for less-used controls

@@ -1,0 +1,1415 @@
+<!DOCTYPE html>
+<!--
+  Borometer - a damage meter for Throne and Liberty
+  Copyright (C) 2026 B0R0AK
+
+  This program is free software: you can redistribute it and/or modify it
+  under the terms of the GNU General Public License as published by the Free
+  Software Foundation, either version 3 of the License, or (at your option)
+  any later version.
+
+  This program is distributed in the hope that it will be useful, but WITHOUT
+  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+  FITNESS FOR A PARTICULAR PURPOSE. See the GNU General Public License for
+  more details. You should have received a copy of the License along with
+  this program. If not, see <https://www.gnu.org/licenses/>.
+
+  Not all of this file is covered: the embedded fonts keep the SIL Open Font
+  License, the game images are the property of their rights holders, and
+  the practice dummy icon is "Target practice icons created by juicy_fish -
+  Flaticon" (https://www.flaticon.com/free-icons/target-practice, Flaticon
+  License). Only release builds embed the game images and that icon; the
+  public source carries neither. See licenses/README.en.md.
+-->
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Borometer — The Hive</title>
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+
+<!-- Vor allem anderen, sichtbar sobald er den Fokus hat: bis zur
+     Hauptregion liegen der Fensterkopf und die ganze linke Schiene, und
+     das waren sechzig Stationen mit der Tabulatortaste. -->
+<a class="skiplink" href="#stage" data-i18n="a11y.skip">Skip to the fight</a>
+
+<!-- Die Symbolleiste steht im Dokument vor der Titelleiste (Neugestaltung
+     28.09., Luecke 12.4): die Tabulatortaste geht wie im Entwurf zuerst in
+     die Leiste, dann in die Titelleiste, dann in den Inhalt. Gezeichnet wird
+     sie fest links unter der Titelleiste (styles.css .bereiche), die erste
+     Spalte von .shell haelt ihr den Platz. -->
+<!-- Die Symbolleiste (Neugestaltung 28.09., Luecken 0.16 bis 0.20): 64
+       Punkt, oben The Hive, die eigenen Symbole aus dem Entwurf (22 Punkt, ein
+       Strich 1,6, der Akzent --acc wird beim Zeigen und in der Auswahl zu
+       Gold); der Name steht fuer den Vorleser im Knopf (.vh) und als Blase
+       rechts (.btip, aria-hidden) bei Zeigen und Fokus. Die Knoepfe behalten
+       die Klasse tab und data-tab, switchTab() (34) ist der eine Wechsel;
+       der gewaehlte traegt aria-current="page". Waffen und Log-Einrichtung
+       nach Builds, nur im Entwicklermodus (syncTabs, 43). Unten Weeklies
+       (leer, 9.1), Start und Einstellungen. Ohne Log sind die Bereiche, die
+       einen Kampf brauchen, schon hier gesperrt (renderAll setzt es danach). -->
+  <nav class="bereiche" id="bereiche" data-i18n-aria-label="tabs.navLabel" aria-label="Areas">
+    <span class="hive"><img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAASwAAABoCAYAAABLw827AABWU0lEQVR42u29eZxkWVUn/v2ee18suW9VmVl779ANLdAgjo5SzaKANCBY6TL6mxVQZ3EcnEHHGatSEFHHYUYd/dg6zjgfFchqkBZRQKUTARGlZe2m96X2yn3PiHjvnvP7477IyqquJSMiqyqr8dUnKutlRby4775zzz3L93wPv/Txd49v7wkvqqWmIIUwAARgMMSDqB80g7F+nr9TvZishOJTb/if17/4A//y4fHeft62GrIsCerN0aA+ay+1Fb7+6JH//rLv+5+H7L6DXl4+mpkBX//L0U/3dso3VWqmoJAKGlhrb2dxerH9V5/zsh//mQ/9wX982Yuv77qXIVjFg4UsIRi4fnxxLPFXBiMAC4QWhJxeDXO//9G//Zb/9t/+9NQXfuutyYvfdnf6pb+5++XbijMfypZXFCy4+t3yzOfz87OuedY51+aDFqAADZQsSNYmDz50+jWv+Vf/83NjYwfcyMjhgGce9WG7r/zFuz67rbPw3EpIg1hwBvDc773UWOrn8d9iCqZdhaQ4Uen83Vu//Ud/3O476HnnaGZmJGnvfve7+7/nW7IvdpfRXQtmoEg+qPq0XvR7LjY2wozmQqmt6J86tfp/vvm1P/vjZmOOHDnfPGyZoz43X/rYe+7dOcD9S7U00NTX762Z53Hmc/kz1TS4QlvypSP8odcd+E/32tiY48hIqP/84P/5r9/90ud0/mHQxaAoOkK50e9pfmwbu24z39PodesybMwMhBmS0FFq808fmfjTl7zhF3/A93Qkvdu7Cp1zUyczmNHgQISolowgJCoDqtFAgwECMyWjcjPt6NmW+LTYW1vsYFdb0rujU7pmT02qlwDNDPAdoae3LzlZLnecu17bOoo9/T2uc/70yYwGSlB68W0d/dudaugAgP62jtL2nnJ3On/SqrUlE7RZcN6glo9hvVJdL4Bqbd093iTx7ewSAMAd8f8Gi2l5qMd3z1SDWnUapICknVHTDYk6aBlpaiiXpa23n49TCpf6VK6xrLcD/UNdWdf8qdMavLfz301DCw+OsJ7+Xb46I91nfSdpZgeF/M/T3/+ZQ18bHup+zdTJk5lkNYKCVr873leAaEB7W69b6vFv/Imf+ImfEhlZXaekt9xx8OBBIanv+8137NvR57+rx80V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" alt="The Hive"></span>
+    <button class="tab" type="button" data-tab="timeline" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.2 4.2L15 15M19.8 4.2L9 15" stroke-width="2.2"/><path d="M11.6 17.6l6-6M12.4 17.6l-6-6"/><path d="M15 15l3.6 3.6M9 15l-3.6 3.6"/><circle cx="19.6" cy="19.6" r="1.2"/><circle cx="4.4" cy="19.6" r="1.2"/><path d="M12 1.4l1.2 1.8L12 5l-1.2-1.8z" fill="var(--acc, #E8A33D)" stroke="none"/></svg><span class="vh" data-i18n="tabs.timeline">Fight</span><i class="ungelesen" id="ungelesen" hidden><span aria-hidden="true" id="ungelesenZahl">1</span><span class="vh" id="ungelesenName"></span></i><span class="btip" aria-hidden="true" data-i18n="tabs.timeline">Fight</span></button>
+    <button class="tab" type="button" data-tab="rotation" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 4.5A7.5 7.5 0 1 0 18.5 8.25"/><path d="M21.4 9.9L18.5 8.25 18.2 11.6"/><rect x="9.6" y="9.6" width="4.8" height="4.8" rx="1.1"/><path d="M12 2.4l1.9 1.9-1.9 1.9-1.9-1.9z" fill="var(--acc, #E8A33D)" stroke="none"/></svg><span class="vh" data-i18n="tabs.rotation">Rotation</span><span class="btip" aria-hidden="true" data-i18n="tabs.rotation">Rotation</span></button>
+    <button class="tab" type="button" data-tab="analysis" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="10" cy="10" r="6.8"/><path d="M15 15l5.6 5.6" stroke-width="2.4"/><path d="M7.3 12.8v-2M12.7 12.8v-3.4"/><path d="M10 12.8V6.9" stroke="var(--acc, #E8A33D)" stroke-width="2"/></svg><span class="vh" data-i18n="tabs.analysis">Analysis</span><span class="btip" aria-hidden="true" data-i18n="tabs.analysis">Analysis</span></button>
+    <button class="tab" type="button" data-tab="compare" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.3V20M8 20h8"/><path d="M4.5 8.2L19.5 5.8"/><path d="M5 8.1l-2.2 5.2M5 8.1l2.2 5.2M19 5.9l-2.2 5.1M19 5.9l2.2 5.1"/><path d="M2.4 13.3h5.2a2.6 2.6 0 0 1-5.2 0z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/><path d="M16.4 11h5.2a2.6 2.6 0 0 1-5.2 0z"/><circle cx="12" cy="4" r="1.3" fill="var(--acc, #E8A33D)" stroke="none"/></svg><span class="vh" data-i18n="tabs.compare">Compare</span><span class="btip" aria-hidden="true" data-i18n="tabs.compare">Compare</span></button>
+    <button class="tab" type="button" data-tab="history" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12A8 8 0 1 1 6.84 17.66"/><path d="M2.4 9.9l2.1 2.1 2.1-2.1"/><path d="M12.5 7.6V12l3 2" stroke="var(--acc, #E8A33D)" stroke-width="1.8"/><circle cx="12.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg><span class="vh" data-i18n="tabs.history">History</span><span class="btip" aria-hidden="true" data-i18n="tabs.history">History</span></button>
+    <button class="tab" type="button" data-tab="party" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.6" r="2.7" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/><path d="M6.4 19.8a5.6 5.6 0 0 1 11.2 0"/><circle cx="4.9" cy="10.6" r="2"/><path d="M1.8 18.6a3.8 3.8 0 0 1 4.9-3.7"/><circle cx="19.1" cy="10.6" r="2"/><path d="M22.2 18.6a3.8 3.8 0 0 0-4.9-3.7"/></svg><span class="vh" data-i18n="tabs.party">Party</span><span class="btip" aria-hidden="true" data-i18n="tabs.party">Party</span></button>
+    <button class="tab" type="button" data-tab="builds" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 10h13.2c1.9 0 3.6-.6 4.4-1.6-.2 2.6-2.2 4.3-5 4.3v1.8l1.8 2.7H7.2L9 14.5v-1.7c-3 0-5.2-1.1-5.6-2.8z"/><path d="M7.2 17.2L6.2 20h12.6l-1-2.8"/><g transform="translate(-.6 -2)"><path d="M3 3.2l6.4 3.8"/><rect x="9.3" y="4.4" width="2.6" height="5.2" rx=".6" transform="rotate(31 10.6 7)"/></g><path d="M15.4 5.6l1.3-1.7M16.6 7.8l2-.5M14.7 3.4l.2-1.7" stroke="var(--acc, #E8A33D)" stroke-width="1.5"/></svg><span class="vh" data-i18n="tabs.builds">Builds</span><span class="btip" aria-hidden="true" data-i18n="tabs.builds">Builds</span></button>
+    <button class="tab" type="button" data-tab="weapons" tabindex="-1" hidden><svg viewBox="0 0 20 20" class="alt" aria-hidden="true"><path d="M4 16L14.5 5.5"/><path d="M12 3.5h4.5V8"/><path d="M3 12.5l4.5 4.5"/></svg><span class="vh" data-i18n="tabs.weapons">Weapons</span><span class="btip" aria-hidden="true" data-i18n="tabs.weapons">Weapons</span></button>
+    <button class="tab" type="button" data-tab="setup" tabindex="-1" hidden><svg viewBox="0 0 20 20" class="alt" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"/><circle cx="7.5" cy="5.5" r="1.5" fill="currentColor"/><circle cx="13" cy="10" r="1.5" fill="currentColor"/><circle cx="8.5" cy="14.5" r="1.5" fill="currentColor"/></svg><span class="vh" data-i18n="tabs.setup">Log setup</span><span class="btip" aria-hidden="true" data-i18n="tabs.setup">Log setup</span></button>
+    <span class="bfrei" aria-hidden="true"></span>
+    <button class="tab" type="button" data-tab="weeklies" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.3" y="5" width="17.4" height="15.2" rx="2"/><path d="M8 2.8v4.1M16 2.8v4.1M3.3 9.6h17.4"/><g fill="currentColor" stroke="none"><circle cx="7.2" cy="13" r=".95"/><circle cx="10.4" cy="13" r=".95"/><circle cx="13.6" cy="13" r=".95"/><circle cx="7.2" cy="16.6" r=".95"/><circle cx="10.4" cy="16.6" r=".95"/></g><circle cx="17.4" cy="17" r="3.6" fill="var(--acc, #E8A33D)" stroke="none"/><path d="M15.8 17l1.1 1.1 2.1-2.3" stroke="var(--acc-ink, #1B1612)" stroke-width="1.5"/></svg><span class="vh" data-i18n="tabs.weeklies">Weeklies</span><span class="btip" aria-hidden="true" data-i18n="tabs.weeklies">Weeklies</span></button>
+    <!-- Rekorde (Spezifikation Rekorde 2a): ein Pokal wie im Entwurf, 22 Punkt, Strich 1,6; der Funke in der
+         Schale ist der Akzent (--acc), in Ruhe Rauch, beim Zeigen und gewaehlt Gold. -->
+    <button class="tab" type="button" data-tab="rekorde" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.6h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.4H4.3c0 2.9 1.2 4.6 3.4 5.2M17 5.4h2.7c0 2.9-1.2 4.6-3.4 5.2"/><path d="M12 13.6v3.2"/><path d="M8.6 20.4h6.8l-.9-3.6H9.5z"/><path d="M12 5.5l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg><span class="vh" data-i18n="tabs.rekorde">Records</span><span class="btip" aria-hidden="true" data-i18n="tabs.rekorde">Records</span></button>
+    <button class="tab on" type="button" data-tab="start" tabindex="0" aria-current="page"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V6.5h3v2.5h3V6.5h4v2.5h3V6.5h3V20"/><path d="M2.4 20h19.2"/><path d="M9.5 20v-4.2a2.5 2.5 0 0 1 5 0V20z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/><path d="M12 6.5V1.8"/><path d="M12.3 2l3.6 1.3-3.6 1.3z" fill="var(--acc, #E8A33D)" stroke="none"/></svg><span class="vh" data-i18n="tabs.start">Start</span><span class="btip" aria-hidden="true" data-i18n="tabs.start">Start</span></button>
+    <button class="tab" type="button" data-tab="settings" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="6.4"/><path d="M18.10 14.53L20.50 15.52" stroke-width="3" stroke-linecap="butt"/><path d="M14.53 18.10L15.52 20.50" stroke-width="3" stroke-linecap="butt"/><path d="M9.47 18.10L8.48 20.50" stroke-width="3" stroke-linecap="butt"/><path d="M5.90 14.53L3.50 15.52" stroke-width="3" stroke-linecap="butt"/><path d="M5.90 9.47L3.50 8.48" stroke-width="3" stroke-linecap="butt"/><path d="M9.47 5.90L8.48 3.50" stroke-width="3" stroke-linecap="butt"/><path d="M14.53 5.90L15.52 3.50" stroke-width="3" stroke-linecap="butt"/><path d="M18.10 9.47L20.50 8.48" stroke-width="3" stroke-linecap="butt"/><circle cx="12" cy="12" r="2.6" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/></svg><span class="vh" data-i18n="tabs.settings">Settings</span><span class="btip" aria-hidden="true" data-i18n="tabs.settings">Settings</span></button>
+  </nav>
+
+<div class="titlebar" id="titlebar" hidden>
+  <div class="tdrag"><span class="tname">Borometer</span></div>
+  <div class="wbtns">
+    <button class="wctl" id="winMin" title="Minimise" aria-label="Minimise" data-i18n-title="win.min" data-i18n-aria-label="win.min"><svg viewBox="0 0 12 12"><path d="M2 6h8"/></svg></button>
+    <button class="wctl" id="winMax" title="Maximise" aria-label="Maximise" data-i18n-title="win.max" data-i18n-aria-label="win.max"><svg viewBox="0 0 12 12"><rect x="2.5" y="2.5" width="7" height="7" rx="1"/></svg></button>
+    <button class="wctl danger" id="winClose" title="Close" aria-label="Close" data-i18n-title="win.close" data-i18n-aria-label="win.close"><svg viewBox="0 0 12 12"><path d="M3 3l6 6M9 3l-6 6"/></svg></button>
+  </div>
+</div>
+<header class="top" data-i18n-aria-label="top.barLabel" aria-label="Title bar">
+  <!-- Neugestaltung 28.09. (Luecke 0.3): die Wortmarke ist die Schrift der
+       App, BOROMETER als Text; das Bild von The Hive steht oben in der
+       Symbolleiste. -->
+  <h1 class="mark">
+    <!-- Filled in by scripts/build-renderer.mjs from package.json. The script
+         below writes the same number on every real launch, so a stale one
+         here would be invisible in the app and show up only where scripts do
+         not run - a chat client's attachment preview, for one. It once sat at
+         v0.11 for forty releases before anyone opened the file that way. -->
+    <span class="wort">Borometer</span><span class="ver" id="appVer">v0.0</span>
+  </h1>
+  <!-- Die Kampfwahl (Instrumententafel 3.2): der Knopf in der Mitte der
+       Titelleiste nennt den Kampf, den man ansieht - Bossbild, Boss, Lauf,
+       Uhrzeit, DPS; ohne Kampf "Kampf waehlen - Strg+K". syncKwKnopf()
+       (23-kampfwahl.ts) schreibt Inhalt und Namen. Im Kompakt nicht da. -->
+  <!-- Neugestaltung 28.09. (Luecken 0.4, 0.5): die Pille, so breit wie ihr
+       Inhalt, dazu voriger und naechster Kampf, ohne das Feld zu oeffnen
+       (auch Strg+Pfeil links/rechts, 23-kampfwahl.ts); am Ende gesperrt. -->
+  <div class="kwahl">
+  <button class="kwpf" id="kwVor" type="button" data-i18n-aria-label="kw.vor" aria-label="Previous fight" data-i18n-title="kw.vorTitle" title="Previous fight (Ctrl+Left)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <button class="kwknopf" id="kwKnopf" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="kampfwahl"><span class="kwwas" id="kwWas">Choose a fight &#183; Ctrl+K</span><span class="kwpfeil" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
+  <button class="kwpf" id="kwNach" type="button" data-i18n-aria-label="kw.nach" aria-label="Next fight" data-i18n-title="kw.nachTitle" title="Next fight (Ctrl+Right)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+  </div>
+  <!-- Die Live-Aufzeichnung ist EIN Umschalter. Vorher standen hier eine
+       Anzeige (Punkt und Satz, role=status) und weiter rechts ein Knopf mit
+       demselben Wort - zwei Dinge, die gleich hiessen, und das eine liess
+       sich nicht anklicken. Jetzt traegt der Knopf den Zustand selbst:
+       aria-pressed, ein Punkt (voll = laeuft, Ring = aus) und ein Wort, das
+       bei jeder Breite stehen bleibt.
+
+       Der Name fuer die Sprachausgabe ist nur "Live"; ob an oder aus, sagt
+       aria-pressed. Das Zustandswort ("aus", "gestoert") ist aria-hidden,
+       sonst hiesse es "Live aus, Umschalter, nicht gedrueckt".
+
+       #live bleibt die Live-Region, aber unsichtbar (.vh): sie sagt den
+       ganzen Satz an - Dateiname, "wartet auf einen Kampf", Stoerung - und
+       beschreibt den Knopf (aria-describedby). Sichtbar steht derselbe
+       Satz im title des Knopfes, gesetzt von syncLiveBtn() (45-startup.ts). -->
+  <div class="vh" id="live" role="status" aria-live="polite"><span id="liveText">Live logging off</span></div>
+  <button class="btn livebtn" id="btnWatch" type="button" aria-pressed="false" aria-describedby="liveText"><span class="ldot" aria-hidden="true"></span><span class="lword" data-i18n="top.live">Live</span><span class="lstate" id="liveState" aria-hidden="true">off</span></button>
+  <!-- title mit demselben Schluessel: der Satz kuerzt jetzt, wenn es eng
+       wird, und was gekuerzt ist, muss beim Zeigen vollstaendig sein. -->
+  <!-- Der kurze Satz steht, der ganze im title. "Zum Laden in die
+       Vollansicht" zeigt auf einen Knopf, der sechzig Punkt weiter rechts
+       dasselbe Wort traegt - dieselbe Doppelung wie "Feldboss, kein
+       Dungeon". Mit dem ganzen Satz blieben dem Text 59 von 165 Punkt und
+       er brach mitten im Wort ab; so passt er, und gekuerzt wird nichts. -->
+  <span id="compactIdle" data-i18n="compact.idleShort" data-i18n-title="compact.idle">No log</span>
+  <!-- Nur solange Klicks durch das Fenster gehen: sagt, warum nichts darauf
+       reagiert, und womit es wieder geht. -->
+  <!-- Overlay-Look (Neugestaltung 28.09., Luecke 11.5): beide Zustaende als
+       Pille rechts im Streifen wie im Entwurf - das Schloss, solange Klicks
+       durchgehen (der ganze Satz mit dem Kuerzel im title, syncThroughHint),
+       das Auge mit der Durchsicht, solange sie ueber 0 steht
+       (applySeeThrough, 37-window-size-and-overlay.ts). -->
+  <span id="throughHint" class="ovpille" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span id="throughText"></span></span>
+  <span id="seePille" class="ovpille" role="img" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.8"/></svg><span id="seePilleText"></span></span>
+  <button class="btn partybtn" id="partyPill" type="button" aria-pressed="false"><span class="pmark" id="partyTabDot" aria-hidden="true"></span><span id="partyPillText">Party</span></button>
+  <div class="partyswitch" id="partySwitch" role="group" data-i18n-aria-label="compact.whoLabel" aria-label="Whose numbers" hidden>
+    <button id="pvMe" class="on" aria-pressed="true" data-i18n="compact.me">Me</button>
+    <button id="pvParty" aria-pressed="false" data-i18n="compact.party">Party</button>
+  </div>
+  <!-- Zwei Sorten Logs, ein Knopf. Das Gruppen-Log lag als eigener Knopf im
+       Gruppen-Reiter, wo es niemand suchte. -->
+  <div class="moremenu openmenu">
+    <!-- Unter 640 Punkt nur das Symbol (styles.css, Titelleiste): das Wort
+         bleibt fuer Vorleser im Knopf (.blabel), sichtbar im title. -->
+    <button class="btn hot" id="btnOpen" aria-haspopup="true" aria-expanded="false" data-i18n-title="top.openLogs" title="Open logs"><svg class="bsym" viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M1.8 4.2V12.6h12.4V5.6H7.6L6.2 4.2z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round"/></svg><span class="blabel" data-i18n="top.openLogs">Open logs</span></button>
+    <div class="morepanel left" id="openPanel" hidden>
+      <button class="mi" id="miOpenCombat" data-i18n="top.openCombat">Load Throne logs</button>
+      <button class="mi" id="miOpenParty" data-i18n="top.openPartyLog">Load party logs</button>
+    </div>
+  </div>
+  <button class="btn" id="btnCompact" data-i18n="top.compact">Compact</button>
+  <!-- Anheften und Geist: der Name (aria-label) bleibt stehen, ob an oder aus
+       sagt aria-pressed; der title nennt, was ein Klick tut, und kommt aus
+       setPinButton() / syncGhostButton(). Vorher war der Name selbst die
+       Handlung ("Nicht mehr ueber dem Spiel anzeigen, gedrueckt").
+       Die Symbole sind neu gezeichnet: die Nadel stand senkrecht mit einem
+       Dreieck auf halber Hoehe und las sich als "l" mit Querstrich, der
+       Geist waren zwei Quadrate, die nichts mit Durchsichtigkeit zu tun
+       hatten. Jetzt eine schraege Reisszwecke und ein Gespenst. -->
+  <button class="btn icon" id="btnPin" type="button" hidden data-i18n-aria-label="top.pinName" aria-label="Keep above the game" title="Stay on top of the game" aria-pressed="false">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><g transform="rotate(40 8 8)" stroke="currentColor" fill="none" stroke-width="1.4" stroke-linecap="round" stroke-linejoin="round"><path d="M5.2 1.6h5.6"/><path d="M6.4 1.6v3.9L4.3 8.3h7.4L9.6 5.5V1.6" fill="currentColor" fill-opacity=".3"/><path d="M8 8.3v6.2"/></g></svg>
+  </button>
+  <!-- Durchklick als Knopf (Entscheidung vom 29.09. (an Claude
+       uebertragen), DECISION 11.4): schaltet dasselbe wie Strg+Umschalt+D -
+       oben halten und die Maus ins Spiel lassen. Zurueck geht es nur mit dem
+       Kuerzel, das die Pille mit dem Schloss nennt. Nur im Kompakt der App. -->
+  <button class="btn icon" id="btnDurch" type="button" hidden data-i18n-aria-label="top.durchName" aria-label="Click-through" aria-pressed="false">
+    <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3 2.5v8.2l2.2-2 1.6 3.6 1.5-.7-1.6-3.5h3z" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linejoin="round"/><path d="M12.5 7.5v6M10.3 11.3l2.2 2.2 2.2-2.2" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round" stroke-linejoin="round"/></svg>
+  </button>
+  <!-- Einstellungen (Instrumententafel Stufe 3): ein ruhiger Symbolknopf wie
+       die anderen, derselbe Wechsel wie das Zahnrad der Bereichsleiste
+       (switchTab("settings"), 57-einstellungen.ts). Im Kompakt nicht da. -->
+  <button class="btn icon" id="btnEinst" type="button" data-i18n-title="tabs.settings" data-i18n-aria-label="tabs.settings" aria-label="Settings" title="Settings"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><path d="M6.95 3.32L7.17 1.45L8.83 1.45L9.05 3.32L10.57 3.95L12.05 2.78L13.22 3.95L12.05 5.43L12.68 6.95L14.55 7.17L14.55 8.83L12.68 9.05L12.05 10.57L13.22 12.05L12.05 13.22L10.57 12.05L9.05 12.68L8.83 14.55L7.17 14.55L6.95 12.68L5.43 12.05L3.95 13.22L2.78 12.05L3.95 10.57L3.32 9.05L1.45 8.83L1.45 7.17L3.32 6.95L3.95 5.43L2.78 3.95L3.95 2.78L5.43 3.95z" fill="none" stroke="currentColor" stroke-width="1.25" stroke-linejoin="round"/><circle cx="8" cy="8" r="2" fill="none" stroke="currentColor" stroke-width="1.25"/></svg></button>
+  <div class="moremenu">
+    <!-- Gezeichnet, nicht getippt. Hier stand ein Auslassungszeichen als Text,
+           waehrend die Fensterknoepfe daneben echte SVG tragen - zwei Sorten
+           Symbole in einer Leiste, zwei Groessen, zwei Gewichte. -->
+      <button class="btn icon" id="btnMore" aria-haspopup="true" aria-expanded="false" title="More" data-i18n-title="top.more" data-i18n-aria-label="top.more" aria-label="More"><svg viewBox="0 0 16 16" width="15" height="15" aria-hidden="true"><circle cx="3.2" cy="8" r="1.35" fill="currentColor"/><circle cx="8" cy="8" r="1.35" fill="currentColor"/><circle cx="12.8" cy="8" r="1.35" fill="currentColor"/></svg></button>
+    <div class="morepanel" id="morePanel" hidden>
+      <button class="mi" id="btnLang" title="Switch to German">Language: DE</button>
+      <button class="mi" id="btnSample" data-i18n="top.sample">Sample</button>
+      <div class="misep"></div>
+      <!-- Three positions, two outcomes. "Auto" is not a third look: it
+           means take the one the system is set to. -->
+      <div class="mizoom miseg" id="themeRow">
+        <span data-i18n="top.theme">Colours</span>
+        <button type="button" data-theme="dark" data-i18n="top.themeDark">Dark</button>
+        <button type="button" data-theme="light" data-i18n="top.themeLight">Light</button>
+        <button type="button" data-theme="tnl" data-i18n="top.themeTnl">TnL</button>
+        <button type="button" data-theme="auto" data-i18n="top.themeAuto">Auto</button>
+      </div>
+      <div class="mizoom" id="zoomRow">
+        <span data-i18n="top.zoom">Size</span>
+        <button id="zoomOut" type="button" aria-label="Smaller" data-i18n-aria-label="top.zoomSmaller">&#8722;</button>
+        <button id="zoomVal" type="button">100%</button>
+        <button id="zoomIn" type="button" aria-label="Bigger" data-i18n-aria-label="top.zoomBigger">+</button>
+      </div>
+      <!-- Only while the overlay is the thing on screen: fading the full view
+           would be fading the window you are working in. -->
+      <div class="mizoom" id="seeRow" hidden title="How much of the game shows through" data-i18n-title="top.seeThroughTitle">
+        <span data-i18n="top.seeThrough">See-through</span>
+        <button id="seeLess" type="button" aria-label="Less see-through" data-i18n-aria-label="top.seeLess">&#8722;</button>
+        <input type="range" id="seeSlide" min="0" max="55" step="1" value="0"
+               aria-label="See-through" data-i18n-aria-label="top.seeThrough">
+        <button id="seeVal" type="button">0%</button>
+        <button id="seeMore" type="button" aria-label="More see-through" data-i18n-aria-label="top.seeMore">+</button>
+      </div>
+      <!-- Der Geist steht seit dem Overlay-Look hier und nicht mehr in der
+           Leiste des Streifens (Entscheidung vom 29.09. (an
+           Claude uebertragen), DECISION 11.4); nur im Kompakt. -->
+      <div class="mizoom" id="ghostRow">
+        <span data-i18n="top.ghostName">Ghost mode</span>
+        <button class="btn icon" id="btnGhost" type="button" hidden data-i18n-aria-label="top.ghostName" aria-label="Ghost mode" title="Go see-through on its own when the mouse is elsewhere" aria-pressed="false">
+      <!-- Wellensaum statt Zacken, kaum Fuellung, hohe Augen: bei 100 %
+           las sich die gefuellte Kuppel ueber dem geraden Koerper als
+           Vorhaengeschloss. Das Gespenst erkennt man an Augen und Saum. -->
+      <svg viewBox="0 0 16 16" aria-hidden="true"><path d="M3.2 14V7.2a4.8 4.8 0 0 1 9.6 0V14Q11.2 12.2 9.6 14Q8 12.2 6.4 14Q4.8 12.2 3.2 14z" stroke="currentColor" fill="currentColor" fill-opacity=".12" stroke-width="1.3" stroke-linejoin="round"/><ellipse cx="6.4" cy="7.4" rx="1" ry="1.4" fill="currentColor"/><ellipse cx="9.6" cy="7.4" rx="1" ry="1.4" fill="currentColor"/></svg>
+    </button>
+      </div>
+      <!-- Steht nur da, wenn der Geist den Regler wirklich deckelt. Ein
+           Deckel, den man nicht sieht, ist ein Fehler. -->
+      <p class="seenote" id="seeNote" hidden></p>
+      <!-- Das Kuerzel fuer den Durchklick, hier und nicht nur im Guide: wer
+           es braucht, sucht es im Menue des Overlays. Ist es von einem
+           anderen Programm belegt, steht das hier statt eines stummen
+           Nichts. syncHotkeyNote() fuellt die Zeile; nur in der App. -->
+      <p class="seenote" id="hotkeyNote" hidden></p>
+      <!-- Die Hilfe zum Kompaktfenster (Fenster-Extras 3.5): warum es nur
+           ueber einem randlosen Spiel liegt. Nur in der App; der Hinweis
+           beim ersten Kompakt zeigt hierher. -->
+      <p class="seenote" id="randlosNote" hidden data-i18n="compact.randlos">The compact window only stays above the game when Throne and Liberty runs as a borderless window (Settings &#8594; Graphics &#8594; Display mode).</p>
+      <!-- Der Satz aus #57 (Nachtraege N4): was das Kompaktfenster ist und
+           was nicht. Nur in der App, wie der Satz darueber. -->
+      <p class="seenote" id="fensterNote" hidden data-i18n="compact.fensterSatz">A normal Windows window above the game, not an overlay in the game. Borometer does not touch the game.</p>
+      <div class="misep"></div>
+      <!-- Nur im Entwicklermodus: eine Gruppe aus Kaempfen des geladenen
+           Logs, damit man die Auswahl "Wessen" im Zeitverlauf und in der
+           Rotation ausprobieren kann, ohne eine echte Gruppe. -->
+      <button class="mi" id="miFakeParty" hidden data-i18n="top.demoParty">Example party</button>
+      <div class="misep"></div>
+      <!-- Das Menue gibt es seit Stufe 3 nur im Kompakt. Der Fehlerbericht
+           steht in der Statusleiste der vollen Ansicht ("Fehler melden"),
+           Aenderungsprotokoll und Entwicklermodus in ihren
+           Einstellungen, "Als Bild teilen" als Knopf im
+           Kopf (#btnBild) - mitten im Kampf schreibt niemand einen
+           Fehlerbericht. Der Satz darunter sagt, wo sie sind. -->
+      <p class="seenote nurkompakt" data-i18n="top.moreInFull">More in the full view</p>
+    </div>
+  </div>
+  <input type="file" id="fileInput" multiple accept=".txt,.log,.csv" hidden>
+  <input type="file" id="runsInput" accept=".json" hidden>
+  <input type="file" id="partyLogInput" accept=".json" hidden>
+</header>
+<!-- Das Aufklappfeld der Kampfwahl. Nicht modal: ein Klick daneben oder Esc
+     schliesst es, der Fokus geht an den Knopf zurueck. Ausserhalb von
+     header.top, weil dessen backdrop-filter ein position:fixed darin an die
+     Leiste binden wuerde. Die Liste ist dieselbe wie in der alten Schiene -
+     ihre ids bleiben, renderFights() und renderRuns() (30) bauen sie. -->
+<div class="kampfwahl" id="kampfwahl" role="dialog" aria-modal="false" data-i18n-aria-label="kw.title" aria-label="Choose a fight" hidden>
+  <!-- Neugestaltung 28.09. (Luecken 0.6, 0.8, DECISION 0.24): oben der Tag
+       und die Zahl der Kaempfe (railKopf, 30), daneben Live, gekoppelt mit
+       dem Umschalter der Titelleiste (syncLiveBtn, 45). -->
+  <!-- Nachtraege N3: links und rechts vom Tag die frueheren Tage aus dem
+       Log-Ordner (nur in der App, syncTage in 23), "Heute" und die Pause,
+       solange ein frueherer Tag offen ist. -->
+  <div class="kwkopf">
+    <button class="kwpf" id="kwTagVor" type="button" data-i18n-aria-label="kw.tagVor" aria-label="Previous day" data-i18n-title="kw.tagVor" title="Previous day" hidden disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+    <p class="kwtag"><b id="kwTag"></b><span class="kwzahl"><span id="fightCount">No fights yet</span><span class="kwpause" id="kwPause" hidden></span></span></p>
+    <button class="kwpf" id="kwTagNach" type="button" data-i18n-aria-label="kw.tagNach" aria-label="Next day" data-i18n-title="kw.tagNach" title="Next day" hidden disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+    <span class="kwluft" aria-hidden="true"></span>
+    <button class="kwheute" id="kwHeute" type="button" data-i18n="kw.heute" hidden>Today</button>
+    <button class="kwlive" id="kwLive" type="button" aria-pressed="false" data-i18n-aria-label="kw.live" aria-label="Live logging"><span class="ldot" aria-hidden="true"></span><span id="kwLiveWort" aria-hidden="true">Live off</span></button>
+  </div>
+  <div class="kwsuche">
+    <input type="text" id="kwSuche" role="combobox" aria-autocomplete="list" aria-expanded="true" aria-controls="fightList"
+           autocomplete="off" spellcheck="false" data-i18n-ph="kw.search" placeholder="Search boss, place, time, DPS"
+           data-i18n-aria-label="kw.searchLabel" aria-label="Search fights">
+  </div>
+  <p class="vh" id="kwStatus" role="status" aria-live="polite"></p>
+  <div class="kwliste" id="kwListe" tabindex="-1">
+    <!-- railKopf() schreibt die Zahl in den Kopf (#fightCount), dazu "n entfernt - zurueck". -->
+    <p class="feditnote" id="fightEditNote" role="status" hidden></p>
+    <!-- Die gespeicherten Kaempfe als eigene Gruppe oben; der Fussknopf
+         "Gespeichert" klappt sie auf und zu (syncKwLaeufe). -->
+    <section class="runsec" id="kwRuns" aria-labelledby="kwRunsTitel" hidden>
+      <h2 id="kwRunsTitel"><span data-i18n="rail.savedRuns">Saved fights</span> <span id="runCount"></span></h2>
+      <div class="runs" id="runList"></div>
+      <div class="empty-note" id="runNote">None yet. Save fight puts the fight you are looking at here, ready to compare.</div>
+      <button class="btn sm cmpbtn" id="btnCompareNow" hidden><span data-i18n="rail.compareNow">Compare</span> <span class="cmpn" id="cmpCount"></span></button>
+    </section>
+    <div class="fightlist" id="fightList" role="listbox" data-i18n-aria-label="rail.railLabel" aria-label="Fights"></div>
+    <p class="empty-note" id="kwKeinTreffer" hidden></p>
+    <!-- Beim Start ohne Log laeuft renderFights() noch nicht: der Satz der
+         Liste ist dann zu und "Kein Kampf - Log oeffnen" steht da. -->
+    <div class="empty-note" id="fightHint" data-i18n="rail.noFightsYet" hidden>No fights loaded yet.</div>
+    <div class="kwleer" id="kwLeer">
+      <span data-i18n="kw.none">No fight &#8211; open a log</span>
+      <button class="btn hot sm" id="kwOeffnen" type="button" data-i18n="top.openLogs">Open logs</button>
+    </div>
+  </div>
+  <!-- DECISION 0.12: links die Tastenhinweise mit gezeichneten Tasten, rechts
+       die Knoepfe; Loesen mit Rueckgaengig bleibt an der Zeile. -->
+  <div class="kwfuss">
+    <p class="kwtasten" data-i18n-title="kw.tasten" title="Arrow keys choose, Enter opens, Ctrl with the left or right arrow goes to the previous or next fight"><span class="kt"><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></kbd> <span data-i18n="kw.tWaehlen">choose</span></span><span class="kt"><kbd>Enter</kbd> <span data-i18n="kw.tOeffnen">open</span></span><span class="kt"><kbd data-i18n="kw.kbdStrg">Ctrl</kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></kbd> <span data-i18n="kw.tBlaettern">previous/next fight</span></span></p>
+    <span class="kwknoepfe">
+    <button class="fclear" id="kwLaeufe" type="button" aria-expanded="false" aria-controls="kwRuns" data-i18n-title="rail.savedRuns" title="Saved fights">Saved</button>
+    <!-- aria-haspopup, nicht aria-expanded: dahinter liegt der Filterdialog
+         (role="dialog" aria-modal="true"). Der volle Name steht im title. -->
+    <button class="fclear" id="filterBtn" type="button" aria-haspopup="dialog" data-i18n-title="rail.filterTitle"
+            title="Split fights and hide short ones, and save or load your saved fights as a file"><span data-i18n="kw.filter">Filter</span></button>
+    <!-- Beschriftung und title setzt renderFights() (Bearbeiten/Fertig). -->
+    <button class="fclear" id="btnEditFights" hidden type="button" aria-pressed="false">Edit</button>
+    <button class="fclear" id="btnClearLog" hidden data-i18n="rail.clearLog" data-i18n-title="rail.clearLogTitle" title="Clear the list">Clear</button>
+    </span>
+  </div>
+</div>
+
+<div class="shell">
+  <!-- role="main" statt eines Wechsels auf <main>: das Element bleibt ein
+     <section>, damit nichts, was es ueber seinen Tag sucht, ins Leere greift.
+     Die Rolle ist dieselbe. Ohne sie hatte das Dokument gar keine
+     Hauptregion, und ein Vorleser konnte nicht zum Inhalt springen. -->
+<section class="stage landing" role="main" id="stage" tabindex="-1" data-i18n-aria-label="top.mainLabel" aria-label="Content">
+    <!-- Start (Neugestaltung 28.09., Luecken 1): zwei Spalten, ueber die Hoehe
+         verteilt (Spezifikation 1; die Vorgabe zu Aufgabe 8: "unten so viel Platz"). Links die Marke - Palatino
+         nur auf "Throne and Liberty" -, der Satz, "Log-Ordner waehlen" (in der
+         App; im Browser, wo es keinen Ordner gibt, "Logdatei oeffnen") und der
+         Beispielkampf, darunter der Hinweis mit dem Pfad und die
+         Nur-gelesen-Zeile. Rechts das Ablagefeld: ein Knopf (Enter waehlt eine
+         Datei), abgelegt werden darf weiter ueberall (#dropOverlay). Darunter,
+         solange der Helfer keinen Log-Ordner kennt, die Einrichtung als leises
+         Feld (DECISION 1.12), sonst "Zuletzt geoeffnet" aus dem Verzeichnis der
+         gelesenen Dateien - jede Zeile oeffnet ihre Datei ueber GET /api/log
+         (1.9, Nachtraege N3). Den wechselnden Teil schreibt
+         renderStart() (45-startup.ts). -->
+    <div class="land" id="land">
+      <section class="startlinks" aria-labelledby="startMarke">
+        <div class="brand"><b class="brandname" id="startMarke">BOROMETER</b> <span class="gamename" lang="en">Throne and Liberty</span></div>
+        <p class="landsatz" data-i18n="land.satz">Borometer reads the combat log the game writes after every fight and shows you what carried your damage &#8211; and where seconds went missing.</p>
+        <div class="landknoepfe">
+          <button class="btn hot gross" type="button" id="btnPickFolder"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span id="btnPickFolderWort">Choose log folder</span></button>
+          <button class="btn gross" type="button" id="btnSample2"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></svg><span data-i18n="land.sampleAnsehen">View the sample fight</span></button>
+        </div>
+        <p class="landhinweis" id="landHinweis"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg><span id="landHinweisSatz"></span></p>
+        <p class="privacy"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg><span data-i18n="land.privacy">Read only: Borometer opens a file the game writes itself. No access to the game, no account, nothing is uploaded.</span></p>
+      </section>
+      <div class="startrechts">
+        <button class="ablage" type="button" id="btnOpen2"><span class="dropkreis" aria-hidden="true"><svg class="i" viewBox="0 0 24 24"><path d="M12 4v11M7.5 10.5L12 15l4.5-4.5"/><path d="M4 15v4a1 1 0 0 0 1 1h14a1 1 0 0 0 1-1v-4"/></svg></span><b data-i18n="land.dropTitel">Drag a log file here</b><span data-i18n="land.dropSatz">A TLCombatLog-&#8230;.txt from the log folder &#183; or Enter to pick a file</span></button>
+        <!-- Die Einrichtung: leise, solange kein Ordner gefunden ist (DECISION 1.12).
+             Die Ziffer steht als eigenes Element neben dem Text: der Uebersetzer
+             setzt textContent, und ein Kind im selben Knoten waere beim
+             Sprachwechsel weg. -->
+        <section class="landsetup" id="landSetup" aria-labelledby="landSetupT">
+          <h2 id="landSetupT" data-i18n="land.setupTitle">First, get the game writing logs</h2>
+          <ol>
+            <li><b>1</b><span data-i18n="land.step1">Settings</span></li>
+            <li><b>2</b><span data-i18n="land.step2">Shortcuts</span></li>
+            <li><b>3</b><span data-i18n="land.step3">Ring Menu</span></li>
+            <li><b>4</b><span data-i18n="land.step4">Add Combat Meter</span></li>
+          </ol>
+          <p data-i18n="land.setupAfter">Then switch it on once from the ring menu. From then on the game writes a file every time a fight ends.</p>
+          <p id="landFehlt" hidden data-i18n="land.folderNotFound">Borometer could not find your combat log folder on its own. Pick it once and it is remembered.</p>
+        </section>
+        <section class="zul" id="landZuletzt" aria-labelledby="landZulT" hidden>
+          <div class="zk"><h2 id="landZulT" data-i18n="land.zuletzt">Recently opened</h2><button class="btn sm leise" type="button" id="btnWatch2" aria-pressed="false"><i class="ldot" aria-hidden="true"></i><span id="btnWatch2Wort">Start live logging</span></button></div>
+          <ul class="zliste" id="landZuletztListe"></ul>
+          <p class="zleer" id="landZuletztLeer" hidden data-i18n="land.zuletztLeer">No file read yet. What Borometer reads shows up here.</p>
+          <button class="zr" type="button" id="landBspZeile"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><path d="M8 5.5v13l10.5-6.5z" fill="currentColor" stroke="none"/></svg><span class="zt"><span class="zf zb" data-i18n="land.bspName">Sample fight</span><small data-i18n="land.bspWas">built in &#183; Dragaryle and Ramux</small></span><span class="zn" data-i18n="land.bspZahl">2 fights</span></button>
+        </section>
+      </div>
+    </div>
+
+    <!-- Einstellungen (Neugestaltung 28.09., Luecken 10; 57-einstellungen.ts):
+         ein Ort wie Start, ohne Kampf erreichbar (state.einst). EINE rollende
+         Seite wie im Entwurf (E:919-966): links die Sprungleiste (haftet; ein
+         Klick springt zum Abschnitt, beim Rollen leuchtet der Abschnitt mit,
+         der oben steht), rechts Titel und acht Abschnitte untereinander -
+         Darstellung, Sprache, Groesse, Overlay, Log-Ordner, Gruppe und Server,
+         Entwickler, Info. Der Titel ist ein h2 (das h1 ist die Wortmarke der
+         Titelleiste), jeder Abschnitt eine section mit h3; die Zeilen im
+         Muster .ezeile > .ezt (Beschriftung, Satz) + .ezc (Bedienelement).
+         Unter 760 Punkt steht die Leiste als Zeile ueber der Seite. -->
+    <section class="einst" id="einst" hidden aria-labelledby="einstTitel">
+      <div class="einstraster">
+        <nav class="einstnav" id="einstNav" data-i18n-aria-label="einst.navName" aria-label="Sections of the settings">
+          <button type="button" data-gruppe="darst" aria-current="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 4l6 6-7.5 7.5-6-6z"/><path d="M6.5 11.5c-2 0-3 1.5-3 3.5 0 2-1 3-1 3s4.5.5 6.5-1.5c1-1 1-2.5.5-3.5"/></svg><span data-i18n="einst.g.darst">Appearance</span></button>
+          <button type="button" data-gruppe="sprache"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5S14.5 17.9 12 20.5M12 3.5C9.5 6.1 8.5 8.9 8.5 12s1 5.9 3.5 8.5"/></svg><span data-i18n="einst.g.sprache">Language</span></button>
+          <button type="button" data-gruppe="groesse"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M4 9V4h5M20 15v5h-5M4 4l6.5 6.5M20 20l-6.5-6.5"/></svg><span data-i18n="einst.g.groesse">Size</span></button>
+          <button type="button" data-gruppe="overlay"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><rect x="11.5" y="8" width="6.5" height="8" rx="1"/></svg><span data-i18n="einst.g.overlay">Overlay</span></button>
+          <button type="button" data-gruppe="logs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span data-i18n="einst.g.logs">Log folder</span></button>
+          <button type="button" data-gruppe="gruppe"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5S14.5 17.9 12 20.5M12 3.5C9.5 6.1 8.5 8.9 8.5 12s1 5.9 3.5 8.5"/></svg><span data-i18n="einst.g.gruppe">Party and server</span></button>
+          <button type="button" data-gruppe="dev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15"/></svg><span data-i18n="einst.g.dev">Developer</span></button>
+          <button type="button" data-gruppe="info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg><span data-i18n="einst.g.info">Info</span></button>
+        </nav>
+        <div class="einstgruppen">
+          <header class="einstkopf">
+            <h2 id="einstTitel" data-i18n="einst.titel">Settings</h2>
+            <p id="einstKopfSatz">Takes effect at once</p>
+          </header>
+          <!-- Darstellung: die Themen als vier Kacheln mit Vorschau (eine
+               radiogroup, ein Tabstopp, Pfeiltasten); jede ruft setzeThema wie
+               das Kompakt-Menue. "Bewegung verringern" nur als Anzeige, was
+               Windows sagt (DECISION 10.4, kein Schluessel). -->
+          <section class="egruppe" id="eg-darst" aria-labelledby="egh-darst">
+            <h3 id="egh-darst" tabindex="-1" data-i18n="einst.g.darst">Appearance</h3>
+            <b class="vh" id="eThemaName" data-i18n="einst.thema">Theme</b>
+            <div class="themen" id="eThema" role="radiogroup" aria-labelledby="eThemaName">
+              <button type="button" class="thk" role="radio" data-theme="dark" aria-checked="true"><span class="thv thv-dark" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeDark">Dark</span></span></button>
+              <button type="button" class="thk" role="radio" data-theme="light" aria-checked="false" tabindex="-1"><span class="thv thv-light" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeLight">Light</span></span></button>
+              <button type="button" class="thk" role="radio" data-theme="tnl" aria-checked="false" tabindex="-1"><span class="thv thv-tnl" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeTnl">TnL</span></span></button>
+              <button type="button" class="thk" role="radio" data-theme="auto" aria-checked="false" tabindex="-1"><span class="thv thv-auto" aria-hidden="true"></span><span class="tn2"><span data-i18n="einst.themaAuto">Auto</span> <small data-i18n="einst.wieWindows">like Windows</small></span></button>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b data-i18n="einst.bewegung">Reduce motion</b><span data-i18n="einst.bewegungSatz">Follows Windows (animation effects). With them off, the big number stands at once and nothing glides.</span></div>
+              <div class="ezc"><span class="ewert" id="eBewegung"></span></div>
+            </div>
+          </section>
+          <section class="egruppe" id="eg-sprache" aria-labelledby="egh-sprache">
+            <h3 id="egh-sprache" tabindex="-1" data-i18n="einst.g.sprache">Language</h3>
+            <div class="ezeile">
+              <div class="ezt"><b id="eSpracheName" data-i18n="einst.sprache">Interface language</b><span data-i18n="einst.spracheSatz">Every sentence exists in both languages.</span></div>
+              <div class="ezc">
+                <!-- Die Namen der Sprachen in ihrer eigenen Sprache: wer die
+                     andere sucht, liest sie so, wie er sie kennt. -->
+                <div class="seg eseg" id="eSprache" role="group" aria-labelledby="eSpracheName">
+                  <button type="button" data-lang="de" lang="de" aria-pressed="false">Deutsch</button>
+                  <button type="button" data-lang="en" lang="en" aria-pressed="true">English</button>
+                </div>
+              </div>
+            </div>
+          </section>
+          <section class="egruppe" id="eg-groesse" aria-labelledby="egh-groesse">
+            <h3 id="egh-groesse" tabindex="-1" data-i18n="einst.g.groesse">Size</h3>
+            <div class="ezeile">
+              <div class="ezt"><b id="eZoomName" data-i18n="einst.groesse">Interface size</b><span id="eZoomSatz" data-i18n="einst.groesseSatz">Everything in Borometer bigger or smaller.</span></div>
+              <div class="ezc"><span class="erng"><input type="range" id="eZoom" min="10" max="200" step="1" value="100" aria-labelledby="eZoomName" aria-describedby="eZoomSatz"><output for="eZoom" class="num">100&nbsp;%</output></span></div>
+            </div>
+          </section>
+          <!-- Overlay: das Kompaktfenster der App (nur im eigenen Fenster am
+               Helfer, .nurapp; im Browser steht der Satz). Durchklickbar schaltet
+               nur das Kuerzel - in einem durchklickbaren Fenster laesst sich
+               nichts mehr anklicken -, die Zeile zeigt es mit dem Satz von
+               #hotkeyNote. "Ueber dem Spiel halten" ist #btnPin als Schalter,
+               "Overlay ansehen" oeffnet das Kompaktfenster (DECISION 10.12). -->
+          <section class="egruppe" id="eg-overlay" aria-labelledby="egh-overlay">
+            <h3 id="egh-overlay" tabindex="-1" data-i18n="einst.g.overlay">Overlay</h3>
+            <p class="ehinweis" id="eFenstBrowser" hidden data-i18n="einst.fenstBrowser">This section concerns the app&#8217;s window; in the browser, the browser draws the window.</p>
+            <p class="ehinweis nurapp" id="eFensterSatz" hidden data-i18n="compact.fensterSatz">A normal Windows window above the game, not an overlay in the game. Borometer does not touch the game.</p>
+            <div class="ezeile nurapp" hidden>
+              <div class="ezt"><b id="eSeeName" data-i18n="top.seeThrough">See-through</b><span id="eSeeSatz" data-i18n="einst.seeSatz">How much of the game shows through the compact window.</span></div>
+              <div class="ezc"><span class="erng"><input type="range" id="eSee" min="0" max="55" step="1" value="0" aria-labelledby="eSeeName" aria-describedby="eSeeSatz"><output for="eSee" class="num">0&nbsp;%</output></span></div>
+            </div>
+            <div class="ezeile nurapp" hidden>
+              <div class="ezt"><b data-i18n="einst.kuerzel">Click-through</b><span id="eKuerzelSatz"></span></div>
+              <div class="ezc"><span class="ekeys" id="eKuerzel"></span></div>
+            </div>
+            <div class="ezeile nurapp" hidden>
+              <div class="ezt"><b id="eObenName" data-i18n="einst.oben">Keep above the game</b><span id="eRandlosSatz" data-i18n="compact.randlos">The compact window only stays above the game when Throne and Liberty runs as a borderless window.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eOben" role="switch" aria-checked="false" aria-labelledby="eObenName" aria-describedby="eRandlosSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="eknoepfe nurapp" hidden><button type="button" class="btn sm" id="eOverlay"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="14" rx="2"/><rect x="11.5" y="8" width="6.5" height="8" rx="1"/></svg><span data-i18n="einst.overlayAnsehen">View the overlay</span></button></div>
+          </section>
+          <!-- Log-Ordner: dieselben Funktionen wie das Filterfeld der Kampfwahl
+               (chooseServerDir, setzeTrennung, kampfdateiSpeichern/-Laden), Live
+               wie der Knopf der Titelleiste. "Im Explorer zeigen" oeffnet den
+               beobachteten Ordner ueber POST /api/folder/open mit dem Schluessel
+               "game" (Nachtraege N1). -->
+          <section class="egruppe" id="eg-logs" aria-labelledby="egh-logs">
+            <h3 id="egh-logs" tabindex="-1" data-i18n="einst.g.logs">Log folder</h3>
+            <div class="ezeile">
+              <div class="ezt"><b id="eOrdnerName" data-i18n="einst.ordner">Combat log folder</b><span id="eOrdnerSatz" data-i18n="einst.ordnerSatz">Borometer reads the game&#8217;s combat logs from this folder, and only reads them.</span><span id="eOrdnerBrowser" hidden data-i18n="einst.ordnerBrowser">In the browser there is no folder to watch: the browser opens single files.</span></div>
+              <div class="ezc" id="eOrdnerBedien"><code class="epfad" id="eOrdner"></code><button type="button" class="btn sm" id="eOrdnerAendern" data-i18n="einst.aendern" data-i18n-aria-label="einst.ordnerAendern" aria-label="Change combat log folder">Change folder</button><button type="button" class="btn sm" id="eOrdnerExplorer" data-i18n="einst.explorer" data-i18n-aria-label="einst.ordnerExplorer" aria-label="Show combat log folder in Explorer">Show in Explorer</button></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b id="eLiveName" data-i18n="einst.live">Live logging</b><span id="eLiveSatz" data-i18n="einst.liveSatz">Checks every few seconds for a newer file. It never starts on its own.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eLive" role="switch" aria-checked="false" aria-labelledby="eLiveName" aria-describedby="eLiveSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b><label for="eGap" data-i18n="rail.splitAfter">Split fights after (s)</label></b><span id="eGapSatz" data-i18n="rail.splitAfterHint">Starts a new fight after this many seconds without damage on the target</span></div>
+              <div class="ezc"><input type="number" id="eGap" class="num enum" value="8" min="1" max="120" aria-describedby="eGapSatz"></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b><label for="eMin" data-i18n="rail.minLength">Minimum fight length (s)</label></b><span id="eMinSatz" data-i18n="rail.minLengthHint">Fights shorter than this are hidden</span></div>
+              <div class="ezc"><input type="number" id="eMin" class="num enum" value="3" min="0" max="120" aria-describedby="eMinSatz"></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b id="ePhasenName" data-i18n="rail.mergePhases">Connect boss phases</b><span id="ePhasenSatz" data-i18n="einst.phasenSatz">Some bosses go untargetable for a phase. On, Borometer connects those phases into one fight; off, it splits at every pause.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="ePhasen" role="switch" aria-checked="true" aria-labelledby="ePhasenName" aria-describedby="ePhasenSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">On</span></button></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b data-i18n="einst.kampfdatei">Fight file</b><span data-i18n="einst.kampfdateiSatz">Every saved fight in one file, to keep or to open on another computer.</span></div>
+              <div class="ezc"><button type="button" class="btn sm" id="eSpeichern" data-i18n="einst.speichern" data-i18n-aria-label="rail.saveRunsFile" aria-label="Save fight file">Save</button><button type="button" class="btn sm" id="eLaden" data-i18n="einst.laden" data-i18n-aria-label="rail.loadRunsFile" aria-label="Load fight file">Load</button></div>
+            </div>
+            <!-- Rekorde (Spezifikation Rekorde 3): die 60 neuesten Logs noch einmal nachlesen
+                 (62-rekorde.ts); geloescht wird nichts. Im Browser gibt es keinen Ordner. -->
+            <div class="ezeile">
+              <div class="ezt"><b id="eRekordeName" data-i18n="einst.rekorde">Records</b><span id="eRekordeSatz" data-i18n="einst.rekordeSatz">Reads the 60 newest logs in the log folder again for the records. Nothing is deleted.</span><span id="eRekordeBrowser" hidden data-i18n="einst.rekordeBrowser">Only in the app: in the browser there is no log folder to read.</span><span class="erkstand" id="eRekordeStand" role="status"></span></div>
+              <div class="ezc"><button type="button" class="btn sm" id="eRekorde" data-i18n="einst.rekordeKnopf" aria-describedby="eRekordeSatz">Read records again</button></div>
+            </div>
+          </section>
+          <!-- Gruppe und Server: der Gruppen-Server wird nur hier gespeichert und
+               geprueft (POST /api/party/server und /api/party/check, die
+               Handler in 42-party.ts); der Bereich Gruppe traegt die Adresse
+               nur zum Starten. Im Browser gibt es keine Gruppe - dann der Satz. -->
+          <section class="egruppe" id="eg-gruppe" aria-labelledby="egh-gruppe">
+            <h3 id="egh-gruppe" tabindex="-1" data-i18n="einst.g.gruppe">Party and server</h3>
+            <p class="ehinweis" id="eGruppeBrowser" hidden data-i18n="party.needsApp">Parties need the Borometer app.</p>
+            <div class="eserver nurserved" hidden>
+              <label for="eServer" data-i18n="einst.server">Party server</label>
+              <div class="srvfeld"><input class="textin mono" id="eServer" autocomplete="off" spellcheck="false" data-i18n-ph="party.serverPh" placeholder="e.g. 203.0.113.5:8732" aria-describedby="eServerSatz eServerOffen">
+                <button class="btn sm" type="button" id="eServerSave" data-i18n="party.serverSave">Save</button>
+                <button class="btn sm" type="button" id="eServerCheck" data-i18n="party.checkNow">Check now</button></div>
+              <p class="gleise" id="eServerOffen" hidden></p>
+              <!-- Ist der Server erreichbar? Nur fuer die gespeicherte Adresse (checkPartyServer) -->
+              <div class="srvstatus" id="eServerStatus" role="status" aria-live="polite" hidden><span class="dot"></span><span id="eServerStatusText"></span></div>
+              <p class="gleise" id="eServerSatz" data-i18n="party.serverDesc">One fixed address for the whole clan, so a code keeps working when the person who made it goes offline.</p>
+            </div>
+          </section>
+          <!-- Entwickler: der Schalter, die Beispiele (Beispielgruppe nur im
+               Entwicklermodus, DECISION 10.12), der Satz zum Fehlerbericht und der Knopf
+               zum Aenderungsprotokoll (der bestehende Dialog, toggleChangelog) -
+               kein Auszug auf der Seite (Entscheidung Pruefung Aufgabe 8). -->
+          <section class="egruppe" id="eg-dev" aria-labelledby="egh-dev">
+            <h3 id="egh-dev" tabindex="-1" data-i18n="einst.g.dev">Developer</h3>
+            <div class="ezeile">
+              <div class="ezt"><b id="eDevName" data-i18n="top.devMode">Developer mode</b><span id="eDevSatz" data-i18n="einst.devSatz">Shows the log setup, the CSV export, &#8220;By weapon&#8221; and the example party &#8211; tools for checking a log.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eDev" role="switch" aria-checked="false" aria-labelledby="eDevName" aria-describedby="eDevSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="ezeile" id="eBeispielZeile" hidden>
+              <div class="ezt"><b id="eBeispielName" data-i18n="top.demoParty">Example party</b><span data-i18n="einst.beispielSatz">Up to three example members made from the fights in the log, to try the group views. A second click clears them.</span></div>
+              <div class="ezc"><button type="button" class="btn sm" id="eBeispiel" aria-labelledby="eBeispiel eBeispielName" data-i18n="einst.beispielKnopf">Show or clear</button></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b data-i18n="einst.beispielkampf">Sample fight</b><span data-i18n="einst.beispielkampfSatz">Two fights to try Borometer without a log of your own. They replace what is loaded now.</span></div>
+              <div class="ezc"><button type="button" class="btn sm" id="eBeispielkampf" data-i18n="einst.laden" data-i18n-aria-label="land.sample" aria-label="Load a sample fight">Load</button></div>
+            </div>
+            <!-- Der Fehlerbericht ist seit 01.10. "Fehler melden" in der
+                 Statusleiste (so gewaehlt). Hier bleibt die Zeile als Satz,
+                 der dorthin zeigt: wer ihn in den Einstellungen sucht, wo er
+                 in 1.7 stand, findet den Weg. -->
+            <div class="ezeile" id="eFehlerZeile">
+              <div class="ezt"><b data-i18n="einst.fehler">Bug report</b><span data-i18n="einst.fehlerSatz">Now at the bottom right of the status bar: &#8220;Report a bug&#8221;.</span></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b data-i18n="einst.clogName">Changes</b><span data-i18n="einst.clogWas">What changed in each version of Borometer.</span></div>
+              <div class="ezc"><button type="button" class="btn sm" id="eClog" data-i18n="top.changelog">Changelog</button></div>
+            </div>
+          </section>
+          <!-- Info: Version, Fanprojekt und Rechte; darunter "Nur gelesen -
+               nichts im Spiel" mit der Sicherheit (DECISION 10.12): was
+               Borometer liest, schreibt, wo sein Server hoert, wann es ins
+               Netz geht und was es im Spiel tut; dieselben Regeln prueft
+               npm run audit:safety. Einziger Schalter ist der Update-Hinweis
+               (Spezifikation Update-Hinweis 2.4, Standard aus, nur mit dem
+               Helfer); seinen Hinweis zeigt die Zeile unter der Version. -->
+          <section class="egruppe" id="eg-info" aria-labelledby="egh-info">
+            <h3 id="egh-info" tabindex="-1" data-i18n="einst.g.info">Info</h3>
+            <p class="einfo"><b>Borometer <span class="num" id="einstVer"></span></b> <span data-i18n="einst.infoSatz">Fan project, free, open source under GPL-3.0.</span></p>
+            <p class="einfo eupdate" hidden><a id="eUpdate" target="_blank" rel="noopener noreferrer"></a></p>
+            <div class="ezeile" id="eUpdateZeile" hidden>
+              <div class="ezt"><b id="eUpdatePruefenName" data-i18n="einst.updatePruefen">Check for a new version at start</b><span id="eUpdatePruefenSatz" data-i18n="einst.updatePruefenSatz">Asks GitHub once per start which version is the newest. GitHub sees your IP address and the time. Nothing is downloaded or installed.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eUpdatePruefen" role="switch" aria-checked="false" aria-labelledby="eUpdatePruefenName" aria-describedby="eUpdatePruefenSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <!-- Namensnennung fuer das Symbol der Uebungspuppe (Flaticon License, Pflicht) -->
+            <p class="einfo" id="einstPuppe" data-i18n="einst.infoPuppe">The practice dummy icon is not from the game: Target practice icons created by juicy_fish - Flaticon (flaticon.com/free-icons/target-practice), under the Flaticon License.</p>
+            <!-- Der Rundgang beim ersten Start (63-rundgang.ts, Spezifikation
+                 02.10.2026): hier jederzeit noch einmal, in der App und im
+                 Browser; leise, er wechselt nach Start. -->
+            <div class="ezeile" id="eRundgangZeile">
+              <div class="ezt"><b id="eRundgangName" data-i18n="einst.rundgang">Tour</b><span data-i18n="einst.rundgangSatz">Six short steps to the buttons you need between two pulls.</span></div>
+              <div class="ezc"><button type="button" class="leise" id="eRundgang" data-i18n="einst.rundgangKnopf">Show the tour</button></div>
+            </div>
+            <p class="esichkopf"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3.5l7 2.8v5.2c0 4.3-2.9 7.6-7 9-4.1-1.4-7-4.7-7-9V6.3z"/><path d="M9 12l2.2 2.2L15.5 10"/></svg><span data-i18n="sb.readOnly">Read only &#8211; nothing in the game</span></p>
+            <dl class="esich">
+              <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2.5 12S6 5.5 12 5.5 21.5 12 21.5 12 18 18.5 12 18.5 2.5 12 2.5 12z"/><circle cx="12" cy="12" r="2.6"/></svg><span data-i18n="einst.sichLiest">Reads</span></dt>
+                <dd data-i18n="einst.sichLiestSatz">Only the combat log folder, and only to read it.</dd></div>
+              <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><rect x="8" y="13" width="8" height="5"/></svg><span data-i18n="einst.sichSchreibt">Writes</span></dt>
+                <dd data-i18n-html="einst.sichSchreibtSatz">Only into its own folders <code>Logs</code>, <code>Party-Logs</code> and <code>Bug-Reports</code>, and into its settings.</dd></div>
+              <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><path d="M12 14.5v2"/></svg><span data-i18n="einst.sichServer">Local server</span></dt>
+                <dd data-i18n-html="einst.sichServerSatz">Listens only on <code>127.0.0.1</code>. Only while you host a party is the party access reachable from outside.</dd></div>
+              <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5s1.2-6.1 3.6-8.5z"/></svg><span data-i18n="einst.sichNetz">Network</span></dt>
+                <dd data-i18n="einst.sichNetzSatz">Only when you use a party, ask Questlog with a click, or turn on the update notice.</dd></div>
+              <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="einst.sichSpiel">Game</span></dt>
+                <dd data-i18n="einst.sichSpielSatz">No access: nothing hooks into the game, nothing reads its memory.</dd></div>
+            </dl>
+          </section>
+        </div>
+      </div>
+    </section>
+
+    <!-- Weeklies (Neugestaltung 28.09., Luecke 9.1; Spezifikation Weeklies
+         29.09., Aufgabe W3): ein eigener Ort wie Start und Einstellungen,
+         ohne Kampf erreichbar (state.weeklies). Oben der Kopf mit dem Namen
+         und der Reset-Anzeige, darunter der Satz zum Speichern (Live-Region),
+         dann der Inhalt, der in sich rollt: Reiter, Wochenband und Kacheln
+         (Neugestaltung "Wochenband", Spezifikation Weeklies 9, 01.10.2026);
+         ihn zeichnet 59-weeklies.ts, die Bilder kommen aus 60-weeklies-bilder.ts. -->
+    <section class="weeklies" id="weeklies" hidden aria-labelledby="weekliesTitel">
+      <div class="wkopf">
+        <h2 id="weekliesTitel" data-i18n="tabs.weeklies">Weeklies</h2>
+        <p class="wkreset"><span id="wkWoche"></span> <span id="wkTag"></span></p>
+      </div>
+      <p class="wkstatus" id="wkStatus" role="status"></p>
+      <div class="wkrollt"><div class="wkinhalt" id="wkBody"></div></div>
+    </section>
+
+    <!-- Rekorde (Spezifikation Rekorde 2a, Sammelalbum, 02.10.2026): ein
+         Ort wie die Weeklies (state.rekorde). Oben der Kopf mit Name, Quelle und
+         dem Satz zum ersten Kampf, darunter die Zeile zum Nachlesen (Live-Region,
+         Fortschritt, Abbrechen, Weiterlesen; im Browser ein Satz), dann der
+         Inhalt, der in sich rollt: Held und Albumseiten. Ihn zeichnet
+         62-rekorde.ts, gerechnet in rekorde-core.ts. -->
+    <section class="rekorde" id="rekorde" hidden aria-labelledby="rkTitel">
+      <div class="rkkopf">
+        <h2 id="rkTitel" tabindex="-1" data-i18n="tabs.rekorde">Records</h2>
+        <p class="rkquelle" id="rkQuelle"></p>
+        <p class="rkhinweis" data-i18n="rk.hinweis">First fight means: first in the period read.</p>
+      </div>
+      <div class="rkstatus" id="rkLesen">
+        <span class="rksatz" id="rkSatz" role="status"></span><span class="rkspur" id="rkSpur" aria-hidden="true" hidden><i></i></span>
+        <button class="leise" type="button" id="rkAbbrechen" hidden data-i18n="rk.abbrechen">Stop</button><button class="leise" type="button" id="rkWeiter" hidden data-i18n="rk.weiter">Continue reading</button>
+      </div>
+      <div class="rkrollt" tabindex="0" role="region" aria-labelledby="rkTitel"><div class="rkinhalt" id="rkInhalt"></div></div>
+    </section>
+
+    <div id="app" hidden>
+      <div class="headwrap"><div class="head">
+        <!-- row 1: the number, what you were hitting, and the two things
+             you do with a finished fight. row 2: the supporting stats as
+             one strip, not five separate boxes. -->
+        <div class="headtop">
+          <div class="big"><span class="v num" id="hDps">0</span><span class="u" data-i18n="head.dpsUnit">damage per second</span><span class="ukurz" id="hDpsKurz" data-i18n="head.dpsKurz">DPS</span><span id="hPrev" class="prevline" hidden></span><span id="hSide" class="sideline" hidden></span></div>
+          <div class="headmeta"><b id="hName">&mdash;</b><span class="snapbadge" id="snapBadge" hidden data-i18n="party.snapshotBadge">Saved</span><span id="hMeta" class="factline">&mdash;</span><span id="hRead" class="readline" hidden></span><span id="hHist" class="histverdict" hidden></span></div>
+          <!-- Neugestaltung 28.09. (Luecken 2.3, 2.5, 2.6): die Handlungen
+               oben rechts wie im Entwurf - "Kampf speichern" mit Symbol,
+               Teilen als leises Symbol. Die Werteleiste (#chips) entfiel
+               (DECISION 2.3), der Knopf zum besten Pull steht jetzt als
+               "Im Vergleich" im Urteil (DECISION 2.5). -->
+          <div class="headact">
+            <!-- Zwei Fassungen, eine sichtbar (styles.css .skk): im flachen
+                 oder schmalen Fenster steht "Speichern". Der volle Name
+                 bleibt aria-label und title; saveKnopf() in 20-meter-head.ts
+                 setzt beides. -->
+            <button class="btn sm" id="btnSaveRun" aria-label="Save fight" title="Save fight"><svg class="bsym" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M5 4h11l3 3v13H5z"/><path d="M8 4v5h7V4"/><path d="M8 20v-6h8v6"/></svg><span class="skl">Save fight</span><span class="skk" aria-hidden="true">Save</span></button>
+            <!-- Als Bild teilen (50-bild.ts, bildOeffnen): ein leises Symbol,
+                 das Wort nur im Namen und im title. -->
+            <button class="btn sm quiet" id="btnBild" type="button" data-i18n-title="bild.title" data-i18n-aria-label="bild.title" aria-label="Share as image" title="Share as image"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></svg><span class="blabel" data-i18n="bild.knopf">As image</span></button>
+            <!-- Steht wieder da, wo er immer stand, und ist nur aus. Der
+                 Schalter "Entwicklermodus" in den Einstellungen (Logs) holt
+                 ihn hervor; applyDevMode() setzt das hidden. -->
+            <button class="btn sm" id="btnCsv" data-i18n="head.exportCsv" hidden>Export CSV</button>
+          </div>
+        </div>
+        <!-- Nur im Kompaktmodus sichtbar: die Lesezeile in kurz, und ob das
+             besser war als der letzte Pull. setCompactRead() fuellt sie. -->
+        <p class="compactread" id="hCompact" hidden></p>
+      </div></div>
+      <!-- Der Glutring (Spezifikation 02.10.2026, 64-glutring.ts): im Bereich
+           Kampf der vollen Ansicht das Ringfeld links oben. Oben links Satz,
+           Einordnung und Mechanik, oben rechts Boss, Fakten und die zwei
+           Handlungen - die Knoten haengt 64 aus dem Kopf hierher und beim
+           Verlassen zurueck, Kompakt findet sie an ihrem Platz. In der Mitte
+           die grosse Zahl; der Ring selbst ist ein Canvas. -->
+      <section class="ringfeld" id="ringFeld" data-i18n-aria-label="ring.feld" aria-label="Fight as a ring">
+        <div class="ringlinks" id="ringLinks"><button class="btn sm" id="ringZurueck" type="button" hidden data-i18n="ring.zurGruppe">&lsaquo; Group</button><div class="headmeta ringsatz" id="ringSatz"></div><p class="kurvemech" id="kurveMech" hidden></p><button class="btn sm" id="ringNachspielen" type="button"><svg class="bsym" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg><span data-i18n="ring.nachspielen">Replay the fight</span></button></div>
+        <div class="ringrechts" id="ringRechts"><div class="headmeta ringmeta" id="ringMeta"></div></div>
+        <div class="ringbuehne" id="ringBuehne"><canvas id="ring" role="img" data-i18n-aria-label="ring.canvas" aria-label="Ring of the fight"></canvas><div class="ringmitte" id="ringMitte"><div class="ringmitglied" id="ringMitglied" hidden><span class="v num" id="ringMitgliedZahl"></span><span class="u" id="ringMitgliedEinheit"></span></div><p class="ringdu" id="ringDu" hidden></p><p class="ringfokus" id="ringFokus" aria-hidden="true"></p></div></div>
+        <!-- Kampf nachspielen (Spezifikation Glutring 6, 65-nachspielen.ts): das
+             Rennen der Faehigkeiten im Ringfeld. Der Ring weicht (body.rennt),
+             Liste und Band bleiben stehen; Esc oder "Zurueck zum Ring" schliessen. -->
+        <section class="rennen" id="rennen" hidden aria-labelledby="rennTitel">
+          <h2 class="vh" id="rennTitel" data-i18n="rennen.titel">Fight replay</h2>
+          <div class="rkopf">
+            <p class="ruhr"><span class="num" id="rennUhr">0:00</span><small id="rennVon"></small></p>
+            <p class="rdps"><span class="num" id="rennDps">&mdash;</span><small data-i18n="rennen.bisHier">per second so far</small></p>
+            <button class="btn sm" id="rennZu" type="button" data-i18n="rennen.zurueck">Back to the ring</button>
+          </div>
+          <p class="rmech" id="rennMech" role="status"><i aria-hidden="true"></i><span id="rennMechText"></span></p>
+          <div class="rbahnen" id="rennBahnen" role="list" data-i18n-aria-label="rennen.bahnen" aria-label="Skills by damage so far"></div>
+          <div class="rsteuer">
+            <button class="rplay" id="rennPlay" type="button" aria-label="Play"><svg class="rsym rspiel" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg><svg class="rsym rhalt" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
+            <div class="rspul"><canvas id="rennKurve" aria-hidden="true"></canvas><input type="range" id="rennPos" min="0" max="1" step="0.1" value="0" data-i18n-aria-label="rennen.zeit" aria-label="Time in the fight"></div>
+            <span class="seg" id="rennTempo" role="group" data-i18n-aria-label="rennen.tempo" aria-label="Speed"><button type="button" data-tempo="1" class="on" aria-pressed="true">1&times;</button><button type="button" data-tempo="2" aria-pressed="false">2&times;</button><button type="button" data-tempo="4" aria-pressed="false">4&times;</button></span>
+          </div>
+          <p class="rfinale" id="rennFinale" aria-live="polite"></p>
+        </section>
+      </section>
+
+      <!-- The switcher sits on the table it switches. It used to float
+           between the readout and the list as a second navigation, forty
+           pixels from the tabs and styled like them, so the screen carried
+           two bars that looked alike and did different jobs. -->
+      <div class="table">
+        <!-- Der Feldkopf der Tafel (Neugestaltung 28.09., Luecke 2.7):
+             "Schaden", wie viele Zeilen und Treffer (renderBars schreibt
+             #tafelZahl), rechts der Umschalter. -->
+        <div class="feldkopf tafelkopf" id="tafelKopf"><h2 id="tafelTitel" data-i18n="tafel.schaden">Damage</h2><span class="fz" id="tafelZahl"></span>
+        <div class="seg" id="groupSeg" role="group" data-i18n-aria-label="seg.label" aria-label="Group the table">
+          <!-- aria-pressed steht schon im Markup: setGroup() setzt es erst beim
+               ersten Umschalten, und bis dahin sagte die Gruppe nicht, was gilt. -->
+          <button data-g="skill" class="on" aria-pressed="true" data-i18n="seg.skills">Your Damage</button>
+          <!-- Nur im Entwicklermodus (Issue #53); applyDevMode() setzt das hidden. -->
+          <button data-g="weapon" id="segWeapon" hidden aria-pressed="false" data-i18n="seg.weapons">By weapon</button>
+          <button data-g="target" aria-pressed="false" data-i18n="seg.targets">Targets</button>
+          <button data-g="player" id="segPlayer" hidden aria-pressed="false" data-i18n="seg.attackers">Attackers</button>
+          <button data-g="party" id="segParty" hidden aria-pressed="false" data-i18n="seg.party">Group</button>
+        </div></div>
+        <!-- treegrid, nicht table: die Zeilen lassen sich aufklappen, und
+             genau das beschreibt treegrid. Ohne Rolle war das hier fuer einen
+             Vorleser eine Folge von Kaesten ohne Zeilen und Spalten - die
+             eine Flaeche, fuer die es diese App gibt. -->
+        <div class="bars" id="bars" role="treegrid"
+             aria-label="Damage table" data-i18n-aria-label="bars.tableLabel"></div>
+        <!-- Das Urteil: Ueberschrift wie beim Kurvenfeld, der Inhalt in
+             #urteilInhalt (renderTafelUrteil schreibt nur ihn), der Knopf zur
+             Analyse steht fest - ein Live-Takt nimmt ihm den Fokus nicht. Seit dem Glutring
+             (02.10.2026) steht das Urteil in der Spalte der Liste, unter ihr
+             (Spezifikation 2). -->
+        <section class="feld urteilfeld" id="urteilFeld" aria-live="off" aria-labelledby="urteilTitel">
+          <!-- Die Schlagzeile steht ohne sichtbare Ueberschrift (Luecke 2.17);
+               das h2 bleibt der Name des Feldes fuer Vorleser. -->
+          <h2 class="vh" id="urteilTitel" data-i18n="tafel.urteil">Verdict</h2>
+          <div id="urteilInhalt"></div>
+          <div class="uknoepfe">
+            <button class="uanalyse" id="urteilAnalyse" type="button" data-i18n="tafel.ganzeAnalyse">Full analysis &rsaquo;</button>
+            <!-- "Im Vergleich" (DECISION 2.5): der Knopf zum besten Pull, frueher
+                 im Kopf. Nur da, wenn es an diesem Boss einen Bezug gibt
+                 (46-best-pull.ts, syncBestBtn). -->
+            <button class="uanalyse" id="btnBestPull" type="button" hidden aria-label="In the comparison: against your best pull" title="In the comparison">In the comparison &rsaquo;</button>
+            <!-- "Build in Questlog" (Aufgabe 12, 29.09.): ein leiser Link, wenn
+                 eine Karte im Bereich Builds die Waffen dieses Kampfs hat
+                 (51-plan.ts, syncKampfQuestlog); das Fenster gibt ihn an den
+                 Browser des Systems weiter. -->
+            <a class="uanalyse" id="kampfQuestlog" hidden target="_blank" rel="noopener noreferrer">Build in Questlog &rsaquo;</a>
+          </div>
+        </section>
+      </div>
+      <p class="hint" id="barsNote"></p>
+      <!-- Die Kopfzeile der Bereiche ausser Kampf (Instrumententafel Stufe 4):
+           nur mit body.felder zu sehen (58-felder.ts, syncFelder). Name des
+           Bereichs, der gewaehlte Kampf, rechts dieselben Aktionen wie im
+           Streifen des Kampfs - eigene Knoepfe, die vorhandenen bleiben dort.
+           Vor #clearedNote: nach dem Leeren steht der Satz unter ihr. -->
+      <header class="bkopf" id="bereichKopf">
+        <h2 id="bkName"></h2>
+        <span class="bkkampf" id="bkKampf" hidden><img id="bkBoss" alt="" aria-hidden="true" hidden><b id="bkBossName"></b><span class="vh" id="bkTr1"></span><span class="bkzeit" id="bkZeit"></span><span class="vh" id="bkTr2"></span><span class="num" id="bkDps"></span></span>
+        <!-- Gruppe und Builds (Luecken 7.1, 8.1) nennen statt des Kampfs ihren
+             Stand: "Noch keine Gruppe", "Gruppe laeuft &#183; K7QX", "4 Builds &#183;
+             Links zu Questlog"; syncFelder() (58-felder.ts). -->
+        <span class="bkctx" id="bkCtx" hidden></span>
+        <!-- Der Beispielkampf wird hier einmal genannt (Kritik 28.09.), nicht
+             in jedem leeren Feld darunter; syncFelder() (58-felder.ts). -->
+        <p class="bkhinweis" id="bkHinweis" hidden></p>
+        <!-- Rotation (Luecken 3.1): die Einsaetze in der Zeitleiste und, wenn das
+             Auge welche ausgeblendet hat, wie viele und "alle zeigen". Nur im
+             Bereich Rotation (syncFelder, 58-felder.ts); den Text schreibt
+             54-deine-rotation.ts. -->
+        <span class="bkrot" id="bkRot" hidden><span id="bkRotZahl"></span><span class="bkrotaus" id="rotCtl" hidden><span id="rotAusZahl"></span><button class="leise" type="button" id="rotShowAll" data-i18n="timeline.showAll">Show all</button></span></span>
+        <!-- Vergleich (Luecken 5.1): gegen den besten oder den letzten Pull. Ein
+             gesperrter Knopf nennt seinen Grund ueber aria-describedby; den Stand
+             schreibt 28-compare.ts (vglWahlSync), sichtbar nur im Vergleich
+             (syncFelder, 58-felder.ts). -->
+        <span class="bkvgl" id="bkVgl" hidden><span class="bkseg" id="vglWahl" role="group" data-i18n-aria-label="vgl.mit" aria-label="Compare with"><button type="button" id="vglBest" aria-pressed="false" data-i18n="vgl.best">Best pull</button><button type="button" id="vglLetzt" aria-pressed="false" data-i18n="vgl.letzt">Last pull</button></span></span>
+        <!-- Verlauf (Luecken 6.1): der Zeitraum; sichtbar nur im Verlauf mit Kaempfen (32-history.ts). -->
+        <span class="bkvgl" id="bkVerlauf" hidden><span class="bkseg" id="verlaufZeit" role="group" data-i18n-aria-label="verlauf.zeitraum" aria-label="Period"><button type="button" data-z="woche" aria-pressed="false" data-i18n="verlauf.woche">Week</button><button type="button" data-z="monat" aria-pressed="true" data-i18n="verlauf.monat">Month</button><button type="button" data-z="alles" aria-pressed="false" data-i18n="verlauf.alles">All</button></span></span>
+        <span class="bkakt" id="bkAkt" hidden>
+          <button class="btn sm" id="bkSpeichern" type="button" data-i18n="head.saveAsRun">Save fight</button>
+          <button class="btn sm" id="bkBild" type="button" data-i18n-title="bild.title" data-i18n-aria-label="bild.title" aria-label="Share as image" title="Share as image"><svg viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M12 15V4M8 8l4-4 4 4"/><path d="M5 13v6h14v-6"/></svg><span class="blabel" data-i18n="bild.knopf">As image</span></button>
+        </span>
+      </header>
+      <!-- Clearing the list is an act of "ready for the next pull", not "I am
+           done here". Sending the start screen back over the meter answered a
+           question nobody asked; this says what is true and what happens next. -->
+      <p class="empty-note" id="clearedNote" hidden data-i18n="bars.clearedWaiting">List cleared. The next fight you finish appears here.</p>
+      <!-- Das Band unter dem Ringfeld (Spezifikation Glutring 2): die Kurve
+           "Schaden pro Sekunde" ueber die volle Breite des Ringfelds; im Kopf
+           die Ueberschrift, welche Spur die Kurve zeigt (#kurveUnter), die
+           Legende und rechts "Zeitverlauf ausklappen" (#zeitAuf: das Band
+           waechst und zeigt die vier staerksten Faehigkeiten) und der Weg in
+           den Bereich Rotation (#spurenAuf). Die Mechanik steht oben links im
+           Ringfeld (#kurveMech). -->
+      <section class="feld kurvefeld" id="kurveFeld" data-i18n-aria-label="tafel.kurve" aria-label="Damage per second">
+        <div class="feldkopf"><h2 id="kurveTitel" data-i18n="tafel.kurve">Damage per second</h2><p class="kurveunter" id="kurveUnter"></p><span class="feldleg" id="kurveLeg"></span>
+          <div class="kfuss"><button class="zeitauf" id="zeitAuf" type="button" aria-expanded="false" aria-controls="kurveFeld"><svg class="zsym" viewBox="0 0 12 12" width="12" height="12" aria-hidden="true"><path d="M3 4.5l3 3 3-3"/></svg><span id="zeitAufText">Show the timeline</span></button><button class="btn sm" id="spurenAuf" type="button" data-i18n="tafel.zurRotation">Timeline and rotation &rsaquo;</button></div></div>
+        <div class="kplot"><div class="kachse" id="kurveAchse" aria-hidden="true"></div><canvas id="kurve" role="img" aria-labelledby="kurveTitel" aria-describedby="kurveUnter"></canvas></div>
+        <div class="kurvereihen" id="kurveReihen" hidden></div><div class="bandgruppe" id="bandGruppe" role="img" hidden></div>
+      </section>
+
+      <!-- Der Bereich Kampf hat keine eigene Flaeche unter der Tafel mehr: der
+           gestapelte Zeitverlauf (Spuren, Zoom, Von/bis) steht seit Aufgabe 10
+           der Neugestaltung (Nachtrag 29.09.) im Bereich Rotation unter der
+           Zeitleiste, auf derselben Zeitachse. Das leere Panel bleibt, damit
+           der Bereichswechsel (switchTab) wie bei jedem Bereich eine Flaeche
+           umschaltet. -->
+      <div class="panel on" id="p-timeline"></div>
+
+      <div class="panel" id="p-rotation">
+        <!-- Ohne Zeitspalte gibt es weder Zeitleiste noch Zeitverlauf; der Satz
+             sagt warum (vorher unter dem Zeitverlauf im Bereich Kampf). -->
+        <p class="needrole warn noclock" data-i18n="chart.noClock">Without a column set as Time there is no clock and no seconds, so nothing here can be measured &mdash; set one under Log setup.</p>
+        <!-- Wessen Rotation (42-party.ts, renderWer): nur bei laufender Gruppe
+             zu sehen, ueber der Steuerzeile wie im Entwurf (Luecken 3.12).
+             Beim Mitglied zeigt der Block nur, was es ueber das Board teilt;
+             die Wahl gilt fuer Zeitleiste und Zeitverlauf zugleich. -->
+        <div class="rotbar drwer" id="rotWhoBar" hidden>
+          <div class="rotzoom" id="rotWho"></div>
+        </div>
+        <!-- Deine Rotation (54-deine-rotation.ts, Issue #44), seit der
+             Neugestaltung 28.09. wie im Entwurf (Luecken 3): oben die
+             Steuerzeile (Abspielen, 1x 2x 4x, Uhr, seit Aufgabe 11 Leiste |
+             Reihenfolge, Jetzt), darunter der Satz, die Zeitleiste (oder die
+             Reihenfolge) und - seit Aufgabe 10 (Nachtrag 29.09.) - direkt
+             darunter der Zeitverlauf auf derselben Zeitachse, dann der Kasten
+             "Automatisch" (einklappbar, DECISION 3.10) und das Feld
+             "Einsaetze" mit dem Auge je Zeile. Die Zahl der Einsaetze und
+             "alle zeigen" stehen in der Kopfzeile (#bkRot). Ohne Kampf und
+             ohne Zeitspalte verborgen. -->
+        <section class="card deinerot" id="deineRot" aria-labelledby="deineRotTitel" hidden>
+          <!-- Die Kopfzeile nennt den Bereich; die Ueberschrift bleibt fuer Vorleser. -->
+          <h3 class="vh" id="deineRotTitel" data-i18n="deinerot.title">Your rotation</h3>
+          <!-- Abspielen (Stufe 2): der Knopf behaelt sein Wort, den Zustand
+               tragen aria-pressed und das Symbol (Dreieck, zwei Balken); das
+               Tempo als Umschalter, die Uhr nur fuers Auge - die Auskunft
+               steht in "Jetzt", rechts in derselben Zeile. Unter drei
+               Einsaetzen verborgen. -->
+          <div class="rotbar drsteuer" id="drSteuer" hidden>
+            <button type="button" class="btn drplay" id="drPlay" aria-pressed="false" aria-describedby="drSperre"
+                    title="Play: the head runs along the bar (Space on the bar)" data-i18n-title="deinerot.playTitel"><svg viewBox="0 0 12 12" aria-hidden="true"><path class="drdreieck" d="M3 1.6v8.8L10.2 6z"/><path class="drbalken" d="M2.6 1.8h2.4v8.4H2.6zM7 1.8h2.4v8.4H7z"/></svg><span data-i18n="deinerot.play">Play</span></button>
+            <div class="seg drtempo" id="drTempo" role="group" aria-label="Speed" data-i18n-aria-label="deinerot.tempo">
+              <button type="button" data-tempo="1" class="on" aria-pressed="true">1&times;</button>
+              <button type="button" data-tempo="2" aria-pressed="false">2&times;</button>
+              <button type="button" data-tempo="4" aria-pressed="false">4&times;</button>
+            </div>
+            <span class="druhr"><b id="drUhr" aria-hidden="true">0:00.0</b><span class="drgesamt" id="drGesamt" aria-hidden="true"></span></span>
+            <!-- Leiste | Reihenfolge (Aufgabe 11, Nachtrag 29.09.): eine
+                 Radiogruppe mit einem Tabstopp und Pfeiltasten (54,
+                 ansichtSetzen); die Wahl gilt fuer die Sitzung. -->
+            <div class="seg dransicht" id="drAnsicht" role="radiogroup" aria-label="View" data-i18n-aria-label="deinerot.ansicht">
+              <button type="button" role="radio" data-ansicht="leiste" class="on" aria-checked="true" tabindex="0" data-i18n="deinerot.leiste">Bar</button>
+              <button type="button" role="radio" data-ansicht="reihe" aria-checked="false" tabindex="-1" data-i18n="deinerot.reihe">Sequence</button>
+            </div>
+            <div class="drjetzt" id="drJetzt" hidden></div>
+            <p class="drsperre" id="drSperre" hidden data-i18n="deinerot.live">Playback works once the fight is over.</p>
+          </div>
+          <p class="vh" id="drLive" aria-live="polite"></p>
+          <div class="drleiste">
+            <p class="drlead" id="deineRotLead"></p>
+            <!-- Zoom und Von/bis gelten fuer Zeitleiste und Zeitverlauf: sie stehen
+                 ueber beiden, unter dem Satz (Fixrunde 1 zu Aufgabe 10 - unten
+                 standen sie bei 1280 x 860 halb unter der Statusleiste). -->
+            <div class="rotbar viewbar chartfoot">
+              <div class="rotzoom">
+                <button class="wbtn" data-act="out" title="Zoom out. Ctrl + mouse wheel does the same" aria-label="Zoom out" data-i18n-title="chart.zoomOutTitle" data-i18n-aria-label="chart.zoomOut">&minus;</button>
+                <span class="rotlevel num vlevel">1.0×</span>
+                <button class="wbtn" data-act="in" title="Zoom in. Ctrl + mouse wheel does the same; once zoomed in, Tab onto the chart and use the arrow keys" aria-label="Zoom in" data-i18n-title="chart.zoomInTitle" data-i18n-aria-label="chart.zoomIn">+</button>
+                <button class="wbtn" data-act="reset" data-i18n="rotation.whole" data-i18n-title="chart.wholeTitle" title="Back to the whole fight, unzoomed">Whole fight</button>
+              </div>
+              <div class="rotrange">
+                <label data-i18n="rotation.from">From</label>
+                <input type="text" class="tinput vfrom" placeholder="0:00" size="5" data-i18n-aria-label="chart.fromLabel" aria-label="Start of the time range" data-i18n-title="chart.fromTitle" title="Start as m:ss, such as 0:30">
+                <label data-i18n="rotation.to">to</label>
+                <input type="text" class="tinput vto" placeholder="3:00" size="5" data-i18n-aria-label="chart.toLabel" aria-label="End of the time range" data-i18n-title="chart.toTitle" title="End as m:ss, such as 1:00">
+                <button class="wbtn" data-act="apply" data-i18n="rotation.apply" data-i18n-title="chart.applyTitle" title="Show only this time range (Enter in a field does the same)">Apply</button>
+              </div>
+            </div>
+            <!-- Zeitleiste und Zeitverlauf in einem Raster (Aufgabe 10): links
+                 die Namensspalte, rechts die Flaechen - so stehen beide in
+                 derselben Spalte, gleich breit, und ein Einsatz steht genau
+                 ueber seiner Spur. Zoom und Von/bis (rotWindow, 25-rotation.ts)
+                 gelten fuer beide; gerollt wird gemeinsam. Beim Abspielen
+                 laeuft der Kopf der Zeitleiste als Strich (#stackKopf) durch
+                 Kurve und Spuren weiter.
+                 Die Leiste ist ein Tabstopp mit eigener Tastatur (54), der
+                 Zeitverlauf ebenso (39: Pfeile rollen, wenn gezoomt).
+                 role="group" und nicht role="region": region legt eine
+                 Landmarke an, und die App hat schon genug davon. -->
+            <div class="rotgrid zvraster" id="zvRaster">
+              <div class="rotgut zvleistegut" aria-hidden="true"><div class="rotgutkopf"><b data-i18n="deinerot.leisteTitel">Your casts</b><span data-i18n="deinerot.leisteHint">one symbol per cast; a click jumps there</span></div></div>
+              <div class="drbuehne" id="deineRotScroll" tabindex="0" role="group"
+                   aria-label="Your rotation, bar" data-i18n-aria-label="deinerot.buehne"
+                   aria-describedby="deineRotLead drTasten"><div class="drinhalt" id="rotBar"></div></div>
+              <!-- Die Reihenfolge (Aufgabe 11): dieselben Einsaetze als Reihe
+                   ohne Zeitachse, umbrechend, in der Zeile unter der Leiste;
+                   gezeigt wird eine von beiden, gebaut nur, was gezeigt
+                   wird. Dieselbe Tastatur wie die Leiste. -->
+              <div class="drfolge" id="drFolge" tabindex="0" role="group" hidden
+                   aria-label="Your rotation, sequence" data-i18n-aria-label="deinerot.reiheBuehne"
+                   aria-describedby="deineRotLead drTasten"><div class="drreihe" id="drReihe"></div></div>
+              <div class="rotgut" id="stackGut"></div>
+              <div class="rotscroll" id="stackScroll" tabindex="0" role="group"
+                   aria-label="Timeline chart"
+                   data-i18n-aria-label="chart.stackRegion"><div class="zvfeld" id="stackFeld"><canvas id="stack" role="img"
+                   aria-label="Chart: damage across the whole fight"
+                   data-i18n-aria-label="chart.stackLabel"
+                   aria-describedby="stackDesc"></canvas><canvas id="stackLanes" role="img"
+                   aria-label="Chart: one lane per skill"
+                   data-i18n-aria-label="chart.laneLabel"
+                   aria-describedby="stackDesc"></canvas><i id="stackMark" hidden></i><i class="zvkopf" id="stackKopf" aria-hidden="true" hidden></i></div></div>
+            </div>
+            <p class="vh" id="drTasten" data-i18n="deinerot.tasten">Space plays or pauses; the left and right arrow keys go one cast back or on; Home goes to the first cast, End to the last.</p>
+            <!-- Unter dem Raster Massstab und Glaettung der Spuren und eine
+                 Hilfe fuer den ganzen Block (vorher zwei, eine je Teil). -->
+            <div class="zvfuss">
+              <!-- Darstellung und Glaettung der Spuren: dieselben Knoepfe wie
+                   ueberall sonst. Eine geglaettete Kurve ist lesbarer, aber
+                   nicht mehr die rohe Wahrheit; der Satz darunter sagt es. -->
+              <div class="rotbar" id="stackCtl">
+                <div class="rotzoom" role="group" aria-labelledby="lblScale">
+                  <!-- "Eigene Spitze / Gleiche Spitze" war Jargon: gemeint ist, ob
+                       jede Spur ihren eigenen Massstab hat oder alle einen. Der
+                       title sagt, wozu welcher taugt. -->
+                  <span class="rotlabel" id="lblScale" data-i18n="timeline.scale">Lane scale</span>
+                  <span class="gleis">
+                    <button class="wbtn on" data-stackscale="eigen" aria-pressed="true" data-i18n="timeline.scaleOwn"
+                            data-i18n-title="timeline.scaleOwnTitle" title="Each lane reaches its own peak: shows the rhythm of every skill">Per lane</button>
+                    <button class="wbtn" data-stackscale="gleich" aria-pressed="false" data-i18n="timeline.scaleShared"
+                            data-i18n-title="timeline.scaleSharedTitle" title="All lanes on one scale: shows how much each skill carries">Shared</button>
+                  </span>
+                </div>
+                <div class="rotzoom" role="group" aria-labelledby="lblSmooth">
+                  <span class="rotlabel" id="lblSmooth" data-i18n="timeline.smoothing">Smoothing</span>
+                  <span class="gleis">
+                    <button class="wbtn" data-stacksmooth="1" aria-pressed="false" data-i18n="timeline.smoothRaw">1 s (raw)</button>
+                    <button class="wbtn" data-stacksmooth="3" aria-pressed="false" data-i18n="timeline.smooth3">3 s</button>
+                    <button class="wbtn on" data-stacksmooth="5" aria-pressed="true" data-i18n="timeline.smooth5">5 s</button>
+                  </span>
+                </div>
+                <button class="wbtn" id="stackShowAll" hidden data-i18n="timeline.showAll">Show all</button>
+              </div>
+              <!-- Die Bedienung auf Abruf: "Hilfe" am Ende, aufklappbar
+                   (aria-expanded, Esc schliesst), und je ein title an den
+                   Knoepfen und Feldern, die er beschreibt. -->
+              <div class="rotbar chartfoot zvhilfe">
+                <button class="helpbtn" type="button" aria-expanded="false" aria-controls="rotHelp"
+                        data-i18n-aria-label="help.rotName" aria-label="Help with the rotation"><svg viewBox="0 0 16 16" aria-hidden="true"><circle cx="8" cy="8" r="6.4" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M6.1 6.3a1.95 1.95 0 1 1 2.75 1.8c-.55.25-.85.7-.85 1.25v.4" fill="none" stroke="currentColor" stroke-width="1.3" stroke-linecap="round"/><circle cx="8" cy="11.55" r=".85" fill="currentColor"/></svg><span data-i18n="help.label">Help</span></button>
+                <div class="helppanel" id="rotHelp" hidden>
+                  <dl>
+                    <dt data-i18n="help.rotBarKey">Your rotation, bar</dt><dd data-i18n="deinerot.tasten">Space plays or pauses; the left and right arrow keys go one cast back or on; Home goes to the first cast, End to the last.</dd>
+                    <dt data-i18n="help.wheelKey">Ctrl + mouse wheel</dt><dd data-i18n="help.wheel">zooms in and out.</dd>
+                    <dt data-i18n="help.dragKey">Drag the scrollbar</dt><dd data-i18n="help.drag">moves along once you are zoomed in.</dd>
+                    <dt data-i18n="help.clickKey">Click into the chart</dt><dd data-i18n="help.click">shows only the stretch you clicked on; click again for the whole fight.</dd>
+                    <dt data-i18n="help.keysKey">Keyboard</dt><dd data-i18n="help.keys">&minus; and + zoom; then Tab onto the chart and move along with the arrow keys.</dd>
+                    <dt data-i18n="help.lanesKey">Name column</dt><dd data-i18n="help.lanes">one Tab stop: the arrow keys pick a skill, Enter or Space takes it out or puts it back.</dd>
+                    <dt data-i18n="help.rangeKey">From / to</dt><dd data-i18n="help.range">type a time range such as 0:30 to 1:00, then Apply or Enter.</dd>
+                    <dt data-i18n="help.rotLanesKey">Casts</dt><dd data-i18n="help.rotLanes">the table under the timeline, one Tab stop: the arrow keys pick a skill, Enter or Space hides it from the timeline with the eye or shows it again. The buttons of a choice (That&#39;s right, Take back, Always leave out) stand under Automatic and are reached with Tab.</dd>
+                  </dl>
+                </div>
+              </div>
+            </div>
+            <p class="zvsatz" id="stackDesc"></p>
+            <p class="hint chartnote" id="stackNote"></p>
+          </div>
+          <!-- "Automatisch" als aufklappbarer Kasten (Issue #52), unter der
+               Zeitleiste (DECISION 3.10): der Kopf eine Zeile mit Anzahl,
+               Symbolen und dem Hinweis auf neue Vorschlaege, darunter eine
+               Zeile je Skill, dazu "Immer weglassen" fuer, was das Auge
+               ausgeblendet hat (DECISION 3.9), und "Zuruecknehmen" fuer, was
+               du selbst drueckst. Kopf und Liste baut 54-deine-rotation.ts;
+               der Kasten selbst bleibt stehen, damit Neuzeichnen weder
+               offen/zu noch den Fokus zuruecksetzt. -->
+          <div class="drspalte drteilauto">
+            <details class="drautokasten" id="drAutoKasten">
+              <summary id="drAutoTitel"><span class="drakopf" id="drAutoKopf"><b data-i18n="deinerot.auto">Automatic</b></span></summary>
+              <div id="drAuto"></div>
+            </details>
+          </div>
+          <!-- Das Feld "Einsaetze" (Luecken 3.7, 3.8): je gedrueckte
+               Faehigkeit eine Zeile, vorn das Auge, der Takt als breite
+               Spalte. Den Inhalt baut 48-einsaetze.ts. -->
+          <section class="drspalte drteilged" aria-labelledby="drGedTitel">
+            <div class="drfk"><h4 class="drkopf" id="drGedTitel" data-i18n="deinerot.einsaetze">Casts</h4><span class="drfz" data-i18n="deinerot.einsaetzeUnter">per skill over the whole fight &middot; the eye takes a skill out of the timeline</span></div>
+            <div class="drtab" id="drGed" role="table" aria-labelledby="drGedTitel"></div>
+          </section>
+        </section>
+      </div>
+
+      <!-- Die Analyse wie im Entwurf (Neugestaltung 28.09., Luecken 4): jedes
+           Kind des Panels ist ein Feld mit 1-Punkt-Fuge (body.felder). Oben
+           das Urteil, darunter "Weitere Befunde" als Zeile, die Form des
+           Kampfes, dann #findings mit den drei Feldern, den Zielen, dem
+           Fenster und Auge von Ventius, ganz unten der Fuss. -->
+      <div class="panel" id="p-analysis">
+        <!-- Das eine Urteil: welcher Befund am meisten gekostet hat, in
+             Schaden gerechnet (urteilHtml). Den Inhalt schreibt
+             renderAnalysis ganz neu; der Name des Feldes steht darum hier am
+             Element, nicht in einer Ueberschrift darin. -->
+        <div class="urteil" id="analysisCall" role="region" aria-label="Verdict" data-i18n-aria-label="tafel.urteil" hidden></div>
+        <section class="neben" id="weitere" aria-labelledby="weitereTitel" hidden>
+          <h3 id="weitereTitel" data-i18n="analysis.weitere">Further findings</h3>
+          <dl id="weitereListe"></dl>
+          <!-- Ein eigener Satz, nicht der geteilte: Zeitverlauf und Rotation
+               zeigen ohne Uhr wirklich nichts, die Analyse zeigt einiges.
+               "Hier laesst sich also nichts messen" stand ueber ihnen und war
+               daneben falsch. -->
+          <p class="needrole warn noclock" data-i18n="analysis.noClock">Without a column set as Time there is no clock and no seconds, so the findings that need them are missing here &mdash; set one under Log setup.</p>
+        </section>
+        <!-- Die Form: eine Saeule je Sekunde, dahinter die Luecken nach dem
+             Median und die Strecken, in denen das Ziel unverwundbar war,
+             gestrichelt der Median. Die Definition der Luecke steht als Satz
+             darunter (#lueckeDef), danach die Zeile zur erkannten Mechanik
+             des Bosses (#mechanikZeile, 61-mechanik.ts), schraffiert im Bild. -->
+        <section class="verdict form" id="verdict" aria-labelledby="formTitel" hidden>
+          <div class="fkx"><h2 id="formTitel" data-i18n="analysis.form">Shape of the fight</h2>
+            <span class="vlegend">
+              <span data-i18n="analysis.legendBalken">damage per second</span>
+              <span class="vleg" id="vlegGap" hidden><i class="lpause"></i><span data-i18n="analysis.legendGap">gap</span></span>
+              <span class="vleg" id="vlegAvg" hidden><i class="lschnitt"></i><span id="vlegAvgText"></span></span>
+              <span class="vleg" id="vlegInvuln" hidden><i class="linvuln"></i><span data-i18n="analysis.legendInvuln">target invulnerable</span></span>
+              <span class="vleg" id="vlegMech" hidden><i class="lmech"></i><span data-i18n="mechanik.legend">mechanic</span></span>
+            </span></div>
+          <p class="fein" id="lueckeDef"></p>
+          <p class="fein" id="mechanikZeile" hidden></p>
+          <div class="vform" id="verdictForm"><div class="saeulen" id="saeulen" role="img"></div></div>
+          <div class="fachse" id="formAchse" aria-hidden="true"></div>
+          <p class="fein" id="verdictText"></p>
+        </section>
+        <div id="findings"></div>
+        <section class="afuss" id="afuss" aria-labelledby="afussTitel">
+          <h2 id="afussTitel" data-i18n="analysis.fuss">What the log does not know</h2>
+          <ul>
+            <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span><span data-i18n="analysis.fuss.1">whether the boss could not be hit during a gap, or you had to move</span><span id="fussMech" hidden></span></span></li>
+            <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span data-i18n="analysis.fuss.2">which buffs were on you and when they ran out</span></li>
+            <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span data-i18n="analysis.fuss.3">your gear &ndash; Borometer recognises the build only by weapons and skills</span></li>
+            <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span data-i18n="analysis.fuss.4">healing and tanking: the log only records damage you deal</span></li>
+          </ul>
+        </section>
+      </div>
+
+      <div class="panel" id="p-weapons">
+        <div class="card">
+          <h3 data-i18n="weapons.pickTitle">Your two weapons</h3>
+          <p data-i18n="weapons.pickDesc">Borometer reads them from the fight you picked on the left. Change them here if it reads them wrong.</p>
+          <div class="f2" style="max-width:430px">
+            <div class="field"><label for="wMain" data-i18n="weapons.mainWeapon">Main weapon</label><select id="wMain"></select></div>
+            <div class="field"><label for="wOff" data-i18n="weapons.secondWeapon">Second weapon</label><select id="wOff"></select></div>
+          </div>
+          <div class="wsource" id="wSource" hidden></div>
+          <div class="classline" id="wClass" hidden></div>
+          <div id="wUnassigned" class="hint"></div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="weapons.damageByWeapon">Damage by weapon</h3>
+          <div id="wpnTable" tabindex="0"></div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="weapons.skillsTitle">Skills in this fight</h3>
+          <!-- <details> und nicht eigene Klapplogik: der Browser kann das,
+               es bleibt mit der Tastatur bedienbar, und der Zustand haengt am
+               Element statt an einer Variablen, die jeder Neuaufbau
+               ueberschreibt. Das Element bleibt deshalb stehen; neu gebaut
+               wird nur die Liste darin. -->
+          <details class="fold assignfold" id="assignFold">
+            <summary><span id="assignSum"></span><span class="act" id="assignAct"></span></summary>
+            <p id="assignDesc"></p>
+            <div id="assign"></div>
+          </details>
+        </div>
+        <div class="card">
+          <!-- Zugeklappt. Begruendung: "Das interessiert 99% eh nicht." Wer eine
+               Liste einfuegen will, sucht danach; alle anderen sehen eine
+               Zeile statt einer halben Seite. <details> statt eigener
+               Klapplogik - der Browser kann das, und es bleibt bedienbar
+               ohne JavaScript und mit der Tastatur. -->
+          <details class="fold" id="pasteFold" hidden>
+            <summary><span data-i18n="weapons.pasteTitle">Paste a list instead</span></summary>
+            <p data-i18n="weapons.pasteDesc">One skill per line, name or id on the left, weapon on the right. Separate them with = or a comma. Short names work: bow, xbow, gs, sns, dagger, staff, wand, spear, passive.</p>
+            <textarea id="wPaste" rows="5" spellcheck="false" placeholder="Decisive Sniping = bow&#10;Quick Fire = xbow&#10;964631505 = longbow"></textarea>
+            <div style="display:flex;gap:8px;margin-top:9px;flex-wrap:wrap">
+              <button class="btn sm" id="wImport" data-i18n="weapons.apply">Apply list</button>
+              <button class="btn sm" id="wCopy" data-i18n="weapons.copy">Copy what I have</button>
+              <button class="btn sm" id="wClear" data-i18n="weapons.clear">Clear all assignments</button>
+            </div>
+          </details>
+        </div>
+      </div>
+
+      <div class="panel" id="p-party">
+        <!-- Gruppe (Neugestaltung 28.09., Luecken 7): ohne Gruppe die zwei Wege
+             nebeneinander, "Dein Charakter" als Zeile ueber beiden (DECISION
+             7.4), darunter nur der Satz, wie man eine startet (7.9). Mit
+             laufender Gruppe die Mitglieder und das Board; den Inhalt schreibt
+             renderParty() (42-party.ts). -->
+        <div class="gwege" id="pWege">
+          <div class="namefeld" id="pNameFeld">
+            <label for="pName" data-i18n="party.yourChar">Your character</label>
+            <!-- maxlength wie im Hauptprogramm (party.ts kuerzt auf 40) -->
+            <input class="textin" id="pName" maxlength="40" autocomplete="off" spellcheck="false" data-i18n-ph="party.namePlaceholder" placeholder="Your name in the game" aria-describedby="pNameBoth">
+            <span class="gleise" id="pNameBoth" data-i18n="party.nameForBoth">Needed for both ways below.</span>
+          </div>
+          <section class="gweg" id="pStart" aria-labelledby="pStartT">
+            <h3 id="pStartT" data-i18n="party.wayHostTitle">Start a party</h3>
+            <p data-i18n="party.wayHostDesc">One person collects the party's numbers and shows everyone the same board. The others join with the code.</p>
+            <!-- Wo die Gruppe laeuft: eine Radiogruppe mit einem Tabstopp und Pfeiltasten (42-party.ts, woSetzen) -->
+            <div class="gseg" id="pWo" role="radiogroup" data-i18n-aria-label="party.woName" aria-label="Where the party runs">
+              <button type="button" role="radio" data-wo="pc" aria-checked="true" tabindex="0" data-i18n="party.woPc">On this PC</button>
+              <button type="button" role="radio" data-wo="server" aria-checked="false" tabindex="-1" data-i18n="party.woServer">Own server</button>
+            </div>
+            <!-- Die Adresse zum Starten auf dem eigenen Server. Gespeichert und
+                 geprueft wird der Gruppen-Server nur in den Einstellungen
+                 (Abschnitt Gruppe und Server, Neugestaltung Aufgabe 8, Entwurf
+                 E:942); #pZuEinst fuehrt dorthin. -->
+            <div class="feldzeile" id="pServerZeile" hidden><label for="pServer" data-i18n="party.serverLabel">Server address</label>
+              <input class="textin mono" id="pServer" autocomplete="off" spellcheck="false" data-i18n-ph="party.serverPh" placeholder="e.g. 203.0.113.5:8732" aria-describedby="pServerSatz"></div>
+            <p class="gleise" id="pServerSatz" hidden><span data-i18n="party.serverDesc">One fixed address for the whole clan, so a code keeps working when the person who made it goes offline.</span>
+              <button class="linkbtn" type="button" id="pZuEinst" data-i18n="party.zuEinst">Save it in Settings &#8250;</button></p>
+            <p class="gleise" id="pHostNote"></p>
+            <div><button class="btn hot" type="button" id="pHost" data-i18n="party.hostBtn" aria-describedby="pHostLock pHostNote pHint">Start party</button></div>
+            <!-- Warum der Knopf gesperrt ist, direkt darunter (syncPartyName) -->
+            <p class="gleise waylock" id="pHostLock" hidden></p>
+            <p class="gleise" data-i18n="party.hinaus">Only the board's numbers go out: target, damage, DPS, weapons. Never a log file.</p>
+          </section>
+          <section class="gweg" id="pBeitritt" aria-labelledby="pBeitrittT">
+            <h3 id="pBeitrittT" data-i18n="party.wayJoinTitle">Join a party</h3>
+            <p data-i18n="party.wayJoinDesc">Whoever hosts gives you a code of four characters.</p>
+            <form class="gcode" id="pJoinForm" autocomplete="off" novalidate>
+              <label class="vh" for="pJoin" data-i18n="party.codeFromHost">Code, four characters</label>
+              <!-- gefiltert beim Tippen: A-HJ-NP-Z2-9, wie die Codes des Hosts (party.ts, boro_server.py) -->
+              <input class="codein" id="pJoin" maxlength="4" placeholder="&#183;&#183;&#183;&#183;" spellcheck="false" autocapitalize="characters" aria-describedby="pJoinHint pJoinLock pHint">
+              <button class="btn" type="submit" id="pJoinBtn" data-i18n="party.joinBtn" disabled>Join</button>
+            </form>
+            <p class="gleise" id="pJoinHint"></p>
+            <p class="gleise waylock" id="pJoinLock" hidden></p>
+            <label class="feldzeile" for="pJoinSrv"><span><span data-i18n="party.serverLabel">Server address</span> <small data-i18n="party.optional">optional</small></span></label>
+            <input class="textin mono" id="pJoinSrv" autocomplete="off" spellcheck="false" data-i18n-ph="party.serverPh" placeholder="e.g. 203.0.113.5:8732" aria-describedby="pJoinSrvSatz">
+            <p class="gleise" id="pJoinSrvSatz"></p>
+          </section>
+          <!-- Antworten von Server und Helfer (role=status), unter beiden Wegen -->
+          <p class="gleise ghint" id="pHint" role="status" aria-live="polite" aria-atomic="true"></p>
+        </div>
+        <!-- Ohne Gruppe: nur der Satz, wie man eine startet (DECISION 7.9). Das
+             Beispiel-Board gibt es nur im Entwicklermodus (43, beispielGruppe). -->
+        <p class="gohne" id="pOhne" data-i18n="party.ohne">No party is running. One of you starts it above, the others join with the code; then the board stands here.</p>
+        <!-- Laufende Gruppe (oder ein Beispiel, ein geladenes Gruppen-Log): nur das Board.
+             Die zweite Mitgliederliste darueber entfiel mit Feinschliff 6 (02.10.); wer
+             noch nichts gemeldet hat, steht im Board unter den Meldenden. -->
+        <section class="feld" id="pBoard" aria-labelledby="pBoardT" hidden>
+          <div class="fk"><h3 id="pBoardT" data-i18n="party.board">Board</h3><span class="fz" id="pBoardZahl"></span><span class="fa" id="pBoardBsp"></span></div>
+          <div class="board">
+            <!-- Der Kopf des Boards (DECISION 7.10): Code, Status, Beitrittsadresse,
+                 Gruppen-Log speichern, Verlassen bzw. Schliessen -->
+            <div class="codeblock" id="pKopf">
+              <span class="lbl" id="pCodeT" data-i18n="party.codeTitel">Party code</span>
+              <div class="codemulde" id="pCode"></div>
+              <p class="stalenote" id="pStale" hidden></p>
+              <p class="pstatus" id="pStatus"></p>
+              <div class="roomacts">
+                <button class="btn sm" type="button" id="btnSavePartyLog" data-i18n="party.saveLogBtn">Save party log</button>
+                <button class="btn sm" type="button" id="pLeave">Leave the party</button>
+              </div>
+            </div>
+            <div class="btab" id="pTafel" role="table" data-i18n-aria-label="party.board" aria-label="Board"></div>
+          </div>
+          <!-- Wer im Raum ist und nie einen Kampf geschickt hat: fast immer das Kampflog im Spiel -->
+          <p class="gleise gloghint" id="pLogHint" hidden></p>
+          <div class="gloghint" id="pLogHintAkt" hidden><button class="btn sm" type="button" id="pCopyHowTo" data-i18n="party.copyHowTo">Copy the logging steps</button></div>
+          <!-- Die Frage des Bereichs - wer meldet, wer steht am Ziel - aendert sich von selbst:
+               diese Zeile schreibt nur, wenn sich eine der Zahlen aendert. -->
+          <p class="vh" id="pCount" role="status" aria-live="polite"></p>
+        </section>
+        <!-- Mit Board (Beispiel, geladenes Gruppen-Log) stehen Charakter und die zwei Wege
+             zugeklappt unter dem Board (Feinschliff 6, 02.10.): renderParty haengt #pWege
+             hierher und ohne Board wieder an seinen Platz oben. -->
+        <details class="gauf" id="pWegeAuf" hidden>
+          <summary><svg viewBox="0 0 16 16" aria-hidden="true"><path d="M6 3.5 10.5 8 6 12.5" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"/></svg><span data-i18n="party.wegeAuf">Start or join a party</span></summary>
+        </details>
+      </div>
+
+      <!-- No card above the results. It held a heading the tab label already
+           says, three lines explaining how to use a page you are looking at
+           because you already used it, and a checkbox offering a fairness
+           fix nobody had been told they needed. The explanation is the empty
+           state's job; the fix is offered where the unfair comparison is. -->
+  
+    <div class="panel" id="p-history">
+      <!-- Nur solange der Verlauf leer ist: was hier erscheinen wird, und der
+           Knopf, der ihn fuellt (32-history.ts). -->
+      <div class="card" id="histLeer">
+        <p class="chartnote" id="histNote" data-i18n="hist.note">How you did against every boss you have logged; a boss shows up here from your second fight on it.</p>
+        <!-- Leer: der Knopf, der ihn fuellt (leerKnopf, 58-felder.ts) -->
+        <div class="leerakt" id="histAkt"></div>
+      </div>
+      <!-- Verlauf (Luecken 6): oben das Diagramm ueber die Zeit, darunter die
+           Liste "Kaempfe" bis zur Unterkante der Flaeche und der Boss-Auswahl;
+           gefuellt von renderHistory() (32-history.ts), gerechnet in
+           verlauf-core.ts. #histVpl bleibt stehen, damit das SVG seine Groesse
+           messen kann. -->
+      <div class="histwrap" id="histWrap" hidden>
+        <section class="vplot" id="histPlotFeld" aria-labelledby="histPlotT">
+          <h3 class="vh" id="histPlotT" data-i18n="verlauf.plotTitel">Damage per second over time</h3>
+          <div class="vkopfzeile" id="histKopfZeile"></div>
+          <div class="vlg" id="histLeg"></div>
+          <div class="vpl" id="histVpl"></div>
+        </section>
+        <section class="hkampf" id="histDetail" aria-labelledby="histListeT"></section>
+      </div>
+    </div>
+
+    <!-- Builds (Neugestaltung 28.09., Luecken 8): ein eigener Bereich. Seit
+         Aufgabe 12 (29.09.) ein Speicher fuer Links zu Questlog: oben das
+         Feld zum Einfuegen, darunter je Link eine Karte; gefuellt von
+         renderBuilds() (51-plan.ts). -->
+    <div class="panel" id="p-builds">
+      <div id="bauBody"></div>
+    </div>
+
+    <div class="panel" id="p-compare">
+        <div id="cmpBody"></div>
+      </div>
+
+      <div class="panel" id="p-setup">
+        <div class="card">
+          <h3 data-i18n="setup.readTitle">How this log is being read</h3>
+          <!-- What the file is, and what to do about it, are two different
+               things. They used to be one middle-dot chain ending in an
+               instruction, which made the instruction look like a fourth
+               statistic. The sentence below was already in the markup,
+               better written — and renderSetup() overwrote it every time,
+               so nobody ever read it. -->
+          <p id="verNote" class="factline"></p>
+          <p data-i18n="setup.readDesc">Borometer reads the column roles from the shape of the data. If you change a role, it recalculates every number.</p>
+          <!-- The one reason a file lands here on its own: no damage column was
+               found. Saying so where the fixing happens beats a notice that has
+               already faded by the time you arrive. -->
+          <p class="needrole" id="needDamage" hidden data-i18n="setup.needDamage">You have not set a Damage column yet. Borometer needs one before it can calculate anything.</p>
+          <!-- The other role the app cannot do without. Without a time column
+               there are no seconds, so every DPS figure in the app reads as a
+               dash - and this was the one page that never said so. Amber, not
+               red: the damage and hit counts are still true. -->
+          <p class="needrole warn" id="needTime" hidden data-i18n="setup.needTime">Without a column set as Time there are no seconds and so no DPS — damage and hits still add up.</p>
+          <!-- The third one. A log with a Skill-ID column but no Skill
+               column parses cleanly and puts one row on screen under a
+               name taken from whichever id happened to come first, which
+               is the worst kind of wrong: it looks like a reading. -->
+          <p class="needrole warn" id="needSkill" hidden data-i18n="setup.needSkill">With no column set as Skill, every hit lands in one unnamed row, so Rotation and the per-skill numbers have nothing to tell apart.</p>
+          <div class="f2" style="max-width:400px;margin-bottom:12px">
+            <div class="field"><label for="selDelim" data-i18n="setup.separator">Separator</label>
+              <select id="selDelim"><option value="auto" data-i18n="setup.detected">Detected</option><option value="," data-i18n="setup.comma">Comma</option><option value="&#9;" data-i18n="setup.tab">Tab</option><option value=";" data-i18n="setup.semicolon">Semicolon</option><option value="|" data-i18n="setup.pipe">Pipe</option></select></div>
+            <div class="field"><label for="selHeader" data-i18n="setup.firstLine">First line</label>
+              <select id="selHeader"><option value="auto" data-i18n="setup.detected">Detected</option><option value="yes" data-i18n="setup.colNames">Column names</option><option value="no" data-i18n="setup.alreadyData">Already data</option></select></div>
+          </div>
+          <div id="mapRows"></div>
+        </div>
+        <div class="card" id="evtCard" hidden>
+          <h3 data-i18n="setup.evtTitle">Which rows count as damage you dealt</h3>
+          <p data-i18n="setup.evtDesc">Rows of an unticked kind are left out of every number.</p>
+          <div id="evtRows"></div>
+        </div>
+        <div class="card">
+          <h3 data-i18n="setup.previewTitle">First rows as read</h3>
+          <p data-i18n="setup.previewDesc">If this looks scrambled, the separator is wrong.</p>
+          <div class="preview" id="preview"></div>
+        </div>
+      </div>
+    </div>
+  </section>
+</div>
+
+<!-- Die Statusleiste (Instrumententafel 3.4): 24 Punkt, leise. Ob Live
+     laeuft, welche Datei gelesen wird (der ganze Pfad im title), wie viele
+     Kaempfe, dass nichts ins Spiel geht, die Groesse (ein Klick setzt 100 %)
+     und die Version. Ohne Live-Bereich: den Zustand sagt #live im Kopf an,
+     eine zweite Region hiesse jede Aenderung doppelt. Im Kompakt nicht da. -->
+<!-- Neugestaltung 28.09. (0.23, DECISION 0.24): wie im Entwurf zuerst Waffen
+     und Klasse mit Rolle, dann Live mit seinem Satz, "Nur gelesen", die
+     Logdatei; Zoom bleibt (der einzige Weg zurueck auf 100 % mit der Maus),
+     die Version rechts. Die Zahl der Kaempfe steht im Kopf der Kampfwahl. -->
+<footer class="statusleiste" id="statusleiste" data-i18n-aria-label="sb.label" aria-label="Status bar">
+  <span class="sbrolle" id="sbRolle" hidden></span>
+  <span class="sblive" id="sbLive"><i class="sbdot" aria-hidden="true"></i><span id="sbLiveText">Live off</span><span id="sbLiveSatz"></span></span>
+  <span class="sbnur" data-i18n="sb.readOnly" data-i18n-title="sb.readOnlyTitle" title="Borometer only reads the combat log the game writes itself. The game is never touched.">Read only &#8211; nothing in the game</span>
+  <span class="sbdatei" id="sbDatei">No log</span>
+  <!-- Fehler melden (Wahl vom 01.10.): derselbe Fehlerbericht wie
+       frueher in den Einstellungen (fehlerbericht() in 44). Unter 640 Punkt
+       nur das Zeichen; der Name steht darum im aria-label. -->
+  <button class="sbfehler" id="sbFehler" type="button" data-i18n-aria-label="sb.fehler" aria-label="Report a bug"
+          data-i18n-title="sb.fehlerTitle" title="Creates a bug report"><span class="sbfw" data-i18n="sb.fehler">Report a bug</span></button>
+  <button class="sbzoom" id="sbZoom" type="button">100&#160;%</button>
+  <!-- Update-Hinweis (Spezifikation Update-Hinweis 2.3): nur wenn der
+       Hauptprozess beim Start eine neuere Version fand; leise, links neben
+       der Version, auch unter 640 Punkt. Der Link geht in den Browser. -->
+  <a class="sbupdate" id="sbUpdate" target="_blank" rel="noopener noreferrer" hidden></a>
+  <span class="sbver" id="sbVer">v0.0</span>
+</footer>
+
+<div class="drop" id="dropOverlay"><div data-i18n="drop.release">Release to read the log</div></div>
+<div class="watchpop" id="watchPop">
+  <span class="rec"></span>
+  <b data-i18n="live.nowLive">Live logging</b>
+  <span id="watchPopFile"></span>
+</div>
+<div class="clogbg" id="clogBg">
+  <div class="clog" id="clog" role="dialog" aria-modal="true" aria-labelledby="clogTitle">
+    <div class="cloghead">
+      <h3><span id="clogTitle" data-i18n="top.changelog">Changelog</span> <span class="ver" id="clogVer"></span></h3>
+      <button class="wbtn" id="clogClose" aria-label="Close" data-i18n-aria-label="win.close">✕</button>
+    </div>
+    <div class="clogbody" id="clogBody"></div>
+  </div>
+</div>
+<!-- role="status" statt stumm: 66 Aufrufe von toast() und toastFail()
+     erschienen und verschwanden, ohne dass etwas gesagt wurde.
+     Hoeflich und nicht assertive, auch fuer Fehler: zwei getrennte
+     Bereiche waeren richtiger, hiessen aber, aria-live im selben Tick
+     umzuschalten, in dem der Text gesetzt wird - darauf ist kein
+     Vorleser verlaesslich. Der Unterschied steht im Text und im
+     Streifen. -->
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<div class="tip" id="tip"></div>
+
+<div class="filterbg" id="filterBg">
+  <div class="filterpanel" id="filterPanel" role="dialog" aria-modal="true"
+       aria-labelledby="filterTitle" hidden>
+    <div class="filterhead">
+      <h3 id="filterTitle" data-i18n="rail.filter">Filter and fight file</h3>
+      <button class="wbtn" id="filterClose" aria-label="Close" data-i18n-aria-label="win.close">&#10005;</button>
+    </div>
+    <div class="filterbody">
+      <div class="field" id="playerField" hidden>
+        <label for="selPlayer" data-i18n="rail.yourChar">Your character</label>
+        <select id="selPlayer"><option value="__all" data-i18n="rail.everyone">Everyone in the log</option></select>
+      </div>
+      <!-- Jeder Hinweis steht unter dem Feld, zu dem er gehoert. Vorher lagen
+           beide als volle Breite unter beiden Feldern, und wer "Standard 3"
+           las, musste raten, welche der zwei Zahlen gemeint war. -->
+      <div class="f2">
+        <div class="field">
+          <label for="inGap" data-i18n="rail.splitAfter">Split fights after (s)</label>
+          <input type="number" id="inGap" class="num" value="8" min="1" max="120">
+          <div class="fieldhint" data-i18n="rail.splitAfterHint">Starts a new fight after this many seconds without damage on the target</div>
+        </div>
+        <div class="field">
+          <label for="inMin" data-i18n="rail.minLength">Minimum fight length (s)</label>
+          <input type="number" id="inMin" class="num" value="3" min="0" max="120">
+          <div class="fieldhint" data-i18n="rail.minLengthHint">Fights shorter than this are hidden</div>
+        </div>
+      </div>
+      <!-- The one case the two numbers above cannot express: a pause long
+           enough to split, on a target you go back to. -->
+      <label class="fcheck"><input type="checkbox" id="inPhases" checked>
+        <span data-i18n="rail.mergePhases">Connect boss phases</span></label>
+      <div class="fieldhint" data-i18n="rail.mergePhasesHint">Some bosses go untargetable for a phase. Ticked, Borometer tries to connect those phases into one fight, and the pause between them counts as fight time. Unticked, it splits at every pause. On a practice dummy it always splits, once the time set above passes without damage.</div>
+      <div class="f2" style="margin-top:11px">
+        <div class="field">
+          <button class="btn sm" id="btnSaveRuns" data-i18n="rail.saveRunsFile">Save fight file</button>
+          <div class="fieldhint" data-i18n="rail.runsFileHint">Saves every saved fight into one file</div>
+        </div>
+        <div class="field">
+          <button class="btn sm" id="btnLoadRuns" data-i18n="rail.loadRunsFile">Load fight file</button>
+          <div class="fieldhint" data-i18n="rail.runsLoadHint">Loads a fight file and adds the fights in it</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+<!-- Der Changelog und der Filter tragen role="dialog" und aria-modal="true",
+     dieser Dialog nicht: ein Vorleser las hinter dem Schleier weiter und
+     nannte beim Oeffnen weder den Titel noch die Frage. Den Fokus faengt
+     openModal schon selbst und gibt ihn auch zurueck, daran aendert sich
+     hier nichts.
+     Der Dialog wird vom Titel benannt und von der Frage beschrieben - so
+     wird die Frage auch dann angesagt, wenn das Eingabefeld gar nicht da
+     ist. Das ist bei fuenf der sieben Aufrufe der Fall: askConfirm und
+     askPick blenden es aus, und ein aria-labelledby auf einem verborgenen
+     Feld traegt dort nichts.
+     Das Feld selbst nennt zuerst die Frage und dann den Titel. Beide Knoten
+     fuellt openModal zur Laufzeit; das traegt, weil der Name aus dem
+     aktuellen Textinhalt berechnet wird und .modalbg bis zum Einblenden auf
+     display:none steht - der Text steht also, bevor der Dialog sichtbar
+     wird. -->
+<div class="modalbg" id="modalBg">
+  <div class="modal" id="modal" role="dialog" aria-modal="true"
+       aria-labelledby="modalTitle" aria-describedby="modalMsg">
+    <h3 id="modalTitle"></h3>
+    <p id="modalMsg" class="hint"></p>
+    <input id="modalInput" type="text" spellcheck="false" aria-labelledby="modalMsg modalTitle">
+    <div class="modallist" id="modalList" hidden></div>
+    <div class="modalact">
+      <button class="btn" id="modalCancel"></button>
+      <button class="btn hot" id="modalOk"></button>
+    </div>
+  </div>
+</div>
+
+<!-- Als Bild teilen (50-bild.ts). Eine eigene Flaeche statt openModal: sie
+     traegt eine Vorschau und drei Handlungen. Vor den Knoepfen steht, was im
+     Bild ist - bei der Gruppe die Charakternamen, dieselben, die alle
+     Mitglieder auf der Tafel schon sehen. Die Vorschau ist das Bild selbst;
+     ihr Ersatztext sagt dasselbe wie der Satz darunter. -->
+<div class="modalbg" id="shareBg">
+  <div class="modal share" id="share" role="dialog" aria-modal="true"
+       aria-labelledby="shareTitle" aria-describedby="shareWas">
+    <h3 id="shareTitle" data-i18n="bild.title">Share as image</h3>
+    <div class="seg" id="shareWahl" role="group" aria-label="What goes in the image" data-i18n-aria-label="bild.pick">
+      <button type="button" data-bild="kampf" aria-pressed="false" data-i18n="bild.kampf">This fight</button>
+      <button type="button" data-bild="board" aria-pressed="false" data-i18n="bild.board">Party board</button>
+    </div>
+    <div class="sharebild"><img id="shareImg" alt=""></div>
+    <p class="hint" id="shareWas"></p>
+    <p class="hint" data-i18n="bild.local">The image is drawn on this computer. Borometer uploads nothing; where it goes is up to you.</p>
+    <p class="hint sharemeld" id="shareMeld" role="status"></p>
+    <div class="modalact">
+      <button class="btn" id="shareClose" type="button" data-i18n="bild.close">Close</button>
+      <button class="btn" id="shareSave" type="button" data-i18n="bild.save">Save as PNG</button>
+      <button class="btn hot" id="shareCopy" type="button" data-i18n="bild.copy">Copy to clipboard</button>
+    </div>
+  </div>
+</div>
+
+<script src="./app.js"></script>
+</body>
+</html>

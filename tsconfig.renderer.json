@@ -1,0 +1,15 @@
+{
+  "extends": "./tsconfig.json",
+  "compilerOptions": {
+    "module": "preserve",
+    "moduleResolution": "bundler",
+    // every file is a module, even one without import/export: nothing in the
+    // page script may fall back to being a global script again
+    "moduleDetection": "force",
+    "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "types": [],
+    "noEmit": true,
+    "strict": true
+  },
+  "include": ["src/renderer/**/*.ts"]
+}

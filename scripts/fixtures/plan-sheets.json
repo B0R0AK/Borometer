@@ -1,0 +1,2109 @@
+{
+ "mastery": [
+  {
+   "id": "Bow_Normal_AttackUtil_03",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Normal_UtilDefense_06",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Normal_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Normal_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Normal_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Bow_Normal_Util_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Bow_High_TacticAttack_12",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_UtilDefense_06",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_DefenseTactic_09",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_TacticAttack_12",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Util_04",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Util_05",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_UtilDefense_06",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Hero_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Hero_Util_02",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Defense_07",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Tactic_11",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_AttackUtil_03",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_Rare_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Bow_Rare_Util_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Bow_High_Util_04",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_Util_05",
+   "lvl": 10
+  },
+  {
+   "id": "Bow_High_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Bow_High_Util_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_Normal_TacticAttack_12",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_AttackUtil_03",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_Util_04",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_Util_05",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_UtilDefense_06",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_TacticAttack_12",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_AttackUtil_03",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_Util_04",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_TacticAttack_12",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_Attack_02",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_AttackUtil_03",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_Util_04",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_Util_05",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_UtilDefense_06",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Rare_Util_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_Rare_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_Hero_Util_02",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Hero_Attack_01",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_DefenseTactic_09",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_Normal_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_Normal_Util_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_High_DefenseTactic_09",
+   "lvl": 10
+  },
+  {
+   "id": "Crossbow_High_Attack_Skill",
+   "lvl": 1
+  },
+  {
+   "id": "Crossbow_High_Util_Skill",
+   "lvl": 1
+  }
+ ],
+ "brief": {
+  "slots": {
+   "belt": {
+    "item": "belt_aa_S1_004",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 8,
+      "all_double_attack": 177,
+      "all_state_tolerance": 62,
+      "skill_cooldown_modifier": 9.3,
+      "magic_armor": 565
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "skill_power_resistance": 80
+     },
+     "resonanz": {
+      "hp_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4
+   },
+   "feet": {
+    "item": "feet_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 8,
+      "str": 8,
+      "hp_max": 1230,
+      "move_speed_modifier": 9.5,
+      "magic_critical_attack": 212,
+      "melee_armor": 535,
+      "range_armor": 535
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "move_speed_modifier": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_double_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_double_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Feet_41_attack_defense_assist",
+     "vals": {
+      "con": 2,
+      "hp_max": 400
+     }
+    }
+   },
+   "head": {
+    "item": "head_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 9,
+      "hp_max": 1230,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 7.8,
+      "melee_armor": 545,
+      "range_armor": 545
+     },
+     "traits": {
+      "skill_cooldown_modifier": 6,
+      "cost_consumption_modifier": 12,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_accuracy",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_evasion",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Head_41_attack_defense_assist",
+     "vals": {
+      "str": 2,
+      "hp_max": 400
+     }
+    }
+   },
+   "legs": {
+    "item": "legs_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 8,
+      "hp_max": 1230,
+      "cost_max": 1120,
+      "skill_cooldown_modifier": 10.2,
+      "melee_armor": 545,
+      "range_armor": 545
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "hp_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_critical_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_critical_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Legs_41_attack_defense_assist",
+     "vals": {
+      "int": 2,
+      "hp_max": 400
+     }
+    }
+   },
+   "chest": {
+    "item": "chest_unique_aa_t2_set_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 10,
+      "hp_max": 2000,
+      "magic_armor": 300,
+      "all_double_attack": 147,
+      "melee_armor": 456,
+      "range_armor": 488
+     },
+     "traits": {
+      "hp_max": 600,
+      "buff_given_duration_modifier": 6,
+      "debuff_taken_duration_modifier": -6
+     },
+     "einzig": {
+      "all_armor": 320
+     },
+     "heroic": {
+      "int": 8,
+      "con": 8,
+      "buff_given_duration_modifier": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_accuracy",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_critical_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Chest_41_attack_defense_assist",
+     "vals": {
+      "dex": 2,
+      "hp_max": 400
+     }
+    },
+    "perk": "SkillSet_WP_Item_Gear_CR_02_1"
+   },
+   "cloak": {
+    "item": "cloak_aa_S1_004",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "hp_max": 1230,
+      "attack_range_modifier": 17.7,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 8.8,
+      "critical_damage_dealt_modifier": 7.1,
+      "melee_armor": 520,
+      "range_armor": 520
+     },
+     "traits": {
+      "hp_max": 600,
+      "cost_max": 600,
+      "skill_power_resistance": 80
+     },
+     "resonanz": {
+      "cost_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_double_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_evasion",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Cloak_41_attack_defense_assist",
+     "vals": {
+      "hp_max": 500,
+      "critical_damage_taken_modifier": 2.5
+     }
+    }
+   },
+   "hands": {
+    "item": "hands_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 8,
+      "per": 8,
+      "hp_max": 1230,
+      "all_accuracy": 157,
+      "all_double_attack": 197,
+      "melee_armor": 535,
+      "range_armor": 535
+     },
+     "traits": {
+      "cost_max": 600,
+      "attack_range_modifier": 8,
+      "attack_speed_modifier": 8
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_critical_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_double_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Hands_41_attack_defense_assist",
+     "vals": {
+      "per": 2,
+      "hp_max": 400
+     }
+    }
+   },
+   "brooch": {
+    "item": "brooch_aa_S1_007",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "boss_all_double_attack": 315,
+      "double_damage_dealt_modifier": 7.3,
+      "all_species_damage_resistance": 63,
+      "magic_doll_heal_modifier": 206
+     },
+     "traits": {
+      "rear_all_double_attack": 160,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "critical_damage_dealt_modifier": 3.2
+     }
+    },
+    "runes": [],
+    "resTier": 4
+   },
+   "ring_1": {
+    "item": "ring_aa_t3_normal_008",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 5,
+      "int": 6,
+      "skill_cooldown_modifier": 6.2,
+      "critical_damage_dealt_modifier": 5,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "chaos",
+      "stat": "boss_range_double_attack",
+      "val": 80,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Ring_41_assist_defense_attack",
+     "vals": {
+      "per": 3,
+      "skill_cooldown_modifier": 3.5
+     }
+    }
+   },
+   "ring_2": {
+    "item": "ring_aa_S1_012",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 8,
+      "str": 8,
+      "all_state_tolerance": 62,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 9.3,
+      "magic_armor": 565
+     },
+     "traits": {
+      "cost_consumption_modifier": 12,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "chaos",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Ring_41_assist_defense_attack",
+     "vals": {
+      "per": 3,
+      "skill_cooldown_modifier": 3.5
+     }
+    }
+   },
+   "earring": {
+    "item": "ear_aa_t2_raid_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 10,
+      "cost_max": 1000,
+      "melee_armor": 300,
+      "range_armor": 300,
+      "all_critical_defense": 165,
+      "magic_armor": 450
+     },
+     "traits": {
+      "rear_all_double_attack": 160,
+      "side_all_double_attack": 120,
+      "rear_all_critical_attack": 160
+     },
+     "heroic": {
+      "int": 8,
+      "dex": 8,
+      "str": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "perk": "SkillSet_WP_Item_Gear_BO_02_1"
+   },
+   "bracelet": {
+    "item": "bracelet_aa_t3_normal_006",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 6,
+      "str": 6,
+      "skill_cooldown_modifier": 5.4,
+      "cost_consumption_modifier": 10.9,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_resistance": 80,
+      "debuff_taken_duration_modifier": -6
+     },
+     "resonanz": {
+      "hp_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Bracelet_41_assist_defense_attack",
+     "vals": {
+      "hp_max": 600,
+      "attack_speed_modifier": 3.5
+     }
+    }
+   },
+   "necklace": {
+    "item": "necklace_aa_t3_normal_008",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 6,
+      "int": 5,
+      "attack_speed_modifier": 8.3,
+      "critical_damage_dealt_modifier": 5,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "chaos",
+      "stat": "boss_range_critical_attack",
+      "val": 80,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Necklace_41_attack_assist_defense",
+     "vals": {
+      "int": 3,
+      "hp_max": 800
+     }
+    }
+   },
+   "off_hand": {
+    "item": "crossbow_aa_t3_normal_002",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 11,
+      "int": 10,
+      "attack_speed_modifier": 9.3,
+      "skill_cooldown_modifier": 7.5,
+      "attack_range_main_hand": 14.4,
+      "attack_speed_main_hand": 0.47,
+      "off_hand_attack_chance": 23,
+      "min_dmg": 39,
+      "max_dmg": 156
+     },
+     "traits": {
+      "all_double_attack": 80,
+      "attack_speed_modifier": 8,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "skill_cooldown_modifier": 4
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "skill_power_amplification",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Weapon_41_attack_assist_defense",
+     "vals": {
+      "dex": 4,
+      "attack_speed_modifier": 3.5
+     }
+    }
+   },
+   "main_hand": {
+    "item": "bow_aa_t2_raid_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 17,
+      "attack_range_modifier": 24,
+      "all_species_damage_amplification": 72,
+      "attack_range_main_hand": 19.2,
+      "attack_speed_main_hand": 0.77,
+      "min_dmg": 88,
+      "max_dmg": 352
+     },
+     "traits": {
+      "all_accuracy": 80,
+      "all_double_attack": 80,
+      "attack_speed_modifier": 8
+     },
+     "einzig": {
+      "per": 8
+     },
+     "heroic": {
+      "int": 14,
+      "per": 14
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "skill_power_amplification",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Weapon_41_attack_assist_defense",
+     "vals": {
+      "dex": 4,
+      "attack_speed_modifier": 3.5
+     }
+    },
+    "perk": "Perk_bow_aa_t5_boss_003"
+   }
+  },
+  "sets": [
+   {
+    "id": "set_aa_t4_leather_002",
+    "worn": 4,
+    "of": 5,
+    "active": [
+     2,
+     4
+    ]
+   }
+  ],
+  "fmt": {
+   "skill_cooldown_modifier": "%",
+   "move_speed_modifier": "%",
+   "double_damage_dealt_modifier": "%",
+   "cost_consumption_modifier": "%",
+   "buff_given_duration_modifier": "%",
+   "debuff_taken_duration_modifier": "%",
+   "attack_range_modifier": "%",
+   "critical_damage_dealt_modifier": "%",
+   "critical_damage_taken_modifier": "%",
+   "attack_speed_modifier": "%",
+   "magic_doll_heal_modifier": "%",
+   "attack_range_main_hand": "m",
+   "attack_speed_main_hand": "s",
+   "off_hand_attack_chance": "%",
+   "range_damage_dealt_modifier": "%",
+   "skill_heal_taken_modifier": "%"
+  },
+  "mast": {
+   "Bow_Normal_AttackUtil_03": {
+    "cost_consumption_modifier": 1.6,
+    "bonus_attack_power_main_hand": 2
+   },
+   "Bow_Normal_UtilDefense_06": {
+    "magic_armor": 32,
+    "buff_given_duration_modifier": 1.1
+   },
+   "Bow_Normal_Attack_01": {
+    "attack_range_modifier": 3.2
+   },
+   "Bow_Normal_Attack_02": {
+    "melee_double_defense": -36,
+    "range_critical_attack": 48
+   },
+   "Bow_High_TacticAttack_12": {
+    "cost_max": 160,
+    "attack_power_main_hand": 3
+   },
+   "Bow_High_Attack_02": {
+    "melee_critical_defense": -45,
+    "critical_damage_dealt_modifier": 3
+   },
+   "Bow_High_Attack_01": {
+    "range_critical_attack": 40
+   },
+   "Bow_High_UtilDefense_06": {
+    "hp_regen": 20,
+    "skill_power_resistance": 10
+   },
+   "Bow_High_DefenseTactic_09": {
+    "stun_tolerance": 25,
+    "magic_double_defense": 20,
+    "melee_double_defense": 20,
+    "range_double_defense": 20
+   },
+   "Bow_Rare_TacticAttack_12": {
+    "attack_range_modifier": 2.4,
+    "range_critical_attack": 24
+   },
+   "Bow_Rare_Attack_02": {
+    "dex": 2,
+    "hp_max": -288,
+    "skill_power_amplification": 36
+   },
+   "Bow_Rare_Attack_01": {
+    "attack_speed_modifier": 3.2
+   },
+   "Bow_Rare_Util_04": {
+    "skill_cooldown_modifier": 2.4
+   },
+   "Bow_Rare_Util_05": {
+    "silence_tolerance": -45,
+    "buff_given_duration_modifier": 4.8
+   },
+   "Bow_Rare_UtilDefense_06": {
+    "hp_max": 192,
+    "cost_regen": 18
+   },
+   "Bow_Rare_Defense_07": {
+    "magic_evasion": 48,
+    "melee_evasion": 48,
+    "range_evasion": 48
+   },
+   "Bow_Rare_Tactic_11": {
+    "bind_tolerance": 60,
+    "stun_tolerance": 60,
+    "blind_tolerance": 60,
+    "sleep_tolerance": 60,
+    "weaken_tolerance": 60,
+    "silence_tolerance": 60,
+    "collide_resistance": 60,
+    "petrification_tolerance": 60,
+    "magic_doll_heal_modifier": -15
+   },
+   "Bow_Rare_AttackUtil_03": {
+    "hp_regen": 24,
+    "range_accuracy": 24
+   },
+   "Bow_High_Util_04": {
+    "cost_consumption_modifier": 4
+   },
+   "Bow_High_Util_05": {
+    "stamina_max": 12,
+    "bind_accuracy": -37.5
+   },
+   "Crossbow_Normal_TacticAttack_12": {
+    "range_accuracy": 16,
+    "attack_speed_modifier": 1.1
+   },
+   "Crossbow_Normal_Attack_02": {
+    "melee_armor": -48,
+    "range_critical_attack": 48
+   },
+   "Crossbow_Normal_Attack_01": {
+    "attack_speed_modifier": 2.1
+   },
+   "Crossbow_Normal_AttackUtil_03": {
+    "cost_consumption_modifier": 1.6,
+    "bonus_attack_power_main_hand": 2
+   },
+   "Crossbow_Normal_Util_04": {
+    "stamina_regen": 3.2
+   },
+   "Crossbow_Normal_Util_05": {
+    "cost_regen": 36,
+    "debuff_taken_duration_modifier": 1.2
+   },
+   "Crossbow_Normal_UtilDefense_06": {
+    "magic_armor": 32,
+    "buff_given_duration_modifier": 1.1
+   },
+   "Crossbow_High_TacticAttack_12": {
+    "attack_range_modifier": 2,
+    "attack_power_main_hand": 3
+   },
+   "Crossbow_High_Attack_02": {
+    "melee_critical_defense": -45,
+    "range_damage_dealt_modifier": 3
+   },
+   "Crossbow_High_Attack_01": {
+    "range_critical_attack": 40
+   },
+   "Crossbow_High_AttackUtil_03": {
+    "hp_regen": 20,
+    "range_double_attack": 20
+   },
+   "Crossbow_High_Util_04": {
+    "skill_heal_taken_modifier": 3.3
+   },
+   "Crossbow_Rare_TacticAttack_12": {
+    "attack_range_modifier": 2.4,
+    "debuff_taken_duration_modifier": -1.2
+   },
+   "Crossbow_Rare_Attack_02": {
+    "dex": 2,
+    "skill_power_resistance": -18,
+    "skill_power_amplification": 36
+   },
+   "Crossbow_Rare_AttackUtil_03": {
+    "range_double_attack": 24,
+    "magic_doll_heal_modifier": 24
+   },
+   "Crossbow_Rare_Util_04": {
+    "cost_regen": 36
+   },
+   "Crossbow_Rare_Util_05": {
+    "sleep_tolerance": -45,
+    "skill_cooldown_modifier": 3.6
+   },
+   "Crossbow_Rare_UtilDefense_06": {
+    "hp_regen": 24,
+    "skill_power_resistance": 12
+   },
+   "Crossbow_Normal_DefenseTactic_09": {
+    "attack_range_modifier": 1.6,
+    "skill_power_resistance": 8
+   },
+   "Crossbow_High_DefenseTactic_09": {
+    "stun_tolerance": 25,
+    "off_hand_attack_chance": 0.8
+   }
+  }
+ },
+ "briefMitNamen": {
+  "slots": {
+   "belt": {
+    "item": "belt_aa_S1_004",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 8,
+      "all_double_attack": 177,
+      "all_state_tolerance": 62,
+      "skill_cooldown_modifier": 9.3,
+      "magic_armor": 565
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "skill_power_resistance": 80
+     },
+     "resonanz": {
+      "hp_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "name": "Test belt"
+   },
+   "feet": {
+    "item": "feet_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 8,
+      "str": 8,
+      "hp_max": 1230,
+      "move_speed_modifier": 9.5,
+      "magic_critical_attack": 212,
+      "melee_armor": 535,
+      "range_armor": 535
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "move_speed_modifier": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_double_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_double_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Feet_41_attack_defense_assist",
+     "vals": {
+      "con": 2,
+      "hp_max": 400
+     }
+    },
+    "name": "Test feet"
+   },
+   "head": {
+    "item": "head_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 9,
+      "hp_max": 1230,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 7.8,
+      "melee_armor": 545,
+      "range_armor": 545
+     },
+     "traits": {
+      "skill_cooldown_modifier": 6,
+      "cost_consumption_modifier": 12,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_accuracy",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_evasion",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Head_41_attack_defense_assist",
+     "vals": {
+      "str": 2,
+      "hp_max": 400
+     }
+    },
+    "name": "Test head"
+   },
+   "legs": {
+    "item": "legs_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 8,
+      "int": 8,
+      "hp_max": 1230,
+      "cost_max": 1120,
+      "skill_cooldown_modifier": 10.2,
+      "melee_armor": 545,
+      "range_armor": 545
+     },
+     "traits": {
+      "cost_max": 600,
+      "cost_regen": 60,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "hp_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_critical_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_critical_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_amplification",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Legs_41_attack_defense_assist",
+     "vals": {
+      "int": 2,
+      "hp_max": 400
+     }
+    },
+    "name": "Test legs"
+   },
+   "chest": {
+    "item": "chest_unique_aa_t2_set_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 10,
+      "hp_max": 2000,
+      "magic_armor": 300,
+      "all_double_attack": 147,
+      "melee_armor": 456,
+      "range_armor": 488
+     },
+     "traits": {
+      "hp_max": 600,
+      "buff_given_duration_modifier": 6,
+      "debuff_taken_duration_modifier": -6
+     },
+     "einzig": {
+      "all_armor": 320
+     },
+     "heroic": {
+      "int": 8,
+      "con": 8,
+      "buff_given_duration_modifier": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_accuracy",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_critical_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Chest_41_attack_defense_assist",
+     "vals": {
+      "dex": 2,
+      "hp_max": 400
+     }
+    },
+    "perk": "SkillSet_WP_Item_Gear_CR_02_1",
+    "name": "Test chest"
+   },
+   "cloak": {
+    "item": "cloak_aa_S1_004",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "hp_max": 1230,
+      "attack_range_modifier": 17.7,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 8.8,
+      "critical_damage_dealt_modifier": 7.1,
+      "melee_armor": 520,
+      "range_armor": 520
+     },
+     "traits": {
+      "hp_max": 600,
+      "cost_max": 600,
+      "skill_power_resistance": 80
+     },
+     "resonanz": {
+      "cost_max": 520
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_double_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_evasion",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Cloak_41_attack_defense_assist",
+     "vals": {
+      "hp_max": 500,
+      "critical_damage_taken_modifier": 2.5
+     }
+    },
+    "name": "Test cloak"
+   },
+   "hands": {
+    "item": "hands_aa_S1_leather_002",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 8,
+      "per": 8,
+      "hp_max": 1230,
+      "all_accuracy": 157,
+      "all_double_attack": 197,
+      "melee_armor": 535,
+      "range_armor": 535
+     },
+     "traits": {
+      "cost_max": 600,
+      "attack_range_modifier": 8,
+      "attack_speed_modifier": 8
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "pvp_melee_critical_attack",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "defense",
+      "stat": "pvp_melee_double_defense",
+      "val": 36,
+      "lvl": 60
+     },
+     {
+      "type": "assist",
+      "stat": "grankus_damage_resistance",
+      "val": 18,
+      "lvl": 60
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Hands_41_attack_defense_assist",
+     "vals": {
+      "per": 2,
+      "hp_max": 400
+     }
+    },
+    "name": "Test hands"
+   },
+   "brooch": {
+    "item": "brooch_aa_S1_007",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "boss_all_double_attack": 315,
+      "double_damage_dealt_modifier": 7.3,
+      "all_species_damage_resistance": 63,
+      "magic_doll_heal_modifier": 206
+     },
+     "traits": {
+      "rear_all_double_attack": 160,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "critical_damage_dealt_modifier": 3.2
+     }
+    },
+    "runes": [],
+    "resTier": 4,
+    "name": "Test brooch"
+   },
+   "ring_1": {
+    "item": "ring_aa_t3_normal_008",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 5,
+      "int": 6,
+      "skill_cooldown_modifier": 6.2,
+      "critical_damage_dealt_modifier": 5,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "chaos",
+      "stat": "boss_range_double_attack",
+      "val": 80,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Ring_41_assist_defense_attack",
+     "vals": {
+      "per": 3,
+      "skill_cooldown_modifier": 3.5
+     }
+    },
+    "name": "Test ring_1"
+   },
+   "ring_2": {
+    "item": "ring_aa_S1_012",
+    "lvl": 90,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 8,
+      "str": 8,
+      "all_state_tolerance": 62,
+      "skill_cooldown_modifier": 8.8,
+      "double_damage_dealt_modifier": 9.3,
+      "magic_armor": 565
+     },
+     "traits": {
+      "cost_consumption_modifier": 12,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_regen": 52
+     }
+    },
+    "runes": [
+     {
+      "type": "chaos",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Ring_41_assist_defense_attack",
+     "vals": {
+      "per": 3,
+      "skill_cooldown_modifier": 3.5
+     }
+    },
+    "name": "Test ring_2"
+   },
+   "earring": {
+    "item": "ear_aa_t2_raid_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "per": 10,
+      "cost_max": 1000,
+      "melee_armor": 300,
+      "range_armor": 300,
+      "all_critical_defense": 165,
+      "magic_armor": 450
+     },
+     "traits": {
+      "rear_all_double_attack": 160,
+      "side_all_double_attack": 120,
+      "rear_all_critical_attack": 160
+     },
+     "heroic": {
+      "int": 8,
+      "dex": 8,
+      "str": 8
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "perk": "SkillSet_WP_Item_Gear_BO_02_1",
+    "name": "Test earring"
+   },
+   "bracelet": {
+    "item": "bracelet_aa_t3_normal_006",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "int": 6,
+      "str": 6,
+      "skill_cooldown_modifier": 5.4,
+      "cost_consumption_modifier": 10.9,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_resistance": 80,
+      "debuff_taken_duration_modifier": -6
+     },
+     "resonanz": {
+      "hp_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     },
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Bracelet_41_assist_defense_attack",
+     "vals": {
+      "hp_max": 600,
+      "attack_speed_modifier": 3.5
+     }
+    },
+    "name": "Test bracelet"
+   },
+   "necklace": {
+    "item": "necklace_aa_t3_normal_008",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 6,
+      "int": 5,
+      "attack_speed_modifier": 8.3,
+      "critical_damage_dealt_modifier": 5,
+      "magic_armor": 430
+     },
+     "traits": {
+      "cost_regen": 60,
+      "skill_power_amplification": 80,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "cost_max": 400
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "boss_range_double_attack",
+      "val": 96,
+      "lvl": 120
+     },
+     {
+      "type": "chaos",
+      "stat": "boss_range_critical_attack",
+      "val": 80,
+      "lvl": 1
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Necklace_41_attack_assist_defense",
+     "vals": {
+      "int": 3,
+      "hp_max": 800
+     }
+    },
+    "name": "Test necklace"
+   },
+   "off_hand": {
+    "item": "crossbow_aa_t3_normal_002",
+    "lvl": 50,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 11,
+      "int": 10,
+      "attack_speed_modifier": 9.3,
+      "skill_cooldown_modifier": 7.5,
+      "attack_range_main_hand": 14.4,
+      "attack_speed_main_hand": 0.47,
+      "off_hand_attack_chance": 23,
+      "min_dmg": 39,
+      "max_dmg": 156
+     },
+     "traits": {
+      "all_double_attack": 80,
+      "attack_speed_modifier": 8,
+      "buff_given_duration_modifier": 6
+     },
+     "resonanz": {
+      "skill_cooldown_modifier": 4
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "skill_power_amplification",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "resTier": 4,
+    "syn": {
+     "id": "rune_synergy_Weapon_41_attack_assist_defense",
+     "vals": {
+      "dex": 4,
+      "attack_speed_modifier": 3.5
+     }
+    },
+    "name": "Test off_hand"
+   },
+   "main_hand": {
+    "item": "bow_aa_t2_raid_001",
+    "lvl": 75,
+    "lvlGuess": true,
+    "vals": {
+     "grund": {
+      "dex": 17,
+      "attack_range_modifier": 24,
+      "all_species_damage_amplification": 72,
+      "attack_range_main_hand": 19.2,
+      "attack_speed_main_hand": 0.77,
+      "min_dmg": 88,
+      "max_dmg": 352
+     },
+     "traits": {
+      "all_accuracy": 80,
+      "all_double_attack": 80,
+      "attack_speed_modifier": 8
+     },
+     "einzig": {
+      "per": 8
+     },
+     "heroic": {
+      "int": 14,
+      "per": 14
+     }
+    },
+    "runes": [
+     {
+      "type": "attack",
+      "stat": "skill_power_amplification",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "assist",
+      "stat": "skill_power_resistance",
+      "val": 42,
+      "lvl": 120
+     },
+     {
+      "type": "defense",
+      "stat": "hp_max",
+      "val": 720,
+      "lvl": 120
+     }
+    ],
+    "syn": {
+     "id": "rune_synergy_Weapon_41_attack_assist_defense",
+     "vals": {
+      "dex": 4,
+      "attack_speed_modifier": 3.5
+     }
+    },
+    "perk": "Perk_bow_aa_t5_boss_003",
+    "name": "Test main_hand"
+   }
+  },
+  "sets": [
+   {
+    "id": "set_aa_t4_leather_002",
+    "worn": 4,
+    "of": 5,
+    "active": [
+     2,
+     4
+    ]
+   }
+  ],
+  "fmt": {
+   "skill_cooldown_modifier": "%",
+   "move_speed_modifier": "%",
+   "double_damage_dealt_modifier": "%",
+   "cost_consumption_modifier": "%",
+   "buff_given_duration_modifier": "%",
+   "debuff_taken_duration_modifier": "%",
+   "attack_range_modifier": "%",
+   "critical_damage_dealt_modifier": "%",
+   "critical_damage_taken_modifier": "%",
+   "attack_speed_modifier": "%",
+   "magic_doll_heal_modifier": "%",
+   "attack_range_main_hand": "m",
+   "attack_speed_main_hand": "s",
+   "off_hand_attack_chance": "%",
+   "range_damage_dealt_modifier": "%",
+   "skill_heal_taken_modifier": "%"
+  },
+  "mast": {
+   "Bow_Normal_AttackUtil_03": {
+    "cost_consumption_modifier": 1.6,
+    "bonus_attack_power_main_hand": 2
+   },
+   "Bow_Normal_UtilDefense_06": {
+    "magic_armor": 32,
+    "buff_given_duration_modifier": 1.1
+   },
+   "Bow_Normal_Attack_01": {
+    "attack_range_modifier": 3.2
+   },
+   "Bow_Normal_Attack_02": {
+    "melee_double_defense": -36,
+    "range_critical_attack": 48
+   },
+   "Bow_High_TacticAttack_12": {
+    "cost_max": 160,
+    "attack_power_main_hand": 3
+   },
+   "Bow_High_Attack_02": {
+    "melee_critical_defense": -45,
+    "critical_damage_dealt_modifier": 3
+   },
+   "Bow_High_Attack_01": {
+    "range_critical_attack": 40
+   },
+   "Bow_High_UtilDefense_06": {
+    "hp_regen": 20,
+    "skill_power_resistance": 10
+   },
+   "Bow_High_DefenseTactic_09": {
+    "stun_tolerance": 25,
+    "magic_double_defense": 20,
+    "melee_double_defense": 20,
+    "range_double_defense": 20
+   },
+   "Bow_Rare_TacticAttack_12": {
+    "attack_range_modifier": 2.4,
+    "range_critical_attack": 24
+   },
+   "Bow_Rare_Attack_02": {
+    "dex": 2,
+    "hp_max": -288,
+    "skill_power_amplification": 36
+   },
+   "Bow_Rare_Attack_01": {
+    "attack_speed_modifier": 3.2
+   },
+   "Bow_Rare_Util_04": {
+    "skill_cooldown_modifier": 2.4
+   },
+   "Bow_Rare_Util_05": {
+    "silence_tolerance": -45,
+    "buff_given_duration_modifier": 4.8
+   },
+   "Bow_Rare_UtilDefense_06": {
+    "hp_max": 192,
+    "cost_regen": 18
+   },
+   "Bow_Rare_Defense_07": {
+    "magic_evasion": 48,
+    "melee_evasion": 48,
+    "range_evasion": 48
+   },
+   "Bow_Rare_Tactic_11": {
+    "bind_tolerance": 60,
+    "stun_tolerance": 60,
+    "blind_tolerance": 60,
+    "sleep_tolerance": 60,
+    "weaken_tolerance": 60,
+    "silence_tolerance": 60,
+    "collide_resistance": 60,
+    "petrification_tolerance": 60,
+    "magic_doll_heal_modifier": -15
+   },
+   "Bow_Rare_AttackUtil_03": {
+    "hp_regen": 24,
+    "range_accuracy": 24
+   },
+   "Bow_High_Util_04": {
+    "cost_consumption_modifier": 4
+   },
+   "Bow_High_Util_05": {
+    "stamina_max": 12,
+    "bind_accuracy": -37.5
+   },
+   "Crossbow_Normal_TacticAttack_12": {
+    "range_accuracy": 16,
+    "attack_speed_modifier": 1.1
+   },
+   "Crossbow_Normal_Attack_02": {
+    "melee_armor": -48,
+    "range_critical_attack": 48
+   },
+   "Crossbow_Normal_Attack_01": {
+    "attack_speed_modifier": 2.1
+   },
+   "Crossbow_Normal_AttackUtil_03": {
+    "cost_consumption_modifier": 1.6,
+    "bonus_attack_power_main_hand": 2
+   },
+   "Crossbow_Normal_Util_04": {
+    "stamina_regen": 3.2
+   },
+   "Crossbow_Normal_Util_05": {
+    "cost_regen": 36,
+    "debuff_taken_duration_modifier": 1.2
+   },
+   "Crossbow_Normal_UtilDefense_06": {
+    "magic_armor": 32,
+    "buff_given_duration_modifier": 1.1
+   },
+   "Crossbow_High_TacticAttack_12": {
+    "attack_range_modifier": 2,
+    "attack_power_main_hand": 3
+   },
+   "Crossbow_High_Attack_02": {
+    "melee_critical_defense": -45,
+    "range_damage_dealt_modifier": 3
+   },
+   "Crossbow_High_Attack_01": {
+    "range_critical_attack": 40
+   },
+   "Crossbow_High_AttackUtil_03": {
+    "hp_regen": 20,
+    "range_double_attack": 20
+   },
+   "Crossbow_High_Util_04": {
+    "skill_heal_taken_modifier": 3.3
+   },
+   "Crossbow_Rare_TacticAttack_12": {
+    "attack_range_modifier": 2.4,
+    "debuff_taken_duration_modifier": -1.2
+   },
+   "Crossbow_Rare_Attack_02": {
+    "dex": 2,
+    "skill_power_resistance": -18,
+    "skill_power_amplification": 36
+   },
+   "Crossbow_Rare_AttackUtil_03": {
+    "range_double_attack": 24,
+    "magic_doll_heal_modifier": 24
+   },
+   "Crossbow_Rare_Util_04": {
+    "cost_regen": 36
+   },
+   "Crossbow_Rare_Util_05": {
+    "sleep_tolerance": -45,
+    "skill_cooldown_modifier": 3.6
+   },
+   "Crossbow_Rare_UtilDefense_06": {
+    "hp_regen": 24,
+    "skill_power_resistance": 12
+   },
+   "Crossbow_Normal_DefenseTactic_09": {
+    "attack_range_modifier": 1.6,
+    "skill_power_resistance": 8
+   },
+   "Crossbow_High_DefenseTactic_09": {
+    "stun_tolerance": 25,
+    "off_hand_attack_chance": 0.8
+   }
+  }
+ }
+}

@@ -1,0 +1,37 @@
+# Zeilenenden festnageln, statt sie der Erkennung zu ueberlassen.
+#
+# core.autocrlf steht hier auf true. Ohne diese Zeilen haengt es an Gits
+# Heuristik, ob eine Datei als Text gilt - und app.ts oder styles.css mit
+# ihren eingebetteten Schriften und Bildern koennten beim naechsten Klonen
+# CRLF bekommen. Ein Wechsel blaeht jeden Unterschied auf zehntausende
+# geaenderte Zeilen auf.
+#
+# ACHTUNG bei der Reihenfolge: es gilt die LETZTE passende Zeile. Erst die
+# allgemeinen Muster, danach die Ausnahmen - andersherum gewinnt das
+# allgemeine Muster gegen die Ausnahme, und genau das ist hier einmal passiert.
+
+# --- allgemein ---
+*.ts              text eol=lf
+*.mjs             text eol=lf
+*.js              text eol=lf
+*.json            text eol=lf
+*.yml             text eol=lf
+*.css             text eol=lf
+*.py              text eol=lf
+*.md              text eol=lf
+*.txt             text eol=lf
+*.html            text eol=lf
+*.service         text eol=lf
+LICENSE           text eol=lf
+.gitattributes    text eol=lf
+.gitignore        text eol=lf
+
+# Windows-Stapeldateien brauchen CRLF, sonst stolpert cmd.exe.
+*.bat             text eol=crlf
+
+# --- nie anfassen ---
+*.png             binary
+*.ico             binary
+*.zip             binary
+*.exe             binary
+*.woff2           binary

@@ -1,0 +1,10 @@
+name: Idea / Wunsch
+description: Something Borometer could do. Nothing that reaches into the game.
+labels: [idea]
+body:
+  - type: textarea
+    id: what
+    attributes:
+      label: What would you like, and when would you use it?
+    validations:
+      required: true

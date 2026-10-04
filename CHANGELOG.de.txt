@@ -1,0 +1,2147 @@
+BOROMETER — ÄNDERUNGSPROTOKOLL
+==============================
+
+v1.9
+----
+  - Der Kampf zeigt den Schaden jetzt als Glutring. Jede Fähigkeit ist ein Bogen
+    um die große Zahl, so groß wie ihr Anteil am Schaden, mit den Trefferarten
+    am dünnen Außenrand und den Namen außen. Zeigst du auf einen Bogen oder eine
+    Zeile, werden beide hervorgehoben, und die Mitte nennt Schaden, Treffer,
+    Kritanteil und größten Treffer dieser Fähigkeit
+  - Ein Klick auf einen Bogen klappt in der Liste neben dem Ring diese Fähigkeit
+    mit ihren Trefferarten auf und die vorher offene zu. Ein zweiter Klick
+    klappt sie wieder zu
+  - „Kampf nachspielen“ lässt die Fähigkeiten im Ring ein Rennen laufen: den
+    ganzen Kampf in etwa zehn Sekunden, mit 1×, 2× oder 4× und zum Spulen. Die
+    Mechanik wird eingeblendet, am Ende stehen die ersten drei Plätze mit einem
+    Satz
+  - In der Gruppe zeigt der Ring innen die Mitglieder und außen ihre
+    Fähigkeiten, in der Mitte deinen Platz und unten den Anteil je Mitglied. Ein
+    Klick öffnet den Ring eines Mitglieds, Esc oder „‹ Gruppe“ führt zurück
+  - Kritisch stark ist jetzt Glut-Orange und überall deutlich von Kritisch
+    (Gold) zu unterscheiden, auch bei Farbschwäche
+  - Borometer erkennt Mechaniken: Strecken im Bosskampf, in denen du weiter
+    triffst, deine Treffer aber kaum Schaden machen, zu ähnlicher Zeit in
+    mindestens 80 % von fünf oder mehr deiner Pulls. Die Analyse nennt sie als
+    eigenen Befund, die Kurve zeigt sie schraffiert, und diese Sekunden zählen
+    nicht mehr als deine Lücke oder schwächste Strecke. Eine Ursache rät
+    Borometer nicht
+  - King Khanzaizin: Nach 20 Sekunden ohne Treffer beginnt ein neuer Kampf,
+    Wipes kleben also nicht mehr zu einem Kampf zusammen. Für andere Bosse
+    ändert sich nichts
+  - Rekorde, der Pokal in der Symbolleiste, sind ein Sammelalbum: oben der
+    höchste Treffer insgesamt, darunter Seiten für Raid, Übungspuppe, Feldbosse
+    und Dungeons nach Sternen. Jeder Boss hat ein Medaillon mit bestem DPS,
+    stärkstem Treffer und erstem Kampf, noch nicht bekämpfte Bosse stehen als
+    leere Umrisse. Beim ersten Öffnen liest Borometer die 60 neuesten Logs im
+    Log-Ordner nach; ein Abbruch verliert nichts
+  - Unter der großen Zahl vergleicht eine neutrale Zeile diesen Pull mit dem
+    letzten, etwa „+8 % zum letzten Pull“. Liegen alle Kämpfe an einem Tag oder
+    an zwei Tagen hintereinander, reiht der Verlauf die Pulls mit ihrer Uhrzeit
+    nacheinander auf. Die Kampfwahl fasst Kämpfe am selben Ort unter einem Kopf
+    zusammen, und die Gruppe zeigt zuerst das Board
+  - Beim ersten Start zeigt die App einen Rundgang: sechs kurze Schritte vom
+    Log-Ordner bis „Fehler melden“. Du kannst ihn überspringen, und „Rundgang
+    zeigen“ in den Einstellungen holt ihn zurück, auch im Browser
+  - Neu in Einstellungen › Info: „Beim Start nach neuer Version sehen“. Der
+    Schalter ist aus, bis du ihn einschaltest. Dann fragt Borometer einmal je
+    Start bei GitHub, und ist eine neuere Version da, führt ein leiser Hinweis
+    in der Statusleiste und in Info zur Release-Seite. Geladen oder installiert
+    wird nichts; GitHub sieht dabei deine IP-Adresse und die Uhrzeit
+  - Borometer ist Open Source unter der GPL. Quelltext, Downloads und Issues
+    liegen bei GitHub unter B0R0AK/Borometer, die Lizenzhinweise gibt es jetzt
+    auch auf Englisch
+  - Wo ein Spielbild fehlt, zeichnet Borometer eine eigene Marke statt eines
+    leeren Kreises. Im Kompaktfenster stehen Zeilen ohne Symbol jetzt bündig mit
+    den übrigen
+
+v1.8
+----
+  - Weeklies im neuen Look: die Woche als Band von Donnerstag 10:00 bis
+    Donnerstag 10:00 mit einem Strich für jetzt, der Raid als 3×3-Raster mit den
+    Bossen seiner drei Flügel, jeder Händler-Punkt mit seinem Spielsymbol und
+    einem Ring, der sich füllt, und ein Fortschrittsring an jedem Charakter
+  - Das Kompaktfenster folgt der Vollansicht: Es zeigt den Kampf, den du dort
+    offen hast, und wechselt mit. Kann es nicht folgen, sagt es warum statt „No
+    log“
+  - Das Kompaktfenster bleibt kompakt: Es hat eine Höchstgröße, und das ⋯-Menü,
+    Dialoge und Meldungen sind ganz zu sehen – das Fenster wächst dafür und
+    kehrt zurück. Durchsicht tönt nur den Grund; Fähigkeiten, Namen und Zahlen
+    bleiben deckend
+  - Vegamor wird erkannt: keine Steuerzeichen mehr im Kampfnamen, das ganze
+    Boss-Event ist ein Lauf mit jedem Teil als eigenem Kampf, und Vegamor hat
+    ein eigenes Bild
+  - Der Schaden an der Übungspuppe stimmt wieder: Eine Skill-ID wird nie mehr
+    als Schaden gelesen
+  - „Fehler melden“ steht in der Statusleiste unten rechts statt in den
+    Einstellungen
+  - Neue Symbole für die Übungspuppe und für Fallende Blume
+
+v1.7
+----
+  - Borometer sieht aus und bedient sich wie eine Begleit-App: links eine
+    Symbolleiste, die Kampfwahl in der Titelleiste (‹ › und Strg K), unten eine
+    Statusleiste und der Inhalt als eine ruhige Fläche. Auf großen Bildschirmen
+    wird nichts gestreckt
+  - Kampf: jede Fähigkeit mit ihrem Balken unter dem Namen, neben der Tabelle
+    die Kurve und ein Urteil mit zwei Belegen, dazu das Spielsymbol des
+    Skillkerns (34 von 35 Kernen)
+  - Rotation: der ganze Kampf als Zeitleiste zum Abspielen mit 1×, 2× oder 4×,
+    als Leiste oder als Reihenfolge, direkt darunter der gestapelte Zeitverlauf
+    auf derselben Achse – ein Abspielstrich läuft durch beides. In der Gruppe
+    die Rotation jedes Mitglieds
+  - Frühere Tage: Die Kampfwahl blättert zu älteren Logdateien im Log-Ordner des
+    Spiels. Solange du einen früheren Tag ansiehst, pausiert das Mitlesen;
+    „Heute“ nimmt es wieder auf. Auf Start öffnet „Zuletzt geöffnet“ die Datei
+  - Kompakt ist unter Windows 11 ein eigenes kleines Fenster über dem Spiel, und
+    das große Fenster bleibt stehen – etwa auf dem zweiten Bildschirm. Ein
+    normales Windows-Fenster über dem Spiel, kein Overlay im Spiel: Borometer
+    greift nicht auf das Spiel zu
+  - Builds merken sich deine Questlog-Links mit einer kleinen Übersicht aus
+    deinen eigenen Logs: Kämpfe, bester Pull und Median je Build. Ein Klick
+    öffnet den Build auf Questlog
+  - Weeklies: eine Checkliste für bis zu sechs Charaktere mit den wöchentlichen
+    und täglichen Aufgaben. Sie leert sich donnerstags um 10:00 und täglich um
+    10:00 deutscher Zeit, und jeder Charakter kann Punkte ausblenden, umbenennen
+    oder eigene hinzufügen
+  - Die Einstellungen sind eine rollende Seite mit Sprungleiste; „Im Explorer
+    zeigen“ öffnet den Log-Ordner des Spiels
+  - Rotationstrainer, Abend und die Leinwand „Alle Einsätze“ entfallen. Alles,
+    was du gespeichert hast, bleibt, wo es war
+
+v1.6
+----
+  - Ein neuer Reiter, Fortschritt, beantwortet eine Frage: Wirst du besser,
+    und woran liegt es? Alles darin bleibt auf deinem PC
+  - Gegen deinen besten Pull: Ein Klick im Kampfkopf vergleicht diesen Kampf
+    mit deinem besten am selben Boss – an der Übungspuppe mit deinem besten
+    derselben Länge, 60, 120 oder 180 Sekunden. Ist dieser Kampf dein bester,
+    steht er gegen den zweitbesten. Zahlen, Fähigkeiten und Rotation
+    nebeneinander
+  - Deine Baue: Borometer erkennt einen Bau am Waffenpaar und an den
+    Fähigkeiten, die 80 % deines Schadens machen, und zeigt je Boss den Median
+    aller Kämpfe damit. Einen Namen gibst du einmal, einen Planer-Link nach
+    Wunsch; sonst ist nichts einzutragen
+  - Rotationstrainer: Nach jedem Pull höchstens drei Sätze, wo deine ersten
+    30, 45 oder 60 Sekunden anders liefen als in deinem besten Pull –
+    seltener, später, in anderer Reihenfolge, eine Pause. Wo der Boss nicht zu
+    treffen war, sagt er das und nennt dort nichts. In der Rotation zeichnet
+    „Bester Pull als Umriss“ deinen besten Pull über deine Einsätze
+  - Abend: die Bosse eines Raid-Abends, der beste Pull je Boss, der
+    Unterschied zur Vorwoche und wer sich verbessert hat – aus den Gruppen-
+    Logs oder ohne Gruppe aus deinen eigenen Kämpfen. Niemand wird von unten
+    genannt
+  - Als Bild teilen: ein Kampf, die Gruppentafel oder der Abend als PNG zum
+    Speichern oder für die Zwischenablage. Borometer zeichnet es aus seinen
+    eigenen Zahlen – keine Bildschirmaufnahme, keine Spielgrafik – und sagt
+    vor dem Kopieren, wessen Namen darin stehen
+
+v1.5.1
+------
+  - Der Installer trägt auf jeder Seite das dunkle Aussehen der App, nicht nur
+    auf der ersten und der letzten. Er fragt nicht mehr, für wen installiert
+    wird – Borometer kommt immer in deinen eigenen Benutzerordner, ohne
+    Admin-Rechte – und lässt die Lizenzseite weg
+  - Ein neuerer Installer über Borometer aktualisiert es an Ort und Stelle.
+    Die Deinstallation sagt, was sie entfernt, und dass deine Einstellungen
+    und gespeicherten Kämpfe bleiben, wo sie sind
+
+v1.5
+----
+  - Die Live-Aufzeichnung ist ein Schalter: „● Live“, solange sie läuft, „○
+    Live aus“, wenn nicht, und ein Klick schaltet sie ein oder aus. Die
+    Beschriftung bleibt bei jeder Breite, im Kompaktmodus und bei 200 %, und
+    der Taskleisten-Knopf schaltet mit
+  - Die Schadenstabelle wächst mit dem Kampf, statt in einem Drittel des
+    Fensters zu scrollen. Ist das Fenster schmal oder vergrößert, wird zuerst
+    die Kopfplatte kleiner, damit die Tabelle sichtbar bleibt
+  - Die stärkste Fähigkeit trägt kein Gold mehr: Gold gehört der Zahl und dem,
+    was du ausgewählt hast. Im hellen Thema glüht nichts mehr, und ein Balken,
+    der die ganze Spalte füllt, läuft aus, damit er nicht wie eine ausgewählte
+    Zeile aussieht
+  - Die Analyse beginnt mit einem Urteil: was dich in diesem Kampf am meisten
+    gekostet hat, oder dass nichts viel gekostet hat. „Schwächste drei
+    Sekunden“ zeigt nicht mehr auf die letzten Sekunden vor dem Kill
+  - Jede Aktion hat einen Ort: „Kampf speichern“ nur am Kampf, der Fuß der
+    Leiste heißt „Filter und Kampfdatei“, und der Reiter heißt Gruppe wie der
+    Knopf. Bedienungshinweise stehen hinter „? Hilfe“ statt über den
+    Diagrammen
+  - Der Kompaktmodus ohne Kampf verkleinert das Fenster wieder auf einen
+    Streifen. Meldungen verdecken keinen Knopf mehr, folgen dem Sprachwechsel,
+    und eine Meldung mit Rückgängig bleibt ihre volle Zeit stehen
+
+v1.4
+----
+  - Borometer trägt den echten Windows-Rahmen. Minimieren, Maximieren mit den
+    Andock-Layouts, Schließen, der Rand zum Ziehen, die Ecken und der Schatten
+    kommen von Windows; die Kopfleiste ist die Titelleiste. Die Knöpfe folgen
+    dem Thema und der UI-Größe
+  - Kompakt liegt unter Windows 11 auf Acrylic: das Spiel scheint unscharf
+    hinter dem Overlay durch, Zahlen, Namen und Gold bleiben deckend.
+    „Durchsicht“ stellt jetzt ein, wie viel vom Spiel durch den Grund scheint,
+    nicht wie blass die Zahlen werden. Auf älterem Windows verblasst es wie
+    bisher
+  - Die Taskleiste kennt Borometer: ein goldener Punkt am Symbol, solange die
+    Live-Aufzeichnung läuft, und zwei Knöpfe in der Vorschau, Kompakt und
+    Live-Aufzeichnung
+  - Ein maximiertes Fenster ist nach dem Kompaktmodus wieder maximiert, statt
+    über den Bildschirmrand hinauszuragen
+  - Der lokale Server der App antwortet nur noch der App selbst. Eine Webseite
+    im Browser kann ihm keine Befehle mehr schicken und den Log-Ordner nicht
+    mehr umstellen
+
+v1.3
+----
+  - Durchklick-Overlay: Strg+Umschalt+D lässt die Maus durch das
+    Kompaktfenster ins Spiel, dieselben Tasten holen sie zurück. Aus der
+    Vollansicht macht es das ganze Overlay auf einmal – kompakt, oben,
+    durchklickbar. Der Streifen sagt es mit einer Amber-Kante und dem Kürzel
+  - Schmale Fenster und 200 % Zoom: Die Kampfliste klappt auf eine Zeile mit
+    einem Knopf zum Öffnen, damit die große Zahl oben bleibt. Ein Klick auf
+    einen Kampf klappt sie wieder zu
+  - Installer und portable Exe sehen aus wie die App: dunkle Seiten, die
+    Wortmarke, eigene Texte auf Deutsch oder Englisch. Die portable Exe zeigt
+    beim Entpacken ein Startbild. Ein Reiterwechsel blendet in 140 statt
+    260 ms ein
+  - Ein Wort für eine Sache: überall „Live-Aufzeichnung läuft/aus“ statt
+    „Livelog“, „LIVE AUS“ im Kompaktstreifen statt eines nackten „AUS“, und
+    „Kampfdatei“ statt „Durchläufe-Datei“
+  - Zwei verschiedene Bosse im Vergleich färben den Unterschied nicht mehr rot
+    oder grün, und die Aufschlüsselung, woher er kommt, beginnt zugeklappt.
+    Trefferzahlen stehen gruppiert (1.201), Unterschiede im Vergleich in
+    k-Form wie jede Rate daneben
+  - Das helle Thema erreicht lesbaren Kontrast an der gewählten Kampfzeile und
+    am Durchklick-Hinweis. Der klebende Tabellenkopf deckt die Zeilen
+    darunter, der Fokusrahmen im Kompaktmodus liegt nicht mehr auf den
+    Nachbarzahlen, und kompakt steht der Schaden als 32.54M
+  - Die Fragen der Analyse stehen eine Stufe über ihren Antworten, und jede
+    Zahl steht einmal – „Auge von Ventius“ über „91 % des Schadens“ statt
+    zweimal der 91. „Eigene Spitze“ im Zeitverlauf zieht eine Spur mit fast
+    keinem Schaden nicht mehr auf volle Höhe
+  - Die Startseite trägt „Logs öffnen“ und „Live-Aufzeichnung“ einmal statt
+    zweimal, und die Einrichtungsschritte sind ruhig nummeriert statt mit vier
+    glühenden Knöpfen. Der Wechsel in den Kompaktmodus klappt offene
+    Tabellenzeilen zu
+
+v1.2
+----
+  - Der Kompaktmodus liest den Kampf mit. Unter der großen Zahl steht eine
+    kurze Zeile – welche Fähigkeit ihn getragen hat – und wie dieser Pull
+    gegen den letzten auf dasselbe Ziel lag, mit Vorzeichen und in Grün oder
+    Rot
+  - Kämpfe vergleichen sagt, wogegen es misst, und ein Knopf tauscht den
+    Bezug. Zwei verschiedene Bosse bekommen keinen Sieger, weil jeder Boss
+    Schaden anders annimmt
+  - Gruppe hosten sagt direkt unter dem Knopf, was es öffnet: einen Port auf
+    diesem PC, der nur Gruppenverkehr beantwortet und nur mit dem Code –
+    oder gar nichts, wenn ein Gruppen-Server eingetragen ist. Ein Knopf, der
+    noch nicht geht, glüht nicht mehr
+  - Der Zeitverlauf hat eine Legende für seine zwei Bänder: Sekunden ohne
+    Treffer und die schwächsten drei Sekunden
+  - Die Fragen der Analyse stehen über ihren Zeilen, und die Zahl im Urteil
+    steht in derselben Schrift wie jede andere große Zahl
+  - Der Tabellenkopf ist ein Tabstopp, die Pfeiltasten gehen durch die
+    Spalten und in die Zeilen. Die Umschalter über der Tabelle sagen einem
+    Vorleser, welcher gilt
+  - Ein Reiterwechsel nach dem Herunterscrollen landet am Anfang des neuen
+    Reiters. Die Zeilen im Kompaktmodus sind 24 Punkt hoch, groß genug zum
+    Treffen
+  - Deutsch liest sich wieder wie Deutsch: „2 Kämpfe aus dem Beispiel
+    gelesen“ statt der Knopfbeschriftung, und die Überschrift der Kampfliste
+    ist ein Satz
+
+v1.1
+----
+  - Borometer läuft jetzt auf Electron statt auf Python. Es bringt sein
+    Fenster selbst mit und braucht weder WebView2 noch einen installierten
+    Browser; was du siehst und klickst, ist dasselbe wie in 1.0
+  - Jede Version gibt es dreifach: als Installer mit Startmenü-Eintrag und
+    Deinstallation, als portable Exe und als Zip zum Entpacken. Installiert
+    landen gespeicherte Kämpfe unter Dokumente\Borometer, portabel neben
+    der Exe
+  - Deine Einstellungen bleiben, wo sie sind. Alle drei lesen dieselbe
+    Datei unter %APPDATA%\Borometer wie die Python-Fassung, einrichten
+    musst du nichts neu
+  - Im Fenster stand noch v0.64. Die Versionsnummer kommt jetzt aus dem
+    Build selbst
+
+v1.0
+----
+  - Die Oberfläche ist neu. Eine Schrift mit echten Stufen, ruhigere
+    Flächen, dichtere Zeilen, und ein Satz Bedienelemente statt acht
+    Bauarten, die sich nur ähnlich sahen
+  - Die Fähigkeiten haben Symbole, 313 Stück, dazu die Waffe dahinter. Was
+    du eingesetzt hast, erkennst du am Bild statt am Namen
+  - Der Zeitverlauf ist eine Kurve. Statt 168 Säulen eine Fläche mit einer
+    Spur je Fähigkeit — ein Klick nimmt eine Spur heraus
+  - Die Rotation hat eine eigene Leiste: was du wann eingesetzt hast, auf
+    einer Zeitachse, mit den Trefferspannen dazu
+  - Die Analyse hat einen Kopf und Abschnitte, und sagt dir, wo dein
+    schwächstes Fenster lag
+  - Der Kompaktmodus ist ein Overlay geworden: ein schmaler Streifen über dem
+    Spiel, der verblasst, solange du ihn nicht ansiehst
+  - Kämpfe vergleichen, Gruppe hosten und der Startbildschirm sind
+    überarbeitet
+  - Bosse stehen mit Bild in der Kampfliste
+  - Die beiden Diagramme lassen sich mit der Tastatur bedienen
+  - Im hellen Thema ist Gold wieder Gold. Auf hellem Grund war es vorher braun
+  - Skillkerne haben eine eigene Marke. Ein Skillkern ist kein Skill, sondern
+    ein Gegenstand, der einen ersetzt
+  - Zwei Borometer nehmen nicht mehr denselben Port. Das zweite Fenster zeigte
+    bisher die Seite des ersten
+  - Das gespeicherte Thema kommt nach einem Neustart zurück, auch TnL
+  - Im Kompaktmodus stand die Sortierspalte auf der falschen Zeile, und die
+    Schadenssumme wurde abgeschnitten
+  - Ramus heißt Ramux, Grimturg und Exodus sind Feldbosse, und Tevents Hunger
+    (Erzürnt) ersetzt doch keinen Skill
+  - Borometer steht ab jetzt unter der GPL v3. Der Quelltext liegt bei
+
+v0.64
+-----
+  - Der Name auf der Gruppentafel kommt jetzt aus deinem Log. Was du beim
+    Beitreten tippst, ist der Startwert — sobald dein Log läuft, steht dort
+    dein Charakter. Einem Charakterwechsel folgt er auch
+  - Die Tabelle zeigt, wie tief du bist. Mitglied, Fähigkeit und Trefferart
+    rücken jede eine Stufe ein, und der Balken dahinter auch. Bei deinem
+    eigenen Schaden genauso
+  - Die linke Leiste lässt keinen Platz mehr liegen. Die Kampfliste bekommt,
+    was die gespeicherten Kämpfe nicht brauchen, statt auf eine feste Höhe
+    gedeckelt zu sein
+
+v0.63
+-----
+  - Die Kampfliste klappt Trash weg. Im Dungeon stehen die Bosse und ein
+    Eintrag Trashmobs mit der Zahl — ein Klick zeigt sie. An einem Raid-
+    Abend sind das 4 sichtbare Zeilen statt 18
+  - Klickst du links einen Bosskampf an, steht oben die ganze Gruppe dazu:
+    jeder mit seinem eigenen Kampf gegen diesen Boss. Kämpfe, zu denen die
+    Gruppe gemeldet hat, tragen in der Liste einen Anhänger
+  - Eine Gruppenzeile klappt jetzt zwei Ebenen tief auf: erst die
+    Fähigkeiten, dann ihre Trefferarten — normal, kritisch, stark, kritisch
+    stark — mit Schaden, Treffern und größtem Treffer
+  - Gruppen-Log speichern legt alle Bosskämpfe des geladenen Logs ab, nicht
+    mehr nur den Augenblick
+  - Wer den Charakter wechselt und weiter loggt, heißt auf der Gruppentafel
+    jetzt auch so
+  - Das TnL-Thema kam nach einem Neustart nicht zurück. Der Fensterrahmen
+    war blau und die App dunkel: die Prüfung beim Start kannte das dritte
+    Thema nicht
+  - In der Gruppenansicht blieb die Verlaufszeile aus dem letzten
+    Einzelkampf stehen, unter dem Namen eines anderen Bosses
+  - Calanthia of Destruction ist Calanthias zweite Phase, kein eigener
+    Gegner. Beide Phasen sind jetzt ein Kampf
+
+v0.62
+-----
+  - Im Kampfkopf steht jetzt „Deine beste Performance von 8 Kämpfen an
+    diesem Boss“ oder „20 % schlechter als sonst“. Vorher hieß es „beste von
+    8“ und „unter deinem Median aus 5“ — das ließ offen, wovon acht, und
+    nannte die Rechnung statt der Auskunft
+  - Liegt ein Kampf genau in der Mitte, steht dort „Genau wie sonst“ statt
+    „0 % besser als sonst“
+
+v0.61
+-----
+  - Der Reiter Verlauf zeigt deine Leistung je Boss: wie oft du ihn gekämpft
+    hast, deine beste Rate, den Median, und jeden einzelnen Kampf mit Datum,
+    DPS, Schaden und Länge
+  - Er zählt nur, was Borometer selbst gesehen hat, und fängt mit dieser
+    Version bei null an. Alte Logs, oder die von jemand anderem auf
+    demselben Rechner, zählen nicht mit
+  - Im Kampfkopf steht, wie der geladene Kampf zu deinen früheren am selben
+    Boss steht: „Deine beste von 8 an diesem Ziel“ oder „20 % unter deinem
+    Median aus 5“
+  - Verlauf und Kampfkopf gelten nur für Bosse. Trash und Übungspuppe stehen
+    nicht drin
+  - Ein Sprachwechsel führt einen Boss nicht mehr doppelt auf. In 0.58 stand
+    hier, das ließe sich nicht lösen — das war falsch
+  - Das ⋯-Menü lief in der Kompaktansicht aus dem Fenster. Jetzt hängt es an
+    der rechten Kante, und die Knöpfe passen in eine Zeile
+  - Unter dem Zeitverlauf steht, was ein Klick tut: ein Klick zeigt nur den
+    Abschnitt, auf den du geklickt hast, noch ein Klick den ganzen Kampf
+
+v0.60
+-----
+  - Der Verlauf zählt jetzt selbst mit, statt deinen Log-Ordner zu lesen.
+    Festgehalten wird, was Borometer selbst gesehen hat — ab dieser Version.
+    Alte Logs, oder die von jemand anderem auf demselben Rechner, zählen
+    nicht mehr mit
+  - Im Verlauf stehen nur noch Bosse — kein Trash, keine Übungspuppe. Über
+    89 Logs gemessen: aus 98 Zielen werden 14, aus 254 Kämpfen 54. Am Dummy
+    misst dich die Zeile im Kampfkopf weiter an deinen früheren Läufen
+  - Ein Sprachwechsel führt einen Boss nicht mehr doppelt auf. In 0.58 stand
+    hier, das ließe sich nicht lösen — das war falsch. Die Dungeon-Tabelle
+    kennt beide Schreibweisen, und angezeigt wird der Name, den dein Client
+    gerade schreibt
+  - Das ⋯-Menü lief in der Kompaktansicht aus dem Fenster. Jetzt hängt es an
+    der rechten Kante, und die Knöpfe passen in eine Zeile
+  - Unter dem Zeitverlauf steht, was ein Klick tut, ohne von einem Ausschlag
+    zu reden: ein Klick zeigt nur den Abschnitt, auf den du geklickt hast,
+    noch ein Klick den ganzen Kampf
+
+v0.59
+-----
+  - Es gibt einen zweiten Download: einen Ordner statt einer einzelnen
+    Datei. Die einzelne Datei packt sich bei jedem Start selbst in einen
+    Temp-Ordner aus, und das ist einer der häufigsten Gründe, warum ein
+    Virenscanner anschlägt — mit dem Code hat es nichts zu tun. In der
+    Ordner-Fassung packt sich nichts aus. Irgendwohin entpacken und
+    BoroMeter.exe darin starten. Dieselbe App, 150 Dateien statt einer
+  - Unter dem Zeitverlauf steht wieder, was ein Klick tut: ein Klick auf
+    einen Ausschlag zoomt darauf, ein zweiter zurück auf den ganzen Kampf.
+    Den Bedienweg gab es immer — der Text wurde in 0.56 gekürzt, und dabei
+    ist er mit herausgefallen
+  - Das dunkle Thema trägt wieder genau die Deckungen, die es vor dem Umbau
+    des hellen hatte. Neun Alphastufen waren auf drei Einstellungen
+    gelandet, gemessen 5 von 255 Abweichung auf 1px-Haarlinien. Jetzt sind
+    es 25 Einstellungen, eine je ursprünglichem Wert. Über alle 674 Regeln
+    geprüft: keine weicht ab. Das helle und das TnL-Thema sind dabei
+    unberührt geblieben — 0 von 4.561.200 Pixelkanälen
+
+v0.58
+-----
+  - Neuer Reiter: Verlauf. Jedes Kampflog in deinem Ordner, einmal gelesen.
+    Auf diesem Rechner sind das 482 Kämpfe an 176 Zielen, 61 davon mehr als
+    zweimal gekämpft. Wähl ein Ziel, und jeder Kampf daran steht da — ein
+    Balken je Kampf, in der Reihenfolge, in der du sie gekämpft hast, der
+    beste golden. Fellinex lag zwischen 150k und 481k, und die App hat es
+    nie gezeigt
+  - Im Kampfkopf eine Zeile: wo dieser Kampf zwischen deinen anderen an
+    diesem Ziel steht. „Deine beste von 8 an diesem Ziel“ oder „20 % unter
+    deinem Median aus 5“. Golden nur bei der besten. Unter zwei Kämpfen
+    steht dort nichts — „deine beste von einer“ ist keine Auskunft
+  - Der Verlauf rechnet nicht selbst. Jede Datei geht durch dieselben vier
+    Schritte wie beim Laden, und die Zahlen kommen aus derselben Funktion —
+    ein Kampf hat damit eine Zahl und nicht zwei. Nachgeprüft, indem
+    dieselbe Datei auf beiden Wegen gelesen wurde: 13 Kämpfe gegen 13, Namen
+    und Raten auf drei Nachkommastellen gleich
+  - Der goldene Knopf lag dort unter AA, wo seine Unterlängen sitzen. Eine
+    Beschriftung nimmt 22 % bis 85 % der Knopfhöhe ein, und das g in „Logs
+    öffnen“ reichte in den dunklen Fuß des Verlaufs: 3,92:1. Die Bernstein-
+    Stufe ist von 62 % auf 85 % gewandert, damit misst die schlechteste
+    Stelle unter der Schrift 5,66:1. Dieselbe Bauart wie beim blauen Knopf
+    in 0.57, diesmal am Hauptknopf
+  - 23 Zeilen im Stilblatt, die nichts mehr trafen, sind weg — alles Reste
+    aus 0.56. Jede wurde vorher einzeln nachgesehen, und zwei Kandidaten
+    haben diese Prüfung überlebt: „.org“ und „.w3“ waren www.w3.org in den
+    Auswahlpfeilen, und „.wbar“ lebt in der Waffentabelle
+  - Eine Grenze, die du kennen solltest: wechselst du die Sprache des
+    Spiels, taucht derselbe Gegner im Verlauf zweimal auf, einmal je
+    Schreibweise. Fähigkeiten werden über ihre ID zusammengeführt — ein Ziel
+    hat im Log nur einen Namen
+
+v0.57
+-----
+  - Der blaue Knopf „Mit diesem Code beitreten“ maß im hellen Thema 2,79:1 —
+    unter AA, genau dort, wo die Beschriftung sitzt. Die mittlere Stufe
+    seines Verlaufs folgte dem Thema, die Tinte darauf nicht. Jetzt stehen
+    alle drei Stufen fest: 10,34 / 7,34 / 5,14 in beiden Themen. Die
+    „5,14:1“ im Verlauf von 0.56 war der Fuß des Knopfes, nicht die Stelle
+    mit der Schrift
+  - Das helle Thema hat eigene Farben statt umgedrehter. Seite, Karten,
+    Knöpfe und Balken lagen alle innerhalb von neun Grad auf einem Farbton —
+    zu unterscheiden waren sie nur noch über hell und dunkel. Der Grund ist
+    jetzt Grünspan, 121 Grad vom Gold entfernt. Gold, Bernstein und die
+    zwölf Fähigkeitsfarben sind unverändert
+  - Helle Flächen sind flach, aus der beleuchteten Oberkante wird eine
+    Haarlinie, und einen Schatten wirft nur, was schwebt. Ein Knopf unter
+    der Maus wird dunkler statt blasser. Weiß bleibt den Daten
+  - 67 Farben im Stilblatt waren fest auf das Gold des dunklen Themas
+    gesetzt, das helle konnte sie also nie anders malen — daher eine goldene
+    Haarlinie um jedes Eingabefeld und ein pechschwarzer Schatten unter
+    jedem Menü. 35 davon sind jetzt Einstellungen. Gold, das etwas bedeutet,
+    bleibt Gold; Gold, das nur eine Kante ist, wird grau
+  - Ein drittes Thema: TnL, nach der Oberfläche des Spiels. Indigo als
+    Grund, Magenta für das Gewählte, Gold für Zahlen — das Spiel trennt die
+    beiden, und hier ist es genauso. Im ⋯-Menü unter Farben
+  - Drei der zwölf Fähigkeitsfarben sind in TnL eine Stufe heller. Auf
+    Indigo fielen sie unter 3:1; der Farbton bleibt derselbe, damit eine
+    Fähigkeit beim Themenwechsel ihre Farbe behält
+  - Das dunkle und das helle Thema sind unverändert: 0 von 4.561.200
+    Pixelkanälen weichen ab. Sichtbar in allen drei Themen ist nur das
+    breitere ⋯-Menü, weil ein vierter Knopf hineinpassen musste
+
+v0.56
+-----
+  - Ein Übungsziel wird nie mehr zusammengefasst, egal wie der Haken steht.
+    Erkannt wird es am Namen: Practice Dummy, Übungspuppe und Arkeum Statue
+    for Training — über die 89 Logs auf diesem Rechner 14.300, 6.091 und 236
+    Zeilen. An einer gebauten Datei gemessen, zweimal dieselbe Puppe mit 20
+    Sekunden Pause dazwischen: vorher ein Kampf über 43,9 s mit zwei Teilen,
+    jetzt zwei Kämpfe zu je 11,9 s. Die Rate stimmte schon vorher, denn bei
+    einem Nicht-Boss zählt nur die gekämpfte Zeit; was sich ändert, ist die
+    Zeile. Jeder Anlauf steht für sich, und die Puppe ist genau das Ziel, an
+    dem man Anläufe gegeneinander liest
+  - Der Hinweis unter „Bossphasen verbinden“ rät nicht mehr zu etwas, das
+    seit 0.53 nicht mehr stimmt. Dort stand: ausschalten, damit jeder
+    Versuch an der Übungspuppe einzeln bleibt. Seit 0.53 teilt ein
+    zusammengezogener Kampf, der kein Boss ist, durch die Zeit, in der
+    wirklich gekämpft wurde — zusammengezogen wird nur die Zeile, nicht die
+    Rate. Wer dem Rat folgte, bekam eine andere Zahl als das Gruppenbrett:
+    ein Deluzhnoa-Pull fiel in 594k und 545k statt der 360k, die dort
+    standen. Der neue Text sagt, was der Haken in beiden Stellungen tut, und
+    nennt die Minute, die wirklich dahintersteckt
+  - Der Knopf „Angreifer“ und das Feld „Dein Charakter“ erscheinen nur noch,
+    wenn im geladenen Log wirklich mehr als ein Angreifer steckt. Ein
+    Throne-Log enthält die Daten eines einzigen Spielers: über die 89 Logs
+    auf diesem Rechner nachgezählt, 89 mal genau ein Angreifer und kein
+    einziges Mal zwei — beide Bedienelemente boten also die Wahl zwischen
+    einem. Gelöscht sind sie nicht: wer die Logdateien seiner Gruppe
+    zusammen lädt, hat mehrere, und dann kommen beide zurück. Steht die
+    Tabelle auf „Angreifer“, wenn der Knopf wegfällt, springt sie auf „Dein
+    Schaden“
+  - Der Analyse-Reiter beantwortet die Fragen, die er stellt. Bei
+    „Schadenskonstanz“ stand „145 % Schwankung“ — das ist der
+    Variationskoeffizient, und er liest sich wie „45 % über dem
+    Durchschnitt“: 100 sieht nach normal aus, und nach oben gibt es keine
+    Grenze. Wo die Zahl stand, steht jetzt die Einordnung, die sie tragen
+    sollte: Burst, Cooldown-Rotation oder Gleichmäßig. „Wie viele Treffer
+    waren kritisch?“ bekam als Antwort „87 % des Schadens“; jetzt antwortet
+    der Wert auf die Frage, und der Schadensanteil steht in der Zeile
+    darunter. Vier Befunde sind raus — Cast-Rhythmus, Eröffnung gegen Rest,
+    stärkste drei Sekunden, Schaden je Einsatz — und die Fünfzehn-Sekunden-
+    Fenster dazu. Die Leerzeit sagt jetzt auch dann etwas, wenn es keine
+    gab; vorher stand dort nichts, und nichts liest sich wie „nicht
+    gemessen“
+  - Im Filter trägt jedes Feld seinen eigenen Hinweis, in seiner Spalte.
+    Vorher lagen beide Hinweise über die volle Breite unter beiden Feldern,
+    und wer „Standard 3“ las, musste raten, welche der zwei Zahlen gemeint
+    war. Die Felder heißen jetzt „Kämpfe trennen nach (s)“ und
+    „Kampfmindestlänge (s)“. Der lange Absatz über den Fehlerbericht ist aus
+    dem Filter raus; den Bericht selbst gibt es weiter im ⋯-Menü. Der Knopf
+    in der Leiste fasste sich selbst zusammen als „Alle im Log | 8s / 3s“ —
+    der erste Teil sagt in fast jedem Log dasselbe, der zweite wiederholt
+    zwei Zahlen, die einen Klick entfernt in ihren Feldern stehen. Dort
+    steht jetzt „Filter“, und darüber eine Zeile, die nennt, was
+    dahinterliegt
+  - „Logs öffnen“ in der Kopfleiste ist ein Menü mit zwei Einträgen: Throne-
+    Logs und Gruppen-Logs. Ein gespeichertes Gruppen-Log lud man bisher
+    unten im Gruppen-Reiter, wo niemand danach suchte, dabei sind beides
+    Dateien, die man öffnet. Gespeichert wird das Gruppen-Log weiter im
+    Gruppen-Reiter. Das Feld neben dem Menü sagt „Livelog nicht aktiv“ statt
+    nur „nicht aktiv“
+  - Ohne Charakternamen lässt sich keine Gruppe starten und keiner
+    beitreten. Vorher liefen beide Knöpfe ins Leere und antworteten mit
+    einer Meldung; jetzt sind sie erst zu drücken, wenn der Name steht, und
+    Beitreten zusätzlich erst mit Code. Leerzeichen zählen nicht als Name.
+    Beitreten trägt eine eigene Farbe, damit die zwei Wege nicht gleich
+    aussehen — Gold führt, Blau begleitet, dieselbe Rolle, die --info in der
+    App schon hat. Der Fuß dieses Verlaufs stand zuerst auf #31628c, und die
+    Tinte darauf trug 2,89:1; jetzt ist es #4e8cbb mit 5,14:1
+  - Ein Haken „Entwicklermodus“ im ⋯-Menü, standardmäßig aus. Er holt drei
+    Dinge hervor, die dort stehen, wo sie immer standen, und nur aus sind:
+    den Reiter Log-Einrichtung, „CSV exportieren“ im Kampfkopf und
+    „Stattdessen eine Liste einfügen“ auf dem Waffen-Reiter. Sie einfach zu
+    verstecken war die schlechtere Antwort — für das eine Prozent, das sie
+    braucht, waren sie damit gar nicht mehr da. Der Haken überlebt den
+    Neustart: „devMode“ steht in der Liste des Starters, dieselbe Liste, die
+    „splitAfter“ ein halbes Jahr lang verschluckt hat, und alle elf
+    Einstellungen sind am laufenden Starter geprüft. Die Log-Einrichtung
+    erscheint außerdem von selbst, wenn eine Spalte fehlt, für die sie
+    gebraucht wird — mit oder ohne Entwicklermodus, denn mehrere Meldungen
+    in der App verweisen auf diesen Reiter
+  - Ein Kampf wird gespeichert, eine Durchlauf-Datei sammelt sie — und die
+    Beschriftungen sagen das endlich mit denselben Wörtern. „Als Durchlauf
+    speichern“ heißt „Kampf speichern“, auf beiden Knöpfen; die Liste in der
+    Leiste heißt „Gespeicherte Kämpfe“, und die zwei Knöpfe im Filter heißen
+    „Durchlauf speichern“ und „Durchlauf laden“. Der Dialog fragt „Gib dem
+    Kampf einen Namen:“, statt den getragenen Build vorzuschlagen. Der
+    Reiter heißt „Kämpfe vergleichen“, und seine Überschrift sagt nicht mehr
+    „Zwei Durchläufe vergleichen“ über einem Reiter, der zwei bis vier nimmt
+  - Über Zeitverlauf und Rotation steht keine Überschrift mehr, und darunter
+    keine Aufzählung. Unter dem Zeitverlauf steht, was man mit ihm tun kann:
+    mit Strg und Mausrad zoomen, und die Leiste mit der linken Maustaste
+    ziehen, wenn man drin ist. Unter der Rotation steht die Zahl und sonst
+    nichts
+  - Im Deutschen heißen Skills jetzt Fähigkeiten, so wie das Spiel sie nennt
+    — 22 Texte, vom Knopf über der Tabelle bis zur Spaltenrolle in der Log-
+    Einrichtung. In Tabellen und Chips steht „Kritisch“ statt „Krit“. Dabei
+    kamen echte Fehler ans Licht: „%P“ gibt es im Deutschen nicht, dort
+    stehen jetzt Prozentpunkte; ein Ein-Stern-Dungeon heißt „1-Stern-
+    Dungeon“ und nicht „1-Sterne-Dungeon“; die Notiz zu Fehltreffern sagt,
+    dass die Zahl darin Einsätze zählt; der Prozentsatz auf der Waffenkarte
+    sagt, dass er ein Schadensanteil ist; und „Auf einen Schild gegangen“
+    heißt jetzt „Auf einen Schild getroffen“. Dazu tragen kleine Zahlen im
+    deutschen Fenster ein Komma — neben „1.234“ stand aus derselben Funktion
+    „0.0 DPS“
+  - Die eine große Schadenszahl hat eine eigene Schrift. Ganz vorne in ihrem
+    Stapel stand „Archivo Black“, eine Google-Schrift: sie liegt auf keinem
+    Windows, und diese App lädt bewusst nichts nach — gezeigt wurde also
+    immer der nächste Eintrag, Arial Black. Sechzehn Kandidaten wurden gegen
+    monospace ausgemessen, denn eine Schrift, die nicht da ist, misst genau
+    wie der Rückfall. Geworden ist es die variable Anzeigeschrift von
+    Windows auf Gewicht 800. Sie betrifft diese eine Zahl und sonst nichts:
+    --display trägt die halbe App und steht dort auf Gewicht 400
+
+v0.55
+-----
+  - Der Zeitverlauf benennt dieselben zwölf Skills wie Tabelle und Rotation
+    — ein Skill trägt in der ganzen App eine Farbe. Vorher benannte er nur,
+    was 2 % oder mehr am ganzen Kampf ausmachte, höchstens sechs. Der
+    Gedanke dahinter war richtig, der Nenner nicht: gezeigt werden Sekunden,
+    nicht der Kampf. An einem echten Pull gemessen fielen neun von elf
+    Skills ins graue Band „Alles andere“, und acht davon besitzen in
+    mindestens einer Sekunde über ein Viertel. Protest von Mutter Natur
+    macht 0,4 % des Kampfes aus und 100 % der Sekunde bei 0:03. Das Band
+    heißt „ein Gemisch aus Kleinigkeiten“, und dort war es ein einziger
+    Skill. Rang dreizehn und weiter behält das Band — da stimmt die Aussage
+    wieder
+  - Unter einem Prozent zeigt die Legende eine Nachkommastelle. Auf ganze
+    Prozent gerundet standen in demselben Kampf fünf Skills mit „0 %“ da —
+    der größte davon hatte 149.495 Schaden gemacht
+
+v0.54
+-----
+  - „Trennen nach (s)“ wird gespeichert. Das wurde es nie: die Seite schickt
+    die Einstellung unter einem Namen, und die Liste dessen, was der Starter
+    schreibt, trug noch den alten — jede Speicherung fiel weg, während die
+    Seite ein „ok“ zurückbekam und glaubte, es sei angekommen. Am laufenden
+    Starter gemessen: von zehn Einstellungen, die die Seite schickt, war das
+    die einzige, die nie die Datei erreichte
+  - Und sie wird als die Zahl gelesen, die dort steht. Eine
+    Einstellungsdatei von vor 0.53 trägt den alten Schlüssel, und 0.53
+    machte daraus bei jedem Start das Dreifache — aus 8 wurden 24, und damit
+    fiel ein Raid-Log von zwanzig Minuten in 10 statt 19 Kämpfe. Diese
+    Multiplikation bewahrte den Fehler, nicht die Einstellung: im Feld stand
+    immer, was gemeint war. Der Wert wird einmal unter dem neuen Namen
+    zurückgeschrieben, dann ist der alte Schlüssel endgültig aus dem Weg
+  - Auf der Gruppentafel ist derselbe Boss unter zwei Schreibweisen ein
+    Boss. Die Tafel vergleicht die Namen, die die Clients schicken, und
+    jeder Client nennt den Boss in seiner Sprache: mit zwei deutschen und
+    zwei englischen Lesern auf einem Pull sprang das gemeinsame Ziel dreimal
+    in drei Sekunden, und die halbe Gruppe galt als woanders kämpfend —
+    darunter der Stärkste, der danach unter Leuten mit einem Fünftel seines
+    Schadens einsortiert wurde. Jeder Leser vergleicht jetzt das, was die
+    App längst wusste, und der Schlüssel reist in jedem Bericht mit, damit
+    der Server dasselbe tun kann
+  - Zwölf Diagrammfarben statt sieben. Bei sieben waren fünf von zwölf
+    Spuren einer Raid-Rotation graue Schraffur. Was zwölf kostet, ist
+    gemessen und nicht gehofft: bei Nachbarrängen — der Reihenfolge, in der
+    die Tabelle sie zeigt — hält die Reihe jede Schwelle, 13,1 unter
+    Farbblindheits-Simulation und 24,5 mit voller Sicht. Über alle 66 Paare
+    hält sie nicht mehr, 7,3 von 8 und 13,8 von 15, zwei weit auseinander
+    liegende Ränge können sich also ähneln. Neben jeder Farbe steht ihr
+    Name, es hängt nichts allein an der Farbe. Graue Schraffur beginnt bei
+    Rang dreizehn
+  - Der Filter ist eine Fläche in der Fenstermitte statt eines Blocks in der
+    linken Leiste. Er passte dort nie hinein: 678 Pixel Inhalt in einer 631
+    Pixel hohen Leiste, was die Kampfliste und die gespeicherten Durchläufe
+    auf 9 und 0 Pixel zusammendrückte, während beide weiter zeichneten — die
+    Filterfelder lagen also auf ihnen
+  - Eine Tabelle, die länger ist als das Fenster, endet bei 62% seiner Höhe
+    und rollt, die Kopfzeile bleibt stehen. Eine Skillliste erreicht das
+    nie; eine Angreiferliste mit zwanzig Namen liefe sonst unten hinaus
+  - Der Fehlerbericht schreibt „Spalte 1“, wo eine Spalte keine eigene
+    Überschrift hat. Vorher stand dort die interne Markierung samt
+    Steuerzeichen
+
+v0.53
+-----
+  - Die Diagrammfarben sind auf sieben herunter, und sie sind so geprüft,
+    wie Farbe geprüft gehört. Die zwölf davor waren mit normaler Farbsicht
+    gemessen; unter einer Farbenblindheits-Simulation lagen der größte und
+    der zweitgrößte Skill jedes Kampfes 1,2 auseinander, auf einer Skala,
+    auf der 8 das Ziel ist — dieselbe Farbe für etwa jeden zwölften Mann.
+    Sieben halten ueber jedes Paar 10,8 unter Simulation und 19,5 mit voller
+    Sicht, acht nicht mehr
+  - Rang acht und weiter tragen gar keine Farbe mehr, sondern eine Schraffur
+    — sie sagt, was wahr ist: keiner der sieben, die das Diagramm verfolgt.
+    Umlaufen hätte dem achten Skill die Farbe des ersten gegeben, und das
+    legte über alle Logs hier in 23 % der Kämpfe zwei Zeilen echter Größe in
+    eine Farbe
+  - Das helle Thema hat seine eigenen sieben. Dieselben Töne, neu
+    abgestimmt: auf der hellen Karte lagen die alten Werte bei 2,6:1 gegen
+    das warme Ende des Verlaufs — und dort steht der Fuß jedes Balkens
+  - Ein Kampf aus mehreren Teilen rechnet seine Rate über die Zeit, in der
+    gekämpft wurde — außer bei einem Boss, wo die Pause zwischen den Teilen
+    seine Zwischenphase ist und mitzählt. Eine Übungspuppe, fünf Sekunden
+    geschlagen, eine Minute stehen gelassen und wieder geschlagen, las sich
+    als 1.885 pro Sekunde, wo 21,7k gelandet sind
+  - Blöcke folgen dem Ort statt der Uhr. Ein Raid läuft seine Teile dichter
+    hintereinander, als es innerhalb eines Teils ruhig ist — sechs Kämpfe
+    des letzten Altar-Teils standen deshalb unter dem Korridor der Pein.
+    Trash gehört zu dem Boss, zu dem er führt
+  - Zwei Bosse, die gleichzeitig stehen, stehen beide im Namen: Zairos ·
+    Vulkan statt nur Zairos
+  - Ein Streifen unter der Uhr zeigt, woraus jede Sekunde bestand, in voller
+    Höhe. Nur ein Drittel der Sekundenbalken ist hoch genug, um darin eine
+    Aufteilung zu lesen — die Balken sagen wieviel, der Streifen woraus
+  - "Der Rest des Kampfes lief 61 % heißer" waren in Wahrheit 155 %. Die
+    Zahl kam aus der falschen Richtung, und je weiter die beiden Hälften
+    auseinanderlagen, desto schlimmer: ein Kampf sagte 88 %, wo der Rest 753
+    % heißer lief
+  - Die Fehlschlagquote steht gegen den Skill, der danebenging. Sie zählte
+    jede Schadenszeile des Kampfes als Schwung, was 0,1 % anzeigte, wo 6,3 %
+    danebengingen
+  - Auge von Ventius wird nach seiner Form gezählt statt nach einem
+    Zeitfenster. Im Dungeon kommt der Knopf schneller wieder, als das
+    Fenster breit ist — 146 Drücke wurden als 127 gezählt, und der Schaden
+    je Einsatz lag bis zu 50 % zu hoch
+  - "Trennen nach (s)" trennt nach so vielen Sekunden. Es multiplizierte
+    hinter deinem Rücken mit drei — auf 5 gestellt, schnitt es nach
+    fünfzehn. Die Vorgabe ist 8: so lange hält dich das Spiel nach deinem
+    letzten Treffer im Kampf
+  - Ein Kampf, der zu kurz für die Liste ist, zählt trotzdem in Uhr und
+    Summe seines Blocks, und die Überschrift sagt, wieviele fehlen. Eine
+    Überschrift behauptete "1m 48s Pause" über eine Pause, in der 22 Treffer
+    lagen
+  - Ein Log aus einem Dungeon sagt, aus welchem. Bei nur einem Block fiel
+    die Kopfzeile weg und mit ihr der Name, die Sterne, die Dauer und die
+    Summe
+  - Deluzhnoa wird unter ihrem deutschen Namen erkannt, und ein Boss mit
+    einem Zustand in Klammern — Aufgestiegener Aridus [Untot] — überhaupt
+
+v0.52
+-----
+  - Ein Heiler, der Auge von Ventius spielt, steht im Gruppen-Board als DPS.
+    Ventius ist eine Langbogen-Fähigkeit, und der einzige Heiler-Build mit
+    Langbogen ist der Sucher — wer als Sucher Ventius spielt, heilt nicht.
+    Nur Heiler: ein Hüter trägt denselben Langbogen und bleibt Tank
+  - Erkannt wird das der Reihe nach an einem Kennzeichen, das jeder Client
+    jetzt neben seinen zwei Waffen mitschickt, sonst an der Skill-Liste
+    seines Kampfberichts, sonst an dem, was ein früherer Poll zeigte.
+    Deshalb stimmt die Rolle auch bei Clan-Mitgliedern mit älterem Stand,
+    nur eben erst ab ihrem ersten gemeldeten Pull statt schon beim Warten.
+    Meldet jemand einen Pull ohne die Fähigkeit, steht dort wieder Heiler
+  - Wessen Build das Kennzeichen beschreibt, wird vorsichtig entschieden —
+    ein Fehler dabei würde fremde Spielweise unter deinem Namen
+    veröffentlichen: es zählt der Charakter, mit dem du der Gruppe
+    beigetreten bist, und nur wenn das geladene Log ihn auch enthält. Ein
+    Log mit mehreren Angreifern ohne gesetzten Filter sagt lieber nichts,
+    und der Beispielkampf bist nie du
+v0.51
+-----
+  - Borometer merkt sich je Ziel den besten Auge-von-Ventius-Cast, den es
+    dort je gesehen hat. Bisher maß der Befund dich an deinem eigenen besten
+    Cast dieses Pulls — wer durchgehend schlecht stand, bekam 10 von 10 und
+    sah perfekt aus. Jetzt kann dort stehen, dass mehr drin war. Eine
+    Grenze, die nur ein einziger Cast je erreicht hat, bleibt stumm; sie
+    steht im Fehlerbericht, wo sie sich prüfen lässt
+  - In einem Gruppen-Log verschwand der Ventius-Befund, sobald zwei Leute
+    auf denselben Boss schossen: ihre Volleys fielen zu einem Cast zusammen,
+    dessen Wellen sechs Treffer hielten statt drei, und die Formprüfung warf
+    ihn als unlesbar weg. Casts werden jetzt nach Schütze und Ziel getrennt
+  - Schaden pro Einsatz schrieb im Deutschen „liefertStorm Current“ — ein
+    fehlendes Leerzeichen, und ein Skillname, der nie übersetzt wurde
+
+v0.50
+-----
+  - Angriffe, die danebengehen, werden gezählt. Das Log schreibt einen
+    Fehlschlag als Treffer ohne Schaden, er fiel also mit allem Wertlosen
+    heraus und die App wusste nie davon — 13 Stück in einem Vier-Minuten-
+    Kampf. Der Analyse-Reiter nennt die Quote, wenn es welche gab
+  - Feld- und Erzbosse sind namentlich bekannt, 25 an der Zahl. Ein
+    Abschnitt darauf sagt „Feldboss, kein Dungeon“ statt einen nicht
+    erkannten Dungeon zu melden, und Manticus heißt nach dem einen Kampf,
+    der er ist, statt nach der größeren seiner zwei Hälften
+  - Jede Trefferart, die im Log vorkommt, steht im Fehlerbericht — auch die
+    Zeilen ohne Schaden. So ist kMiss überhaupt erst aufgefallen
+  - Die Einstellungen liegen an einem festen Ort je Benutzer
+    (%APPDATA%\Borometer) statt neben der exe, und der erste Start holt die
+    alte Datei dort ab. Vorher fing jeder neue Versionsordner bei null an —
+    dort ist die Waffenzuordnung verschwunden und mit ihr die Klasse neben
+    deinem Namen. Ein Versionswechsel ist jetzt nur noch der Austausch der
+    exe
+  - Liste leeren leert den Analyse-Reiter mit. Der Zweig, der Tabelle und
+    Diagramme leert, kehrte vor dem Analyse-Bereich zurück — dort standen
+    also weiter die Fenster des gelöschten Kampfes, unter einer Schiene, die
+    „keine Kämpfe“ sagte
+  - Die Kompaktansicht öffnet wieder klein. Ihre Breite wurde an einem
+    Behälter gemessen, der sich bis zum Fensterrand zieht — beim Umschalten
+    forderte sie 1271 px, und der zweite, korrigierende Durchgang wurde von
+    einer Wächter-Abfrage verworfen, die nur die Höhe verglich
+  - Eine Dungeon-Überschrift zeigt einen Pfeil, offen wie zu. Sie hatte
+    einen im Markup, aber kein Zeichen darin — also ein 10-px-Kästchen
+    voller nichts
+  - Die Wertung steht als Sterne da und sagt Dungeon: ★★★★ Dungeon statt „4
+    Sterne“
+  - Die Kompaktansicht ist durchsichtig, 0 bis 55 % in ganzen Schritten. Der
+    Alphawert des Fensters selbst, nicht pywebviews Transparenz — die machte
+    nur die Seite klar auf ein graues Wirtsfenster. Durch die gebaute App
+    gemessen: bei 50 % trifft sie die Mischung exakt
+  - Ein Dungeon lässt sich einklappen. Ein Druck auf die Überschrift faltet
+    seine Kämpfe zusammen; Anzahl, Dauer und Schaden bleiben oben stehen.
+    Der Kampf, den du ansiehst, bleibt sichtbar
+  - Kämpfe werden zu Dungeon-Läufen gruppiert und nach ihrem Boss benannt —
+    alle 23 Dungeons und der Altar-Raid mit seinen drei Teilen. Von jedem
+    Boss beide Schreibweisen, damit deutscher und englischer Client gleich
+    gut erkannt werden
+  - Auge von Ventius hat einen eigenen Befund: der Pfeil, dann ein
+    Nachbeben, das bis zu dreimal trifft. Wie viele Nachbeben ein Ziel
+    aufnimmt, ist seine Größe — die Obergrenze wird deshalb am
+    meistbeschossenen Ziel abgelesen, nicht am Kampf
+  - Jeder Ventius-Druck zählt als ein Cast. Das allgemeine 400-ms-Fenster
+    teilte ihn in zwei: doppelte Cast-Zahl, halber Schaden je Cast — beim
+    Skill, der 80 % eines Kampfes trägt
+  - Klasse und Rolle neben deinem Namen und neben jedem Namen im Gruppen-
+    Board: Orakel · Heiler, Kreuzritter · Tank. Unterwegs ist das
+    Waffenpaar, jeder Client benennt es in seiner Sprache
+  - Liste leeren und ein älteres Log öffnen zeigte gar nichts mehr, ohne Weg
+    zurück in der App. Die Grenze endet jetzt mit der Datei
+  - Die Kompaktansicht behält die Spalte, nach der sortiert ist. Nach Krit
+    sortieren und Krit ausblenden ließ eine Reihenfolge übrig, für die
+    nichts auf dem Schirm sprach
+  - Eine vom eigenen PC gehostete Gruppe zeigt jetzt jeden Build, nicht nur
+    deinen
+  - Liste leeren leert den Waffen-Reiter mit
+  - „Nur Beschuss traf“ steht nur da, wenn wirklich einer allein traf;
+    sonst, welcher führte und wie viele weitere trafen
+  - Schildtreffer sind eine eigene Kategorie, mit eigener Farbe und eigenem
+    Befund
+  - Ein helles Thema, wählbar oder von Windows übernommen. Jeder Balken,
+    Knopf und Wert in beiden gemessen: schlechtester Fall auf einem Balken
+    4,5:1
+  - Bossphasen bleiben ein Kampf, und der Schalter dafür merkt sich das
+    jetzt
+  - Ein Block ohne Zielspalte heißt nach seiner Uhrzeit statt nach einem
+    Gedankenstrich und nennt keine Pause, wenn das Log keine Uhr hat
+  - Die Version in der Titelzeile stimmt auch dort, wo keine Skripte laufen
+    — sie stand vierzig Releases lang auf v0.11
+  - Drei Ordner neben der exe: Logs, Gruppen-Logs und Fehlerberichte,
+    angelegt beim ersten Speichern der jeweiligen Art
+  - Die Sicherheitsprüfung deckt die Durchsicht mit ab: Sie setzt nur den
+    Alphawert des eigenen Fensters und kommt dem Bildschirm, einem Bild oder
+    dem Spiel nirgends nahe
+v0.49
+-----
+  - Das Gruppen-Board sagt, wer tankt. Jede Zeile trägt den Build und seine
+    Rolle — Orakel · Heiler, Kreuzritter · Tank —, was die App aus den zwei
+    Waffen ausgerechnet hat, die sie ohnehin kannte und nirgends
+    hinschreiben konnte. Zwischen den Clients reist das Waffenpaar, kein
+    Name: Ein englischer und ein deutscher Client lesen dasselbe Board und
+    bekommen es jeder in seiner Sprache
+  - Wer noch keinen Pull beendet hat, zeigt trotzdem seinen Build. Die
+    Waffen reisen neben dem Kampfbericht statt darin, denn eine Gruppe will
+    vor dem Pull sehen, woraus sie besteht — und eine Zeile ohne Kampf hat
+    keinen Bericht, in den etwas hineinpasste. Genau diese Zeile schaut ein
+    Host beim Durchzählen an
+  - Ein Client, der zu alt ist, um seine Waffen zu schicken, bekommt eine
+    Zeile ohne Build statt einen geratenen, und ein Board von einem zu alten
+    Server lässt jede Zeile ohne. Beides geht nicht kaputt: Das Feld fehlt
+    einfach, und nichts anderes auf der Zeile hängt daran
+
+v0.48
+-----
+  - Die 45 Builds, die das Spiel benennt, stehen jetzt in der Sprache des
+    Lesers. Die Tabelle kannte nur den englischen Namen, ein deutscher
+    Client bekam also Scout statt Späher für das Paar aus Langbogen und
+    Armbrust — die einzige Stelle in der App, an der ein deutscher Spieler
+    ein englisches Wort für etwas bekam, das das Spiel ihm längst benannt
+    hatte
+  - Ein Build sagt, wofür er da ist. Tank, DPS oder Heiler steht neben dem
+    Namen, leiser als er und auf derselben Zeile — die Rolle ist das, was
+    die anderen elf Leute im Raid über einen Build wissen wollen, und die
+    beiden Waffen, aus denen sie folgt, kannte die App ohnehin schon
+  - Verqueres Labor, nicht Verworrenes — der deutsche Name des Twisted
+    Laboratory war in der Dungeon-Tabelle geraten und ist jetzt der, den das
+    Spiel benutzt
+
+v0.47
+-----
+  - Jetzt steht jeder Dungeon des Spiels in der Tabelle, nicht die drei, die
+    zufällig in einem Log vorkamen: 23 Dungeons über die vier Sterne-Stufen,
+    die drei Stufen-Dungeons und der Zwölf-Spieler-Raid Altar von Calanthia
+    mit seinen drei Teilen. Eine Blocküberschrift nennt den Dungeon und die
+    Schwierigkeit, die das Spiel ihm gibt — Frostatemhöhle, 4 Sterne —, und
+    ein Raid-Teil nennt den Raid darunter
+  - Von jedem Boss sind beide Schreibweisen hinterlegt, denn das Log
+    schreibt, worauf der Spiel-Client steht: Ein Clan mit deutschem Client
+    schreibt Grauauge, wo ein englischer Grayeye schreibt, und Magna-Fürst,
+    wo der andere Duke Magna schreibt. Eine Tabelle mit nur einer
+    Schreibweise hätte die Hälfte der Logs eines Clans benannt und die
+    andere Hälfte namenlos gelassen
+  - Ein Raid läuft seine Teile ohne Pause hintereinander, ein Block kann
+    also zwei davon enthalten: An einem Altar-Log gemessen lagen Zairos,
+    Calanthia und Vulkan in einem einzigen Block — das sind der Korridor der
+    Pein und der Altar der Wiedergeburt zusammen. Ihn nach dem Boss mit dem
+    meisten Schaden zu benennen hätte einen ausgewählt und über den anderen
+    geschwiegen; ein Block über mehrere Teile heißt deshalb nach dem Raid
+    und nennt die Teile darunter
+  - Der Boss benennt den Block, wo immer er darin steht, nicht nur wenn er
+    den meisten Schaden bekommen hat. Ein Lauf kann auf einem Boss enden,
+    den der Trash davor übertroffen hat, und der erste Block eines Logs kann
+    mitten in einem Pull anfangen — nachgeschlagen wird gegen jeden Gegner
+    im Block, den größten zuerst, und der erste, den die Tabelle kennt,
+    gewinnt
+
+v0.46
+-----
+  - Der Befund zu Auge von Ventius erschien in einer Nacht voller Dungeons
+    auf keinem einzigen Kampf. Er fragte, ob ein Cast genau vier oder genau
+    sieben Treffer landet — das tut ein Cast an der Übungspuppe. Über 193
+    Casts in drei Dungeons gemessen: sechs landeten vier und 37 landeten
+    sieben, aber 79 landeten zehn und 36 landeten dreizehn, das Tor ging
+    also kein einziges Mal auf. Sieben ist nicht die Decke, sieben ist die
+    Decke der Puppe: je Ziel gemessen gibt Vulcanus nie mehr als drei
+    Wellen, Deus Chimaerus läuft auf vier, gewöhnlicher Trash und die Puppe
+    auf zwei. Gefragt wird jetzt gegen das Beste, was dieser Kampf selbst
+    erreicht hat — an der Puppe sagt das weiterhin sieben Treffer, im
+    Dungeon sagt es ebenfalls etwas Wahres
+  - Was ein Ventius-Cast ist, Treffer für Treffer gelesen: ein
+    Eröffnungstreffer, dann 900 bis 990 ms Pause, dann eine Welle von drei
+    Treffern in derselben Millisekunde, dann rund 106 ms, die nächste Welle
+    zu dritt, und so weiter. Die Trefferzahl ist also eins plus dreimal die
+    Zahl der Wellen, was auf 86 % aller Casts in diesem Log passt, und die
+    Wellen sind das, was die Entfernung bewegt. Die Größe des Ziels legt
+    fest, wie viele es aufnimmt; wo du stehst entscheidet, wie oft du
+    hinkommst — der Befund vergleicht deshalb Pulls auf dasselbe Ziel und
+    sagt das auch
+  - Zwei zusammengelaufene Casts teilen sich genauso glatt wie einer —
+    neunzehn Treffer sind eins plus dreimal sechs —, und die Wellen aus der
+    Trefferzahl zu errechnen ließ ein einziges verschmolzenes Paar an einem
+    Trashmob eine Decke von sechs Wellen setzen, die kein echter Cast
+    erreicht; darunter stand dann 1 von 4. Die Wellen werden jetzt als
+    Wellen gezählt, und ein verschmolzenes Paar verrät sich selbst, weil der
+    Eröffnungstreffer des zweiten Casts als Welle von eins mittendrin steht.
+    So ein Cast ist schlicht nicht lesbar und bleibt draußen, statt gerundet
+    zu werden
+  - Das Log eines ganzen Abends war eine flache Liste, drei Dungeons darin
+    lasen sich also als vierundzwanzig Pulls am Stück. Die Schiene fasst
+    Kämpfe jetzt zu Blöcken zusammen, jeder mit seinem Dungeon überschrieben
+    — Fellinex ist die Steingrab-Wiege, Vulcanus die Frostatemhöhle, Deus
+    Chimaerus der Höllenfeuertiegel —, dazu die Kämpfe darin, ihre Zeit und
+    ihr Schaden. Nichts wird eingeklappt: die Überschrift kommt über die
+    Zeilen, nie an ihre Stelle
+  - Ein Block endet dort, wo das Log eine Minute lang still ist. In einer
+    Nacht mit drei Dungeons gemessen: jede Pause innerhalb eines Laufs lag
+    zwischen 15 und 51 Sekunden, jede Pause zwischen zwei Läufen bei 112,
+    224, 441, 452 oder 927 — in der Nähe des Schnitts liegt also gar nichts.
+    Es ist eine eigene Zahl und kein Vielfaches von „Trennen nach“: bei
+    einer Einstellung von vier hätte dieses Feld die Grenze auf 48 Sekunden
+    gelegt, unter die gemessenen 51, und einen Lauf stillschweigend
+    halbiert. Jede Überschrift nennt die Pause, die ihren eigenen Schnitt
+    ausgelöst hat — über die Zahl lässt sich also am Bildschirm streiten
+  - Ein Block, dessen größter Gegner keiner der drei bekannten Bosse ist,
+    wird nach diesem Gegner benannt und sagt unter dem Namen, dass er genau
+    das getan hat. Ein Log mit nur einem Block — ein einzelner Pull, ein
+    Abend an der Puppe — bekommt gar keine Überschriften statt einer
+    Überschrift über allem
+
+v0.45
+-----
+  - Das Startbild öffnete mit dem Throne-and-Liberty-Logo als 170-kB-
+    Base64-PNG — 17 % der ganzen Datei für einen Namen, den die Zeile
+    daneben ohnehin nennt. Jetzt ist der Name gesetzt, in einer
+    humanistischen Serifenschrift neben „Ein DPS-Meter für“, und 170 kB der
+    Datei gingen mit
+  - Gold lag auf elf Dingen gleichzeitig und sagte dem Auge damit nichts
+    Bestimmtes. Jetzt sind es drei — die Heldenzahl, die sortierte Spalte
+    und der aktive Reiter —, also die Live-Zahl, die Ordnung, in der die
+    Tabelle steht, und die Ansicht, die offen ist
+  - Eine Gruppe, in der noch niemand einen Pull beendet hat, sagt „Alle sind
+    verbunden. Zahlen erscheinen, sobald jemand einen Pull beendet.“ — und
+    darunter zeichnete die App eine 28 Pixel hohe Spaltenüberschrift über
+    null Zeilen, einen Hinweis auf Zeilen, die sich gleich öffnen, und drei
+    Chips mit 0, 0 und 0,0. Im Einzelbetrieb wird all das längst
+    ausgeblendet, solange es nichts zu zeigen gibt; eine Gruppe zählt als
+    geladener Kampf, also griff die Regel dort nie. Jetzt schon
+  - Ohne Zeit-Spalte stempelt der Parser 200 ms pro Zeile — nötig für
+    Reihenfolge und x-Achse —, und rund fünfzehn Stellen teilten durch diese
+    Phantasieuhr und druckten das Ergebnis als Messung: „9m 29s“ Kampflänge,
+    „570 von 570 Sekunden mit Treffern“, eine Tabelle aus fünf Fünfzehn-
+    Sekunden-Fenstern, eine Schwankung um das 24,8-fache — während die Log-
+    Einrichtung wörtlich sagt, es gebe keine Sekunden. Die fehlende Uhr ist
+    jetzt ein Zustand, den die App kennt: Zeitverlauf und Rotation zeigen
+    statt der Leinwand den Grund und wie er zu beheben ist, und der Reiter
+    bleibt offen — ein gesperrter Reiter kann sich nicht erklären
+  - Die Balken zeichneten Schaden, egal nach welcher Spalte sortiert war.
+    Nach Treffern sortiert zog Rang 1 mit 0,4 % des Schadens einen
+    unsichtbaren Strich über einem vollbreiten Rang 2; nachgemessen ergeben
+    373/287/286 Treffer jetzt 1,000/0,769/0,767. Name und Rang behalten den
+    Schadensbalken mit Absicht
+  - Borometer hatte einen Satz Farben, und Fast-Schwarz ist der falsche
+    Schirm für einen hellen Raum. Jetzt gibt es einen hellen Modus — ein
+    einziger Block Farbwerte, der jede Regel, jede Schriftgröße, jeden
+    Abstand und jeden Radius mit dem dunklen teilt. Es ist keine Umkehrung:
+    Dunkel ist erhitztes Metall im dunklen Raum, Hell ist dasselbe Material
+    bei Tageslicht, Bienenwachs und Papier. Die Seite selbst ist mit #e9dfcd
+    das dunkelste Ding auf dem Schirm, die Karten heben sich nach Weiß —
+    damit eine Karte etwas hat, wovon sie sich abhebt
+  - kDamageShieldHit wurde seit jeher aus dem Log ins Ereignis eingelesen
+    und nirgends benutzt — Schildschaden zählte still als gewöhnlicher
+    Schaden. Jetzt wird genau dieses Token in der Trefferart-Spalte gelesen,
+    ohne Mustersuche: bei einem Log ohne Kopfzeile werden die Spalten nach
+    Position zugeordnet, und in der geratenen kann alles Mögliche stehen. Im
+    Beispiel sind das 67 Treffer, alle auf Zairos, 1.178.179 Schaden, 11,3 %
+    dieses Kampfes, in rund vier Sekunden
+  - Entschlossener Scharfschuss und Entschlossenes Bombardement sind
+    derselbe Basis-Skill unter zwei Spezialisierungen, die sich gegenseitig
+    ausschließen, und im Log steht so oder so der Basisname. Mehr als ein
+    Treffer auf dasselbe Ziel innerhalb von 20 ms ist Auge von Ventius, und
+    eine Spezialisierung gehört zum Build, nicht zum einzelnen Cast: Sobald
+    die Signatur irgendwo in einem Kampf auftaucht, ist die ganze Familie
+    dieses Kampfes dieser Skill und bleibt eine Zeile, Einzeltreffer-Casts
+    eingeschlossen — derselbe Tastendruck in zwei Zeilen gäbe beiden einen
+    Schaden je Einsatz, der keinen von beiden beschreibt. Das Fenster ist 20
+    ms je Ziel, nicht die 400 ms der App; ab 120 ms verschmelzen echte
+    Casts, aus Dreiern werden Zwölfer
+  - Ein Kampf mit Schildtreffern bekommt einen eigenen Befund im Analyse-
+    Reiter: die Summe, das Ziel, auf das alles ging, und den Skill mit dem
+    meisten Schildschaden. Sortiert nach absolutem Schildschaden, nicht nach
+    eigenem Anteil — im Referenzkampf steckte Beschuss 42 % des eigenen
+    Schadens in den Schild und Auge von Ventius 11 %, das sind aber 98.188
+    gegen 982.449, und die zweite Zahl ist die Antwort auf die Frage, was da
+    reinging. Es ist zugleich die einzige Stelle, an der der tragende Satz,
+    dass nichts abgezogen wird, auf dem Bildschirm steht statt in einem
+    Tooltip
+  - Ventius wurde einmal je Log gefragt, mit dem Argument, eine
+    Spezialisierung gehöre zum Build und ein Build wechsle nicht innerhalb
+    einer Datei. Ein Puppen-Log mit je einem Test, 33,5 s auseinander, sagt
+    etwas anderes: Der erste Kampf hat 35 Salven, der zweite fünfzehn Casts,
+    von denen kein einziger doppelt trifft — einmal für die ganze Datei
+    gefragt, hießen beide Auge von Ventius. Der Durchgang läuft jetzt in
+    segment(), einmal je Kampf und vor stats(), denn er benennt Events um,
+    und jede Zahl danach wird auf diesen Namen gezählt
+  - Diese Regel ist richtig für einen Boss, der zwischendurch nicht
+    anvisierbar ist, und falsch für zwei Versuche an der Übungspuppe — und
+    im Log sind die beiden nicht zu unterscheiden, also ist es ein Schalter
+    statt einer Vermutung. „Bossphasen zusammenhängend“ steht im Filter, ist
+    an, teilt den Abend beim Umlegen neu auf und übersteht einen Neustart.
+    Ohne ihn war Build-Testen an der Puppe unmöglich, sobald zwei Tests
+    weniger als eine Minute auseinanderlagen, und keine Einstellung konnte
+    es verhindern
+  - Auge von Ventius trifft siebenmal aus 2, 5, 8, 11, 14 oder 17 m und
+    sonst nur viermal — das Log braucht also keine Entfernungsspalte, um zu
+    sagen, wo jemand stand: Die Trefferzahl je Cast ist der Beleg. Einen
+    Cast zu zählen verlangt ein zweites, viel weiteres Fenster als ihn zu
+    erkennen: Ein Cast ist ein Eröffnungstreffer, knapp eine Sekunde später
+    eine Dreierwelle, rund 100 ms später noch eine; größter Abstand
+    innerhalb eines Casts 1051 ms, kleinster zwischen zwei Casts 1344 ms,
+    also liegt das Cast-Fenster bei 1200 ms. An der Puppe kommt damit jeder
+    Cast als genau sieben oder genau vier heraus, 14 zu 7, und „Wo du
+    gestanden hast“ nennt den Anteil
+  - Zwei Überschriften in fast einer Größe, neunzig Pixel auseinander — also
+    führte keine von beiden: „Zieh ein Kampflog hierher“ stand mit 24 px
+    unter einem 26 px großen Schriftzug. Jetzt ist die Anweisung das Größte
+    auf dem Startbild: 30 px gegen 24 für BOROMETER und 21 für den Namen des
+    Spiels
+  - Der Kopf saß in einer goldenen Fassung. Die Heldenzahl darin sind 46 px
+    Verlauf mit einem Schein dahinter, der Rahmen war also ein zweiter
+    Anspruch auf dieselbe Aufmerksamkeit, und die geschnittene Ecke liest
+    sich in einer dunklen Linie genauso gut. Jetzt ist es eine 1-px-
+    Haarlinie, die von Bernstein in die Kante der Karte ausläuft
+  - Ein radialer Schimmer hellte die Mitte des Kopfes auf — unter dem
+    einzigen Ding auf dem Schirm, das ohnehin selbst leuchtet. Jetzt ist der
+    Kopf eine schlichte Verlaufsfläche: Die Helligkeit dort kommt von der
+    Zahl, nicht von der Fläche
+  - Die fünf Messwerte unter der Zahl waren mit Haarlinien getrennt, jeder
+    in seinem eigenen Kasten, und lasen sich als fünf kleine Karten, die mit
+    der Zahl darüber konkurrierten. Jetzt trennt sie ein Abstand von 34 px,
+    und die Haarlinie über dem Streifen ist die einzige Linie, die bleibt:
+    die, die sagt, dass das zu jenem gehört
+  - Zwölf goldene Schilder liefen die linke Kante der Tabelle hinunter, eins
+    hinter jedem Rang — zwölf Ansprüche auf das Auge für eine Ordnung, in
+    der die Zeilen ohnehin stehen. Der Rang ist jetzt eine Ziffer, ohne
+    Plakette und ohne Gold, und die Unterzeilen haben ihre mit verloren
+  - „Größter Schaden“ stand golden im Kopf und golden die ganze Spalte
+    hinunter, also sah eine Bezugsspalte aus wie die sortierte — und Gold
+    heißt in diesem Kopf: die Spalte, nach der sortiert ist. Die Spalte
+    bleibt, sie ist jetzt eine Zahl wie die sechs daneben
+  - „Als Durchlauf speichern“ und „CSV exportieren“ saßen in der obersten
+    Zeile des Kopfes: bei 1060 px gemessen gingen dort 262 px an die
+    Heldenzahl, 261 px an zwei Export-Knöpfe und 166 px an den Zielnamen —
+    das Thema des Kopfes wurde also als Erstes gequetscht, und zwar von den
+    beiden unwichtigsten Knöpfen der Zeile. Jetzt sitzen sie am rechten Ende
+    des Messwerte-Streifens, wo vorher nur Luft war
+  - Ein Skill mit 91 % eines Kampfes zog einen Balken über die volle Breite
+    von Zeile eins — das liest sich als „ausgewählt“ statt als „am größten“
+    —, während die Zeilen drei bis zwölf zwei bis acht Pixel bekamen. Die
+    Deckkraft des ruhenden Balkens im dunklen Thema ging von 0,5 auf 0,34,
+    und jeder Balken hat 2 px Mindestbreite, damit die kleinen eine Marke
+    sind statt nichts
+  - Der Gruppierungs-Umschalter schwebte zwischen Kopf und Liste, vierzig
+    Pixel unter den Reitern und wie sie gestaltet — der Schirm trug also
+    zwei Leisten, die gleich aussahen und Verschiedenes taten. Skills,
+    Waffen, Ziele und Angreifer — dazu Gruppe, sobald eine offen ist — sind
+    jetzt die Oberkante der Tabelle selbst, eine Fläche mit den Zeilen, die
+    sie sortieren
+  - Der Rotations-Reiter stellte sein Zoom-Paar, „Ganzer Kampf“ und die
+    Von/bis-Felder über das Diagramm, während der Zeitverlauf, mit dem er
+    ein Paar bildet, sie darunter hat — zwei Karten mit einer Aufgabe in
+    zwei Reihenfolgen. Die Rotation läuft jetzt Element für Element wie ihr
+    Gegenstück: Überschrift, Satz, Bild, Bedienung, Fußnote
+  - Überschrift und Untertitel des Rotations-Reiters waren in einem eigenen
+    Ton geschrieben und sagten nichts über den Kampf davor. Jetzt steht
+    „Wann du was eingesetzt hast“ neben dem „Wann der Schaden fiel“ des
+    Zeitverlaufs, und die Zeile darunter zählt, was im Fenster liegt: 233
+    Einsätze aus 12 Skills, und die längste Pause zwischen zwei Einsätzen
+    desselben Skills — 7,2 s ab 0:14
+  - Die Legende der Rotation benannte ein rotes Aussetzer-Feld auf einem
+    Kampf, der überhaupt keine Pause über 1,5 s hat, und gab „eine Marke pro
+    Einsatz“ ein goldenes Kästchen, das für nichts stand. Sie ist weg, und
+    der Satz über dem Diagramm zählt, was das Bild wirklich zeichnet
+  - Die Waffen-Karte begann mit 380 Zeichen Fließtext über ihren zwei
+    Auswahlfeldern, und der letzte Halbsatz erklärte, dass Zuordnungen an
+    der Skill-ID hängen — wie das Ding gebaut ist, und danach handelt
+    niemand. Der Einstieg ist jetzt ein Satz, „Wähle beide, dann bekommt
+    unten jeder Skill für jede einen Knopf“, und die Passiv-Erklärung steht
+    auf der Karte, die den Passiv-Knopf auch trägt
+  - Ohne gewählte Waffen waren zwei der drei Knöpfe in jeder Skillzeile
+    leere Spannen — ein Passiv-Knopf mit zwei Lücken daneben, was kaputt
+    aussieht statt noch nicht eingerichtet. Die Zeile der Karte sagt jetzt,
+    dass oben erst die zwei Waffen zu wählen sind, und wird zum
+    Zuweisungstext, sobald beide stehen
+  - Die Log-Einrichtung hatte eine rote Notiz für eine fehlende
+    Schadensspalte und gar nichts für eine fehlende Zeitspalte — dabei
+    zeichnet ohne sie jede DPS-Zahl der App als Strich, und genau hier
+    repariert man das. Jetzt steht dort eine bernsteinfarbene Notiz, die
+    sagt, was fehlt und was trotzdem gilt: keine Sekunden und damit kein DPS
+    — Schaden und Treffer stimmen trotzdem
+  - Ein Log ohne eigene Kopfzeile ließ die Vorschau „Spalte 1 Zeit“ drucken
+    und wiederholte damit eine Position, die die Indexspalte der
+    Zuordnungszeile längst trägt. Die Zelle einer namenlosen Spalte nennt
+    jetzt nur die Rolle; ein Log, das seine Spalten benennt, behält den
+    Namen und bekommt die Rolle daneben
+  - Die Zuordnungszeilen waren auf 660 px gedeckelt, in einer Karte, die
+    mehr hergibt — daneben standen 360 px leeres Brett, während die
+    Beispielwerte zum Passen abgeschnitten wurden. Der Deckel liegt jetzt
+    bei 920 px, und die Notizen über den Zeilen messen dasselbe Maß, damit
+    diese Textspalte eine Kante hat
+  - Sechs der Regeln, die im Stylesheet Text in Gold setzen, saßen auf der
+    Gruppen-Karte — darunter die zwei Zustände, die ein Host beim
+    Durchzählen auseinanderhalten will: jemand ist woanders und damit in
+    Ordnung, jemand ist da und hat noch nichts gesendet. Der Zustand liegt
+    jetzt auf einer 3 px breiten Kante links — Bernstein, wo der Host
+    gebraucht wird, das Blau, das ohnehin „anders als live, kein Problem“
+    heißt, wo jemand woanders ist, nichts, wo nichts zu tun ist
+  - Der Kopf zählte „3 Spieler melden Daten“ über einer Liste mit fünf
+    Zeilen und überließ die Lücke zwischen den beiden Zahlen dem Host.
+    Solange jemand fehlt, steht dort „3 von 5 Spielern melden Daten“; melden
+    alle, fällt der Satz auf die schlichte Form zurück
+  - Das Gold im Startbild wurde Regel für Regel geprüft, statt eine Fläche
+    nach Gefühl auszusuchen: Sieben Objekte trugen es, und „Zieh ein
+    Kampflog hierher“ — die Zeile, die führen soll — war als einziges großes
+    Element ohne Gold und lebte allein von seiner Größe. In der Karte ist
+    Gold jetzt der BOROMETER-Schriftzug und der Knopf, den man drückt;
+    Spielname, die vier Schritte der Log-Einrichtung und der Pfad zum Log-
+    Ordner stehen als gewöhnlicher Text da
+  - Die vier Schritte, die den Weg im Spiel nennen — Einstellungen,
+    Tastenkürzel, Ringmenü, Kampfmesser hinzufügen — waren golden, also
+    hatte eine Anleitung dieselbe Farbe wie der Knopf an ihrem Ende und trat
+    gegen ihn an. Sie stehen jetzt in der gewöhnlichen Textfarbe; die
+    Pfeilspitzen davor behalten ihr dunkles Gold, damit die Liste weiterhin
+    als Liste zu lesen ist
+  - Derselbe Zustand zeichnete einen Gedankenstrich an der Stelle der
+    Heldenzahl — fehlt die Zahl, setzt die Anzeige einen Strich, und der ist
+    bei 46 Pixel in Archivo Black ein massiver goldener Balken: das größte
+    Element auf dem Bildschirm, ausgerechnet im Zustand, der nichts zu
+    melden hat. Bis zum ersten fertigen Pull bleibt die Heldenzahl ganz weg
+  - Und der Satz selbst war abgeschnitten. Er steht in der Zeile, die für
+    einen Zielnamen gebaut ist und auf eine Zeile gekürzt wird — zu lesen
+    war „Alle sind verbunden. Zahlen erscheinen, sobald jemand e…“, mitten
+    im Wort an der Kartenkante. Im leeren Gruppen-Zustand bricht diese Zeile
+    jetzt um, und der Satz steht ganz da
+  - Der erste Kontrast-Durchgang der App fand das eigentliche Risiko dort,
+    wo eine allgemeine Prüfung nicht hinsieht: bei Text, der auf einem
+    Balken steht, denn der Balken ist sein Geschwister und nicht sein Grund.
+    Gegen alle zwölf Serienfarben gemessen, kamen die vier hinteren Spalten
+    — Treffer, Größter Schaden, Krit, Stark — über dem Balken der ersten
+    Zeile auf 3,06:1. Die Abdunklung ist weg, sie stehen in der Farbe, die
+    die Anteil-Spalte daneben ohnehin schon benutzt, und die Tabelle hat ein
+    Grau weniger
+  - Die Rangziffer der kompakten Ansicht stand bei 78 % Deckkraft und maß
+    3,37:1 gegen den Balken hinter ihr. Sie steht jetzt in voller Stärke und
+    behält ihren dunklen Schein, der für das Verhältnis nichts tut und für
+    das Auge viel. Eine dunkle Ziffer war die naheliegende Alternative und
+    ist eine Falle: Auf einem kräftigen Balken hält sie, auf blankem Glas
+    fällt sie auf 1,04:1 — und genau dorthin stellt sie eine kurze Zeile
+  - In der kompakten Ansicht lief der Balken über die ganze Zeilenbreite,
+    und die Zahlenspalten standen darauf; die DPS-Zelle der ersten Zeile kam
+    so auf 2,33:1, der schlechteste Wert der App, in der Ansicht, die beim
+    Spielen offen bleibt. Die Schiene endet jetzt dort, wo die Namensspalte
+    endet, bei jeder Fensterbreite, also steht auf einem Balken nie mehr als
+    Skill-Name und Rang — die Länge einer Balkenbahn ist ohnehin
+    willkürlich, die Zeilen bleiben untereinander vergleichbar
+  - Der Wechsel in den kompakten Modus schiebt die Balken nicht mehr. Bei
+    jedem Neuzeichnen werden die Balken neu gebaut, eine Breite wurde also
+    nie animiert — außer bei genau diesem Umschalten, bei dem das Element
+    stehen bleibt und sich nur die Bahn darunter ändert: Der Balken wanderte
+    420 ms lang unter den Zahlen hervor und zeichnete dabei genau die
+    Überdeckung noch einmal, gegen die die kürzere Bahn da ist. Die Breite
+    ist aus dem Übergang raus, Ein- und Ausblenden bleiben
+  - Die Balken der Unterzeilen zeichnen mit einer Deckkraft statt mit vier
+    abgestuften. Die Abstufung gab zwei der vier Kategorien — crit und heavy
+    — denselben Wert, hat sie also nie unterschieden; das tun die Farbtöne,
+    zusätzlich als Strich vor jedem Namen wiederholt. Der hellste von ihnen
+    ließ dabei seine eigene Beschriftung bei 1,38:1 stehen, woran keine
+    Schriftfarbe etwas ändert: Reines Weiß misst auf diesem Balken 3,48:1.
+    Jetzt ein Wert je Farbeinstellung, 0,27 dunkel und 0,38 hell, und über
+    alle Farben, Gruppierungen und Zeilentiefen gemessen steht der
+    schlechteste Fall auf einem Balken bei 4,56:1 im hellen und 4,50:1 im
+    dunklen Thema
+  - In der vollen Ansicht fängt der Balken dort an, wo der Name anfängt. Die
+    Rangzahl stand auf dem Kopf des Balkens von Zeile eins — dem Breitesten
+    und Hellsten, was die Tabelle zeichnet — bei 2,9:1, und die Ziffern
+    aufzuhellen hätte sie lauter gemacht als die Skillnamen, die sie
+    nummerieren. Stattdessen beginnt die Bahn hinter der Rangspalte,
+    gemessen an deren eigener Breite, die an einem der drei Umbruchpunkte 24
+    px statt 26 px ist: Der Rang liegt jetzt auf der Karte, 6,22:1, und die
+    vier Prozent Bahnlänge, die das kostet, verliert jeder Balken
+    gleichermaßen — die Längen bleiben vergleichbar
+  - Die Sortier-Spaltenköpfe sind ohne Maus erreichbar. Sechzehn Elemente
+    des Readouts trugen einen Klick und sonst nichts, woran eine Tastatur
+    ansetzen kann; fünfzehn davon waren diese Köpfe und die aufklappbaren
+    Zeilen — die beiden Bedienelemente, mit denen die Tabelle überhaupt
+    bedient wird. Ein Kopf nimmt jetzt den Fokus an und sagt die Sortierung
+    an, die er trägt — aufsteigend, absteigend oder keine —, die der Pfeil
+    bisher nur zeigte. Der Rang-Kopf bleibt außen vor: Sein Klick macht
+    nichts, und was nichts tut, braucht keinen Halt im Tabulatorlauf
+  - Eine Zeile, die sich aufklappt, ist ein Bedienelement, das die Tastatur
+    fassen kann. Die aufklappbaren Zeilen nehmen den Fokus an und tragen
+    ihren Zustand mit sich, ein Vorleseprogramm sagt also offen oder zu
+    statt nur Name und Zahl; eine Zeile ohne Unterzeilen bleibt außen vor,
+    dort ist nichts aufzuklappen. Den Fokusring gab es die ganze Zeit —
+    diese Elemente konnten ihn nur nie bekommen
+  - Enter und Leertaste machen das, was der Klick macht. Hinter Köpfen wie
+    Zeilen steht derselbe Helfer, damit eine Fokusposition nie etwas ist,
+    das bedienbar aussieht und auf nichts reagiert, und der Tastendruck wird
+    geschluckt statt weitergereicht — sonst scrollt die Leertaste die Seite
+    unter der Zeile weg, die sie gerade aufgeklappt hat. Nachgemessen: Enter
+    auf „DPS“ sortiert um und der Kopf meldet „descending“, Leertaste auf
+    einer Zeile klappt sie auf — von den sechzehn unerreichbaren Elementen
+    bleiben drei, und das sind delegierende Container mit echten Buttons
+    darin
+  - Die Tastaturbedienung der Haupttabelle hielt genau einen
+    Seitendurchgang. Beide Listen werden per innerHTML neu gebaut, und der
+    Browser wirft den Fokus dabei auf den Seitenkörper — Enter auf „DPS“
+    sortierte einmal und antwortete danach nicht mehr. Das fokussierte
+    Element wird an seinem data-Attribut gemerkt und dem Knoten übergeben,
+    der es ersetzt: Sortierkopf, aufgeklappte Zeile, Kampf in der Schiene
+  - Der Satz über dem Zeitverlauf zählte den ganzen Kampf, während die
+    Leinwand darunter nur das Zoomfenster zeichnet — genau die Hausregel,
+    die für diese beiden Reiter gilt. Jetzt zählt er das Fenster: ins letzte
+    Drittel gezoomt steht da „6 von 24 Sekunden“ statt „21 von 70“, und die
+    goldene Klammer der Spitze wird nur genannt, wenn sie im gezeichneten
+    Ausschnitt liegt
+  - Der Rotationssatz zählte genauso — den ganzen Kampf, unter einem
+    Streifen, der das Fenster zeichnet. Jetzt zählt er die tatsächlich
+    gezeichneten Markierungen: „69 Einsätze aus 10 Skills“ deckt sich exakt
+    mit dem, was im Streifen steht, und der genannte Rhythmus-Abstand misst
+    nur die Einsätze im Fenster
+  - Das Überfahren einer Zeile bleichte den Namen darauf aus. Gegen den
+    echten Zeilengrund #060402 gemessen, setzte die Hover-Füllung des
+    dunklen Themas mit .58 den Skillnamen auf 4,29:1 — jetzt .50 und 5,34:1.
+    Das Kompaktfenster hellt beim Überfahren nicht mehr auf: die Zeile
+    leuchtet ohnehin auf, und ihre ruhende Füllung steht je Thema, im
+    Dunklen bei .52 — dort geht der Name auf dem hellsten Balken bei .53
+    über die AA-Schwelle
+  - Der Aufklapppfeil sitzt auf der hellsten Stelle des Balkens und hatte
+    nichts, was ihn davon abhob. Jetzt ist er #fff8ee mit Schatten — 9,41:1
+    in Ruhe, 5,93:1 im Hover — und der offene Zustand nimmt kein Gold mehr:
+    offen ist ein Zustand, keine Live-Zahl
+  - Die Schnappschuss-Marke verlor den Spezifitätswettstreit gegen die Span-
+    Regel der Kopfzeile und zeichnete die blasse Tinte auf den Info-Grund:
+    1,27:1, in Beschriftungsgröße also gar nicht lesbar. Als Marke innerhalb
+    der Kopfzeile geschrieben sind es 8,04:1
+  - Die Analyse behält, was ohne Uhr wahr ist, und druckt sonst nichts:
+    Schadenskonzentration, Krit-Anteil, Schild und Zielaufteilung. Die
+    Fünfzehn-Sekunden-Fenster, der Schwankungssatz und jeder Befund, der
+    Sekunden braucht — die längste Pause, die Eröffnung, die schwächste
+    Phase — fallen weg, statt aus einem 200-ms-Stempel gerechnet zu werden
+  - Ein Durchlauf, der aus einem Log ohne Uhr gespeichert wurde, trägt das
+    mit — so wäscht sich die Erfindung nicht in die Liste des Abends: Die
+    Zeile in der Seitenleiste druckt Schaden statt einer Rate, und die
+    Kampfschiene druckt „—“ bei DPS und lässt die Länge weg
+  - Im Vergleich fallen bei einem Durchlauf ohne Uhr DPS, Länge und
+    Standzeit aus der Kennzahlenliste, die Spaltenüberschrift zeigt „—“
+    statt einer Länge, und die beiden Matrizen darunter heißen „Schaden,
+    Skill für Skill“ und „Schaden, Waffe für Waffe“ statt „Schaden pro
+    Sekunde“
+  - Gruppen-Unterzeilen druckten 0,0, 0 % und 0 % für den größten Treffer,
+    die Krit-Rate und die Heavy-Rate — drei Werte, die der sendende Client
+    nie mitschickt, gedruckt, als wären sie mit null gemessen worden. Bei
+    allen dreien steht jetzt „—“
+  - Ein Log mit Skill-ID-Spalte, aber ohne Skill-Spalte hat genau eine
+    namenlose Zeile, und die trug bisher den Namen irgendeines Skills aus
+    der ID-Tabelle. Jetzt heißt sie „—“, und die Log-Einrichtung hat neben
+    den Notizen zu Schaden und Zeit eine dritte, die die fehlende Skill-
+    Spalte benennt
+  - Das Zoomfenster gehörte dem Diagramm, nicht dem Kampf, auf dem es
+    gezogen wurde. 1:15–1:25 eines 85-s-Kampfes wurde beim Wechsel zu einem
+    69-s-Kampf zu einer halben Sekunde hinter dessen Ende; jetzt hängt das
+    Fenster am Beginn des Kampfes und wird mit ihm zurückgesetzt — eine
+    Korrektur für Zeitverlauf und Rotation zugleich
+  - Die „Mindestlänge“ wurde still verworfen, sobald sie alles
+    herausgefiltert hätte — und zwar zurück auf die rohen Abschnitte statt
+    auf die zusammengeführten, was die Bossphasen-Zusammenführung rückgängig
+    machte und Treffer doppelt zählte. Der Rückfall bleibt jetzt auf den
+    zusammengeführten, und die Schiene sagt, dass die Einstellung übergangen
+    wurde
+  - Ein einzelner 7.000er-Treffer in einem Kampf, der einen Wimpernschlag
+    dauerte, las sich als „7.00M“, weil die Rate durch eine Dauer unter
+    einer Sekunde teilte. Der Nenner ist auf eine Sekunde gedeckelt; die
+    daneben gedruckte Dauer bleibt die echte
+  - Ein geladener Gruppen-Schnappschuss bot „Gruppen-Log speichern“ an und
+    wies jeden Klick mit „noch niemand hat gemeldet“ ab, weil die Prüfung
+    ein laufendes Ranking verlangte. Ein eingefrorenes zählt jetzt mit, und
+    erneutes Speichern behält die Stunde des Kampfes, statt den Moment des
+    Knopfdrucks zu stempeln
+  - Die Prüfung einer Laufdatei las fünf Felder, die Vergleichstabelle liest
+    alles — eine dünne Datei kam durch, wurde in die Konfiguration
+    geschrieben und tötete den Vergleichs-Reiter, während die Meldung sagte,
+    sie sei abgelehnt worden. Jetzt prüft sie alles, was die Tabelle liest:
+    den Namen, die drei Listen und jede Zahl, die gedruckt wird
+  - Escape im Kompaktfenster schloss Menü und Overlay zugleich, was mitten
+    im Raid das Fenster über dem Spiel vergrößert. Jetzt schließt es nur das
+    Oberste — erst ⋯-Menü, Modal, Filterfeld oder Changelog, das
+    Kompaktfenster erst, wenn nichts mehr darüber liegt
+  - Der Changelog war ein Fenster, dessen eigener Schließen-Knopf der 61.
+    Tabstopp war. Jetzt ist er ein echter Dialog — der Fokus landet beim
+    Öffnen auf „Schließen“, Tab bleibt darin gefangen, und beim Schließen
+    geht er zurück auf „⋯“
+  - Das Datei-Modal setzte den Fokus nirgendwohin, ließ Tab in die Seite
+    dahinter laufen, und sein Escape war tot, sobald man vom Textfeld
+    wegtabbte — der globale Handler hört nur zu, solange dieses Feld
+    versteckt ist. Jetzt fokussiert es die erste Datei der Liste, hält Tab
+    fest, nimmt Escape selbst entgegen und gibt den Fokus dorthin zurück, wo
+    er herkam
+  - Neun Knöpfe trugen fest verdrahtete englische Tooltips unter einer
+    deutschen Oberfläche — Minimieren, Maximieren und Schließen am Fenster
+    sowie die Zoompaare am Fenster, am Zeitverlauf und an der Rotation. Sie
+    kommen jetzt aus dem Wörterbuch, in beiden Sprachen
+  - Die Zustandskante der Gruppenliste — das einzige Signal einer „away“-
+    oder „wartet“-Zeile — war 0 px breit und malte gar nichts. Die
+    Kopfzeilen-Regel, die sie mitbenutzt, trägt einen automatischen rechten
+    Rand, ein Auto-Rand hebt das Grid-Strecken auf, und gestrecktes Nichts
+    ist nichts
+  - Die Notizen der Log-Einrichtung verloren Farbe, Größe, Maß und Rand an
+    die Absatzregel der Karte — die Farbe, die eine Notiz lauter machen
+    sollte, tat nichts, und die Notiz las sich wie Fließtext. Jetzt setzen
+    sie sich selbst durch, und die bernsteinfarbene Warnung setzt sich
+    weiterhin über sie, statt übermalt zu werden
+  - „border:none“ lässt die Rahmenbreite auf „medium“ stehen, also kam der
+    gestrichelte Ring am Passiv-Knopf 3 px dick zurück und machte ihn 6 px
+    höher als die Waffenknöpfe daneben. Jetzt tragen alle einen
+    durchsichtigen 1-px-Rahmen, beim Passiv-Knopf gestrichelt in der
+    Kantenfarbe — und die Rahmenfarbe eines gewählten Waffenknopfs ist
+    überhaupt zum ersten Mal sichtbar
+  - Im laufenden Bild gemessen: Der Zeitverlauf schrieb „trugen 88 % des
+    Schadens“, die Analyse einen Klick weiter „145% Schwankung“ und
+    „Normalerweise 1.9s Abstand“, und das Vergleichsurteil sagte „4,2 %
+    Unterschied“ direkt über einer Zelle mit „31.4%“. Die Helfer gab es
+    längst — die Analyse ging mit blankem toFixed daran vorbei. Prozente und
+    Sekunden laufen jetzt durch einen Satz Helfer, das Deutsche behält das
+    geschützte Leerzeichen vor dem Prozentzeichen, und eine Dauer unter
+    einer Minute bekommt eine Nachkommastelle
+  - Karte 1 der Analyse sagte „96 % aus den drei stärksten Skills / X allein
+    war 91 %“, Karte 2 dreihundert Pixel darunter „91 % von X / Die drei
+    stärksten tragen 96 % des Kampfes“ — dieselben zwei Zahlen mit
+    vertauschter Überschrift und Notiz. Die Konzentrations-Kachel ist weg,
+    die Schwankung steht einmal unter der Fenstertabelle, und die
+    Eröffnungs-Kachel bleibt nur auf Kämpfen, die für ihren Befund zu kurz
+    sind
+  - Das Unentschieden-Urteil rundete dieselbe Zahl anders als der Chip
+    darunter — „3,7 % Unterschied“ über einem „+4 %“. Jetzt wird einmal
+    gerundet, und die 5-%-Schwelle liest gegen die Zahl, die tatsächlich
+    gedruckt wird
+  - Die Fenstertabelle der Analyse skalierte ihre Balken über alle Fenster,
+    während der Satz darunter nur volle vergleicht: Der angeschnittene
+    Schluss, gemessen über 10,6 s, bekam den längsten Balken, und die Zeile
+    darunter nannte ein Fenster „das beste“, das die Tabelle bei 69 %
+    zeichnete. Beide arbeiten jetzt auf derselben Menge, und die Teil-Zeile
+    behält jede Zahl und ihr „Teil“ — nur keinen Balken auf einer Bahn, auf
+    die sie nicht gehört
+  - Der Kompakt-Spaltenkopf stand auf Opazität .7, und Opazität setzt die
+    ganze Gruppe zusammen — das schwarze Band hinter der Schrift bleichte
+    mit aus, und das Paar maß 4,38:1 bei 9,5 px. Mit der blassen Tinte statt
+    Opazität: 6,44:1, Gold 9,55:1
+  - Die Zahl der angehakten Durchläufe auf dem Vergleichsknopf war das
+    einzige dunkel-auf-hell-Paar der App und lag bei 3,75:1. Sie nimmt jetzt
+    #180d02, die Tinte jedes anderen Gold-Chips: 11,4:1
+  - Die Delta-Chips hatten durchsichtigen Grund, also stapelten sich die
+    Tönung der Gewinnerspalte und der Zeilen-Hover darunter und drückten
+    10,5-px-Text auf 3,96:1. Der Grund ist jetzt deckend, ein Ton je Zustand
+  - Der Geistermodus holte die volle Deckkraft nur beim Überfahren zurück,
+    also fuhr ein Tastaturbenutzer das Overlay — und seinen eigenen
+    Fokusring — bei 55 %. Jetzt zählt auch der Fokus darin
+  - Die Animationen ohne Ausstieg für reduzierte Bewegung haben einen,
+    darunter der Statuspuls, der den ganzen Raid läuft
+  - Gespeichert wurde in genau einen Ordner namens saves neben der exe —
+    Durchläufe, Party-Logs und Fehlerberichte auf einem Haufen. Jetzt sind
+    es drei, jeder nach seinem Inhalt benannt: Logs, Party-Logs und Bug-
+    Reports
+  - Der Fehlerbericht ging über dieselbe Route wie ein Durchlauf — er
+    landete also zwischen den gespeicherten Kämpfen und tauchte danach in
+    „Durchläufe-Datei laden“ als Datei auf, die sich nicht laden lässt.
+    Jetzt hat er eine eigene Route und einen eigenen Ordner, und in der
+    Liste der gespeicherten Durchläufe stehen Durchläufe
+  - Beim ersten Start wird saves zu Logs und party-logs zu Party-Logs —
+    umbenannt, nicht kopiert, damit niemand mit zwei Ordnern und jeweils
+    halbem Inhalt dasteht. Gibt es beide Namen schon, wandern die Dateien
+    einzeln hinüber, und ein Name, der drüben bereits belegt ist, bleibt
+    unangetastet
+  - Der Knopf „Ordner öffnen“ sitzt in den Dateiauswahl-Dialogen für
+    Durchläufe und Gruppen-Logs, auf dem Platz, den der ausgeblendete OK-
+    Knopf frei lässt — die Zeilen sind die Auswahl, OK hatte dort nichts zu
+    tun, und wer gerade eine Datei sucht, ist genau der, für den ihr Ordner
+    einen Knopf wert ist. Er schließt den Dialog nicht, die Auswahl läuft
+    weiter, und auf dem Zustand „Noch nichts gespeichert“ steht er auch. Ein
+    ⋯-Menüeintrag für Ordner, die es vielleicht noch gar nicht gibt, wäre
+    eine Liste von Orten statt einer Handlung gewesen — er ist gestrichen
+  - Gold hat zwei Aufgaben, und nur eine davon überlebt das Tageslicht: als
+    Füllung funktioniert Honig auf Papier, als Schrift ist er das schwächste
+    in der Palette. Gold als Schrift ist jetzt eine eigene Farbe und wird im
+    hellen Satz zu Bronze — an über zwanzig Stellen
+  - Der Balken lebt davon, heller als sein Grund zu sein, und auf Papier ist
+    Honig praktisch so hell wie das Papier: nachgemessen bleibt #eca948
+    selbst bei 70 % Deckkraft bei 1,29:1 gegen den Grund, die Deckkraft
+    hochzudrehen bringt also nichts. Im hellen Satz wird die Füllung
+    multiplizierend gemalt — dieselbe Farbe sinkt ins Papier, statt darauf
+    zu liegen — und sie läuft deutlich dichter: 0,34 gegen 0,62 in Ruhe,
+    0,50 gegen 0,76 unter dem Zeiger. Die Legenden-Marke neben dem Namen
+    behält die ungemischte Farbe, Zeile und Legende bleiben also dasselbe
+  - Der Umschalter sitzt im ⋯-Menü, drei Knöpfe unter „Farben“: Dunkel,
+    Hell, Auto. Der geltende ist markiert, und die Wahl bleibt über den
+    Start hinaus erhalten
+  - Auto wird in der Seite aufgelöst und stempelt immer ein ausdrückliches
+    Thema auf sie, damit nie eine Media-Query gegen eine Einstellung
+    arbeitet. Ein Wechsel des Systemthemas schlägt live durch, und die
+    Diagramme werden mitgezeichnet — die Zeichenflächen malen mit Farben,
+    die sie aus dem Stylesheet lesen, also müssen sie neu gefragt werden
+  - Die Trefferkategorien lasen die Krit- und Stark-Flaggen, ein
+    Schildtreffer wurde also unter dem einsortiert, was da gerade stand — im
+    Beispielkampf standen 47 der 67 unter „Starker Angriff“ und 20 unter
+    „Normal“, Unterzeilen, die eine Trefferart behaupteten, die das Log nie
+    gemeldet hat. Schildtreffer sind jetzt die fünfte Kategorie und werden
+    vor den Flaggen geprüft, weil das Log eine Trefferart pro Zeile schreibt
+    und „shield“ statt „crit“ geschrieben hat
+  - Auf einem Kampf, der Schildtreffer hatte, erscheint ein sechster Chip —
+    und nur dort. Er steht als Trefferquote da, weil „Krit“ und „Stark“
+    daneben Trefferquoten sind und ein Schadensanteil an derselben Stelle
+    wie dasselbe gelesen würde; Schaden und Schadensanteil stehen im Titel
+  - Die Schild-Marke sitzt auf der Zeile, deren Schildschaden beim
+    Aufklappen nicht sichtbar würde — nach Zielen gruppiert ist das die
+    Ziel-Zeile — und unter Waffen nie. Auf den Skill-Zeilen würde sie gegen
+    genau die Tabelle ranken, in der sie steht: nach eigenem Anteil läge
+    Beschuss (42 % des eigenen Schadens, 98.188) vor Entschlossenem
+    Scharfschuss (11 %, 982.449)
+  - Es wird nichts abgezogen, und das steht in jedem Titel in beiden
+    Sprachen. Das Log hält fest, welchen Schaden man gemacht hat; es sagt
+    nicht, was der Schild damit gemacht hat — Abziehen wäre die Erfindung,
+    Mitzählen nicht
+  - Der Analyse-Reiter hat eine Karte dafür — „Auf einen Schild gegangen“:
+    wie viel Schaden, über wie viele Treffer, welcher Anteil des Kampfes,
+    auf welches Ziel alles ging und welcher Skill den größten Teil
+    beigesteuert hat — ausgewählt nach Schildschaden, nicht nach eigenem
+    Anteil, damit die Karte den Skill nennt, auf den es im Kampf ankam
+  - Die Zeile nur über den Namen umzubenennen machte sich selbst rückgängig:
+    skillLabel löst die ID vor dem Namen auf, also kam Auge von Ventius mit
+    der gelogten ID 964500434 als Entschlossener Scharfschuss zurück — und
+    die ID zu leeren half nicht, dann fiel die Zeile auf Nicht zugewiesen,
+    weil weaponFor nichts mehr nachzuschlagen hat. Die Zeile hat jetzt eine
+    eigene ID, boro:ventius, im Wörterbuch und in SKILL_WEAPON als Langbogen
+    wie alle fünf Familien-IDs — der übersetzte Name hält, unter Waffen
+    steht die Zeile beim Langbogen, und die gelogte ID wandert für den
+    Fehlerbericht nach baseSid
+  - Das Spiel schreibt Skillnamen in der Sprache des Clients, ein
+    Familientest gegen den rohen englischen String hätte auf einem deutschen
+    Client also nie angeschlagen — dort steht „Entschlossener Scharfschuss“
+    im Log. Der Test geht über skillEntry, denn nur das Wörterbuch weiß,
+    dass beide Schreibweisen derselbe Skill sind — auf einem deutschen Log
+    wird die Zeile damit genauso erkannt wie auf einem englischen
+  - Die Zahlen der Zeile sind die des Logs, der Name ist die Lesart der App
+    — also trägt die Zeile eine Marke, die das sagt: ein gezeichnetes Auge
+    statt des Wortes „erkannt“ oder eines Ausrufezeichens, denn der Skill
+    heißt Auge von Ventius, und eine Marke, die die Zeile benennt, ist
+    besser als eine, die nur warnt. Inline-SVG mit 13 px, Mandel und
+    Pupille, weil keine Schrift, auf die sich diese App verlassen kann, ein
+    Auge mitbringt, auf einer 18-px-Scheibe in Amber mit dunkler Tinte,
+    5,66:1 in beiden Themen; Amber und nicht Gold, weil Gold die Live-Zahl,
+    die sortierte Spalte und der aktive Reiter ist. Dazu role=„img“ und das
+    aria-label „von Borometer erkannt“ für alles, was keinen Tooltip zu
+    sehen bekommt
+  - Der Tooltip der Marke zählte beide Skills auf, auf denen die
+    Spezialisierung sitzen kann, dazu das 20-ms-Fenster: 290 Zeichen Regel
+    für eine Zeile, die eine Antwort hat. Jetzt nennt er den Namen, den
+    dieses Log wirklich geschrieben hat — „Im Log steht Entschlossener
+    Scharfschuss. Mehrere Treffer je Cast auf ein Ziel macht nur Auge von
+    Ventius.“, 106 Zeichen, kürzer und genauer — und der Basisname wird je
+    Kampf gemerkt, zwei Builds in einem Log behalten also jeder seinen
+  - Die Schild-Marke hing an der Gruppierung nach Ziel, also blieb unter
+    anderem die Angreiferzeile stumm über Schaden, der in einen Schild ging.
+    Jetzt hängt sie an der Zeile selbst — Schildschaden vorhanden und kein
+    Schild unter den Unterzeilen — und markiert damit genau dann, wenn
+    Aufklappen den Schild nicht zeigen würde; das deckt auch den Skill ab,
+    dessen Treffer alle Schildtreffer waren, wo die Ein-Kategorie-Regel mit
+    der Unterzeile den Pfeil mitnimmt. Unter Waffen bleibt sie weg: Eine
+    Waffe ist nichts, was einen Schild hat, und dort las sich die Marke, als
+    hätte der Langbogen einen
+  - Die hellen Kategoriefarben waren über --pitch komponiert, also über der
+    Seite — hinter einer Unterzeilen-Füllung liegt aber --well-deep über der
+    .table-Fläche, und die ist deutlich heller. Gegen den echten Grund
+    gemessen liest der Name in --dim auf den vier warmen Kategorien 4,74 /
+    5,14 / 4,90 / 5,19 bei .27 durch multiply, sie behalten ihr Band also,
+    statt Kontrast zu kaufen, der nirgends knapp war. Schild steht bei
+    #74959f und hält mehr vom Band als ein blasseres Schiefer, bei 4,92 für
+    den Namen: Die Füllung muss weiter als Länge lesbar sein, nicht nur als
+    Text
+  - segment() läuft erneut auf denselben Event-Objekten, sobald Gap,
+    Mindestlänge oder der Charakterfilter sich ändern — buildEvents läuft
+    dann nicht — und die Umbenennung ist destruktiv: Der zweite Durchgang
+    fand keine Familie mehr, antwortete „kein Ventius“ und ließ die
+    umbenannten Zeilen trotzdem stehen. Der Durchgang setzt Skill und ID
+    jetzt erst aus baseSkill und baseSid zurück und fragt dann neu; über
+    vier Wechsel hin und her nachgemessen
+  - Warum zwei Puppentests als ein Kampf ankamen: Gap 5 s heißt harte Lücke
+    15 s, die Pause hat also getrennt — und dann hat die Bossphasen-Regel
+    wieder zusammengefügt, weil 33,5 s unter der Bosslücke von 5 × 12 = 60 s
+    liegen und beide Teile dasselbe Hauptziel haben. Die Regel hat korrekt
+    gegriffen und keine Spur davon hinterlassen, das war die ganze
+    Überraschung; die Schiene sagt jetzt „2 Teile“, wenn ein Kampf aus
+    mehreren Abschnitten besteht
+  - Im Raid trägt diese Lesart nicht: Casts liegen dichter beieinander, als
+    das Fenster sie trennen kann, und kommen als Zehner und Dreizehner
+    heraus — ein Anteil daraus gelesen wäre erfunden. Der Befund erscheint
+    nur bei mindestens 5 Casts, von denen mindestens 80 % genau vier oder
+    genau sieben Treffer landen — nachgemessen 100 % an der Puppe und 1 von
+    11 Kämpfen im Raid-Log, sonst bleibt er still, statt einen Anteil zu
+    erfinden
+  - Ein Themenwechsel ändert Custom Properties und sonst nichts, und ein
+    Element mit einer transition auf einer Eigenschaft, die eine davon
+    liest, wertet sie nicht neu aus: Nachgemessen blieben die
+    Reiterbeschriftungen und die Gruppierungsknöpfe auf der Tinte des alten
+    Themas stehen, 1,9:1 auf dem neuen Grund, bis irgendetwas sie neu
+    zeichnete oder der Zeiger darüberfuhr. applyTheme hängt jetzt für zwei
+    Frames html.nofade an, das Transitions und Animationen über den Wechsel
+    abschaltet, dazu ein Rückfall nach 120 ms, weil rAF im Hintergrund-Tab
+    bis zum Stillstand gedrosselt wird
+  - Die Balken trugen einen Satz fester Deckkräfte für beide Themen, und die
+    Zahl dahinter war ein Kontrastverhältnis — das wirft den
+    Farbtonunterschied weg, und genau der macht einen Balken überhaupt
+    sichtbar. Als dE76 gemessen steht der dunkle Balken bei .34 mit 34,7 von
+    seinem Grund, der helle kam bei derselben Zahl nur auf 17,1, also halb
+    so deutlich. multiply hält das Band hell, während die Tinte darauf
+    dunkel bleibt, Hell hat damit Luft, die Dunkel nicht hat: vier Tokens
+    statt vier fester Zahlen, hell .62/.76/.38/.78 und dunkel
+    .34/.50/.27/.52
+  - Jede dieser Zahlen war am Namen gemessen, und der Name ist nicht das
+    Blasseste, was auf einem Balken steht. Die Unterzeile hört bei .38 auf,
+    weil ihr eigener Text die Grenze ist — sie liest 4,46:1 bei .40 und
+    überschreitet AA bei .38, was 1,2 dE kostet — und dunkel kompakt hört
+    bei .52 auf, mit dem Namen auf dem hellsten Balken bei 4,22:1 unter .56
+    und der Grenze bei .53. Beim Überfahren kommt die Tinte hoch, statt die
+    Deckkraft zurückzudrehen, denn zurückdrehen hätte dem Hover seinen
+    Schritt gekostet: Die schlichten Spalten der Zeile unter dem Zeiger
+    lesen in voller Textfarbe, sie ist die Zeile, die gelesen wird.
+    Unterzeilen bleiben, wie sie waren
+  - Gradiententext meldet bei naiver Messung 1:1, weil die Farbe selbst
+    transparent ist und der Verlauf der Hintergrund — richtig gemessen lag
+    der oberste Stopp der hellen Heldenzahl bei 3,09 gegen die nötigen 3,0
+    für große Schrift, also ohne jeden Spielraum. --grad-hero und --grad-
+    mark beginnen im hellen Thema jetzt bei #8c5008, jeder Stopp bei 4,9
+    oder besser; die Honigrampe des dunklen Themas bleibt unangetastet
+  - Der Messwerte-Streifen trug vorneweg die Beschriftung „Dieser Kampf“.
+    Jede Zahl im Kopf ist dieser Kampf — einen anderen wählt man in der
+    Seitenleiste —, die Zelle benannte also den Normalfall und ist weg
+  - Der Hinweis auf Strg-Scrollen und Ziehen war eine rechtsbündige Zeile
+    zwischen Bedienung und Bild und gehörte zu keinem von beiden. Jetzt ist
+    er die letzte Zeile der Karte, eine Fußnote unter der Bedienung, die er
+    beschreibt
+  - Ein Aussetzer war im Zeitverlauf ein Satz und in der Rotation ein
+    Legendenkästchen — zwei Formulierungen für dieselbe Tönung. Jetzt
+    drucken beide Reiter denselben String — „Getönte Felder sind Aussetzer:
+    über 1,5 s traf nichts.“ —, und nur dann, wenn ein Feld tatsächlich im
+    Fenster liegt
+  - Die Statuszeile über der Aufteilung nannte zusätzlich den als Passiv
+    markierten Anteil — den die Tabelle darunter als eigene Zeile führt, und
+    zwar anders gerundet. Diese Hälfte ist weg, und der nicht zugewiesene
+    Anteil, den die Zeile weiterhin nennt, steht auf einer Nachkommastelle,
+    wie die Tabellenzelle, von der er spricht
+  - Die Skillzeilen setzten den Mittelpunkt zwischen Schadenszahl und ID von
+    Hand, in einer App, die für genau diese Paarung einen Helfer hat. Der
+    Punkt ist aus dem Wörterbuch-String heraus, die Zeilen laufen über
+    factLine — das Trennzeichen zwischen zwei Fakten ist damit überall eine
+    Regel statt eines Zeichens in einem Eintrag
+  - In der Anteilsspalte begannen Zahl und Balken an verschiedenen Stellen,
+    also fingen drei untereinander stehende Balken an drei x-Positionen an
+    und ließen sich nicht gegeneinander lesen. Beide sitzen jetzt an der
+    linken Kante der Zelle — die Bahn ist 110 bis 120 px breit, und das
+    Einzige, was sich die Spalte hinunter ändert, ist die Füllung
+  - Die Vorschau setzte alle elf Rollenbezeichnungen in Gold, auf einer
+    Seite, auf der keine Zahl live ist und keine Spalte sortiert. Gold heißt
+    in dieser App die Heldenzahl, die sortierte Spalte und der Reiter, in
+    dem man steht — eine Rolle unter einem Spaltennamen ist nichts davon,
+    also stehen die Bezeichnungen jetzt gedämpft
+  - Der Spielname unter dem Schriftzug war golden — zwei goldene Marken
+    übereinander am Kopf der Karte, und „Throne and Liberty“ las sich als
+    zweites Abzeichen statt als der Name des Spiels. Er steht jetzt in der
+    gewöhnlichen Textfarbe, mattes warmes Weiß, und oben glänzt nur noch der
+    Schriftzug
+  - Auch der Pfad zum Log-Ordner war golden. Ein Pfad ist zum Kopieren und
+    Nachsehen da und nicht zum Verkünden, und Gold heißt in dieser App „hier
+    steht die Zahl, auf die es ankommt“ — der Pfad ist jetzt schlichter Text
+    in seiner dunklen Mulde, golden bleibt allein die Haarlinie um den
+    Kasten, denn die Kante ist das Bedienelement und nicht die Schrift
+  - In der kompakten Ansicht steht der Skill-Name auf seinem Balken statt
+    daneben, und über der blassesten der zwölf Serienfarben waren es 3,99:1
+    — unter der AA-Grenze, in der Ansicht, die während des Kampfes offen
+    bleibt. Der Balken ist so weit abgedunkelt, dass alle zwölf die Grenze
+    halten, und nur so weit, wie es dafür nötig ist; das Ranking liest sich
+    weiterhin auf einen Blick
+  - Ein kompakter Balken steht auch im sehr schmalen Fenster noch für etwas.
+    Die Bahn ist das, was von der Zeile übrig bleibt, wenn die beiden
+    Zahlenspalten ihres genommen haben — unter einer Zeilenbreite von etwa
+    134 px, also unter den 136 px, die allein die festen Spalten belegen,
+    wurde die Rechnung negativ, und jeder Balken fiel auf seine 2-px-
+    Untergrenze und sagte gar nichts mehr. Die Bahn hat jetzt eine
+    Untergrenze von 16 %, bitgenau gleich von 364 px bis 136 px, und
+    überhaupt nur bei 175–200 % Größe mit von Hand kleingezogenem Fenster
+    erreichbar
+  - Eine Kategorie-Unterzeile unter dem Zeiger bekommt ihren Balken nicht
+    mehr heller. Bei den Hauptzeilen ist das Absicht — die Zeile unter dem
+    Zeiger ist die, die gelesen wird —, aber dieselbe Regel hob die Füllung
+    einer Unterzeile auf 0,46 und drückte deren Beschriftung wieder unter
+    die Grenze, für die die Deckkraft der Unterzeilen gerade erst
+    eingestellt worden war. Unterzeilen behalten ihren einen Wert, mit
+    Zeiger wie ohne
+  - Der Aufklapppfeil ist auf jeder Farbe lesbar, die ein Balken annehmen
+    kann. Er sitzt im Namensfeld, in der vollen Ansicht also auf dem
+    breitesten, hellsten Stück des eigenen Balkens der Zeile, und trug die
+    gedämpfte Schriftfarbe der Zeile bei rund 3:1 — die hellere gedämpfte
+    Farbe der Nebenzahlen misst dort nicht besser. Jetzt hell mit dunklem
+    Schein, wenn die Farben dunkel stehen, und dunkle Schrift mit hellem
+    Schein, wenn sie hell stehen: dieselbe Aufgabe mit umgekehrtem Material,
+    und aufgeklappt bleibt eine Vierteldrehung statt einer Farbe
+  - Aufgeklappte Unterzeilen behielten die Reihenfolge, in der sie gebaut
+    wurden, während die Spalte darüber sortiert war. Jetzt sortieren sie mit
+    — unter „Rang“ nicht, denn dort ist die gebaute Reihenfolge der Inhalt
+  - Der Waffen-Hinweis erklärte die Zeile „Nicht zugewiesen“, ob sie in der
+    Tabelle stand oder nicht; jetzt erscheint er mit der Zeile
+  - Das Schließen des ⋯-Menüs warf den Fokus auf den Seitenkörper, der
+    nächste Tab begann also wieder ganz oben. Das Menü gibt den Fokus an den
+    ⋯-Knopf zurück, bevor es das Panel versteckt
+  - Zwei Einträge im englischen Changelog nannten ihren Reiter auf Deutsch —
+    die einzige Stelle, an der die englische Fassung deutsch sprach
+  - Ein Hinweis oder eine Diagramm-Fußnote in einer Karte las sich wie deren
+    eigener Fließtext: Beide waren einteilige Regeln gegen eine zweiteilige,
+    die Unterscheidung, die das Design zieht, stand also im Stylesheet und
+    nirgends auf dem Schirm
+  - Die Höhenkappen für schmale Fenster griffen nie — die Kappe der
+    Laufliste war zweiteilig gegen eine dreiteilige Grundregel, und die
+    Kampfliste daneben war aus demselben Grund tot. Beide deckeln unter 900
+    px Breite wieder bei 190 px
+  - Die Einheit heißt überall DPS, auch an den drei Stellen, die „dps“ am
+    Wörterbuch vorbei fest verdrahtet hatten
+  - Der Umschalter zum Kürzen wechselte beim Drücken die Knopfklasse und
+    damit die Größe — das Bedienelement änderte sich unter dem Zeiger, der
+    es gerade getroffen hatte
+  - Dieselbe Farbmarke stand in zwei Geometrien eine Karte auseinander —
+    3×12 mit 2 px Radius in der Skill-Zuordnung, 3×13 mit 1 px in der
+    Waffentabelle darüber. Die Zuordnung nimmt jetzt die Marke der
+    Waffentabelle
+  - Im Deutschen hieß das Gruppenbrett mehr als eine Sache — „Gruppen-
+    Ranking“ als Überschrift, „Board“ in der Zeile darunter. In jedem
+    deutschen String heißt es jetzt Ranking
+  - Alte boro-bug-*.json, die noch in saves gelandet sind, als der
+    Fehlerbericht die Route des Durchlaufs mitbenutzte, werden einmalig nach
+    Bug-Reports verschoben — jede nur dann, wenn dort noch keine gleichen
+    Namens liegt
+  - Ordner entstehen beim Speichern, nicht beim Start: frisch installiert
+    gibt es keinen, Logs kommt mit dem ersten gespeicherten Durchlauf, Bug-
+    Reports mit dem ersten Bericht. Einen Ordner aufzulisten, den es nicht
+    gibt, ist eine leere Liste — und das ist die wahre Antwort. Die
+    Umbenennung der beiden alten läuft dagegen bei jedem Start, damit das,
+    was schon da ist, auch ohne Schreibzugriff unter seinem jetzigen Namen
+    gefunden wird
+  - Die vier Füll-Farben behalten im hellen Modus ihre dunklen Werte. Die
+    Rampe von lite über amber nach deep muss fallen, sonst sind die Knöpfe
+    nicht mehr von oben beleuchtet — deep einmal mitgedreht, und der Haken
+    im Ringmenü war unsichtbar und die Knopframpe flach. Nur Gold selbst
+    wird auf Papier eine Spur tiefer: es zeichnet auch die 1px-Ringe und die
+    2px-Unterstriche, und eine Haarlinie braucht mehr Abstand vom Grund als
+    eine Fläche
+  - Auf Papier glüht nichts: die Halos hinter der Heldenzahl und dem
+    Gruppencode und die blassen Konturen um ihre Ziffern sind im hellen Satz
+    aus — auf dunklen Buchstaben sehen sie nach Unschärfe aus statt nach
+    Licht
+  - Der Launcher malt den Fensterrahmen, bevor es die Seite gibt — Hell
+    öffnete also für einen Moment auf Fast-Schwarz. Die Seite schreibt ihr
+    aufgelöstes Thema in die Konfiguration, und der Rahmen liest es beim
+    nächsten Start. Der erste Start nach einem Wechsel öffnet noch einmal
+    auf der alten Farbe
+  - Der Fokusring hat eine eigene Farbe, statt Gold mitzunehmen: Honig gegen
+    Papier schafft nur 2,30:1, und WCAG will 3:1 für die Kontur eines
+    Bedienelements. Alle drei Fokus-Regeln laufen über dieses eine Token —
+    nachgemessen 6,0–9,5:1 auf jeder Oberfläche —, es bleibt also keine
+    Kontur auf einem rohen Wert stehen
+  - Auf der Schild-Unterzeile bleibt die Krit-Zelle leer, die Stark-Quote
+    wird gezeigt. Die Krit-Spalte ist keine eigene Information — auf allen
+    8485 Zeilen des Beispiels ist sie exakt die kritische Trefferart, ohne
+    eine einzige Abweichung in beide Richtungen —, ein Schildtreffer kann
+    also gar nicht kriten, und eine Krit-Rate dort wäre eine Definition im
+    Gewand einer Messung. Die Stark-Spalte ist dagegen unabhängig und kreuzt
+    jede Trefferart, die Quote dort ist echt
+  - Drei Zustände bleiben getrennt, statt zu einer Null zu verschmelzen: gar
+    keine Trefferart-Spalte heißt unbekannt, eine Spalte ohne Schildtreffer
+    ist eine gemessene Null, und Schildtreffer werden gezeichnet. Auf dem
+    Schirm zeichnen die ersten beiden dasselbe, nämlich nichts; der
+    Unterschied ist das, was ein gespeicherter Durchlauf mitträgt
+  - Es heißt „Schildtreffer“ und nicht „Auf Schild“: das eine benennt, was
+    im Log steht, das andere behauptet, wohin der Schaden ging. „Schild“
+    allein scheidet ohnehin aus — die Waffen-Aliasse bilden es auf Schwert
+    und Schild ab
+  - Die Schild-Kategorie hat eine eigene Farbe — das eine Kühle auf einer
+    warmen Tabelle —, in beiden Themen definiert und weit genug vom Blau der
+    Diagrammreihen entfernt, damit eine Zeile nicht dieselbe Farbe trägt wie
+    die Marke auf ihr
+  - Zwei Schild-Tooltips wiederholten, was die Marke daneben schon sagt: der
+    Chip lief über 164 Zeichen, die Zeilenmarke über 152. Der tragende
+    Halbsatz bleibt überall stehen, der Rest fällt weg — der Chip steht bei
+    64 Zeichen, „1.178.179 Schaden, 11,3 % des Kampfes. Es wird nichts
+    abgezogen.“, die Zeilenmarke bei gut sechzig
+  - Eine Farbe lag wirklich unter AA, und zwar eine ältere: --cat-critheavy
+    im dunklen Thema stand bei 4,44 gegen den Zeilengrund. Eine Nuance
+    tiefer bringt 4,57 und kostet fast nichts vom Band — sie steht jetzt bei
+    #e9b944, das helle Gegenstück bei #e0a017 bleibt unangetastet
+  - Die Schild-Marke ist Text auf einer Karte, nicht Füllung auf einer
+    Zeile, also hat sie eine eigene Tinte, statt sich die der Füllung zu
+    leihen: --shield-ink, dunkel #9fc3cd und hell #2c5762 — dieselbe
+    Trennung wie --gold gegen --gold-ink
+
+v0.44
+-----
+  - Der Zeitverlauf sagte „gestapelt nach Skill“ und zeichnete eine Farbe.
+    Ein Skill trägt in diesem Kampf 91 %, also versprachen acht gleich große
+    Kästchen unter dem Diagramm eine Aufteilung, die in den Balken nicht
+    steckt. Jetzt gibt es einen Streifen, geteilt nach dem, was jeder Skill
+    wirklich beigetragen hat, und die Liste darunter nennt weiterhin jeden
+    Skill — mit seinem Anteil daneben
+  - Das Diagramm hat eine Linie, gegen die man es lesen kann. Eine Achse von
+    0 bis 2,5M kann nicht sagen, ob eine Spitze gut war, also war „hohe
+    Stapel sind deine Burst-Fenster“ ein Adjektiv ohne Bezug. Die eigene
+    Rate des Kampfes liegt jetzt quer über der Fläche — dieselbe Zahl, die
+    oben im Kopf steht — und der Satz über dem Diagramm zählt die Sekunden,
+    die darüber lagen, und was sie wert waren
+  - Das Diagramm ist so hoch, wie das Fenster es zulässt. Es waren 240 Pixel
+    in einer Seite, die auf gar nichts festgelegt ist; darunter blieb noch
+    einmal etwa so viel leer, und eine 400k-Sekunde stand acht Pixel neben
+    einer mit 600k
+  - Abschnitte, in denen nichts traf, werden gezeichnet und beziffert — in
+    derselben Tönung und aus demselben Durchgang wie im Rotations-Reiter,
+    damit ein Aussetzer überall dasselbe ist und gleich aussieht. Sie sind
+    seltener als gedacht: von den zwei echten Kämpfen im Beispiel hat einer
+    gar keine Pause über 1,5 s und der andere genau eine von 1,8 s
+  - Der Vergleichs-Reiter sagt jetzt, welcher Durchlauf gewonnen hat — in
+    einem Satz, über zwei Balken, deren Längen die beiden Zahlen sind.
+    Vorher stand oben eine Überschrift, drei Zeilen Erklärung, wie man die
+    Seite benutzt, die man gerade benutzt, und ein nicht angehaktes Kästchen
+    — das Ergebnis stand nirgends. Unter 5 % Unterschied wird kein Sieger
+    genannt, und es steht da, warum
+  - Ob ein Vergleich fair ist, steht dort, wo verglichen wird. Zwei
+    unterschiedlich lange Durchläufe bekommen eine bernsteinfarbene Zeile
+    über der Tabelle, mit der Korrektur als Knopf — statt eines Satzes unter
+    der Tabelle, die er entwertet. Gekürzt wird nicht mehr auf sechzig
+    Sekunden, sondern auf die Länge des kürzeren Durchlaufs, und die Zeilen,
+    die sich aus einem gespeicherten Durchlauf nicht neu berechnen lassen —
+    die Raten, der größte Treffer, die Standzeit — sagen das an der Zeile
+
+v0.43
+-----
+  - Der Analyse-Reiter hat eine Geschichte dreimal erzählt. Die Schwankung
+    zwischen bester und schwächster Phase stand als Zahl im Kasten oben, als
+    Tabelle in der Mitte und als Befund unten — alle drei aus denselben fünf
+    Zeilen. Die Fenster sind jetzt die Seite, und das schwächste ist in der
+    Tabelle markiert, statt darunter beschrieben zu werden
+  - Die Fakten darüber lesen sich als Sätze statt als vier Zahlen auf
+    Sockeln. Sie waren eine Reihe gleicher Kästen mit 100 %, 627.1k und 96 %
+    — eine Rate, eine Schadenszahl und ein Anteil, alle gleich groß, sodass
+    keine davon führte
+  - Eine Spalte, in der jede Zelle denselben Skillnamen trug, ist weg. Dass
+    ein Skill jedes Fenster anführt, ist bei einem Build-Test der
+    Normalfall, und er hat seinen Namen fünfmal rechts untereinander
+    gedruckt; jetzt steht er einmal unter der Tabelle
+  - Die Drei-Sekunden-Phasen heißen auch so. „Schwächstes Fenster“ stand
+    direkt neben einer Tabelle aus Fünfzehn-Sekunden-Fenstern und meinte
+    eine andere Spanne — ein Wort, das zwei Aufgaben schlecht erledigt
+
+v0.42
+-----
+  - Die Seitenleiste zeigt die Kämpfe des Abends als Liste. Sie war ein
+    Aufklappknopf — ein Kampf sichtbar, der Rest hinter einem Pfeil,
+    darunter zwei Drittel leere Spalte. Die Liste war zusammengeklappt, um
+    Platz zu sparen, der nie knapp war. Sie scrollt, wenn der Abend lang
+    wird, und der Kampf, den du ansiehst, ist an der Kante markiert
+  - Gespeicherte Durchläufe sagen in einer Zeile, was ein Durchlauf ist,
+    statt in vier. Ein leerer Abschnitt braucht keinen Absatz, der die
+    Funktion bewirbt, die leer ist — Überschrift, Anzahl und der Knopf, der
+    einen anlegt, sind die ganze Einladung
+
+v0.41
+-----
+  - Der Gruppen-Reiter ist um das gebaut, was dort wirklich passiert: Jemand
+    liest vier Zeichen vor. Der Code steht einzeln, Zeichen für Zeichen —
+    als Wort gelesen wird „XMLF“ von dem, der es tippt, falsch buchstabiert
+  - Die Liste, wer im Raum ist, ist nach Aufmerksamkeit sortiert, nicht nach
+    Schaden: Wer noch nichts geschickt hat, steht oben und ist markiert, wer
+    in einem anderen Kampf ist, bekommt ihn genannt, und wer läuft, ist
+    leise. Die Rangfolge nach Schaden macht die Tabelle oben — hier lautet
+    die Frage, wer fehlt
+  - Zwei Wege hinein, in derselben Form: Board aufmachen oder beitreten. Als
+    Knopf neben Feld-und-Knopf lagen sie nie auf einer Linie, und das leere
+    Codefeld sah für jemanden, der gerade hosten will, nach Pflicht aus — er
+    wird nie einen Code einzutippen haben
+  - Entfernen erscheint an der Zeile unter dem Zeiger und an den Zeilen, die
+    nichts geschickt haben, statt die ganze Liste hinunter. Fünfmal dieses
+    Wort neben den Namen des eigenen Clans ist eine Einladung, um die
+    niemand gebeten hat
+  - Ein Knopf, der die Gruppenzahlen zeigt, wo vorher drei Zeilen Fließtext
+    erklärt haben, wo man sie findet
+
+v0.40
+-----
+  - Die Größeneinstellung verkleinert Fenster und Seite gemeinsam. Bei 75 %
+    war das Fenster schon bei 75 %, die Seite darin aber nicht: Ein vh ist
+    ein Hundertstel des Fensters, und der Zoom multipliziert das Ergebnis,
+    ohne die Einheit zu teilen — gemessen ergab 100vh 525 px in einem
+    700-px-Fenster, alles mit der Bedeutung „Fenster füllen“ füllte also
+    drei Viertel und ließ den Rest schwarz. Jede Ansichtseinheit ist jetzt
+    eine Zahl, die die Einstellung mitzieht, und die Höhe der Kopfleiste
+    wird gemessen statt angenommen — eine umbrechende Leiste schiebt die
+    Seite nicht mehr unten raus
+  - Fehlerberichte enthalten, was zum Finden echter Fehler nötig ist: alles,
+    was währenddessen abgestürzt ist, die in gemischten Gruppen gelernten
+    Skill-Namenspaare, und pro Gruppenmitglied Anteil, eigenes Ziel und
+    Sprache. Dazu, was das Layout zu haben glaubt — nicht dasselbe wie die
+    Fenstergröße, sobald die Größeneinstellung im Spiel ist, und genau diese
+    Lücke war jetzt zweimal der Fehler
+  - Im Download liegt nur noch die Exe. Das Änderungsprotokoll steht in der
+    App, unter ⋯
+
+v0.39
+-----
+  - Die Größeneinstellung zieht das Fenster mit. 150 % hieß bisher, dass
+    weniger von der App in denselben Rahmen passt; jetzt wächst das Fenster
+    um denselben Faktor, so weit der Bildschirm es zulässt. Beim Start wird
+    die gespeicherte Größe auf die Größe gerechnet, mit der das Fenster
+    aufgeht — nicht auf die von letzter Sitzung, sonst würde sie sich mit
+    jedem Start multiplizieren
+  - Wer aus einer Gruppe entfernt wurde, kann direkt wieder rein. Zwanzig
+    Sekunden statt zwei Minuten, und der Code steht schon im Beitrittsfeld:
+    Entfernen ist meistens die Art, jemanden zu entklemmen, also muss der
+    Weg zurück so kurz sein wie der Weg raus
+  - Borometer lernt Skill-Übersetzungen aus der Gruppe, statt sie zu raten.
+    Das Spiel benennt Skills in der Sprache des jeweiligen Clients, in einer
+    gemischten Gruppe steht dieselbe Skill-ID also unter beiden
+    Schreibweisen auf dem Board — genau der Beleg, den das eingebaute
+    Wörterbuch verlangt, bevor es eine ID übersetzt. Was ein Raid ihm
+    beibringt, weiß es nächste Woche noch
+
+v0.38
+-----
+  - Anteil und Gruppen-DPS zählen alle auf dem Board. Gezählt wurden nur
+    die, deren Zielname mit dem der Mehrheit übereinstimmte — in einem Raid
+    ist aber selten jemand in derselben Sekunde beim selben Pull. Aus einem
+    echten Raid: vier von sechs Zeilen standen auf 0,0 %, und oben standen
+    113 M von den 215 M, die in der Liste darunter lagen. Auch vorher
+    gespeicherte Gruppenprotokolle stimmen jetzt
+  - Das Leeren der Kampfliste wird der Gruppe mitgeteilt. Vorher wurde
+    einfach geschwiegen, und das Board behielt den letzten Kampf bis zum
+    Zeitablauf — „Kampf gegen Ramux, 1 Spieler meldet Daten“, ohne geladenen
+    Kampf und ohne dass jemand kämpfte
+  - Die Gruppen-Einrichtung zeigt, wer gerade im Raum ist, was die Person
+    tut und wer noch nichts geschickt hat. Die Historie darunter sagt, wer
+    wann kam — eine andere Frage
+  - Der Host kann jemanden aus der Gruppe entfernen. Zwei Minuten lang
+    bleibt die Person draußen: Jeder Client meldet sich alle drei Sekunden
+    neu, ein Rauswurf ohne Pause hält also genau bis zur nächsten Meldung
+  - Wer in der Gruppe ist und nie einen Kampf schickt, wird beim Namen
+    genannt — mit der Log-Anleitung zum Kopieren, in der Sprache, in der du
+    liest, fertig zum Einfügen dort, wo die Gruppe schreibt
+
+v0.37
+-----
+  - Die Gruppen-Einrichtung schlägt nicht mehr den Charakter aus dem
+    Beispielkampf vor. Wer das Beispiel geladen hatte, fand „Demo“ im
+    Namensfeld — und wer dann auf Gruppe erstellen drückte, hieß Demo. Aus
+    einem echten Log wird der Name weiterhin übernommen, genau so
+    geschrieben wie dort
+  - Eine Größeneinstellung von 10 % bis 200 % im ⋯-Menü, oder mit Strg und
+    Plus, Minus, Null. Alles skaliert mit, auch das Layout: Bei 150 % ordnet
+    sich die App so, als wäre das Fenster kleiner — für den Inhalt ist es
+    das. Im kompakten Modus wächst und schrumpft auch das Fenster selbst,
+    das Overlay kann also so klein oder so gut lesbar sein, wie du willst
+  - Das Fenster lässt sich an den Rändern ziehen. Das ging nie: Ein
+    rahmenloses Fenster bekommt von Windows keinen Ziehrand, und die App hat
+    trotzdem seit mehreren Versionen dazu geraten. Jetzt alle vier Ränder
+    und alle vier Ecken
+
+v0.36
+-----
+  - Der kompakte Modus trägt jetzt die Farben der App, deckend wie die
+    Vollansicht. Die Durchsichtigkeit, hinter der er seit 0.33 her war, ging
+    nie: Das Fenster lässt nicht den Desktop durch, sondern eine hellgraue
+    Fläche, und jede Transparenz wurde darüber gerechnet. Mit den
+    Fenstereinstellungen der App gemessen kommt ein völlig klares Pixel als
+    240,240,240 heraus statt als das, was wirklich hinter dem Fenster liegt
+    — je durchsichtiger also, desto ausgeblichener
+  - Der kompakte Modus ist kleiner: 364 x 222 statt 396 x 258, ein Fünftel
+    weniger Bildschirm. Dafür wurde nichts geopfert — die Namensspalte ist
+    weiterhin 80 Pixel breiter als der längste deutsche Skillname
+  - Ein Streifen Fensterrahmen statt zwei, in beiden Ansichten. Minimieren,
+    Maximieren und Schließen sitzen in der Kopfleiste, die Titelleiste fällt
+    weg. In der Vollansicht stand „Borometer“ bisher zweimal untereinander
+  - Die Einstellung „Durchsichtiges Fenster“ ist aus dem ⋯-Menü
+    verschwunden. Es gab keine Stellung, in der sie die App besser aussehen
+    ließ
+
+v0.35
+-----
+  - Die Fläche des kompakten Modus wurde wieder abgedunkelt, auf 82 %
+    Deckkraft. 0.34 hatte sie zu blass gelassen
+
+v0.34
+-----
+  - Der kompakte Modus hat einen Weichzeichner verloren, der seine eigene
+    Fläche fast schwarz gemalt hat
+
+v0.33
+-----
+  - Die Fläche des kompakten Modus wurde von 88–92 % auf 70 % Deckkraft
+    aufgehellt. Zwei Regeln haben sie gesetzt, und ausgerechnet die, an der
+    man drehen konnte, wurde überschrieben
+  - Das Leeren der Kampfliste lässt das Meter stehen. Der Startbildschirm
+    kam bisher darüber zurück und beantwortete eine Frage, die niemand
+    gestellt hat; jetzt steht dort, dass der nächste Kampf hier erscheint
+  - Das Beispiel sind zwei echte Kämpfe — 86 Sekunden auf Dragaryle und 70
+    auf Ramux — statt eines aus Zufallszahlen gebauten. Echte Rotation,
+    echte Krit-Raten, echte Skill-IDs
+  - Das Namensfeld der Gruppe schlägt dir nicht mehr den Charakter von
+    jemand anderem vor
+  - Behoben: Eine Byte-Reihenfolge-Marke in der boro-config.json ließ jede
+    Einstellung, jeden gespeicherten Durchlauf und jede Waffenzuordnung
+    kommentarlos verschwinden. Windows-Notepad schreibt so eine
+    standardmäßig, und diese Datei darf man laut Anleitung von Hand
+    bearbeiten
+
+v0.32
+-----
+  - Die App heißt überall Borometer. An vierzig Stellen stand nur „Boro“
+  - Eine deutsche Beschriftung sagte das Falsche: „Kritisiert nie“ bedeutet
+    bemängeln, nicht kritisch treffen. Jetzt „Trifft nie kritisch“ — dazu
+    deutsche Anführungszeichen und „1 Zeile“ statt „1 Zeilen“
+
+v0.31
+-----
+  - Tritt jemand der Gruppe bei, erfahren es alle — mit Namen, egal wo sie
+    gerade in der App sind. Borometer hat es längst bemerkt, schrieb es aber
+    nur ins Gruppen-Log
+  - Die Statuszeile des Gruppen-Servers folgt einem Sprachwechsel sofort,
+    statt die alte Sprache zu behalten
+
+v0.30
+-----
+  - Eine falsche Datei löscht die geladenen Kämpfe nicht mehr. Was kein
+    Kampflog ist, wird abgelehnt, und es ändert sich nichts
+  - Ein Kampflog, dessen Spalten nicht gelesen werden konnten, öffnet jetzt
+    die Log-Einrichtung, damit du sie zuordnen kannst. Der Startbildschirm
+    hat genau diesen Tab vorher verdeckt
+  - Eine Durchlauf-Datei wird geprüft, bevor sie geladen wird. Fremdes JSON
+    mit einem „runs“-Schlüssel hat die Seitenleiste vorher mit NaN-Zeilen
+    gefüllt und sie in deine Einstellungen geschrieben
+  - Borometer merkt sich, was du einstellst: Trennen nach, Mindestlänge und
+    das Ausblenden im kompakten Modus. Vorher überlebte nur das Anheften
+    einen Neustart
+  - Das Änderungsprotokoll öffnet bei der neuesten Version und faltet die
+    übrigen zu je einer Zeile, mit der Anzahl der Änderungen
+  - Ein Schalter für das durchsichtige Fenster im ⋯-Menü, falls es auf
+    deinem Rechner fehlerhaft dargestellt wird. Vorher hieß das: eine Datei
+    von Hand bearbeiten
+  - Beim Hosten über einen Gruppen-Server steht der Code einmal statt
+    zweimal
+  - Gruppen-Server: Ein verlassener Raum gibt seinen Code nach einer halben
+    Stunde frei statt nach drei Stunden. Eine Gruppe in Benutzung wird nie
+    abgeräumt
+
+v0.29
+-----
+  - Die Auswahlmenüs treffen jetzt den Namen, den du angeklickt hast. Unter
+    Filter sortiert sich „Dein Charakter“ während eines Kampfes laufend um,
+    und der Klick landete dann bei dem, der nachgerückt war
+  - Solange ein Auswahlmenü offen ist, kann nichts anderes mehr die Auswahl
+    ändern. Ein Buchstabe, Bild auf/ab oder F4 haben sie vorher unsichtbar
+    hinter dem offenen Menü umgestellt
+  - Tab schließt ein offenes Auswahlmenü. Vorher blieb es stehen und
+    schluckte danach jede Taste, die du gedrückt hast
+  - Ein Rechtsklick öffnet kein Auswahlmenü mehr. Maustaste gedrückt halten
+    und auf einen Namen ziehen wählt ihn beim Loslassen aus
+
+v0.28
+-----
+  - Die Auswahlmenüs sehen aus wie der Rest der App. Vorher hat Windows sie
+    gezeichnet, und sie kamen grau
+  - Alle Scrollbalken haben die Farben der App — vorher nur zwei davon
+
+v0.27
+-----
+  - Ein aufgeklappter Skill wiederholt sich nicht mehr. In der Zeile
+    „Kritischer Treffer“ stand nochmal 100 % Krit, was der Name schon sagt
+  - Der kompakte Modus öffnet nicht mehr in Bildschirmgröße
+  - Der Sprachumschalter im ⋯-Menü sieht wieder aus wie die anderen Punkte
+    darin
+  - Der Hinweis zum Fehlerbericht sagt wieder, wo du ihn findest — in beiden
+    Sprachen
+  - Zeig mit der Maus auf einen langen Bossnamen, dann liest du ihn ganz
+
+v0.26
+-----
+  - Die Werte unter der großen DPS-Zahl sagen, worauf sie sich beziehen:
+    „Dieser Kampf“ oder „Diese Gruppe“
+
+v0.25
+-----
+  - Die zwei Tab-Leisten sehen unterschiedlich aus, weil sie
+    Unterschiedliches tun
+  - Zeitverlauf und Rotation nutzen wieder die volle Fensterbreite. Die
+    Tabelle behält ihre
+  - Die kleinste Schrift der App ist heller und dadurch besser lesbar
+
+v0.24
+-----
+  - Anzeige, Tabs, Tabelle und Diagramme sind gleich breit und stehen als
+    eine Spalte untereinander
+  - Die Achsen der Diagramme stehen auf runden Zahlen. So kannst du zwei
+    Kämpfe mit bloßem Auge vergleichen
+  - Das Zeitraster liegt hinter den Balken statt mitten durch sie hindurch
+  - Die Farben der Skills: Je mehr Schaden, desto heller
+  - Kompakt: Die Balken gehen über die ganze Zeilenhöhe, die DPS-Zahl ist
+    größer
+  - Lange Skillnamen werden im kompakten Modus und in der Rotation nicht
+    mehr abgeschnitten
+  - Gespeicherte Durchläufe füllen die Seitenleiste statt eines kleinen
+    Kastens
+  - Wenn etwas schiefgeht, hat die Meldung einen roten Rand — vorher sah sie
+    aus wie eine Erfolgsmeldung
+  - Im Vergleich sagt die Farbe, ob eine Änderung gut oder schlecht ist,
+    nicht ob die Zahl größer wurde. Krit und Stark rechnen in Prozentpunkten
+  - Die obere Leiste überlappt sich bei schmalem Fenster nicht mehr
+  - Behoben: Die Analyse schrieb „in 58 von 57 Sekunden ist ein Treffer
+    gelandet“
+  - Zahlenreihen sind durch feine Striche getrennt statt durch Punkte
+
+v0.23
+-----
+  - Die Analyse wiederholt nicht mehr Kampfdauer und Treffer — die stehen
+    schon darüber
+  - Dein Klassenname im Waffen-Tab steht jetzt in einem beschrifteten Feld
+  - Kompakt: besseres Symbol fürs Ausblenden. Ausblenden und Anheften sagen
+    jetzt kurz, was passiert ist
+  - Gruppe einrichten: Hosten und Beitreten stehen ganz oben
+
+v0.22
+-----
+  - Alle 45 Klassennamen sind bestätigt. Crusader ist Großschwert & Schwert
+    und Schild, Paladin ist Großschwert & Zauberstab und Foliant
+
+v0.21
+-----
+  - Der deutsche Name für Gauntlet ist bestätigt: „Panzerhandschuhe“
+
+v0.20
+-----
+  - Der Waffen-Tab nennt deine Klasse, sobald Haupt- und Zweitwaffe gesetzt
+    sind
+  - Behoben: Stulpen und Kugel fehlten komplett in der Waffenliste
+  - Behoben: Skills für Zauberstab und Foliant liefen intern nur unter
+    „Wand“ und konnten bei der Waffenzuordnung durchrutschen
+
+v0.19
+-----
+  - Behoben: Im kompakten Modus wurden Skillnamen abgeschnitten — im
+    Deutschen besonders oft, weil die Namen länger sind
+  - Behoben: Die Abzeichen „Krit“ und „×2“ liefen in die Schadensspalte
+    hinein
+  - Die Namensspalte im kompakten Modus nimmt sich den restlichen Platz,
+    damit lange Namen hineinpassen
+  - Kompakte Kopfzeile neu gestaltet: die DPS-Zahl auf eigenem Grund, das
+    Ziel in einem beschrifteten Feld
+
+v0.18
+-----
+  - Die Live-Aufzeichnung ist bei langen Sitzungen etwa doppelt so schnell.
+    Sie liest nur noch das, was neu dazugekommen ist
+  - Neuer Startbildschirm
+
+v0.17
+-----
+  - Behoben: Beim Beitreten zu einer Gruppe wurden Kämpfe von vor Stunden
+    mitgeschickt. Jetzt zählt nur, was nach dem Beitreten passiert
+  - Der kompakte Modus ist eine echte durchscheinende Überlagerung über dem
+    Spiel, kein kleines Fenster
+  - Neu im kompakten Modus: ein Knopf zum Ausblenden. So musst du die
+    Überlagerung nie mitten im Kampf verschieben
+  - Die Analyse beginnt mit „Dieser Kampf in Fakten“: Aktivität, Eröffnung,
+    Konzentration, Schwankung und die Aufteilung pro Gegner
+  - Ein schmales Fenster blendet Spalten sauber aus, statt sie
+    zusammenzuquetschen
+
+v0.16
+-----
+  - Du kannst einen Schnappschuss der Gruppe speichern und später laden,
+    auch ohne noch verbunden zu sein
+  - Behoben: Der Schalter Ich/Gruppe im kompakten Modus sprang bei einem
+    geladenen Schnappschuss zurück auf deine eigenen Zahlen
+  - Behoben: „Export CSV“ schrieb in der Gruppenansicht die falsche
+    Aufschlüsselung
+  - Kompakt: Die Kopfzeile saß zu tief, die Knöpfe standen nicht auf einer
+    Linie
+
+v0.15
+-----
+  - Die Update-Benachrichtigung ist komplett wieder draußen. Sie hätte nie
+    ausgeliefert werden dürfen
+  - Behoben: Aus der Gruppentafel verschwand jemand, sobald sein Ziel kurz
+    von dem der anderen abwich
+  - Behoben: Ein zu großes Symbol machte die Knopfleiste im kompakten Modus
+    höher als nötig
+  - Die Kopfzeile ist zweizeilig, statt dass sich alles in eine Zeile
+    quetscht
+  - Die DPS-Zahl zählt zu einem neuen Wert hoch, statt zu springen
+  - Einheitliche Schriftgrößen und Eckradien in der ganzen App
+  - Wörterbuch: 6 weitere bestätigte Skill-IDs
+
+v0.14
+-----
+  - Die Gruppe ist ein Knopf in der oberen Leiste, kein eigener Tab mehr
+  - Der Gruppenschaden zeigt, was alle zusammen auf dasselbe Ziel gemacht
+    haben
+  - Der kompakte Modus neu gebaut: eine flache Überlagerung, eine Kopfzeile
+  - Zeitverlauf und Rotation teilen sich Zoom und Zeitfenster. Du zoomst in
+    einen Burst und siehst ihn in beiden
+  - Cast-Markierungen werden beim Hineinzoomen breiter und zeigen ihren
+    Schaden
+
+v0.13
+-----
+  - Gruppenübersicht: Der vierte Wert ist der gemeinsame Schaden der Gruppe,
+    nicht der größte Treffer eines Einzelnen
+  - Die Gruppentabelle hat eine eigene Spalte „Größter Schaden“ je Spieler
+  - Die kompakte Gruppenübersicht bricht nicht mehr in drei krumme Zeilen um
+  - Im kompakten Modus steht „Pdps“ statt des vollen Textes
+  - Dieses Änderungsprotokoll hinzugefügt, auf Deutsch und Englisch
+
+v0.12
+-----
+  - Der Gruppen-Tab steht ganz vorn
+  - „Größter“ heißt jetzt „Größter Schaden“ und ist hervorgehoben
+  - ⋯-Menü neu sortiert: Sprache, Beispiel, Fehlerbericht
+  - Behoben: Ein Bosskampf mit Adds wurde bei jedem Zielwechsel in mehrere
+    Kämpfe zerschnitten
+  - Behoben: Ein Skill, den es auf zwei Waffen gibt, wurde komplett nur
+    einer davon angerechnet
+  - Der Gruppen-Server schreibt keine Abstürze mehr ins Log, wenn sich
+    jemand normal trennt
+
+v0.11
+-----
+  - Die Cast-Zeitleiste neu gebaut: eine Markierung pro Einsatz, zoombar,
+    scrollbar, mit Zeitfilter
+  - Waffen werden automatisch aus über 270 gemessenen Skill-IDs zugeordnet
+  - Die Einstellungen sitzen jetzt in einem Filter-Menü, „Vergleichen“ in
+    der Seitenleiste
+  - Gruppe: hosten schon vor dem Laden eines Logs, Mitglieder erscheinen
+    beim Beitreten, Gruppensumme, Serverstatus
+  - Die Startseite sagt deutlich, wenn der Log-Ordner nicht gefunden wurde
+  - Kompakter Modus neu gebaut: echtes Verkleinern des Fensters, feste
+    Spalten, Status nur noch als Punkt
+  - Automatische Sicherheitsprüfung und ein Fehlerbericht per Knopfdruck
+  - Versionsabzeichen und ein ⋯-Menü für selten genutzte Funktionen

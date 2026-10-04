@@ -1,0 +1,222 @@
+# Checks every push, and builds the Windows downloads of a release.
+#
+#   push / pull request   typecheck, the safety audit and its negative cases,
+#                         the core and page tests - without game images: the
+#                         source carries none, and the page shows its own drawn
+#                         marks instead (README, "Building from source")
+#   tag v*                the same once more with the game images from the
+#                         private repository B0R0AK/Borometer-Assets (same tag,
+#                         read-only deploy key, environment "release", tags
+#                         only), then the release: installer, portable exe,
+#                         zip and boro-meter.html are built (read access only)
+#                         and handed to a separate job that attests and
+#                         publishes them, each with build provenance
+#                         (gh attestation verify <file> --repo B0R0AK/Borometer).
+#                         The tag has to be package.json's version: v1.9 or
+#                         v1.9.0 for 1.9.0.
+
+name: build
+
+on:
+  push:
+    branches: ["main"]
+    tags: ["v*"]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+          cache: npm
+      - name: Tag matches package.json
+        if: startsWith(github.ref, 'refs/tags/v')
+        shell: bash
+        run: |
+          full="$(node -p "require('./package.json').version")"
+          short="${full%.0}"
+          if [ "$GITHUB_REF_NAME" != "v$full" ] && [ "$GITHUB_REF_NAME" != "v$short" ]; then
+            echo "::error::tag $GITHUB_REF_NAME does not match package.json $full (expected v$short or v$full)"
+            exit 1
+          fi
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run audit:safety
+      # every audit rule has to fail when broken, or it checks nothing
+      - run: npm run audit:negative
+      - run: npm run test:best-core
+      - run: npm run test:builds-core
+      - run: npm run test:plan-core
+      - run: npm run test:live-core
+      - run: npm run test:analyse-core
+      - run: npm run test:mechanik-core
+      - run: npm run test:rotation-core
+      - run: npm run test:lage-core
+      - run: npm run test:verlauf-core
+      - run: npm run test:weeklies-core
+      - run: npm run test:kerne-core
+      - run: npm run test:spielbilder-core
+      - run: npm run test:rekorde-core
+      - run: npm run test:glutring-core
+      - run: npm run test:weeklies-store
+      - run: npm run test:update-core
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:best-page
+      - run: npm run test:live-page
+      - run: npm run test:analyse-page
+      - run: npm run test:rotation-page
+      - run: npm run test:extras-page
+      - run: npm run test:rahmen-page
+      - run: npm run test:tafel-page
+      - run: npm run test:einst-page
+      - run: npm run test:felder-page
+      - run: npm run test:neu-page
+      - run: npm run test:weeklies-page
+      - run: npm run test:tage-page
+      - run: npm run test:rundgang-page
+      - run: npm run test:rekorde-page
+
+  bilder:
+    # the same checks with the game images, before anything is released
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+    env:
+      BORO_BILDER: pflicht
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: B0R0AK/Borometer-Assets
+          ref: ${{ github.ref_name }}
+          ssh-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+          path: assets
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm run audit:safety
+      # every audit rule has to fail when broken, or it checks nothing
+      - run: npm run audit:negative
+      - run: npm run test:best-core
+      - run: npm run test:builds-core
+      - run: npm run test:plan-core
+      - run: npm run test:live-core
+      - run: npm run test:analyse-core
+      - run: npm run test:mechanik-core
+      - run: npm run test:rotation-core
+      - run: npm run test:lage-core
+      - run: npm run test:verlauf-core
+      - run: npm run test:weeklies-core
+      - run: npm run test:kerne-core
+      - run: npm run test:spielbilder-core
+      - run: npm run test:rekorde-core
+      - run: npm run test:glutring-core
+      - run: npm run test:weeklies-store
+      - run: npm run test:update-core
+      - run: npm run build
+      - run: npx playwright install --with-deps chromium
+      - run: npm run test:best-page
+      - run: npm run test:live-page
+      - run: npm run test:analyse-page
+      - run: npm run test:rotation-page
+      - run: npm run test:extras-page
+      - run: npm run test:rahmen-page
+      - run: npm run test:tafel-page
+      - run: npm run test:einst-page
+      - run: npm run test:felder-page
+      - run: npm run test:neu-page
+      - run: npm run test:weeklies-page
+      - run: npm run test:tage-page
+      - run: npm run test:rundgang-page
+      - run: npm run test:rekorde-page
+
+  windows:
+    # builds the downloads, with read access only; the release job publishes them
+    needs: [check, bilder]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: windows-latest
+    environment: release
+    permissions:
+      contents: read
+    env:
+      BORO_BILDER: pflicht
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: B0R0AK/Borometer-Assets
+          ref: ${{ github.ref_name }}
+          ssh-key: ${{ secrets.ASSETS_DEPLOY_KEY }}
+          path: assets
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4
+        with:
+          node-version: 22
+      - name: npm ci
+        shell: bash
+        run: npm ci
+      - name: Windows downloads
+        shell: bash
+        run: npm run dist:win
+        env:
+          CSC_IDENTITY_AUTO_DISCOVERY: "false"
+      - name: Standalone page
+        shell: bash
+        run: cp dist/renderer/index.html release/boro-meter.html
+      # the exe carries the game images: kept one day, only as long as the release job needs it
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: downloads
+          path: |
+            release/*.exe
+            release/*.zip
+            release/boro-meter.html
+          if-no-files-found: error
+          retention-days: 1
+
+  release:
+    # no npm ci here: this job runs no package code, it attests and publishes the built files
+    needs: [windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      contents: write
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4
+        with:
+          name: downloads
+          path: release
+      - uses: actions/attest-build-provenance@e8998f949152b193b063cb0ec769d69d929409be # v2
+        with:
+          subject-path: |
+            release/*.exe
+            release/*.zip
+            release/boro-meter.html
+      - name: Release
+        uses: softprops/action-gh-release@3bb12739c298aeb8a4eeaf626c5b8d85266b0e65 # v2
+        with:
+          files: |
+            release/*.exe
+            release/*.zip
+            release/boro-meter.html
+          fail_on_unmatched_files: true

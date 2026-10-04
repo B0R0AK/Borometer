@@ -1,0 +1,32 @@
+# Build output - dependencies, the compiled app and the packed downloads.
+# Git is the wrong place for those; releases carry the downloads.
+node_modules/
+dist/
+release/
+__pycache__/
+*.pyc
+
+# Settings. Since 0.50 these live in %APPDATA%\Borometer, but an older build
+# or a portable copy still writes one here, and it holds saved runs.
+boro-config.json
+
+# Anything the app writes for the person using it. These are their fights,
+# their character names and their machine's paths — not source.
+Logs/
+Party-Logs/
+Bug-Reports/
+saves/
+party-logs/
+*.txt.bak
+
+# Combat logs, wherever one gets dropped for testing
+TLCombatLog-*.txt
+
+# what npm run test:parity leaves behind when a step differs
+test-results/
+
+# Die eigene Sperrliste fuer den Export (Serveradresse u. a.), nie im Repo
+export-sperre.local.txt
+
+# the game images, checked out by the release workflow only (B0R0AK/Borometer-Assets)
+assets/

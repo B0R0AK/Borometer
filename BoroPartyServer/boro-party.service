@@ -1,0 +1,22 @@
+[Unit]
+Description=Boro Party Server
+After=network.target
+
+[Service]
+Type=simple
+# adjust this path if you put the files somewhere other than /opt/boro-party
+WorkingDirectory=/opt/boro-party
+ExecStart=/usr/bin/python3 /opt/boro-party/boro_server.py
+Restart=on-failure
+RestartSec=3
+
+# it never reads a file or opens a socket outside its own port —
+# a locked-down user account is enough, no special permissions needed
+DynamicUser=yes
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+
+[Install]
+WantedBy=multi-user.target
