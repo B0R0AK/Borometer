@@ -1,3 +1,6 @@
+Hallo ihr Lümmel da draussen! Die App ist vollständig KI generiert. Das einzige was ich gemacht habe ist ihm lediglich zu sagen was er basteln soll und fixxen soll. Denn KI ist genauso blöd wie der Nutzer.
+Viel Spaß damit. :-)
+
 # Borometer
 
 Ein DPS-Meter für **Throne and Liberty**. Es liest die Kampflog-Datei, die das
