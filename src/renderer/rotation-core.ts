@@ -11,7 +11,7 @@
    aufgeloest.
 
    Stufe 1: was automatisch ist, die Folge der gedrueckten Einsaetze samt
-   Stille, die Wahl am Build, die Etagen der Leiste. Stufe 2: die Uhr zum
+   Stille, die Etagen der Leiste. Stufe 2: die Uhr zum
    Abspielen, der Einsatz zu einer Zeit und was die Leiste unter Live
    stueckweise weiterbauen laesst. Neugestaltung 28.09. (Spezifikation 3):
    der Massstab nach dem Median-Abstand, das Mitrollen und die Folge mit
@@ -19,14 +19,14 @@
    der Breite (leistenDauer), und die Strecken, in denen das Ziel
    unverwundbar war, rechnet dieser Kern fuer die Analyse. */
 
-/** Die Wahl je Faehigkeit am Build: 0 zurueckgenommen, 1 von selbst, 2 druecke ich. */
+/** Die Wahl je Faehigkeit (in der Sitzung): 0 zurueckgenommen, 1 von selbst, 2 druecke ich. */
 export type RotWahl = 0 | 1 | 2;
 /* Warum Borometer eine Faehigkeit fuer automatisch haelt - nur, was es
    sicher weiss (Entscheidung 26.09. abends): Passiv in der festen
-   Tabelle, von dir im Waffen-Reiter als Passiv markiert, in der festen
-   Liste VON_SELBST, oder in einem anderen Build desselben Waffenpaars
-   bestaetigt. Keine Takt- oder Gefolge-Regel. */
-export type Grund = "passiv" | "markiert" | "liste" | "anderer";
+   Tabelle, von dir im Waffen-Reiter als Passiv markiert, oder in der festen
+   Liste VON_SELBST. Keine Takt- oder Gefolge-Regel. (Der Grund "in einem
+   anderen Build bestaetigt" entfiel mit dem Builds-Reiter, #207.) */
+export type Grund = "passiv" | "markiert" | "liste";
 /** Eine Faehigkeit des Kampfes: sprachfreier Schluessel (skillKey) und ihr Grund, falls einer. */
 export interface RotSkill { k: string; grund: Grund | null }
 /** Ein Einsatz: Schluessel, Beginn und Ende (letzter Treffer), in ms seit Kampfbeginn. */
@@ -59,22 +59,6 @@ export function automatisch(skills: readonly RotSkill[], rot: Readonly<Record<st
   return raus;
 }
 
-const gleichesPaar = (a: readonly string[], b: readonly string[]) => [...a].sort().join("|") === [...b].sort().join("|");
-
-/* Der Grund "anderer": ein anderer Build mit demselben Waffenpaar, in dem
-   du die Faehigkeit als automatisch bestaetigt hast. Nie der eigene; die
-   Kennungen in fester Reihenfolge, damit derselbe Vorschlag immer denselben
-   Build nennt. */
-export function andererBau(k: string, hier: { id: string | null; weapons: readonly string[] },
-    builds: Readonly<Record<string, { weapons: readonly string[]; rot?: Readonly<Record<string, RotWahl>> }>>): string | null {
-  for(const id of Object.keys(builds).sort()){
-    if(id === hier.id) continue;
-    const b = builds[id]!;
-    if(b.rot && wahlVon(b.rot, k) === 1 && gleichesPaar(b.weapons, hier.weapons)) return id;
-  }
-  return null;
-}
-
 /* Die Folge: gedrueckte und automatische Einsaetze getrennt, beide nach
    der Zeit, dazu die Stille zwischen den gedrueckten - gemessen vom Ende
    des letzten, der noch trifft, bis zum Beginn des naechsten. */
@@ -90,30 +74,6 @@ export function folge(einsaetze: readonly RotEinsatz[], aus: ReadonlySet<string>
     ende = Math.max(ende, e.ende, e.t);
   }
   return {gedrueckt, auto, stille};
-}
-
-/* Eine Wahl setzen: ein neues Objekt, nie ein Schluessel entfernt. Ein neuer
-   Schluessel ueber der Grenze wird nicht gesetzt (null) - die Seite sagt es
-   und haelt die Wahl in der Sitzung. */
-export function wahlSetzen(rot: Readonly<Record<string, RotWahl>>, k: string, v: RotWahl, max: number): Record<string, RotWahl> | null {
-  if(!Object.hasOwn(rot, k) && Object.keys(rot).length >= max) return null;
-  return {...rot, [k]: v};
-}
-
-/* Die Wahlen der Sitzung, sobald der Build bekannt ist: nur fuer
-   Schluessel, zu denen der Build noch nichts sagt, bis zur Grenze. null,
-   wenn sich nichts aendert. */
-export function sitzungUebernehmen(rot: Readonly<Record<string, RotWahl>>, sitzung: Readonly<Record<string, RotWahl>>,
-    max: number): Record<string, RotWahl> | null {
-  let neu: Record<string, RotWahl> | null = null;
-  for(const k of Object.keys(sitzung)){
-    const basis = neu ?? rot;
-    if(Object.hasOwn(basis, k)) continue;
-    const r = wahlSetzen(basis, k, sitzung[k]!, max);
-    if(!r) break;
-    neu = r;
-  }
-  return neu;
 }
 
 /* Die Etage je Symbol, wie in der alten Leiste: die unterste, in der es mit

@@ -29,11 +29,14 @@ function headerHeight(height: unknown): number {
 /* The symbols in the ink of the title bar's quiet buttons (--dim), as in the
    draft of 2026-09-28 (DECISION 0.15: keep titleBarOverlay, match height and
    colours). --dim is 8.2:1 (dark), 6.3:1 (light) and 7.3:1 (TnL) against
-   the ground (--pitch); the page's own buttons beside them use the same ink. */
+   the ground (--pitch); smoked glass (spec Rauchglas 3.1) 8.6:1 on its solid
+   ground #1a1817 and 5.8:1 over the assumed worst Mica (#4a4a4a under the
+   frame tint). The page's own buttons beside them use the same ink. */
 const SYMBOL: Record<string, string> = {
   dark: "#b3a189",   // --dim, dark
   light: "#41514c",  // --dim, light
   tnl: "#aaa18f",    // --dim, TnL
+  glas: "#bdb4a7",   // --dim, smoked glass
 };
 
 export function overlayFor(theme: unknown, height?: unknown): { color: string; symbolColor: string; height: number } {
@@ -43,7 +46,8 @@ export function overlayFor(theme: unknown, height?: unknown): { color: string; s
   return { color: "#00000000", symbolColor: SYMBOL[key]!, height: headerHeight(height) };
 }
 
-/** Acrylic behind a window exists from Windows 11 22H2 (build 22621). */
+/** Acrylic and Mica behind a window exist from Windows 11 22H2 (build 22621):
+    Electron's setBackgroundMaterial needs that build for either. */
 export function acrylicSupported(): boolean {
   if (process.platform !== "win32") return false;
   const build = Number(os.release().split(".")[2] ?? 0);
@@ -58,12 +62,14 @@ export function acrylicSupported(): boolean {
  *   dark   rgba(198,214,226,.158) over #060402 = #242525, 1.33:1 against the ground
  *   light  rgba(30,58,56,.24)     over #d8e1e0 = #abb9b8, 1.52:1
  *   tnl    rgba(196,107,176,.24)  over #0e1122 = #3a2744, 1.38:1
+ *   glas   rgba(255,255,255,.15)  over #1a1817 = #3c3b3a, 1.55:1
  * A hairline, not a frame: the contrast is meant to be low.
  */
 const BORDER: Record<string, string> = {
   dark: "#242525",
   light: "#abb9b8",
   tnl: "#3a2744",
+  glas: "#3c3b3a",
 };
 
 export function borderFor(theme: unknown): string {
@@ -83,7 +89,21 @@ export function themeSourceFor(resolved: unknown, setting: unknown): "system" | 
   return resolved === "light" ? "light" : "dark";
 }
 
-/* Compact sits on Acrylic unless Windows has "Transparency effects" off (3.3). */
-export function materialFor(compact: boolean, reducedTransparency: boolean): "acrylic" | "none" {
-  return compact && !reducedTransparency ? "acrylic" : "none";
+/*
+ * The window's material (spec Fenster-Extras 3.3, Rauchglas 3.1): compact
+ * sits on Acrylic, full view on Acrylic too, but only in the theme smoked
+ * glass, and nothing at all with Windows' "Transparency effects" off. The
+ * theme is a name the page sent or the config holds; only an exact match
+ * counts, so no word from a request can become a material.
+ * Full view was on Mica until #189. Mica only ever shows a blurred copy of
+ * the desktop wallpaper, never the windows behind, and Windows swaps it for
+ * a solid colour whenever the window is not the active one: on a one-colour
+ * desktop, or beside the game, smoked glass was plain grey. Acrylic blurs
+ * what really lies behind the window and stays when it loses the focus.
+ * The page still calls this ground "mica" (GET /api/state, html.mica).
+ */
+export function materialFor(compact: boolean, reducedTransparency: boolean, theme: unknown): "acrylic" | "none" {
+  if (reducedTransparency) return "none";
+  if (compact) return "acrylic";
+  return theme === "glas" ? "acrylic" : "none";
 }

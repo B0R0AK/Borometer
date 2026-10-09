@@ -7,7 +7,6 @@ import { $, esc, wallTime } from "./18-interface-basics";
 import { kampfSpeichern } from "./34-menus-drop-and-tabs";
 import { gruppeKontext } from "./42-party";
 import { isWatching } from "./45-startup";
-import { buildsKontext } from "./51-plan";
 import { bildOeffnen } from "./50-bild";
 
 /* ---------- Felder (Instrumententafel Stufe 4) ----------
@@ -68,11 +67,10 @@ export function syncFelder(): boolean {
      dass er "niemandes Leistung" ist. Die Felder darunter sagen nur noch,
      was dort erscheinen wird, und tragen den Knopf, der es fuellt. */
   const beispiel = state.origin === "sample" && !!seg;
-  /* Gruppe und Builds (Luecken 7.1, 8.1) nennen statt des Kampfs ihren
-     Stand, wie der Entwurf: "Noch keine Gruppe", "Gruppe laeuft \u00b7 K7QX",
-     "4 Builds \u00b7 Links zu Questlog" (seit Aufgabe 12). Um den gewaehlten Kampf geht es
-     dort nicht. */
-  const ctx = state.tab === "party" ? gruppeKontext() : state.tab === "builds" ? buildsKontext() : "";
+  /* Die Gruppe (Luecken 7.1) nennt statt des Kampfs ihren Stand, wie der
+     Entwurf: "Noch keine Gruppe", "Gruppe laeuft · K7QX". Um den
+     gewaehlten Kampf geht es dort nicht. */
+  const ctx = state.tab === "party" ? gruppeKontext() : "";
   const mitKampf = !!seg && !ctx;
   const sig = [state.lang, name, seg ? 1 : 0, boss, zeit, dps, bild.length, beispiel ? 1 : 0, ctx].join("|");
   if(sig === kopfZuletzt) return true;

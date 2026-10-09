@@ -15,11 +15,11 @@ import { setzeStackKopf } from "./24-table-keyboard-and-timeline";
 import { ACHSE_RAND as RAND, achsenBreite, achsenPxs, renderRotation, rotWindow } from "./25-rotation";
 import { SERVED } from "./41-server-mode";
 import { isWatching } from "./45-startup";
-import { bauNameVon, bauRevision, bauRotSetzen, bauRotUebernehmen, bauVon, rotBauVon } from "./47-builds";
+import { paarVon } from "./47-paar";
 import { einsaetzeHtml, einsaetzeLeer, taktKopf, taktStriche, type EinsatzZeile } from "./48-einsaetze";
-import { abspielUhr, andererBau, automatisch, einsatzBei, etagenFort, folge, leistenDauer, stilleVor, takt, uhrZehntel,
+import { abspielUhr, automatisch, einsatzBei, etagenFort, folge, leistenDauer, stilleVor, takt, uhrZehntel,
   wahlVon, weiter, type AbspielUhr, type Grund, type RotEinsatz, type RotSkill, type RotWahl, type Stille } from "../rotation-core";
-import { bauId as fpKennung, findBau, sameBau, type Fingerprint } from "../build-core";
+import { samePair } from "../build-core";
 import type { Fight, RotationHit, RotationMark, SkillCast, SkillStats } from "../types";
 
 /* ---------- Deine Rotation ----------
@@ -49,11 +49,10 @@ import type { Fight, RotationHit, RotationMark, SkillCast, SkillStats } from "..
 
    Der erste Block im Reiter Rotation: nur die Einsaetze, die du gedrueckt
    hast, in der Reihenfolge des Kampfes. Was von selbst Schaden macht
-   (Passiv, die feste Liste VON_SELBST, in einem anderen Build desselben
-   Waffenpaars bestaetigt), schlaegt Borometer vor; es faellt vorlaeufig aus
-   der Leiste und steht als Punkt in der Punktreihe "automatisch". Die Wahl
-   gilt je Build (Bau.rot, 47-builds.ts), ohne bekannten Build in der
-   Sitzung. Auge von Ventius drueckt man selbst (Entscheidung 26.09.
+   (Passiv, die feste Liste VON_SELBST), schlaegt Borometer vor; es faellt
+   vorlaeufig aus der Leiste und steht als Punkt in der Punktreihe
+   "automatisch". Die Wahl gilt je Waffenpaar in der Sitzung (der Builds-Reiter
+   mit seinem Speicher ist entfallen, #207). Auge von Ventius drueckt man selbst (Entscheidung 26.09.
    abends) - es wird nie vorgeschlagen.
 
    Die Leiste ist aus Elementen statt einer Leinwand, wie "Rotation
@@ -86,15 +85,10 @@ interface Stand {
   keyOf: Map<string, string>;
   /** die eigenen Kaempfe links; die Kurve eines Gruppenmitglieds nicht */
   eigen: boolean;
-  bauId: string | null;
-  /** der Fingerabdruck des Kampfes (47-builds.ts, bauVon), auch ohne bekannten Build */
-  fp: Fingerprint | null;
-  /** Build und Paar fuer den Grund "anderer" */
-  hier: { id: string | null; weapons: readonly string[] } | null;
+  /** das Waffenpaar des Kampfes (47-paar.ts, paarVon) */
+  paar: [string, string] | null;
   wahl: Record<string, RotWahl>;
   grund: Map<string, Grund>;
-  /** Name des Builds, der den Grund "anderer" gibt */
-  anderer: Map<string, string>;
   auto: Map<string, { grund: Grund | "hand"; fest: boolean }>;
   byCast: Map<string, SkillCast[]>;
   einsaetze: (RotEinsatz & { name: string; cast: SkillCast })[];
@@ -104,61 +98,37 @@ interface Stand {
 }
 
 /* ---------- die Sitzung ----------
-   Eine Wahl ohne bekannten Build gilt in der Sitzung - aber nur fuer den
-   Build, an dessen Kampf sie getroffen wurde (Review #44): sie liegt in einem
-   Topf mit dem Fingerabdruck dieses Kampfes, gilt in Kaempfen desselben
-   Builds (sameBau) und geht in genau diesen Build ueber, sobald Borometer
-   ihn kennt (findBau); was uebergegangen ist, verlaesst die Sitzung. Eine
-   Wahl, die ein voller Build nicht mehr nahm, liegt im Topf dieses Builds,
-   gilt nur dort und geht nie irgendwohin ueber. */
-const topfName = (fp: Fingerprint | null, voll: string | null) => voll ? "voll:" + voll : fp ? "fp:" + fpKennung(fp) : "ohne";
-function inSitzung(k: string, v: RotWahl, fp: Fingerprint | null, voll: string | null){
-  const name = topfName(fp, voll);
+   Eine Wahl gilt in der Sitzung, je Waffenpaar (Topf "paar:..."), nur in
+   Kaempfen mit demselben Paar (Topf "ohne": nur bei unbekanntem Paar). Sie
+   geht nicht auf die Platte: der Builds-Reiter, an dem sie frueher hing,
+   ist entfallen (#207). */
+const topfName = (paar: readonly string[] | null) =>
+  paar ? "paar:" + [...paar].sort().join("+") : "ohne";
+function inSitzung(k: string, v: RotWahl, paar: [string, string] | null){
+  const name = topfName(paar);
   const alt = state.rotSitzung[name];
-  state.rotSitzung = {...state.rotSitzung, [name]: {fp: alt?.fp ?? fp, bau: voll, rot: {...(alt?.rot ?? {}), [k]: v}}};
+  state.rotSitzung = {...state.rotSitzung, [name]: {paar: alt?.paar ?? paar, rot: {...(alt?.rot ?? {}), [k]: v}}};
 }
-function sitzungFuer(bauId: string | null, fp: Fingerprint | null): Record<string, RotWahl> {
+function sitzungFuer(paar: readonly string[] | null): Record<string, RotWahl> {
   const raus: Record<string, RotWahl> = {};
   for(const topf of Object.values(state.rotSitzung)){
-    const gilt = topf.bau ? topf.bau === bauId : !topf.fp || !fp || sameBau(topf.fp, fp);
-    if(gilt) Object.assign(raus, topf.rot);
+    if(topf.paar ? !!paar && samePair(topf.paar, paar) : !paar) Object.assign(raus, topf.rot);
   }
   return raus;
 }
-/* Die Toepfe, die zu diesem Build gehoeren, gehen in ihn ueber; was er danach
-   selbst weiss, faellt aus dem Topf. true, wenn sich etwas geaendert hat. */
-function sitzungUebergeben(bauId: string): boolean {
-  let geaendert = false;
-  for(const [name, topf] of Object.entries(state.rotSitzung)){
-    if(topf.bau || !topf.fp || findBau(topf.fp, state.builds) !== bauId) continue;
-    if(bauRotUebernehmen(bauId, topf.rot)) geaendert = true;
-    const rot = state.builds[bauId]?.rot ?? {};
-    const rest = Object.fromEntries(Object.entries(topf.rot).filter(([k]) => wahlVon(rot, k) === undefined));
-    const neu = {...state.rotSitzung};
-    if(Object.keys(rest).length) neu[name] = {...topf, rot: rest}; else delete neu[name];
-    state.rotSitzung = neu;
-  }
-  return geaendert;
-}
 
-/* Die Wahlen, die fuer einen Kampf gelten: die des Builds vor denen der
-   Sitzung, die zu ihm gehoeren. Beim Gruppenmitglied keine. */
-function wahlen(eigen: boolean, bauId: string | null, fp: Fingerprint | null): Record<string, RotWahl> {
-  if(!eigen) return {};
-  const bau = bauId ? state.builds[bauId]?.rot : undefined;
-  return {...sitzungFuer(bauId, fp), ...(bau ?? {})};
+/* Die Wahlen, die fuer einen Kampf gelten: die der Sitzung zu seinem Paar.
+   Beim Gruppenmitglied keine. */
+function wahlen(eigen: boolean, paar: readonly string[] | null): Record<string, RotWahl> {
+  return eigen ? sitzungFuer(paar) : {};
 }
 
 /* Warum Borometer eine Faehigkeit fuer automatisch haelt (Spezifikation
    4.1): nur, was sicher ist. Der erste passende Grund gilt. */
-function grundVon(name: string, ids: Set<string>, k: string, eigen: boolean,
-    hier: { id: string | null; weapons: readonly string[] } | null): { grund: Grund; bau?: string } | null {
+function grundVon(name: string, ids: Set<string>): { grund: Grund } | null {
   const sid = [...ids][0];
   if(weaponFor(name, sid) === "Passive") return {grund: isAutoWeapon(name, sid) ? "passiv" : "markiert"};
-  if([...ids].some(i => VON_SELBST.has(i))) return {grund: "liste"};
-  // aus einem anderen Build nur bei den eigenen Kaempfen: ein Mitglied hat deine Builds nicht
-  const bau = eigen && hier ? andererBau(k, hier, state.builds) : null;
-  return bau ? {grund: "anderer", bau} : null;
+  return [...ids].some(i => VON_SELBST.has(i)) ? {grund: "liste"} : null;
 }
 
 /* Unter Live, solange der Kampf waechst (Stufe 2): eine Faehigkeit, die
@@ -193,19 +163,17 @@ function stand(seg: Fight): Stand {
     s.add(e.sid);
   }
   const eigen = !seg.fremd && seg === state.encounters[state.sel];
-  const bauId = eigen ? rotBauVon(seg) : null;
-  const fp = eigen ? bauVon(seg) : null;
-  const hier = fp ? {id: bauId, weapons: fp.weapons} : null;
-  const keyOf = new Map<string, string>(), grund = new Map<string, Grund>(), anderer = new Map<string, string>();
+  const paar = eigen ? paarVon(seg) : null;
+  const keyOf = new Map<string, string>(), grund = new Map<string, Grund>();
   const skills: RotSkill[] = [];
   for(const sk of lanes){
     const k = skillKey(sk.name, sidOf.get(sk.name));
     keyOf.set(sk.name, k);
-    const g = grundVon(sk.name, idsOf.get(sk.name) ?? new Set(), k, eigen, hier);
-    if(g){ grund.set(k, g.grund); if(g.bau) anderer.set(k, bauNameVon(g.bau)); }
+    const g = grundVon(sk.name, idsOf.get(sk.name) ?? new Set());
+    if(g) grund.set(k, g.grund);
     skills.push({k, grund: g ? g.grund : null});
   }
-  const wahl = wahlen(eigen, bauId, fp);
+  const wahl = wahlen(eigen, paar);
   /* Beim Gruppenmitglied nur, was es ueber das Board teilt (castsFest):
      casts() leitete sonst aus der nachgebauten Kurve einen Einsatz je
      Sekunde ab - eine Rotation, die es nie gab (Luecken 3.12). */
@@ -219,7 +187,7 @@ function stand(seg: Fight): Stand {
     anzahl.set(k, liste.length);
     for(const c of liste) einsaetze.push({k, name: sk.name, cast: c, t: c.t - seg.start, ende: (c.last || c.t) - seg.start});
   }
-  return {seg, lanes, reihe: new Map(lanes.map(sk => [sk.name, sk])), sidOf, keyOf, eigen, bauId, fp, hier, wahl, grund, anderer, auto: automatisch(skills, wahl), byCast, einsaetze, anzahl, leer};
+  return {seg, lanes, reihe: new Map(lanes.map(sk => [sk.name, sk])), sidOf, keyOf, eigen, paar, wahl, grund, auto: automatisch(skills, wahl), byCast, einsaetze, anzahl, leer};
 }
 
 /** Die gedrueckten Einsaetze eines Kampfes, gezaehlt wie die Zeitleiste (ohne
@@ -265,8 +233,7 @@ function knopf(k: string, name: string, v: RotWahl, art = v === 1 ? "stimmt" : v
     ' data-art="' + art + '" aria-label="' + esc(t("deinerot." + art + "Label", {name})) + '">' + esc(t("deinerot." + art)) + "</button>";
 }
 
-function grundText(st: Stand, k: string, grund: Grund | "hand"): string {
-  if(grund === "anderer") return t("deinerot.grund.anderer", {bau: st.anderer.get(k) ?? ""});
+function grundText(grund: Grund | "hand"): string {
   return t("deinerot.grund." + grund);
 }
 
@@ -281,10 +248,9 @@ function autoHtml(st: Stand, aus: Set<string>): string {
     const k = st.keyOf.get(sk.name)!;
     const a = st.auto.get(k);
     if(!a) continue;
-    const sid = st.sidOf.get(sk.name), name = skillLabel(sk.name, sid), grund = grundText(st, k, a.grund);
+    const sid = st.sidOf.get(sk.name), name = skillLabel(sk.name, sid), grund = grundText(a.grund);
     // von Hand weggelassen heisst nicht "bestaetigt": der title sagt, was es ist und wo es gilt
-    const imBau = !!st.bauId && wahlVon(state.builds[st.bauId]?.rot ?? {}, k) === 1;
-    const fest = t(a.grund === "hand" ? (imBau ? "deinerot.weg" : "deinerot.wegSitzung") : imBau ? "deinerot.fest" : "deinerot.festSitzung");
+    const fest = t(a.grund === "hand" ? "deinerot.wegSitzung" : "deinerot.festSitzung");
     zeilen.push('<li data-k="' + esc(k) + '"><span class="drname">' + skillMark(sk.name, sid, sk.color, sk.rest) +
       '<b title="' + esc(name) + '">' + esc(name) + "</b>" + anzahlText(st.anzahl.get(k) ?? 0) + "</span>" +
       '<span class="drgrund" title="' + esc(grund) + '">' + esc(grund) + "</span>" +
@@ -298,7 +264,7 @@ function autoHtml(st: Stand, aus: Set<string>): string {
   /* Die Wahlen, die frueher in der Spalte "Gedrueckt" standen (DECISION 3.9):
      was du selbst drueckst, mit "Zuruecknehmen", und was das Auge in diesem
      Kampf ausgeblendet hat, mit "Immer weglassen". Das Auge gilt der
-     Sitzung, die Wahl dem Build. Nur bei eigenen Kaempfen. */
+     Ansicht, die Wahl der Sitzung. Nur bei eigenen Kaempfen. */
   const wahlen: string[] = [];
   if(st.eigen) for(const sk of st.lanes){
     const k = st.keyOf.get(sk.name)!;
@@ -312,7 +278,7 @@ function autoHtml(st: Stand, aus: Set<string>): string {
       '<span class="drknoepfe">' + (selbst ? knopf(k, name, 0) : knopf(k, name, 1, "immer")) + "</span></li>");
   }
   if(wahlen.length) html += '<ul class="drauto drwahlen" aria-labelledby="drAutoTitel">' + wahlen.join("") + "</ul>";
-  const wo = !st.eigen ? t("deinerot.mitglied") : !st.bauId ? t("deinerot.sitzung") : t("deinerot.autoBau", {bau: bauNameVon(st.bauId)});
+  const wo = !st.eigen ? t("deinerot.mitglied") : t("deinerot.sitzung");
   html += '<p class="drhinweis">' + esc(zeilen.length ? t("deinerot.autoSatz") + " " + wo : wo) + "</p>";
   return html;
 }
@@ -348,9 +314,9 @@ function kopfVon(st: Stand, aus: Set<string>): { html: string; label: string; ne
    Vorschlag, der vorher nicht da war, oeffnet den Kasten; sonst gilt, was
    man zuletzt von Hand getan hat - auch nach dem Neuzeichnen, das nur
    Kopf und Liste tauscht. Gemerkt im Browser-Speicher, eine Bequemlichkeit:
-   ohne ihn beginnt der Kasten zu. "Gesehen" gilt je Build (Kennung|Schluessel,
-   in der Sitzung ohne Build "~|Schluessel"): derselbe Vorschlag in einem
-   anderen Build ist dort neu. Eintraege ohne "|" (aeltere) zaehlen nicht. */
+   ohne ihn beginnt der Kasten zu. "Gesehen" steht als "~|Schluessel" (vor
+   dem Entfall des Builds-Reiters stand vor dem Strich die Kennung eines
+   Builds; diese Eintraege zaehlen nicht mehr). Eintraege ohne "|" zaehlen nicht. */
 const KASTEN = "boroDrAuto";
 let kastenOffen = false;
 let kastenGesehen: Set<string> | null = null;
@@ -381,7 +347,7 @@ function kastenZeigen(st: Stand, aus: Set<string>){
   if(su.getAttribute("aria-label") !== kopf.label) su.setAttribute("aria-label", kopf.label);
   const gesehen = kastenLaden();
   let frisch = false;
-  const bezug = (st.bauId ?? "~") + "|";
+  const bezug = "~|";
   for(const k of kopf.neu) if(!gesehen.has(bezug + k)){ gesehen.add(bezug + k); frisch = true; }
   if(frisch){ kastenOffen = true; kastenMerken(); }
   kastenSetzen(kastenOffen);
@@ -1053,14 +1019,13 @@ export function deineRotVergessen(){
 }
 /* Alles, wovon der Block abhaengt, als eine Zeile: der Kampf (Anfang,
    Ende, Zahl der Ereignisse, Schaden), welcher links gewaehlt ist und wessen
-   Kurve, Sprache, Breite, was ausgeschaltet ist, die Wahlen der Sitzung, der
-   Stand der Builds (bauRevision), die Waffenzuordnung (Grund Passiv) und
+   Kurve, Sprache, Breite, was ausgeschaltet ist, die Wahlen der Sitzung, die Waffenzuordnung (Grund Passiv) und
    Live. Gleich wie beim letzten Mal: nichts rechnen, nichts bauen - unter
    Live aendert sich so nur etwas, wenn der gezeigte Kampf waechst. */
 let letzteSig = "";
 function signatur(seg: Fight, breite: number, aus: Set<string>): string {
   return [seg.start, seg.end, seg.events.length, seg.stats.total, seg.fremd ?? "", state.sel, state.zeigeMitglied ?? "",
-    state.lang, breite, [...aus].join("\u0001"), JSON.stringify(state.rotSitzung), bauRevision(), SERVED, state.origin,
+    state.lang, breite, [...aus].join("\u0001"), JSON.stringify(state.rotSitzung), SERVED, state.origin,
     !!state.wall, state.players.length, isWatching(), JSON.stringify(state.weaponById), JSON.stringify(state.weaponOf),
     JSON.stringify(state.weaponPick), etagenZahl(), state.rotZoom, state.rotFrom ?? "", state.rotTo ?? ""].join("|");
 }
@@ -1108,9 +1073,6 @@ export function renderDeineRotation(seg: Fight | null){
   const sig = signatur(seg, breite, aus);
   if(sig === letzteSig && letzter) return;
   let st = stand(seg);
-  /* Kennt Borometer den Build jetzt, gehen die Wahlen der Sitzung hinein,
-     soweit er zu der Faehigkeit noch nichts sagt (Spezifikation 7). */
-  if(st.bauId && Object.keys(state.rotSitzung).length && sitzungUebergeben(st.bauId)) st = stand(seg);
   letzter = st;
   const f = folge(st.einsaetze, new Set(st.auto.keys()));
   // was in "Gedrueckt" ausgeschaltet ist, faellt nur aus dem Bild; die Stille rechnet mit allen gedrueckten
@@ -1184,15 +1146,8 @@ export function renderDeineRotation(seg: Fight | null){
 
 /* ---------- waehlen (Spezifikation 4.2) ----------
    "Stimmt" 1, "Druecke ich selbst" 2, "Zuruecknehmen" 0, "Immer weglassen" 1.
-   Mit bekanntem Build an den Build (47-builds.ts schreibt ueber
-   /api/builds), sonst in die Sitzung; ist der Build voll (24 Wahlen), gilt
-   die Wahl in der Sitzung, und der Hinweis sagt es. Nie wird ein Schluessel
-   entfernt: "Rueckgaengig" schreibt den Wert davor, ohne einen die 0. */
-function setzeWahl(bauId: string | null, fp: Fingerprint | null, k: string, v: RotWahl): "ok" | "voll" | "abgelehnt" {
-  const r = bauId ? bauRotSetzen(bauId, k, v) : "ok";
-  if(r !== "ok" || !bauId) inSitzung(k, v, fp, bauId);
-  return r;
-}
+   Die Wahl geht in die Sitzung. Nie wird ein Schluessel entfernt:
+   "Rueckgaengig" schreibt den Wert davor, ohne einen die 0. */
 /* Nach dem Neubau steht der Fokus auf dem Knopf, der jetzt fuer dieselbe
    Faehigkeit gilt: Zuruecknehmen nach einer Wahl, Stimmt nach dem
    Zuruecknehmen, sonst ihr Name in "Gedrueckt". */
@@ -1209,14 +1164,14 @@ function waehlen(b: HTMLElement){
   if(!st || !st.eigen) return;
   const k = b.dataset.k!, v = +b.dataset.wahl! as RotWahl, name = b.dataset.n || k;
   const vorher: RotWahl = wahlVon(st.wahl, k) ?? 0;
-  const bauId = st.bauId, fp = st.fp;
+  const paar = st.paar;
   // aus der Ansicht dieses Kampfes genommen, jetzt fuer immer: die Ansicht gibt ihn frei
   if(b.dataset.art === "immer") state.rotAus?.delete(b.closest<HTMLElement>("[data-rot]")?.dataset.rot ?? "");
-  const gemerkt = setzeWahl(bauId, fp, k, v);
+  inSitzung(k, v, paar);
   flip(renderRotation);
   fokusAuf(k);
-  toast(gemerkt === "ok" ? tt(MELDUNG[b.dataset.art!] ?? "deinerot.tZurueck", {name}) : tt("deinerot." + gemerkt), 9000, null, {label: tt("plan.undo"), fn: () => {
-    setzeWahl(bauId, fp, k, vorher);
+  toast(tt(MELDUNG[b.dataset.art!] ?? "deinerot.tZurueck", {name}), 9000, null, {label: tt("plan.undo"), fn: () => {
+    inSitzung(k, vorher, paar);
     flip(renderRotation);
     fokusAuf(k);
   }});

@@ -254,6 +254,51 @@ function naechst(jetzt, takt, erwartet, name) {
   ok(Object.isFrozen(G) && G.every(p => Object.isFrozen(p)), "die Grundliste ist unveraenderlich");
 }
 
+// ---- Fortschritt, Zu-Zustand, Vorwoche (Spezifikation Weeklies neu, 4.1 bis 4.5)
+{
+  const profil = (zaehler, rest = {}) => ({ id: "w000000001", name: "Aurel", zaehler, aus: [], namen: {}, eigene: [], ...rest });
+  const voll = (seit) => Object.fromEntries(core.GRUNDLISTE.map(g => [g.schluessel, { stand: g.menge, seit }]));
+  const Dienstag = Z("2026-10-06T12:00:00Z");
+  const woche = core.GRUNDLISTE.filter(g => g.takt !== "tag");
+  const tag = core.GRUNDLISTE.filter(g => g.takt === "tag");
+
+  let f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-06T18:00:00Z"));
+  ok(f.fertig && f.woche.n === woche.length && f.woche.g === woche.length && f.tag.n === tag.length, "alles voll: Woche und Tag erledigt", f);
+  f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-07T09:00:00Z"));
+  ok(f.fertig && f.tag.n === 0 && f.tag.g === tag.length, "nach dem Tagesreset bleibt die Woche erledigt (121)", f);
+  f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-08T08:05:00Z"));
+  ok(!f.fertig && f.woche.n === core.GRUNDLISTE.filter(g => g.takt === "monat" || g.takt === "montag").length, "nach dem Wochen-Reset ist die Woche offen (Monats- und Montagspunkte gelten weiter)", f);
+
+  const teil = profil({ dimensionDungeons: { stand: 3, seit: Dienstag }, goldeneKiste: { stand: 2, seit: Dienstag } });
+  f = core.fortschrittVon(teil, Z("2026-10-06T18:00:00Z"));
+  const erwartet = (3 / 7 + 2 / 5) / woche.length;
+  ok(Math.abs(f.woche.anteil - erwartet) < 1e-9 && f.woche.n === 0, "Teilfortschritt zaehlt nach Menge in den Ring (121)", { anteil: f.woche.anteil, erwartet });
+
+  const eig = profil({}, { aus: ["illusionen"], eigene: [
+    { schluessel: "eigenaaa", name: "Mein Punkt", menge: 2, takt: "woche" },
+    { schluessel: "eigenbbb", name: "Alt", menge: 1, takt: "woche", geloest: true }] });
+  const sp = core.sichtbarePunkte(eig);
+  ok(!sp.some(x => x.schluessel === "illusionen") && sp.some(x => x.schluessel === "eigenaaa") && !sp.some(x => x.schluessel === "eigenbbb"), "sichtbarePunkte: aus und geloest fehlen, eigener Punkt da", sp.map(x => x.schluessel));
+  ok(core.fortschrittVon(profil({}, { aus: core.GRUNDLISTE.map(g => g.schluessel) }), Dienstag).fertig === false, "ohne sichtbare Wochenpunkte ist nichts 'fertig'");
+
+  ok(core.bereichZu(undefined, true) === true && core.bereichZu(undefined, false) === false, "bereichZu: ohne Wahl gilt 'zu = fertig'");
+  ok(core.bereichZu({ zu: false, bei: true }, true) === false, "bereichZu: aufgeklappt bleibt aufgeklappt, solange fertig");
+  ok(core.bereichZu({ zu: false, bei: true }, false) === false && core.bereichZu({ zu: true, bei: true }, false) === false, "bereichZu: Wahl verfaellt, wenn der Fertig-Zustand wechselt");
+  ok(core.bereichZu({ zu: true, bei: false }, false) === true, "bereichZu: zugeklappt im offenen Zustand bleibt, solange offen");
+
+  const mi = Z("2026-10-07T20:00:00Z");
+  const alt = profil({ zitadelleNormal: { stand: 1, seit: mi }, illusionen: { stand: 2, seit: mi } });
+  const doDanach = Z("2026-10-08T08:05:00Z");
+  let lw = core.letzteWoche([alt], doDanach);
+  ok(lw && lw.length === 1 && lw[0].n === 1 && lw[0].g === woche.filter(g => g.takt === "woche").length && lw[0].name === "Aurel", "Letzte Woche erscheint nach dem Reset", lw);
+  const neu = profil({ zitadelleNormal: { stand: 1, seit: mi }, illusionen: { stand: 2, seit: mi }, zitadelleSchwer: { stand: 1, seit: Z("2026-10-08T08:10:00Z") } });
+  ok(core.letzteWoche([neu], Z("2026-10-08T09:00:00Z")) === null, "Letzte Woche verschwindet beim ersten Stand der neuen Woche");
+  ok(core.letzteWoche([profil({})], doDanach) === null, "Letzte Woche fehlt, wenn nie etwas gesetzt wurde");
+  const mitVor = profil({}, { vorwoche: { reset: Z("2026-10-01T08:00:00Z"), zaehler: { zitadelleNormal: { stand: 1, seit: mi } } } });
+  lw = core.letzteWoche([mitVor], doDanach);
+  ok(lw && lw[0].n === 1, "Letzte Woche liest die gespeicherte vorwoche", lw);
+}
+
 // ---- andere Rechner-Zeitzone: gleiche Ergebnisse
 const probe = () => {
   const aus = [];

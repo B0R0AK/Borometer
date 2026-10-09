@@ -4,7 +4,7 @@
 //
 // Gezielter Test von "Gegen deinen besten Pull" an der gebauten Seite,
 // dist/renderer/index.html ueber file:// - ohne Server, der Speicher lebt
-// also nur in dieser Sitzung. Acht kleine erzeugte Logs werden nacheinander
+// also nur in dieser Sitzung. Neun kleine erzeugte Logs werden nacheinander
 // geladen; was eines als besten Pull festhaelt, muss das naechste finden.
 //
 // Run:  npm run test:best-page     (baut die Seite zuerst)
@@ -64,6 +64,32 @@ const L7 = logFile("best-7.txt", [V(22, 1.47)]);
    Quick Fire bei 90 %, der Rest wie beim besten (L3). Das Gegenstueck zu den
    gleichmaessig skalierten Logs oben, deren Abstand sich verteilt. */
 const L8 = logFile("best-8.txt", [{ ...V(23, 1.5), je: { "Detonation Mark": 0.4, "Quick Fire": 0.9 } }]);
+/* #151: zwei Fehlstarts mit 14 s und starkem Opener, dann zwei lange Pulls,
+   alle schwaecher als L3 ueber die Mindestlaenge (min(60, 90/2) = 45 s). */
+const W = (min, secs, scale) => ({ target: "Vulcanus", start: at(24, 21, min), secs, scale });
+const L9 = logFile("best-9.txt", [W(0, 14, 4), W(2, 14, 4), W(4, 90, 1.0), W(8, 80, 1.1)]);
+/* Aufgabe 7: ein Fehlstart mit fuenffachem Schaden (14 s) vor einem langen Pull
+   (90 s) an einem Boss, an dem sonst kein Test kaempft (Lyxara). */
+const L10 = logFile("best-10.txt", [{ target: "Lyxara", start: at(25, 21, 0), secs: 14, scale: 5 },
+  { target: "Lyxara", start: at(25, 21, 4), secs: 90, scale: 1 }]);
+/* Ein Log ohne Datum: nur die Uhrzeit (HH:MM:SS), so liest parseTime
+   (03-helpers.ts) es als "nur Tageszeit" (state.wall falsch). Zwei Pulls an
+   Vulcanus, beide ueber der Schwelle. */
+function logTextNoWall(pulls) {
+  const lines = ["CombatLogVersion,4"];
+  for (const p of pulls) {
+    for (let k = 0; k * 500 < p.secs * 1000; k++) {
+      const [skill, sid] = SKILLS[k % SKILLS.length];
+      const d = new Date(p.start + k * 500);
+      const zeit = `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:${two(d.getUTCSeconds())}`;
+      const dmg = Math.round(1000 * p.scale * (1 + (k % 5)));
+      lines.push(`${zeit},DamageDone,${skill},${sid},${dmg},0,0,kNormalHit,Tester,Vulcanus`);
+    }
+  }
+  return lines.join("\n") + "\n";
+}
+const L11 = (() => { const f = join(work, "best-11.txt");
+  writeFileSync(f, logTextNoWall([V(26, 1.0), { ...V(26, 1.2), start: at(26, 21, 5) }])); return f; })();
 const L6 = logFile("best-6.txt", [{ target: "Molting Grave Wolf", start: at(21, 22, 0), secs: 20, scale: 1.0 }]);
 
 const browser = await chromium.launch(process.env.PARITY_CHROMIUM ? { executablePath: process.env.PARITY_CHROMIUM } : {});
@@ -81,6 +107,9 @@ try {
     await page.waitForFunction((n) => (document.querySelector("#hName")?.textContent || "").includes(n), name);
     await page.waitForTimeout(150);
   };
+  /* Die Kampfwahl: je Zeile die Zahl (.kd) und ob der Goldpunkt (i.best) dran haengt. */
+  const kwZeilen = () => page.evaluate(() => [...document.querySelectorAll("#fightList .fight")]
+    .map((r) => ({ kd: r.querySelector(".kd")?.textContent || "", gold: !!r.querySelector("i.best") })));
   /* Der Knopf steht im Urteil des Kampfs (Neugestaltung 28.09.); seit Stufe 4 (#54) haben die
      anderen Bereiche statt des Streifens eine Kopfzeile (58-felder.ts).
      Gemessen wird darum im Bereich Kampf, danach geht es zurueck in den
@@ -159,6 +188,8 @@ try {
   await load(L1, "Vulcanus");
   assert(!(await head()).shown, "erster Kampf: kein Knopf");
   assert((await line()).includes("first fight on Vulcanus"), "erster Kampf: Satz warum", await line());
+  assert((await kwZeilen()).length === 1 && (await kwZeilen()).every((z) => !z.gold),
+    "Aufgabe 7: ein einziger Pull am Boss traegt kein Gold", await kwZeilen());
 
   // 2 · schwaecher als der erste: Knopf, per Tastatur
   await load(L2, "Vulcanus");
@@ -335,6 +366,9 @@ try {
 
   // 9 · unter 5 %: gleichauf, ohne Faehigkeit, die "fehlt"
   await load(L7, "Vulcanus");
+  // der Bezug ist hier der beste Pull aus L3 (19.09.); #151 unten vergleicht damit
+  const besterTitel = (await head()).title;
+  assert(besterTitel.includes("19.09."), "L7: der Bezug ist der beste Pull aus L3", besterTitel);
   await kampf();
   await page.click("#btnBestPull");
   await page.waitForTimeout(150);
@@ -352,7 +386,73 @@ try {
     && !ursache.includes("verteilt"), "Deutsch: klare Ursache - der Satz nennt die Faehigkeit", ursache);
   assert(m.sub.includes("tragen") && !m.sub.includes("verteilt"), "Deutsch: klare Ursache - der Block sagt dasselbe", m.sub);
 
+  /* 11 · #151: ein kurzer Fehlstart mit starkem Opener ist nie der beste
+     Pull. L9 bringt zwei 14-s-Pulls mit vierfachem Schaden; bisher wurden
+     sie bester und zweitbester, und jeder Kampf in L9 mass sich an ihnen.
+     Nach der Regel (Mindestlaenge 45 s ueber die ganze Menge) bleibt der
+     Bezug fuer jeden Kampf in L9 der beste Pull aus L3 - auch fuer die
+     Fehlstarts selbst: sie werden verglichen, sind aber nie selbst der
+     beste. Gold in der Kampfwahl prueft Aufgabe 7. */
+  await load(L9, "Vulcanus");
+  const kaempfe9 = await page.evaluate(() => document.querySelectorAll("#fightList .fight").length);
+  assert(kaempfe9 === 4, "#151: L9 hat vier Kaempfe", kaempfe9);
+  for (let i = 0; i < kaempfe9; i++) {
+    await page.evaluate((k) => document.querySelector(`#fightList .fight[data-i="${k}"]`).click(), i);
+    await page.waitForTimeout(150);
+    const h9 = await head();
+    assert(h9.shown && h9.label === "Im Vergleich: gegen deinen besten Pull" && h9.title === besterTitel,
+      "#151: Kampf " + i + " in L9 misst sich am besten Pull aus L3, nicht an einem Fehlstart", { h9, besterTitel });
+  }
+
+  /* Aufgabe 7: In L9 liegt der beste Vulcanus-Pull in L3, also traegt hier kein Kampf Gold -
+     auch nicht der Fehlstart mit der hoechsten DPS (vorher: Gold nach hoechster DPS im Log). */
+  const z9 = await kwZeilen();
+  assert(z9.length === 4 && z9.every((z) => !z.gold), "Aufgabe 7: L9 hat kein Gold, der beste Pull liegt in L3", z9);
+
+  /* Aufgabe 7: Fehlstart (14 s, Skala 5) und langer Pull (90 s). Gold genau einmal, am langen
+     Pull, nicht am Fehlstart mit der hoechsten DPS. */
+  await load(L10, "Lyxara");
+  const z10 = await kwZeilen();
+  const hoechste = z10.reduce((a, b) => (parseFloat(b.kd) > parseFloat(a.kd) ? b : a));
+  assert(z10.length === 2 && z10.filter((z) => z.gold).length === 1 && !hoechste.gold,
+    "Aufgabe 7: Gold genau am langen Pull, nicht an der hoechsten DPS", z10);
+
   assert(!errors.length, "keine Fehler in der Seite", errors);
+
+  /* 12 · Log ohne Datum: die Zeitpunkte sind Millisekunden seit Mitternacht.
+     Der Bezug sagt "in this log", nie ein erfundenes Datum wie "01/01". */
+  {
+    const nw = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const nwErrors = [];
+    nw.on("pageerror", (e) => nwErrors.push(String(e)));
+    await nw.addInitScript(() => {
+      try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ }
+    });
+    await nw.goto("file://" + join(root, "dist", "renderer", "index.html"));
+    await nw.setInputFiles("#fileInput", L11);
+    await nw.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+    await nw.waitForFunction(() => document.querySelectorAll("#fightList .fight").length >= 2);
+    for (let i = 0; i < 2; i++) {
+      await nw.evaluate((k) => { document.querySelector(`#fightList .fight[data-i="${k}"]`).click();
+        document.querySelector('[data-tab="timeline"]').click(); }, i);
+      await nw.waitForTimeout(200);
+      const k = await nw.evaluate(() => { const b = document.querySelector("#btnBestPull");
+        return { shown: !!b && !b.hidden, title: b?.title || "", urteil: document.querySelector("#urteilFeld")?.textContent || "" }; });
+      assert(k.shown && k.title.includes("in this log") && !/01\/01/.test(k.title) && !/01\/01/.test(k.urteil),
+        "ohne Datum, Kampf " + i + ": Knopf und Urteil sagen „in this log“, kein 01/01", k);
+      await nw.click("#btnBestPull");
+      await nw.waitForTimeout(200);
+      const v = await nw.evaluate(() => ({
+        lead: document.querySelector("#cmpLead")?.textContent || "",
+        gross: [...document.querySelectorAll("#cmpOut .vgross .lbl")].map((b) => b.textContent),
+        out: document.querySelector("#cmpOut")?.textContent || "",
+      }));
+      assert(v.lead.includes("in this log") && v.gross.some((g) => g.includes("in this log")) && !/01\/01/.test(v.out + v.lead),
+        "ohne Datum, Kampf " + i + ": Antwortsatz und Namen sagen „in this log“, kein 01/01", v);
+    }
+    assert(!nwErrors.length, "ohne Datum: keine Fehler in der Seite", nwErrors);
+    await nw.close();
+  }
 
   // 8 · Wie vom eigenen Helfer ausgeliefert (SERVED): die Seite unter einer
   // erfundenen http-Adresse, jede Anfrage beantwortet page.route - es geht
@@ -629,10 +729,287 @@ try {
     }
     await q.evaluate(() => document.querySelector('[data-tab="compare"]').click());
     await q.waitForTimeout(150);
-    assert((await q.evaluate(() => document.querySelector("#cmpBest")?.textContent || "")).includes("Your best pull comes from a different build (Longbow/Crossbow 1)."),
-      "der Vergleich bleibt beim besten Pull und nennt den Build wie bisher", await q.evaluate(() => document.querySelector("#cmpBest")?.textContent || ""));
+    /* Builds-Reiter 6: vorher erkannte die Seite die Builds aus den Skills und nannte "Longbow/Crossbow 1".
+       Jetzt gilt ohne gespeicherten Build das Waffenpaar, und der Satz nennt es mit " + ". */
+    assert((await q.evaluate(() => document.querySelector("#cmpBest")?.textContent || "")).includes("Your best pull used a different weapon pair (Longbow + Crossbow)."),
+      "der Vergleich bleibt beim besten Pull und nennt das Paar (Bezug: dasselbe Waffenpaar)", await q.evaluate(() => document.querySelector("#cmpBest")?.textContent || ""));
     assert(!qErrors.length, "zwei Builds: keine Fehler in der Seite", qErrors);
     await q.close();
+
+    /* Spezifikation Bester Pull 5.2, "ohne Lauf", im Browser ohne Server
+       (file://): ein Log mit zwei Angreifern kommt in den Verlauf, aber
+       bestRecord haelt dort keinen Lauf fest. Sein Pull ist der beste an
+       Vulcanus; der Kampf des naechsten Logs wird gegen ihn verglichen. Ohne
+       Server kann keine Datei geoeffnet werden: die Tafel nennt den Bezug mit
+       seiner DPS und sagt, dass Treffer und Rotation fehlen - ohne Knopf. */
+    {
+      const zwei = join(work, "best-zwei.txt");
+      const reihen = ["CombatLogVersion,4"];
+      for (let k = 0; k * 500 < 120000; k++) {
+        const [skill, sid] = SKILLS[k % SKILLS.length];
+        for (const [wer, f] of [["Tester", 3], ["Zweiter", 1]])
+          reihen.push(`${stamp(at(9, 21, 0) + k * 500)},DamageDone,${skill},${sid},${Math.round(1000 * f * (1 + (k % 5)))},0,0,kNormalHit,${wer},Vulcanus`);
+      }
+      writeFileSync(zwei, reihen.join("\n") + "\n");
+      const a = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      const aErrors = [];
+      a.on("pageerror", (e) => aErrors.push(String(e)));
+      await a.addInitScript(() => {
+        try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ }
+      });
+      await a.goto("file://" + join(root, "dist", "renderer", "index.html"));
+      await a.setInputFiles("#fileInput", zwei);
+      await a.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+      await a.waitForTimeout(250);
+      /* Seit 06.10. ist die Summe einer Gruppe ("alle") nie dein bester Pull (g im Verzeichnis). Der Pull
+         ohne Lauf ist darum der eines gewaehlten Angreifers: Tester waehlen und dasselbe Log unter einem
+         zweiten Namen oeffnen (dieselbe Datei loest kein neues Lesen aus) - histRecord schreibt dann seinen
+         Kampf ohne Markierung, bestRecord haelt weiter keinen Lauf fest (mehrere Angreifer). */
+      const gruppeDps = await a.evaluate(() => document.querySelector("#fightList .fight .kd")?.textContent || "");
+      await a.evaluate(() => { const e = document.querySelector("#selPlayer"); e.value = "Tester"; e.dispatchEvent(new Event("change")); });
+      const zweiB = join(work, "best-zwei-tester.txt");
+      writeFileSync(zweiB, reihen.join("\n") + "\n");
+      await a.setInputFiles("#fileInput", zweiB);
+      await a.waitForFunction(() => /best-zwei-tester/.test(document.querySelector("#sbDatei")?.textContent || "")
+        && document.querySelector("#selPlayer")?.value === "Tester");
+      await a.waitForTimeout(250);
+      // die Zahl, die der Verlauf fuer diesen Kampf fuehrt: die der Kampfwahl
+      const bezugDps = await a.evaluate(() => document.querySelector("#fightList .fight .kd")?.textContent || "");
+      await a.setInputFiles("#fileInput", logFile("best-ohne-a.txt", [V(25, 1.0)]));
+      await a.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus")
+        && (document.querySelector("#fightList .fight .kd")?.textContent || "") !== "");
+      await a.waitForTimeout(250);
+      await a.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await a.waitForTimeout(200);
+      const u = await a.evaluate(() => ({
+        bezug: document.querySelector("#urteilInhalt .ubezug")?.textContent || "",
+        satz: document.querySelector("#urteilInhalt .ohnelauf")?.textContent || "",
+        knopf: !!document.querySelector("#btnOhneLauf"),
+        vergleich: !!document.querySelector("#btnBestPull")?.hidden,
+      }));
+      assert(u.satz.includes("Hits and rotation of this pull are not saved.") && !u.knopf,
+        "ohne Lauf, ohne Server: der Satz best.ohneLaufWeg steht im Urteil, ohne Knopf", u);
+      assert(!!bezugDps && u.bezug.includes("against your best pull") && u.bezug.trim().endsWith(bezugDps),
+        "ohne Lauf, ohne Server: die Zeile nennt die DPS des Bezugs aus dem Verlauf", { bezugDps, ...u });
+      assert(u.vergleich, "ohne Lauf, ohne Server: „Im Vergleich“ bleibt verborgen", u);
+      /* Derselbe Kampf steht zweimal im Verzeichnis: als Summe der Gruppe (g) und als Kampf von Tester.
+         Im Verlauf gewinnt der Eintrag ohne g - Gold und die Zeile best tragen die DPS des Angreifers. */
+      await a.evaluate(() => document.querySelector('[data-tab="history"]').click());
+      await a.click('#verlaufZeit [data-z="alles"]', { timeout: 3000 }).catch(() => {});
+      await a.waitForFunction(() => document.querySelectorAll("#histPlotFeld svg circle.hp").length >= 2, null, { timeout: 5000 }).catch(() => {});
+      const v = await a.evaluate(() => ({
+        punkte: [...document.querySelectorAll("#histPlotFeld svg circle.hp")].map((c) => ({ at: +c.dataset.at, dps: +c.dataset.dps, gold: c.classList.contains("hpspitze") })),
+        best: [...document.querySelectorAll("#histDetail tbody tr.best")].map((z) => z.textContent.replace(/\s+/g, " ").trim()),
+      }));
+      const goldP = v.punkte.filter((x) => x.gold);
+      assert(!!gruppeDps && gruppeDps !== bezugDps && v.punkte.length === 2 && goldP.length === 1 && goldP[0].at === at(9, 21, 0)
+        && v.best.length === 1 && v.best[0].includes(bezugDps) && !v.best[0].includes(gruppeDps),
+        "ohne Lauf: im Verlauf steht der Kampf einmal, mit der DPS des Angreifers - Gold und Zeile best, nicht die Summe der Gruppe",
+        { gruppeDps, bezugDps, ...v });
+      assert(!aErrors.length, "ohne Lauf, ohne Server: keine Fehler in der Seite", aErrors);
+      await a.close();
+    }
+
+    /* Spezifikation Bester Pull 5.2, "ohne Lauf": der beste Pull steht nur
+       im Verlauf (logIndex), boro-best.json kennt ihn nicht. Er bleibt der
+       Bezug (BestInfo.ohneLauf), aber es gibt nichts zu vergleichen: der
+       Knopf in der Tafel bleibt verborgen, der Vergleich hakt nichts an, und
+       keine Stelle wirft. Satz und Knopf "Log oeffnen" folgen spaeter. */
+    {
+      const altAt = at(10, 21, 0);
+      // zwei Kaempfe, beide schwaecher als der im Verlauf: der Vergleich hat den letzten Pull als Paar
+      const L10 = logFile("best-10.txt", [V(25, 1.0), { ...V(25, 1.1), start: at(25, 21, 5) }]);
+      const s3 = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      const s3Errors = [];
+      s3.on("pageerror", (e) => s3Errors.push(String(e)));
+      await s3.addInitScript(() => {
+        try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ }
+      });
+      const s3Posts = [];
+      /* Die Datei des besten Pulls liegt im Log-Ordner des gestellten Helfers
+         (GET /api/logs, GET /api/log): sein Pull und danach ein schwacher,
+         der beim Laden zuerst gewaehlt ist. */
+      const altText = logText([{ target: "Vulcanus", start: altAt, secs: 90, scale: 3 },
+        { target: "Vulcanus", start: at(10, 21, 5), secs: 75, scale: 0.5 }]);
+      const logHolt = [];
+      await s3.route("http://boro.test/**", async (route) => {
+        const req = route.request();
+        const url = new URL(req.url()), path = url.pathname;
+        const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+        if (path === "/api/logs" && req.method() === "GET")
+          return json(200, { ok: true, files: [{ name: "alt.txt", size: altText.length, mtime: Math.round(altAt / 1000) + 600 }] });
+        if (path === "/api/log" && req.method() === "GET") {
+          logHolt.push(url.searchParams.get("name"));
+          if (url.searchParams.get("name") !== "alt.txt") return json(404, { ok: false });
+          return json(200, { ok: true, file: "alt.txt", from: 0, to: altText.length, size: altText.length, text: altText });
+        }
+        if (path === "/api/config" && req.method() === "GET")
+          return json(200, { logIndex: { "alt.txt": { size: 1, fights: [{ name: "Vulcanus", dps: 20000, dmg: 1800000, dur: 90, at: altAt }] } } });
+        if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best: {} });
+        if (path === "/api/best" && req.method() === "POST") { s3Posts.push(JSON.parse(req.postData() || "{}")); return json(200, { ok: true }); }
+        if (path.startsWith("/api/")) return json(200, {});
+        return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+      });
+      await s3.goto("http://boro.test/index.html");
+      await s3.waitForTimeout(300);
+      await s3.setInputFiles("#fileInput", L10);
+      await s3.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+      await s3.waitForTimeout(300);
+      await s3.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await s3.waitForTimeout(150);
+      const knopf = await s3.evaluate(() => { const b = document.querySelector("#btnBestPull"); return { da: !!b, hidden: !!b?.hidden }; });
+      assert(knopf.da && knopf.hidden, "ohne Lauf: der Knopf „Im Vergleich“ bleibt verborgen", knopf);
+      await s3.evaluate(() => document.querySelector('[data-tab="compare"]').click());
+      await s3.waitForTimeout(150);
+      const vgl = await s3.evaluate(() => ({
+        zeile: document.querySelector("#cmpBest")?.textContent || "",
+        haken: [...document.querySelectorAll(".cmppick .run input:checked")].map((i) => i.closest(".run")?.getAttribute("data-cid") || ""),
+        letzt: document.querySelector("#vglLetzt")?.getAttribute("aria-pressed") || "",
+      }));
+      /* Ohne Lauf gibt es das Paar "bester Pull" nicht; der Vergleich nimmt
+         den letzten Pull. Ein Haken allein hiesse: das Paar wurde mit einer
+         Kennung ohne Lauf gesetzt, die kein Lauf ist. */
+      assert(!vgl.zeile.includes("first fight") && vgl.haken.length === 2 && vgl.letzt === "true",
+        "ohne Lauf: der Vergleich nennt keinen ersten Kampf und steht gegen den letzten Pull", vgl);
+      for (const n of ["analysis", "rotation", "timeline", "compare"]) {
+        await s3.evaluate((x) => document.querySelector(`[data-tab="${x}"]`).click(), n);
+        await s3.waitForTimeout(150);
+      }
+      for (const end = Date.now() + 6000; Date.now() < end && !s3Posts.length;) await s3.waitForTimeout(250);
+      assert(s3Posts.length > 0 && s3Posts.every((p) => p.entry?.best?.at !== altAt),
+        "ohne Lauf: boro-best.json haelt nur, was einen Lauf hat", s3Posts.map((p) => p.entry?.best?.at));
+      /* Mit Server: unter der Zeile des Bezugs der Satz und der Knopf "Log
+         oeffnen". Er ist per Tastatur erreichbar, sein Name enthaelt den
+         sichtbaren Text (WCAG 2.5.3), und bei 560 px rollt nichts waagerecht. */
+      await s3.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await s3.waitForTimeout(200);
+      const mit = await s3.evaluate(() => {
+        const b = document.querySelector("#btnOhneLauf");
+        return { satz: document.querySelector("#urteilInhalt .ohnelauf")?.textContent || "",
+                 bezug: document.querySelector("#urteilInhalt .ubezug")?.textContent || "",
+                 knopf: !!b && !!b.offsetParent, text: (b?.textContent || "").trim(),
+                 name: b?.getAttribute("aria-label") ?? null, tab: b ? b.tabIndex : -1, aus: !!b?.disabled };
+      });
+      assert(mit.satz.includes("Open the log from 10/09") && mit.knopf && mit.text === "Open log",
+        "ohne Lauf, mit Server: Satz best.ohneLauf mit Datum und Knopf „Open log“", mit);
+      assert(mit.bezug.includes("against your best pull") && mit.bezug.trim().endsWith("20.0k"),
+        "ohne Lauf, mit Server: die Zeile nennt Bezug und DPS aus dem Verlauf", mit);
+      assert(mit.tab >= 0 && !mit.aus && (mit.name === null || mit.name.toLowerCase().includes(mit.text.toLowerCase())),
+        "ohne Lauf: der Knopf ist per Tastatur erreichbar, sein Name enthaelt den sichtbaren Text", mit);
+      await s3.setViewportSize({ width: 560, height: 860 });
+      await s3.waitForTimeout(250);
+      const breit = await s3.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth,
+        knopf: !!document.querySelector("#btnOhneLauf")?.offsetParent }));
+      assert(breit.knopf && breit.scroll <= breit.client, "ohne Lauf: bei 560 px rollt nichts waagerecht", breit);
+      await s3.setViewportSize({ width: 1280, height: 860 });
+      await s3.waitForTimeout(250);
+      await s3.focus("#btnOhneLauf");
+      await s3.keyboard.press("Enter");
+      for (const end = Date.now() + 8000; Date.now() < end && !logHolt.includes("alt.txt");) await s3.waitForTimeout(100);
+      assert(logHolt.includes("alt.txt"), "ohne Lauf: der Knopf holt die Datei ueber GET /api/log?name=alt.txt", logHolt);
+      await s3.waitForFunction(() => { const b = document.querySelector("#btnBestPull"); return !!b && !b.hidden && !!b.offsetParent; },
+        null, { timeout: 8000 }).catch(() => {});
+      const nach = await s3.evaluate(() => {
+        const b = document.querySelector("#btnBestPull");
+        return { vergleich: !!b && !b.hidden && !!b.offsetParent, satz: document.querySelector("#urteilInhalt .usatz")?.textContent || "",
+                 ohne: !!document.querySelector("#urteilInhalt .ohnelauf"), fokus: document.activeElement?.id || "" };
+      });
+      /* Gewaehlt ist danach der Kampf des Bezugs (start === refAt), nicht der
+         zuerst gewaehlte schwache: er ist jetzt selbst der beste Pull, und
+         "Im Vergleich" steht gegen den zweitbesten. */
+      assert(nach.vergleich && !nach.ohne && nach.satz.includes("Your best pull on Vulcanus"),
+        "ohne Lauf: nach dem Oeffnen ist der Kampf des Bezugs gewaehlt und „Im Vergleich“ da", nach);
+      assert(nach.fokus === "kwKnopf", "ohne Lauf: der Fokus steht danach auf der Kampfwahl wie nach jedem Wechsel des Kampfes", nach);
+      assert(!s3Errors.length, "ohne Lauf: keine Fehler in der Seite", s3Errors);
+      await s3.close();
+    }
+
+    /* Alte Zuordnung (#207): das Verzeichnis traegt noch b aus der Zeit des Builds-Reiters. Die Seite liest es nicht
+       mehr und fragt /api/builds nicht mehr; der Hinweis nennt das Paar des besten Pulls. Dateiname und
+       Startzeit stimmen mit denen der Logs ueberein. */
+    const lager = { "lb00000000": { name: "Bow", weapons: ["Longbow", "Crossbow"], first: 1, eigen: 1 },
+                    "da00000000": { name: "Dagger", weapons: ["Dagger", "Crossbow"], first: 1, eigen: 1 } };
+    const zeile = (b, day) => ({ name: "Vulcanus", dps: 1, dmg: 1, dur: 80, at: at(day, 21, 0), b });
+    const index = { "bau-lb.txt": { size: 1, fights: [zeile("lb00000000", 20)] }, "bau-da1.txt": { size: 1, fights: [zeile("da00000000", 21)] } };
+    const g = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const gErrors = [], gAsked = [];
+    g.on("pageerror", (e) => gErrors.push(String(e)));
+    await g.addInitScript(() => {
+      try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ }
+    });
+    await g.route("http://boro.test/**", async (route) => {
+      const req = route.request();
+      const path = new URL(req.url()).pathname;
+      const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+      if (/^\/api\/(builds|plans)/.test(path)) gAsked.push(path);
+      if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best: {} });
+      if (path === "/api/config" && req.method() === "GET") return json(200, { rundgangGesehen: true, logIndex: index });
+      if (path.startsWith("/api/")) return json(200, { ok: true });
+      return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+    });
+    await g.goto("http://boro.test/index.html");
+    await g.waitForTimeout(500);
+    for (const f of [join(work, "bau-lb.txt"), join(work, "bau-da1.txt")]) {
+      await g.setInputFiles("#fileInput", f);
+      await g.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+      await g.waitForTimeout(250);
+    }
+    await g.evaluate(() => document.querySelector('[data-tab="compare"]').click());
+    await g.waitForTimeout(250);
+    assert((await g.evaluate(() => document.querySelector("#cmpBest")?.textContent || "")).includes("Your best pull used a different weapon pair (Longbow + Crossbow)."),
+      "alte Zuordnung b im Verzeichnis (Builds-Reiter entfallen, #207): sie wird nicht gelesen, der Vergleich nennt das Paar des besten Pulls", await g.evaluate(() => document.querySelector("#cmpBest")?.textContent || ""));
+    assert(!gErrors.length, "alte Zuordnung: keine Fehler in der Seite", gErrors);
+    assert(!gAsked.length, "die Seite fragt weder /api/builds noch /api/plans (#207)", gAsked);
+    await g.close();
+
+    /* Builds-Reiter 6 (Fixrunde 1): kennt das Verzeichnis zu einem gespeicherten besten Pull weder Build noch Paar
+       (ein Eintrag ohne w und b), kommt das Paar aus seinem Lauf - der Hinweis nennt es. Zuerst wird der Pull aus
+       dem Langbogen-Log festgehalten, dann dient er in einer neuen Sitzung als gespeicherter bester Pull, mit
+       einem Eintrag im Verzeichnis (anderer Dateiname, anderer Zeitpunkt), der nur den Zeitpunkt kennt. */
+    const offen = async (best, index, bei) => {
+      const h = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      h.errors = [];
+      h.on("pageerror", (e) => h.errors.push(String(e)));
+      await h.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ } });
+      await h.route("http://boro.test/**", async (route) => {
+        const req = route.request();
+        const path = new URL(req.url()).pathname;
+        const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+        if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best });
+        if (path === "/api/best") { bei(JSON.parse(req.postData() || "{}")); return json(200, { ok: true }); }
+        if (path === "/api/config" && req.method() === "GET") return json(200, { rundgangGesehen: true, ...(index ? { logIndex: index } : {}) });
+        if (path.startsWith("/api/")) return json(200, { ok: true });
+        return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+      });
+      await h.goto("http://boro.test/index.html");
+      await h.waitForTimeout(500);
+      return h;
+    };
+    const ladeVulcanus = async (h, datei) => {
+      await h.setInputFiles("#fileInput", datei);
+      await h.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+      await h.waitForTimeout(250);
+    };
+    let festgehalten = null;
+    const h1 = await offen({}, null, (b) => { festgehalten = b; });
+    await ladeVulcanus(h1, join(work, "bau-lb.txt"));
+    for (const ende = Date.now() + 10000; Date.now() < ende && !festgehalten;) await h1.waitForTimeout(200);
+    await h1.close();
+    const entry = structuredClone(festgehalten?.entry);
+    const spaeter = entry.best.at + 864e5 * 40;
+    entry.best.at = spaeter;
+    /* Bester Pull 4: ein Kampf, den Verlauf und boro-best.json beide kennen, zaehlt mit den Zahlen des Verlaufs.
+       Der Eintrag traegt deshalb DPS und Laenge des gespeicherten Laufs, wie ihn das Verzeichnis fuer denselben
+       Kampf auch fuehrte - mit dps 1 waere er nach der Regel nicht mehr der beste Pull. */
+    const h2 = await offen({ [festgehalten.key]: entry },
+      { "fremd.txt": { size: 1, fights: [{ name: "Vulcanus", dps: entry.best.run.dps, dmg: 1, dur: entry.best.run.seconds, at: spaeter }] } }, () => {});
+    await ladeVulcanus(h2, join(work, "bau-da1.txt"));
+    await h2.evaluate(() => document.querySelector('[data-tab="compare"]').click());
+    await h2.waitForTimeout(250);
+    assert((await h2.evaluate(() => document.querySelector("#cmpBest")?.textContent || "")).includes("Your best pull used a different weapon pair (Longbow + Crossbow)."),
+      "Eintrag im Verzeichnis ohne Paar: das Paar kommt aus dem Lauf des gespeicherten Pulls", await h2.evaluate(() => document.querySelector("#cmpBest")?.textContent || ""));
+    assert(!h2.errors.length, "Paar aus dem Lauf: keine Fehler in der Seite", h2.errors);
+    await h2.close();
   }
 } finally {
   await browser.close();

@@ -98,3 +98,9 @@ a new party.
 no rights), `ProtectSystem=strict`, `ProtectHome=yes`, `PrivateTmp=yes` and
 `NoNewPrivileges=yes`. The server needs none of what these take away. Do not
 loosen them, and do not run it as root.
+
+The server also limits what a stranger who finds the port can do: a request body
+over 256 kB is refused with 413 before it is read, a connection that sends nothing
+for 10 seconds is closed, and a room holds at most 40 names. A real party never
+gets near any of these. If you run an older `boro_server.py`, update it (step 7)
+to get them.

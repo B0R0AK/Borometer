@@ -1,6 +1,6 @@
-import { aufsummiert, fuehrtSeit, rennSchritt, rennStand, type RennPlatz } from "../glutring-core";
+import { aufsummiert, fuehrtSeit, gruppenBahnen, rennSchritt, rennStand, type RennPlatz } from "../glutring-core";
 import type { Fight } from "../types";
-import { SERIES_N, state } from "./01-state";
+import { SERIES_N, seriesColor, state } from "./01-state";
 import { fmt } from "./03-helpers";
 import { stats } from "./06-blocks-and-places";
 import { t } from "./08-translation";
@@ -10,6 +10,10 @@ import { paintMech, perSecond } from "./16-fight-analysis";
 import { $, clock, cssv, esc } from "./18-interface-basics";
 import { glaetten } from "./22-timeline-smoothing";
 import { kampfwahlOffen } from "./23-kampfwahl";
+import { mitgliedName, partyForFight, partyGroupQuelle, partyGroupRows } from "./19-grouping-and-party-fights";
+import { uiZoomFactor } from "./37-window-size-and-overlay";
+import { gruppenKurvenHolen } from "./42-party";
+import { ringStand } from "./64-glutring";
 import { mechanikSekunden, mechanikStrecken } from "./61-mechanik";
 
 /* ---------- Kampf nachspielen (Spezifikation Glutring 6) ----------
@@ -24,9 +28,14 @@ import { mechanikSekunden, mechanikStrecken } from "./61-mechanik";
    schliessen es. Es fragt nichts und merkt sich nichts (Audit). */
 interface Bahn { key: string; label: string; color: string; kum: number[]; el: HTMLElement }
 interface Lauf {
-  start: number; T: number; bahnen: Bahn[]; total: number[]; mech: boolean[]; strecken: {from: number; to: number}[];
+  start: number; modus: string; T: number; bahnen: Bahn[]; total: number[]; mech: boolean[]; strecken: {from: number; to: number}[];
+  /* Die DPS am Ende, wie der Kopf sie fuer diesen Lauf zeigt (#98); null: Summe durch Sekunden. */
+  schlussDps: (() => string) | null;
   seit: number; t: number; spielt: boolean; letzt: number | null; raf: number;
 }
+/* Die Uebrigen laufen ausser Konkurrenz: kein Platz, kein Abzeichen, nie Sieger
+   (Spezifikation Feinschliff 1.1, #97). */
+const REST = "__other__";
 let lauf: Lauf | null = null;
 let tempo = 1;   // gilt fuer die Sitzung
 const ruhig = () => typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
@@ -36,35 +45,159 @@ function sidVon(seg: Fight, name: string): string {
   for(const e of seg.events) if(e.skill === name && e.sid) return e.sid;
   return "";
 }
+/* Eine Bahn, bevor sie Knoten wird: Schluessel, Name, Farbe, Zeichen davor, Schaden je Sekunde. */
+interface BahnRoh { key: string; label: string; color: string; mark: string; werte: number[] }
+let laden = 0;   // Laufnummer: ein spaeter Abruf nach einem Wechsel wird verworfen
+const standSchluessel = () => { const r = ringStand(); return r.modus + "\u0000" + (r.mitglied || ""); };
+function eigeneBahnen(seg: Fight): {ps: ReturnType<typeof perSecond>; roh: BahnRoh[]} {
+  if(!seg.stats) seg.stats = stats(seg);
+  const ps = perSecond(seg, SERIES_N);
+  const roh = ps.series.map(s => {
+    const sonst = s.name === REST, sid = sonst ? "" : sidVon(seg, s.name);
+    return {key: s.name, label: sonst ? t("rennen.uebrige") : skillLabel(s.name, sid), color: s.color,
+            mark: sonst ? "" : skillMark(s.name, sid, s.color), werte: s.values};
+  });
+  return {ps, roh};
+}
 export function rennenOeffnen(){
+  if($("#ringNachspielen").getAttribute("aria-busy") === "true") return;
   rennenSchliessen(false);
   const seg = state.encounters[state.sel];
   if(!seg || !document.body.classList.contains("glut")) return;
-  if(!seg.stats) seg.stats = stats(seg);
-  const ps = perSecond(seg, SERIES_N);
+  const stand = ringStand();
+  if(stand.modus === "gruppe") { gruppenRennen(seg); return; }
+  if(stand.modus === "mitglied" && stand.mitglied && stand.mitglied !== ((state.party && state.party.name) || "")) { mitgliedRennen(seg, stand.mitglied); return; }
+  eigenesRennen(seg, "");
+}
+function eigenesRennen(seg: Fight, luecke: string){
+  const {ps, roh} = eigeneBahnen(seg);
+  laufStarten(seg, ps.T, roh.map(b => ({...b, kum: aufsummiert(b.werte)})), ps.total,
+    mechanikSekunden(seg, ps.T), mechanikStrecken(seg), "rennen.bahnen", luecke,
+    () => state.noTime || !seg.stats ? "—" : fmt(seg.stats.dps));
+}
+function gruppenRennen(seg: Fight){
+  const zeilen = partyGroupRows();
+  const ich = (state.party && state.party.name) || "";
+  /* Deine Bahn kommt aus deinem Log, wenn der gezeigte Kampf deiner ist: der
+     gewaehlte Pull hat Meldungen der Gruppe, oder die lebende Tafel und dein
+     neuester Kampf. */
+  const meins = zeilen.find(z => z.name === ich) && (partyForFight(seg) || state.sel === 0) ? seg : null;
+  const nr = ++laden, schluessel = standSchluessel();
+  ladenZeigen(true);
+  void gruppenKurvenHolen(partyGroupQuelle(), ich).then(kurven => {
+    if(nr !== laden) return;
+    ladenZeigen(false);
+    if(standSchluessel() !== schluessel || state.encounters[state.sel] !== seg || !document.body.classList.contains("glut")) return;
+    const fehlen = zeilen.filter(z => z.name !== ich && !kurven.has(z.name)).length + (zeilen.some(z => z.name === ich) && !meins ? 1 : 0);
+    const luecke = fehlen ? t("rennen.ohneVerlauf", {n: fehlen, m: zeilen.length}) : "";
+    /* Passt keine fremde Kurve, spielt der gewaehlte eigene Kampf (Spezifikation 4.1.7), auch wenn er nicht deiner ist. */
+    if(!kurven.size){ eigenesRennen(meins || seg, luecke); return; }
+    const roh: (BahnRoh & {t0: number | null})[] = [];
+    let eigenPs: ReturnType<typeof perSecond> | null = null;
+    for(const z of zeilen){
+      if(z.name === ich && meins){
+        eigenPs = perSecond(meins, SERIES_N);
+        roh.push({key: z.name, label: z.label, color: z.color, mark: z.icon || "", werte: eigenPs.total, t0: state.wall ? meins.start : null});
+      } else {
+        const k = kurven.get(z.name);
+        if(k) roh.push({key: z.name, label: z.label, color: z.color, mark: z.icon || "", werte: k.total, t0: k.t0});
+      }
+    }
+    const g = gruppenBahnen(roh.map(b => ({key: b.key, t0: b.t0, werte: b.werte})));
+    /* In der Liste fuer den Vorleser und im Bild stehen die Bahnen nach dem Schaden am Ende. */
+    const ende = (i: number) => g.bahnen[i]!.kum[g.bahnen[i]!.kum.length - 1] || 0;
+    const ordnung = roh.map((_, i) => i).sort((a, b) => ende(b) - ende(a) || a - b);
+    const bahnen = ordnung.map(i => ({...roh[i]!, kum: g.bahnen[i]!.kum}));
+    /* Die Mechanik kennt nur dein eigener Kampf; sie rueckt um deinen Versatz. */
+    const mech: boolean[] = new Array(g.T).fill(false);
+    let strecken: {from: number; to: number}[] = [];
+    const ei = roh.findIndex(b => b.key === ich && !!meins);
+    if(ei >= 0 && meins && eigenPs){
+      const ab = g.bahnen[ei]!.ab;
+      mechanikSekunden(meins, eigenPs.T).forEach((m, i) => { if(m && ab + i < g.T) mech[ab + i] = true; });
+      strecken = mechanikStrecken(meins).map(s => ({from: s.from + ab, to: s.to + ab}));
+    }
+    /* Die Gruppe: Summe durch Sekunden der gemeinsamen Uhr - es laufen nur die Mitglieder mit Kurve. */
+    laufStarten(seg, g.T, bahnen, g.total, mech, strecken, "rennen.mitglieder", luecke, null);
+  });
+}
+/* Ein geoeffnetes Mitglied (Spezifikation Gruppenkurven 4.2): seine Faehigkeiten
+   aus den Spuren seiner Kurve. Die Spuren kommen erst, wenn sein Kampf steht;
+   bis dahin oeffnet nichts. Die Farbe folgt dem Rang nach Schaden wie im Ring
+   des Mitglieds. Keine Mechanik - die kennt nur dein eigener Kampf. */
+function mitgliedRennen(seg: Fight, wer: string){
+  const z = partyGroupRows().find(r => r.name === wer);
+  if(!z){ hinweis(t("rennen.keinVerlauf", {name: mitgliedName(wer)})); return; }
+  const nr = ++laden, schluessel = standSchluessel();
+  ladenZeigen(true);
+  void gruppenKurvenHolen(partyGroupQuelle().filter(r => r.name === wer), "").then(kurven => {
+    if(nr !== laden) return;
+    ladenZeigen(false);
+    if(standSchluessel() !== schluessel || state.encounters[state.sel] !== seg) return;
+    const k = kurven.get(wer);
+    if(!k || !k.lanes || !k.lanes.length){ hinweis(t("rennen.keinVerlauf", {name: z.label})); return; }
+    const summe = (v: number[]) => v.reduce((a, x) => a + (x || 0), 0);
+    const reihe = k.lanes.filter(l => l.n !== REST).sort((a, b) => summe(b.v) - summe(a.v));
+    const rang = new Map(reihe.map((l, i) => [l.n, i] as [string, number]));
+    const T = Math.max(k.T, ...k.lanes.map(l => l.v.length));
+    const roh = k.lanes.map(l => {
+      const sonst = l.n === REST, c = sonst ? seriesColor(SERIES_N) : seriesColor(rang.get(l.n)!);
+      return {key: l.n, label: sonst ? t("rennen.uebrige") : skillLabel(l.n, l.sid), color: c,
+              mark: sonst ? "" : skillMark(l.n, l.sid, c), werte: l.v, kum: aufsummiert(l.v)};
+    });
+    /* Am Ende seine DPS wie im Kopf seines Rings (#ringMitgliedZahl). */
+    laufStarten(seg, T, roh, k.total, new Array(T).fill(false), [], "rennen.bahnen", "", () => fmt(z.dps));
+  });
+}
+/* "Verlaeufe laden ...": der Knopf ist besetzt, bis die Abrufe zurueck sind. Er
+   bleibt bedienbar (der Fokus bleibt auf ihm); ein zweiter Klick waehrenddessen
+   tut nichts (rennenOeffnen). */
+function ladenZeigen(an: boolean){
+  const k = $("#ringNachspielen"), s = k.querySelector("span")!;
+  /* Waehrend des Ladens ohne data-i18n: ein Sprachwechsel setzt den Text sonst zurueck. */
+  if(an){ k.setAttribute("aria-busy", "true"); s.removeAttribute("data-i18n"); s.textContent = t("rennen.laden"); }
+  else { k.removeAttribute("aria-busy"); s.dataset.i18n = "ring.nachspielen"; s.textContent = t("ring.nachspielen"); }
+}
+/* Ein kurzer Satz neben dem Knopf, wenn kein Rennen oeffnet; nach vier Sekunden weg. */
+let hinweisUhr = 0;
+function hinweis(text: string){
+  const h = $("#ringHinweis");
+  /* Das Feld bleibt im Baum (role=status); leer blendet CSS es aus. So sagt der Vorleser den neuen Text an. */
+  h.textContent = text;
+  clearTimeout(hinweisUhr);
+  hinweisUhr = window.setTimeout(() => { h.textContent = ""; }, 4000);
+}
+function laufStarten(seg: Fight, T: number, roh: (BahnRoh & {kum: number[]})[], total: number[], mech: boolean[],
+                     strecken: {from: number; to: number}[], liste: string, luecke: string,
+                     schlussDps: (() => string) | null){
+  /* Ein spaeter Abruf darf kein Rennen oeffnen, wenn der Glutring nicht mehr zu sehen ist (Spezifikation 4.3). */
+  if(!document.body.classList.contains("glut")) return;
   const box = $("#rennBahnen");
   box.innerHTML = "";
-  const bahnen: Bahn[] = ps.series.map((s, i) => {
-    const sonst = s.name === "__other__", sid = sonst ? "" : sidVon(seg, s.name);
-    const label = sonst ? t("rennen.uebrige") : skillLabel(s.name, sid);
+  box.setAttribute("aria-label", t(liste));
+  box.dataset.i18nAriaLabel = liste;
+  const bahnen: Bahn[] = roh.map((b, i) => {
     const el = document.createElement("div");
     el.className = "rbahn";
     el.id = "rbahn" + i;   // fuer aria-owns (Reihenfolge fuer den Vorleser, zeigeBei)
     el.setAttribute("role", "listitem");
-    el.dataset.key = s.name;
-    el.style.setProperty("--c", s.color);
-    el.innerHTML = '<span class="rpos"></span><span class="rwer">' + (sonst ? "" : skillMark(s.name, sid, s.color)) +
-      '<span class="rname">' + esc(label) + '</span></span><span class="rspur"><span class="rfill"></span><span class="rwert num"></span></span>';
+    el.dataset.key = b.key;
+    el.classList.toggle("rest", b.key === REST);
+    el.style.setProperty("--c", b.color);
+    el.innerHTML = '<span class="rpos"></span><span class="rwer">' + b.mark +
+      '<span class="rname" title="' + esc(b.label) + '">' + esc(b.label) + '</span></span><span class="rspur"><span class="rfill"></span><span class="rwert num"></span></span>';
     box.appendChild(el);
-    return {key: s.name, label, color: s.color, kum: aufsummiert(s.values), el};
+    return {key: b.key, label: b.label, color: b.color, kum: b.kum, el};
   });
-  lauf = {start: seg.start, T: ps.T, bahnen, total: ps.total, mech: mechanikSekunden(seg, ps.T), strecken: mechanikStrecken(seg),
-    seit: fuehrtSeit(bahnen), t: 0, spielt: false, letzt: null, raf: 0};
-  $("#rennPos").setAttribute("max", String(ps.T));
+  const l = $("#rennLuecke");
+  l.textContent = luecke; l.hidden = !luecke;
+  lauf = {start: seg.start, modus: standSchluessel(), T, bahnen, total, mech, strecken, schlussDps,
+    seit: fuehrtSeit(bahnen, REST), t: 0, spielt: false, letzt: null, raf: 0};
+  $("#rennPos").setAttribute("max", String(T));
   document.body.classList.add("rennt");
   $("#rennen").hidden = false;
   tempoSetzen(tempo);
-  if(ruhig()) zeigeBei(ps.T); else { zeigeBei(0); abspielen(); }
+  if(ruhig()) zeigeBei(T); else { zeigeBei(0); abspielen(); }
   knopf();
   $("#rennPlay").focus();
 }
@@ -82,6 +215,7 @@ export function rennenSchliessen(fokus: boolean){
   $("#rennBahnen").removeAttribute("aria-owns");
   $("#rennFinale").textContent = "";
   $("#rennMechText").textContent = "";
+  $("#rennLuecke").hidden = true; $("#rennLuecke").textContent = "";
   document.body.classList.remove("rennt");
   if(!fokus && !drin) return;
   const nach = $("#ringNachspielen");
@@ -101,15 +235,15 @@ export function rennenSchliessen(fokus: boolean){
 export function rennenPruefen(){
   if(!lauf) return;
   const seg = state.encounters[state.sel];
-  if(!seg || seg.start !== lauf.start || !document.body.classList.contains("glut")) rennenSchliessen(false);
+  if(!seg || seg.start !== lauf.start || lauf.modus !== standSchluessel() || !document.body.classList.contains("glut")) rennenSchliessen(false);
 }
 /* Die Hoehe der Bahnen und wo ihr Block beginnt. Das Rennen ist eine
-   Grafik, keine Liste (Entscheidung 03.10.): die Bahnen wachsen mit dem Feld in
-   Schritten von 4 Punkt von 44 bis 64, in einem kleinen Feld bis hinab zu
-   28. Der Block steht senkrecht mittig im freien Raum; was oben rechts aus
-   dem Ringfeld hereinragt (#ringRechts mit "Kampf speichern" und
-   "Teilen"), haelt er mit 8 Punkt Abstand frei. Gestapelt 36 je Bahn, und
-   die Bahnen bekommen ihre Hoehe. */
+   Grafik, keine Liste: die Bahnen wachsen mit dem Feld in Schritten von 4
+   Punkt von 44 bis 64, in einem kleinen Feld bis hinab zu 24. Der Block
+   steht mittig im freien Raum und haelt 8 Punkt Abstand zu #ringRechts.
+   Gerechnet in Punkten der Seite: unter Vergroesserung misst
+   getBoundingClientRect in Bildschirmpunkten, darum geteilt durch den
+   Zoom. Gestapelt 36 je Bahn, und die Bahnen bekommen ihre Hoehe. */
 function bahnLage(): {h: number; oben: number} {
   const n = lauf ? lauf.bahnen.length : 1, box = $("#rennBahnen");
   if(document.documentElement.matches(".w-max-899,.h-max-699")){
@@ -118,33 +252,34 @@ function bahnLage(): {h: number; oben: number} {
     return {h: 36, oben: 0};
   }
   if(box.style.height) box.style.height = "";
+  const z = (typeof uiZoomFactor === "function" ? uiZoomFactor() : 1) || 1;
   const b = box.getBoundingClientRect(), rr = $("#ringRechts").getBoundingClientRect();
-  const frei = rr.height > 0 && rr.left < b.right && rr.bottom + 8 > b.top ? Math.ceil(rr.bottom + 8 - b.top) : 0;
-  const platz = box.clientHeight - frei, roh = Math.floor(platz / n);
-  const h = roh >= 44 ? Math.min(64, 44 + Math.floor((roh - 44) / 4) * 4) : Math.max(28, roh);
+  const ueber = (rr.bottom - b.top) / z + 8;
+  const frei = rr.height > 0 && rr.left < b.right && ueber > 0 ? Math.ceil(ueber) : 0;
+  const platz = Math.min(box.clientHeight, Math.floor(b.height / z)) - frei, roh = Math.floor(platz / n);
+  const h = roh >= 44 ? Math.min(64, 44 + Math.floor((roh - 44) / 4) * 4) : Math.max(24, roh);
   return {h, oben: frei + Math.max(0, Math.floor((platz - n * h) / 2))};
 }
 function zeigeBei(zeit: number){
   if(!lauf) return;
   const L = lauf;
   L.t = Math.max(0, Math.min(L.T, zeit));
-  const stand = rennStand(L.bahnen, L.t), ende = L.t >= L.T;
+  const stand = rennStand(L.bahnen, L.t, REST), ende = L.t >= L.T;
   const final = Math.max(1, ...L.bahnen.map(b => b.kum[b.kum.length - 1] || 0));
-  const vorn = Math.max(stand[0]?.wert || 0, final * 0.12);
+  const vorn = Math.max(final * 0.12, ...stand.map(p => p.wert));
   const {h, oben} = bahnLage();
   $("#rennBahnen").style.setProperty("--bh", h + "px");
-  for(const p of stand){
+  for(const [i, p] of stand.entries()){
     const b = L.bahnen.find(x => x.key === p.key)!;
-    b.el.style.top = oben + (p.platz - 1) * h + "px";
-    b.el.dataset.platz = String(p.platz);
+    b.el.style.top = oben + i * h + "px";
+    b.el.dataset.platz = p.platz ? String(p.platz) : "";
     b.el.classList.toggle("vorn", p.platz === 1);
-    const w = (86 * p.wert / vorn).toFixed(2) + "%";
-    b.el.querySelector<HTMLElement>(".rfill")!.style.width = w;
+    /* Die Fuellung als Bruch (--f): das Stilblatt zieht den Platz fuer den Wert ab, er bleibt im Bild. */
+    b.el.style.setProperty("--f", (p.wert / vorn).toFixed(4));
     const wert = b.el.querySelector<HTMLElement>(".rwert")!;
-    wert.style.left = w;
     wert.textContent = fmt(p.wert, 1e3);
     const platz = b.el.querySelector<HTMLElement>(".rpos")!;
-    const html = ende && p.platz <= 3
+    const html = !p.platz ? "" : ende && p.platz <= 3
       ? '<span class="medaille m' + p.platz + '" role="img" aria-label="' + esc(t("rennen.platz", {platz: p.platz})) + '">' + p.platz + "</span>"
       : String(p.platz);
     if(platz.innerHTML !== html) platz.innerHTML = html;
@@ -158,7 +293,10 @@ function zeigeBei(zeit: number){
   $("#rennUhr").textContent = clock(L.t);
   $("#rennVon").textContent = t("rennen.von", {T: clock(L.T)});
   const summe = stand.reduce((a, p) => a + p.wert, 0);
-  $("#rennDps").textContent = L.t >= 1 ? fmt(summe / L.t) : "\u2014";
+  /* Am Ende zeigt die Zeile dieselbe DPS wie der Kopf (#hDps, im Ring eines
+     Mitglieds seine Zahl), nicht Summe durch Sekunden (schlussDps je Lauf). */
+  $("#rennDps").textContent = ende && L.schlussDps ? L.schlussDps()
+    : L.t >= 1 ? fmt(summe / L.t) : "\u2014";
   const mech = !ende && !!L.mech[Math.min(L.T - 1, Math.floor(L.t))];
   const mt = mech ? t("rennen.mechanik") : "";
   if($("#rennMechText").textContent !== mt) $("#rennMechText").textContent = mt;
@@ -171,7 +309,7 @@ function zeigeBei(zeit: number){
   const zeitText = t("rennen.zeitText", {t: clock(L.t), T: clock(L.T)});
   if(leiste.getAttribute("aria-valuetext") !== zeitText) leiste.setAttribute("aria-valuetext", zeitText);
   $("#rennen").dataset.t = L.t.toFixed(1);
-  const fin = ende ? satz(stand) : "";
+  const fin = ende ? satz(stand.filter(p => p.platz > 0)) : "";
   if($("#rennFinale").textContent !== fin) $("#rennFinale").textContent = fin;
   miniKurve();
 }

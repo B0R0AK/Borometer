@@ -1,16 +1,18 @@
 import { state } from "./01-state";
 import { fmt } from "./03-helpers";
-import { DUNGEON_TAFEL, OFFENE_BOSSE } from "./06-blocks-and-places";
+import { DUNGEON_TAFEL, histKey, OFFENE_BOSSE } from "./06-blocks-and-places";
 import { t } from "./08-translation";
 import { bossIcon, skillIcon } from "./12-boss-images";
 import { skillEntry } from "./10-skill-names";
 import { $, esc } from "./18-interface-basics";
-import { histNachlesen, renderAll, topName } from "./32-history";
+import { logOrdnerKennt, oeffneDateien, waehleKampf } from "./23-kampfwahl";
+import { histNachlesen, renderAll, topName, verlaufZiele } from "./32-history";
+import { switchTab } from "./34-menus-drop-and-tabs";
 import { konfigGelesen, SERVED } from "./41-server-mode";
 import { wkBilderCss, wkHatBild } from "./60-weeklies-bilder";
 import { abendText } from "../build-core";
-import type { HistFight } from "../types";
-import { albumTafel, lesebedarf, NACH_MAX, rekorde, type RkAlbum, type RkOrt, type RkPlatz, type RkSeiteWert } from "../rekorde-core";
+import { albumTafel, lesebedarf, NACH_MAX, rekorde, type RkAlbum, type RkKampf, type RkOrt, type RkPlatz, type RkSeiteWert } from "../rekorde-core";
+import { mitDatum } from "../verlauf-core";
 
 /* ---------- Rekorde (Spezifikation 2026-10-01-rekorde-design.md, 2a und 3) ----------
    Ein Ort wie die Weeklies (state.rekorde, switchTab("rekorde")): ein
@@ -25,7 +27,15 @@ import { albumTafel, lesebedarf, NACH_MAX, rekorde, type RkAlbum, type RkOrt, ty
    Zahlen; kein Rot, kein Gruen; keine Meldung.
 
    Gerechnet wird in ../rekorde-core.ts aus allen Eintraegen des Verzeichnisses
-   (rekordKaempfe): geoeffnete und nur nachgelesene Dateien.
+   (rekordKaempfe): geoeffnete und nur nachgelesene Dateien, dazu die
+   gespeicherten besten Pulls, die das Verzeichnis nicht kennt (Spezifikation
+   Bester Pull 4 und 5.3) - dieselbe Menge wie "Gegen deinen besten Pull".
+
+   Jedes Medaillon mit Kampf ist ein Knopf (Bester Pull 5.3): er oeffnet das
+   Log des besten Pulls (ohne besten den neuesten Kampf) und waehlt ihn, wenn
+   die Datei im Log-Ordner liegt; sonst wechselt er in den Verlauf dieses
+   Bosses. Geht keins von beiden (im Browser ein Boss, den der Verlauf nicht
+   zeigt), bleibt das Medaillon ein Listenpunkt ohne Knopf.
    Die Raid-Portraets sind eigene Bildschirmfotos aus den Weeklies
    (60-weeklies-bilder.ts, als Klassen wkb-*), die uebrigen kommen ueber
    bossIcon, die Faehigkeitssymbole ueber skillIcon.
@@ -203,20 +213,36 @@ function medaillon(p: RkPlatz, i: number){
   if(!w) return '<li class="rkmed leer"' + stil + '><span class="bild" aria-hidden="true"></span><span class="mname">' + esc(name) + "</span>" + unter +
     '<span class="vh">' + esc(t("rk.leerVh", {w: t("rk.bekaempft")})) + "</span></li>";
   const plus = w.vorher != null ? t("rk.plus", {p: w.plus ?? 0, w: zahl(w.vorher)}) : w.n === 1 ? t("rk.einKampf") : t("rk.ersterVon", {n: w.n});
+  /* Als Knopf (Bester Pull 5.3) nennt der Name, was sichtbar steht - Boss
+     und Wert (aria-labelledby, WCAG 2.5.3) - und die Handlung (.vh). Der
+     Rest des Medaillons bleibt fuer den Vorleser als Beschreibung
+     (aria-describedby). Die Kennungen zaehlen ueber das ganze Album. */
+  const knopf = weg(o, w.bester ? w.dpsAt : w.zuletzt);
+  const id = (teil: string) => knopf ? ' id="rkm' + i + teil + '"' : "";
   const sb = w.top != null ? faehigkeitBild(w.topSid!) : null;
   const top = w.top != null
-    ? '<span class="mtop"><span class="vh">' + esc(t("rk.topVh")) + "</span>" + (sb ? '<img src="' + sb + '" alt="" aria-hidden="true">' : "") +
-      "<b>" + esc(zahl(w.top)) + '</b></span><span class="mskill">' +
+    ? '<span class="mtop"' + id("t") + '><span class="vh">' + esc(t("rk.topVh")) + "</span>" + (sb ? '<img src="' + sb + '" alt="" aria-hidden="true">' : "") +
+      "<b>" + esc(zahl(w.top)) + '</b></span><span class="mskill"' + id("s") + ">" +
       esc(w.topTeil ? t("rk.teil", {skill: faehigkeit(w.topSid!), teil: w.topTeil}) : faehigkeit(w.topSid!)) + "</span>"
-    : '<span class="mtop offen">' + esc(t("rk.offen")) + "</span>";
+    : '<span class="mtop offen"' + id("t") + ">" + esc(t("rk.offen")) + "</span>";
   // "ab": der Satz dazu steht im title und fuer Vorleser im Medaillon (.vh)
-  const erst = w.ab ? '<span class="merst" title="' + esc(t("rk.abTitle")) + '">' + esc(t("rk.ersterAb", {d: tagKurz(w.erster)})) +
+  const erst = w.ab ? '<span class="merst"' + id("e") + ' title="' + esc(t("rk.abTitle")) + '">' + esc(t("rk.ersterAb", {d: tagKurz(w.erster)})) +
       '<span class="vh">' + esc(t("rk.abVh")) + "</span></span>"
-    : '<span class="merst">' + esc(t("rk.erster", {d: tagKurz(w.erster)})) + "</span>";
-  return '<li class="rkmed"' + stil + ">" + bild(o, "bild") + '<span class="mname">' + esc(name) + "</span>" + unter +
-    '<span class="mdps"><span class="vh">' + esc(t("rk.dpsVh")) + "</span>" + esc(zahl(w.dps)) + "</span>" +
-    '<span class="mplus">' + esc(plus) + '<span class="vh"> \u00b7 ' + esc(t("rk.dpsAm", {d: tagKurz(w.dpsAt)})) + "</span></span>" +
-    '<span class="mtrenn" aria-hidden="true"></span>' + top + erst + "</li>";
+    : '<span class="merst"' + id("e") + ">" + esc(t("rk.erster", {d: tagKurz(w.erster)})) + "</span>";
+  const r = "rkm" + i;
+  const beschrieben = [o.unter ? "u" : "", "p", "t", w.top != null ? "s" : "", "e"].filter(Boolean).map(x => r + x).join(" ");
+  return '<li class="rkmed"' + stil + ">" +
+    (knopf ? '<button type="button" class="rkknopf" data-at="' + knopf.at + '" data-datei="' + esc(knopf.datei) + '" data-ort="' + esc(knopf.ort) +
+      '" aria-labelledby="' + r + "n " + r + "w " + r + 'h" aria-describedby="' + beschrieben + '">' : "") +
+    bild(o, "bild") + '<span class="mname"' + id("n") + ">" + esc(name) + "</span>" +
+    (o.unter ? '<span class="munter"' + id("u") + ">" + esc(unterName(o.unter)) + "</span>" : "") +
+    /* ohne besten Pull (Spezifikation Bester Pull 5.3): bekaempft, aber keine Zahl und kein Datum */
+    (w.bester
+      ? '<span class="mdps"' + id("w") + '><span class="vh">' + esc(t("rk.dpsVh")) + "</span>" + esc(zahl(w.dps)) + "</span>" +
+        '<span class="mplus"' + id("p") + ">" + esc(plus) + '<span class="vh"> \u00b7 ' + esc(t("rk.dpsAm", {d: tagKurz(w.dpsAt)})) + "</span></span>"
+      : '<span class="mdps offen"' + id("w") + ">" + esc(t("rk.keinBester")) + "</span>" + '<span class="mplus"' + id("p") + ">" + esc(plus) + "</span>") +
+    '<span class="mtrenn" aria-hidden="true"></span>' + top + erst +
+    (knopf ? '<span class="vh"' + id("h") + ">" + esc(t(knopf.log ? "rk.oeffnen" : "rk.verlauf")) + "</span></button>" : "") + "</li>";
 }
 
 function seite(s: RkSeiteWert, zaehler: { i: number }){
@@ -249,18 +275,83 @@ function held(a: RkAlbum){
    Rest soll stehen bleiben, ohne neu einzublenden. still: ein Block, der
    nach dem Oeffnen neu gezeichnet wurde, blendet nicht noch einmal ein. */
 /* Alle Kaempfe des Verzeichnisses mit ihrer Datei, auch die nur
-   nachgelesenen (nach), die Verlauf und Builds nicht zaehlen (histCollect). */
-function rekordKaempfe(){
-  const raus: (HistFight & {file: string})[] = [];
-  for(const [file, e] of Object.entries(state.hist.files)) for(const f of e.fights || []) raus.push({...f, file});
+   nachgelesenen (nach), die Verlauf und Builds nicht zaehlen (histCollect).
+   Dazu die zwei gespeicherten Pulls je Schluessel (boro-best.json), deren at
+   das Verzeichnis nicht kennt, wie bossPulls (46-best-pull.ts) sie nimmt:
+   sonst zeigten Medaillon und "Gegen deinen besten Pull" verschiedene
+   Zahlen. Ihr Name kommt aus dem Lauf; fehlt er, der Schluessel (der
+   histKey findet seinen Platz, test-rekorde-core.mjs). Ohne die Summen
+   einer Gruppe (g, histRecord), wie bossPulls: sie sind nie dein bester
+   Pull (Entscheidung 06.10.). Ein gespeicherter Pull mit demselben at
+   (derselbe Kampf, mit einem gewaehlten Angreifer gerechnet) zaehlt dann
+   wie dort. Ohne einen Kampf ohne Datum (mitDatum, Fix verlauf-ohne-datum):
+   er stuende am 01.01.1970. */
+type RkEintrag = RkKampf & { file: string };
+function rekordKaempfe(): RkEintrag[] {
+  const raus: RkEintrag[] = [];
+  const bekannt = new Set<number>();
+  for(const [file, e] of Object.entries(state.hist.files)) for(const f of e.fights || []){
+    if(f.g || !mitDatum(f.at)) continue;
+    raus.push({...f, file}); bekannt.add(f.at);
+  }
+  for(const [key, e] of Object.entries(state.best)) for(const p of [e.best, e.second]){
+    if(!p || bekannt.has(p.at)) continue;
+    bekannt.add(p.at);
+    const c = key.startsWith("dummy:") ? Number(key.slice(6)) : 0;
+    raus.push({name: p.run.name || key.replace(/^(?:boss|dummy):/, ""), dps: p.run.dps, dur: p.run.seconds ?? 0, at: p.at, file: p.file,
+      ...(c ? {c} : {})});
+  }
   return raus;
+}
+
+/* Wohin ein Medaillon fuehrt (Bester Pull 5.3), je Zeichnen einmal
+   bestimmt: die Kaempfe nach at und die Bosse, die der Verlauf zeigt. */
+let wege: { kaempfe: Map<number, RkEintrag>; verlauf: Set<string> } = {kaempfe: new Map(), verlauf: new Set()};
+/* Der Kampf at eines Platzes: seine Datei und sein Boss im Verlauf (histKey;
+   die Uebungspuppe steht nicht im Verlauf). null: weder Log noch Verlauf. */
+function weg(o: RkOrt, at: number): { at: number; datei: string; ort: string; log: boolean } | null {
+  const k = wege.kaempfe.get(at);
+  if(!k) return null;
+  const ort = o.klasse != null ? "" : histKey(k.name);
+  const log = logGeht(k.file);
+  return log || verlaufGeht(ort, wege.verlauf) ? {at, datei: k.file, ort, log} : null;
+}
+/* Das Log oeffnen geht mit dem Helfer, wenn der Log-Ordner die Datei kennt
+   oder seine Liste noch nicht da ist (dann sagt oeffneDateien "Datei fehlt"). */
+const logGeht = (datei: string) => SERVED && !!datei && logOrdnerKennt(datei.split(" + ")) !== false;
+/* Der Verlauf steht nur neben einem geladenen Kampf (#app) und zeigt nur Bosse mit zwei Kaempfen. */
+const verlaufGeht = (ort: string, ziele: Set<string>) => !!ort && state.encounters.length > 0 && ziele.has(ort);
+
+/* Der Klick: das Log wie "Log oeffnen" in der Tafel (56-tafel.ts), dann
+   der Kampf mit diesem Beginn, der Fokus auf die Kampfwahl. Kommt die Datei
+   nicht (Toast "Datei fehlt" oder ein Lesefehler), geht es wie ohne Datei
+   weiter: in den Verlauf mit diesem Boss, der Fokus auf seine Wahl - gibt
+   es ihn dort nicht, bleibt alles, wie es war. */
+async function medaillonOeffnen(b: HTMLElement){
+  const at = Number(b.dataset.at), datei = b.dataset.datei || "", ort = b.dataset.ort || "";
+  if(logGeht(datei)){
+    const namen = datei.split(" + ");
+    await oeffneDateien(namen);
+    if((state.fileNames || []).join(" + ") === namen.join(" + ")){
+      const i = state.encounters.findIndex(s => s.start === at);
+      if(i >= 0) waehleKampf(i);
+      $("#kwKnopf").focus({preventScroll: true});
+      return;
+    }
+  }
+  if(!verlaufGeht(ort, verlaufZiele())) return;
+  state.hist.sel = ort;
+  switchTab("history");
+  document.getElementById("histBoss")?.focus({preventScroll: true});
 }
 const BLOECKE = ["held", "raid", "puppe", "feld", "dungeon"] as const;
 export function renderRekorde(still = true){
   const box = document.getElementById("rkInhalt");
   if(!box) return;
   if(!tafel) tafel = albumTafel(DUNGEON_TAFEL, OFFENE_BOSSE);
-  const a = rekorde(rekordKaempfe(), tafel, aelter !== false);
+  const kaempfe = rekordKaempfe();
+  wege = {kaempfe: new Map(kaempfe.map(k => [k.at, k])), verlauf: verlaufZiele()};
+  const a = rekorde(kaempfe, tafel, aelter !== false);
   const quelle = a.kaempfe && a.von != null && a.bis != null
     ? t("rk.quelle", {n: a.dateien, k: a.kaempfe, von: tagKurz(a.von), bis: tagKurz(a.bis)}) : t("rk.quelleLeer");
   const q = $("#rkQuelle");
@@ -334,6 +425,11 @@ export function setup(): void {
     void nachlesen(false);
   });
   document.getElementById("eRekorde")?.addEventListener("click", rekordeNeuEinlesen);
+  // die Medaillons stehen im neu geschriebenen Inhalt: am festen Kasten gefangen
+  document.getElementById("rkInhalt")?.addEventListener("click", e => {
+    const b = (e.target as Element).closest<HTMLElement>(".rkknopf");
+    if(b) void medaillonOeffnen(b);
+  });
   const eb = document.getElementById("eRekordeBrowser");
   if(eb) eb.hidden = SERVED;
   zeichneStand();

@@ -15,13 +15,16 @@
 import { BrowserWindow, nativeTheme, screen, shell } from "electron";
 import * as path from "node:path";
 import { acrylicSupported, borderFor, materialFor, overlayFor, themeSourceFor } from "./chrome";
+import { autostartSetzen } from "./autostart";
 import { loadConfig, updateConfig } from "./config";
 import { bump } from "./events";
 import {
   fensterNeu, neuerMerker, platzGross, platzKompakt, teilAus,
   type LageGross, type LageKompakt, type Monitor, type Teil,
 } from "./lage";
+import { meldeKampf } from "./notify";
 import { setLiveBadge } from "./taskbar";
+import { auftragErledigt } from "./start";
 import type { Json } from "./http";
 
 export const WINDOW_W = 1280;
@@ -42,9 +45,18 @@ const MIN_ACTION_H = 24;
 /*
  * The page's web preferences, one object for both windows (safety audit 8b):
  * no Node, no preload and no bridge into this process. The page talks to it
- * over http on 127.0.0.1 only.
+ * over http on 127.0.0.1 only. Throttling off: live logging and the fight
+ * watch go on while the window is minimized or in the tray (spec
+ * Windows-Einbindung 4.1).
  */
-const SEITE = Object.freeze({ nodeIntegration: false, contextIsolation: true, sandbox: true, spellcheck: false });
+const SEITE = Object.freeze({ nodeIntegration: false, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: false });
+
+/* Set once the app really quits (tray "Quit", before-quit, session end):
+   from then on closing closes, even with "close to tray" on. */
+const ende = { erlaubt: false };
+export function beendenErlauben(): void {
+  ende.erlaubt = true;
+}
 
 /* The page's origin and the icon, as createWindow() got them from main.ts:
    the compact window loads the same page from the same server. */
@@ -136,10 +148,11 @@ export function kompaktMoeglich(): boolean {
 function backgroundFor(theme: unknown): string {
   if (theme === "light") return "#d8e1e0";
   if (theme === "tnl") return "#0e1122";
+  if (theme === "glas") return "#1a1817";
   return "#060402";
 }
 
-export function createWindow(url: string, iconPath: string): BrowserWindow {
+export function createWindow(url: string, iconPath: string, start: "normal" | "minimiert" | "verborgen" = "normal"): BrowserWindow {
   const cfg = loadConfig();
   /* Full view's place from last time (spec Fenster-Extras 3.4) while its
      title bar is still on a monitor, else the middle of the main monitor;
@@ -177,6 +190,7 @@ export function createWindow(url: string, iconPath: string): BrowserWindow {
   state.compact = false;
   state.placed = platz !== null;
   borderInTheme(win, cfg.themeResolved);
+  materialSetzen(win, false, cfg.themeResolved);
   watchTransparency();
   // A page that (re)loads starts in full view with live logging off and
   // knows nothing of what its predecessor set on this window: click-through,
@@ -188,7 +202,7 @@ export function createWindow(url: string, iconPath: string): BrowserWindow {
       win.setIgnoreMouseEvents(false);
       state.through = false;
     }
-    if (acrylicSupported()) win.setBackgroundMaterial("none");
+    materialSetzen(win, false, loadConfig().themeResolved);
     state.compact = false;
     // A page reloaded in compact had shrunk the window to the strip; the new
     // one starts in full view, so full view's place comes back (backToFull).
@@ -224,7 +238,15 @@ export function createWindow(url: string, iconPath: string): BrowserWindow {
   win.on("resize", bewegt);
   win.on("maximize", bewegt);
   win.on("unmaximize", bewegt);
-  win.on("close", () => merker.jetzt());
+  win.on("close", (e) => {
+    merker.jetzt();
+    // close to tray (spec Windows-Einbindung 4.1): hidden, not closed; compact stays
+    if (!ende.erlaubt && process.platform === "win32" && loadConfig().trayBeimSchliessen === true) {
+      e.preventDefault();
+      win.hide();
+    }
+  });
+  win.on("session-end", beendenErlauben);
   // nativeTheme may not report a change of "Transparency effects" as
   // "updated" (its documentation names only colours); coming back to the
   // window looks again
@@ -238,6 +260,14 @@ export function createWindow(url: string, iconPath: string): BrowserWindow {
    * backgroundColor above covers. */
   const reveal = (): void => {
     if (win.isDestroyed() || win.isVisible()) return;
+    // started with Windows (spec Windows-Einbindung 4.2): in the tray, or
+    // minimized in the taskbar without taking the focus
+    if (start === "verborgen") return;
+    if (start === "minimiert") {
+      win.showInactive();
+      win.minimize();
+      return;
+    }
     // maximised last time: maximised again, on the monitor its place is on
     if (platz?.max) win.maximize();
     win.show();
@@ -301,6 +331,10 @@ function nurEigeneSeite(win: BrowserWindow, origin: string): void {
  * ?kompakt=1, so it starts as the strip; full view stays where it is.
  * Shown without taking the focus: it is opened over a running game, often by
  * the hotkey, and the game keeps the keyboard.
+ * From outside the page - the taskbar preview button, and the tray menu
+ * (#56) the same way - the compact window opens and closes only through
+ * bump("compact"): full view hears it and does what its own button does,
+ * sending live state and fight along. No second way in.
  */
 function openKompakt(start: { live: boolean; durch: boolean }): boolean {
   if (!kompaktMoeglich() || !seite.origin) return false;
@@ -339,11 +373,7 @@ function openKompakt(start: { live: boolean; durch: boolean }): boolean {
   // a new strip measures itself anew: its limit starts from its first size
   streifen.grenze = { w: 0, h: 0 };
   streifen.vorMenue = null;
-  const material = (): void => {
-    if (!acrylicSupported()) return;
-    const acrylic = materialFor(true, nativeTheme.prefersReducedTransparency) === "acrylic";
-    kw.setBackgroundMaterial(acrylic ? "acrylic" : "none");
-  };
+  const material = (): void => materialSetzen(kw, true, cfg.themeResolved);
   material();
   borderInTheme(kw, cfg.themeResolved);
   // a reload starts the page anew: the mouse comes back to the window
@@ -503,12 +533,44 @@ function borderInTheme(win: BrowserWindow, theme: unknown): void {
   nativeTheme.themeSource = themeSourceFor(theme, loadConfig().theme);
 }
 
-/** After POST /api/config changed theme or themeResolved (server.ts). */
+/*
+ * The window's own material (spec Rauchglas 3.2), the one place it is set:
+ * chrome.ts's materialFor() picks it from compact, Windows' "Transparency
+ * effects" and a theme name. Where Windows has neither Acrylic nor Mica the
+ * window keeps its solid ground and nothing is called.
+ */
+function materialSetzen(win: BrowserWindow, compact: boolean, theme: unknown): void {
+  if (acrylicSupported()) win.setBackgroundMaterial(materialFor(compact, nativeTheme.prefersReducedTransparency, theme));
+}
+
+/** Whether full view sits on its glass ground right now (GET /api/state,
+    spec Rauchglas 3.3). The page's name for it is still "mica"; the
+    material has been Acrylic since #189 (chrome.ts, materialFor). */
+export function micaNow(): boolean {
+  return acrylicSupported() && !state.compact
+    && materialFor(false, nativeTheme.prefersReducedTransparency, loadConfig().themeResolved) === "acrylic";
+}
+
+/** Why full view could not sit on its glass ground: "system" (before
+    Windows 11 22H2, Linux), "aus" ("Transparency effects" off), null when
+    it could. */
+export function micaGrund(): "system" | "aus" | null {
+  if (!acrylicSupported()) return "system";
+  return nativeTheme.prefersReducedTransparency ? "aus" : null;
+}
+
+/** After POST /api/config changed theme or themeResolved (server.ts): the
+    border, Windows' menus and full view's material (Acrylic in smoked glass);
+    the page hears of the material through the event channel. */
 export function themeChanged(): void {
   const win = currentWindow();
-  if (win) borderInTheme(win, loadConfig().themeResolved);
+  if (win) {
+    borderInTheme(win, loadConfig().themeResolved);
+    materialSetzen(win, state.compact, loadConfig().themeResolved);
+  }
   const kw = kompaktWindow();
   if (kw) borderInTheme(kw, loadConfig().themeResolved);
+  bump("material");
 }
 
 /** Whether compact can sit on Acrylic right now (GET /api/state). */
@@ -527,12 +589,11 @@ function transparencyChanged(): void {
   const reduced = nativeTheme.prefersReducedTransparency;
   if (reduced === state.reduced) return;
   state.reduced = reduced;
-  const acrylic = materialFor(true, reduced) === "acrylic";
   const win = currentWindow();
-  if (win && state.compact && acrylicSupported()) win.setBackgroundMaterial(acrylic ? "acrylic" : "none");
+  if (win) materialSetzen(win, state.compact, loadConfig().themeResolved);
   // the compact window is compact all the time
   const kw = kompaktWindow();
-  if (kw && acrylicSupported()) kw.setBackgroundMaterial(acrylic ? "acrylic" : "none");
+  if (kw) materialSetzen(kw, true, loadConfig().themeResolved);
   bump("material");
 }
 
@@ -709,6 +770,19 @@ export function winAction(sent: Json): Answer {
         bump("kompaktstand");
         return ok();
       }
+      case "autostart": {
+        // start with Windows on or off (autostart.ts); Windows keeps the state
+        return ok({ autostart: autostartSetzen(sent.an === true) });
+      }
+      case "kampf": {
+        // full view reports a finished fight (notify.ts decides and shows)
+        const gezeigt = meldeKampf(currentWindow(), seite.icon, sent.titel, sent.satz, sent.best);
+        return gezeigt === null ? fail("not a fight report") : ok({ gezeigt });
+      }
+      case "starterledigt": {
+        // the page did what the jump list asked (start.ts); only the number counts
+        return ok({ erledigt: auftragErledigt(sent.nr) });
+      }
       case "resize": {
         // compact shrinks the real window to fit the meter, and remembers the
         // old size so Full view can restore it. Content size, not outer size:
@@ -835,6 +909,8 @@ export function winAction(sent: Json): Answer {
         win.setTitleBarOverlay(overlayFor(sent.theme, sent.height));
         state.header = sent.height;
         borderInTheme(win, sent.theme);
+        // smoked glass puts full view on Acrylic, every other theme takes it off
+        if (win === state.win) materialSetzen(win, state.compact, sent.theme);
         break;
       }
       case "material": {
@@ -850,13 +926,16 @@ export function winAction(sent: Json): Answer {
         // Windows' "Transparency effects" off: compact on its solid ground,
         // its buttons hidden all the same (spec Fenster-Extras 3.3)
         const compact = sent.kind === "acrylic";
-        const acrylic = materialFor(compact, nativeTheme.prefersReducedTransparency) === "acrylic";
+        const acrylic = materialFor(compact, nativeTheme.prefersReducedTransparency, sent.theme) === "acrylic";
         state.compact = compact;
-        if (acrylicSupported()) win.setBackgroundMaterial(acrylic ? "acrylic" : "none");
+        materialSetzen(win, compact, sent.theme);
         if (compact) win.setTitleBarOverlay({ color: "#00000000", symbolColor: "#00000000", height: 1 });
         else win.setTitleBarOverlay(overlayFor(sent.theme, sent.height));
         state.header = sent.height;
         borderInTheme(win, sent.theme);
+        // full view's glass ground follows compact (micaNow); the page hears of it
+        // through the event channel and asks /api/state again
+        bump("material");
         return ok({ material: acrylic ? "acrylic" : "none" });
       }
       case "live": {

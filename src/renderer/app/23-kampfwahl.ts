@@ -8,8 +8,9 @@ import { darfEntfernen } from "./19-grouping-and-party-fights";
 import { kampfEntfernen, renderFights } from "./30-fight-list";
 import { loadText, renderAll, setLoadOrigin } from "./32-history";
 import { schliesseAndereKopffenster } from "./34-menus-drop-and-tabs";
-import { liveFortsetzen, livePausieren, SERVED } from "./41-server-mode";
+import { liveFortsetzen, livePausieren, SERVED, serverDir } from "./41-server-mode";
 import { isWatching, syncLiveBtn } from "./45-startup";
+import { gelesenMelden } from "./66-windows";
 import { berlinTag, logTage, tagTeile, type LogTag } from "../verlauf-core";
 
 /* ---------- Die Kampfwahl (Instrumententafel 3.2) ----------
@@ -50,17 +51,25 @@ function eintraege(): HTMLElement[] {
 /* Der angewaehlte Eintrag, gemerkt an seiner id: nach einem Neubau der Liste
    steht dieselbe id an einem neuen Knoten. */
 let aktivId = "";
+/* Stand die Anwahl auf dem gewaehlten Kampf, als die Liste neu gebaut
+   wurde, folgt sie ihm (#153): Enter oeffnet dann, was die Glut zeigt.
+   Stand sie woanders (mit den Pfeilen hingesetzt), bleibt sie dort. Nur im
+   Live: eine von Hand geoeffnete Datei springt zum neuesten, die Anwahl
+   bleibt dann auf ihrem Kampf. */
+let aufGewaehltem = false;
 function setzeAktiv(ziel: HTMLElement | null | undefined){
   const feld = suchfeld();
   const alt = aktivId ? document.getElementById(aktivId) : null;
   if(alt && alt !== ziel) alt.classList.remove("aktiv");
   if(!ziel){
     aktivId = "";
+    aufGewaehltem = false;
     if(feld.hasAttribute("aria-activedescendant")) feld.removeAttribute("aria-activedescendant");
     return;
   }
   if(!ziel.classList.contains("aktiv")) ziel.classList.add("aktiv");
   aktivId = ziel.id;
+  aufGewaehltem = ziel.classList.contains("on");
   if(feld.getAttribute("aria-activedescendant") !== ziel.id) feld.setAttribute("aria-activedescendant", ziel.id);
   kwZeigen(ziel);
 }
@@ -72,19 +81,29 @@ export function kwZeigen(ziel: HTMLElement){
   const liste = document.getElementById("kwListe");
   if(!liste || !ziel.getClientRects().length) return;
   const lr = liste.getBoundingClientRect(), r = ziel.getBoundingClientRect();
+  /* Ein Ortskopf zeigt seine Gruppe von oben (#154): Pos1 nach Ende rollte
+     sonst nur bis zur ersten Zeile, der Kopf darueber blieb draussen. */
+  if(ziel.matches(".blockfold")){
+    const g = ziel.closest<HTMLElement>(".blockgroup") || ziel;
+    const gr = g.getBoundingClientRect(), gOben = gr.top - lr.top + liste.scrollTop;
+    // der Kopf klebt oben, also zaehlt der Anfang der Gruppe, nicht er selbst
+    if(gr.top < lr.top - 0.5 || r.bottom > lr.bottom) liste.scrollTop = g === liste.querySelector(".blockgroup") ? 0 : Math.max(0, gOben);
+    return;
+  }
   const kopf = ziel.closest(".blockhead") ? null : ziel.closest(".blockgroup")?.querySelector<HTMLElement>(".blockhead");
   const oben = lr.top + (kopf ? kopf.getBoundingClientRect().height : 0);
   let soll = liste.scrollTop;
   if(r.top < oben) soll -= oben - r.top;
   else if(r.bottom > lr.bottom) soll += Math.min(r.bottom - lr.bottom, r.top - oben);
   else return;
-  /* Die Liste rastet an Zeilen (scroll-snap, styles.css): eine Lage zwischen
-     zwei Rasten nimmt der Browser zurueck, und die Zeile stand wieder halb
-     draussen. Gerollt wird darum zur ersten Raste ab dem Soll - sie zeigt
-     die Zeile ganz, spaetestens ihre eigene. */
-  const pad = parseFloat(getComputedStyle(liste).scrollPaddingTop) || 0;
-  const rasten = [...liste.querySelectorAll<HTMLElement>(".fight")].filter(f => f.getClientRects().length)
-    .map(f => f.getBoundingClientRect().top - lr.top + liste.scrollTop - pad).filter(x => x >= soll - 0.5);
+  /* Die Liste rastet fest an Zeilen und Gruppen (scroll-snap, styles.css):
+     eine Lage zwischen zwei Rasten nimmt der Browser zurueck, und die Zeile
+     stand wieder halb draussen. Gerollt wird darum zur ersten Raste ab dem
+     Soll - sie zeigt die Zeile ganz, spaetestens ihre eigene. Der Abstand
+     der Raste ist das scroll-margin-top des Eintrags. */
+  const rasten = [...liste.querySelectorAll<HTMLElement>(".fight, .trashhead, .blockgroup")].filter(f => f.getClientRects().length)
+    .map(f => f.getBoundingClientRect().top - lr.top + liste.scrollTop - (parseFloat(getComputedStyle(f).scrollMarginTop) || 0))
+    .filter(x => x >= soll - 0.5);
   liste.scrollTop = rasten.length ? Math.min(...rasten) : soll;
 }
 /* Die Ueberschrift ueber einem Eintrag: rueckwaerts bis zum ersten Klappkopf. */
@@ -99,13 +118,38 @@ function kopfUeber(alle: HTMLElement[], i: number){
    weg. Ohne Suche ist nichts verborgen - dann schreibt diese Funktion auf
    einer frisch gebauten Liste nichts. */
 let statusZuletzt = "";
+/* Der Baum ist flach (#154): Ebene, Platz und Zahl der Geschwister stehen an
+   jedem Eintrag, gezaehlt ueber die sichtbaren. Geschwister sind Eintraege
+   derselben Ebene unter demselben Eintrag der Ebene darueber. Schreibt nur,
+   was sich aendert. */
+export function baumZaehlen(box: HTMLElement){
+  const alle = [...box.querySelectorAll<HTMLElement>(".blockfold, .trashhead, .fight")].filter(e => !e.closest("[hidden]"));
+  const gruppen = new Map<string, HTMLElement[]>();
+  const eltern: (HTMLElement | null)[] = [];
+  alle.forEach(e => {
+    const ebene = +(e.getAttribute("aria-level") || 1);
+    eltern[ebene] = e; eltern.length = ebene + 1;
+    const vater = ebene > 1 ? eltern[ebene - 1] : null;
+    const k = (vater ? vater.id : "") + "|" + ebene;
+    if(!gruppen.has(k)) gruppen.set(k, []);
+    gruppen.get(k)!.push(e);
+  });
+  gruppen.forEach(reihe => reihe.forEach((e, i) => {
+    const pos = String(i + 1), n = String(reihe.length);
+    if(e.getAttribute("aria-posinset") !== pos) e.setAttribute("aria-posinset", pos);
+    if(e.getAttribute("aria-setsize") !== n) e.setAttribute("aria-setsize", n);
+  }));
+}
 function kwFiltern(){
   const box = document.getElementById("fightList");
   if(!box) return;
   const w = woerter();
   let n = 0;
   box.querySelectorAll<HTMLElement>(".fight").forEach(f => {
-    const lauf = f.closest(".blockgroup")?.querySelector(".blockhead")?.textContent || "";
+    /* Der Ort des Kopfes zaehlt, nicht der eine Boss darin (.kboss, #152):
+       sonst passte "vulc" auf jede Zeile der Gruppe, auch auf den Trash. */
+    const kopfEl = f.closest(".blockgroup")?.querySelector(".blockhead");
+    const lauf = (kopfEl?.textContent || "").replace(kopfEl?.querySelector(".kboss")?.textContent || "\u0000", "");
     const heu = ((f.getAttribute("aria-label") || "") + " " + lauf).toLowerCase();
     const passt = w.every(x => heu.includes(x));
     const reihe = f.closest<HTMLElement>(".fightrow") || f;
@@ -116,6 +160,14 @@ function kwFiltern(){
     const aus = w.length > 0;
     if(h.hidden !== aus) h.hidden = aus;
   });
+  /* Waehrend der Suche ist der Kopf "Trashmobs" weg; seine Kaempfe ruecken
+     eine Ebene hoch, sonst hielte der Baum (baumZaehlen) den Bosskampf
+     davor fuer ihren Vater. Die Ebene aus dem Neubau merkt data-ebene. */
+  box.querySelectorAll<HTMLElement>(".fight.trash").forEach(f => {
+    const basis = +(f.dataset.ebene ??= f.getAttribute("aria-level") || "1");
+    const ebene = String(w.length ? Math.max(1, basis - 1) : basis);
+    if(f.getAttribute("aria-level") !== ebene) f.setAttribute("aria-level", ebene);
+  });
   box.querySelectorAll<HTMLElement>(".blockgroup").forEach(g => {
     const aus = w.length > 0 && !g.querySelector(".fightrow:not([hidden])");
     if(g.hidden !== aus) g.hidden = aus;
@@ -124,16 +176,34 @@ function kwFiltern(){
   const satz = $("#kwKeinTreffer");
   if(satz.hidden === keiner) satz.hidden = !keiner;
   if(keiner) satz.textContent = t("kw.noMatch", {q: suchfeld().value.trim()});
+  baumZaehlen(box);
   const ansage = w.length ? t("kw.treffer", {n}) : "";
   if(ansage !== statusZuletzt){ statusZuletzt = ansage; $("#kwStatus").textContent = ansage; }
+}
+
+/* Platz unter der letzten Zeile (#154): mit fester Rastung kann die letzte
+   Zeile nur unter dem klebenden Kopf (36 Punkt) einrasten, wenn die Liste
+   noch so weit rollen darf; sonst kappt der Browser die Raste am Ende des
+   Rollbereichs, und eine Zeile bleibt halb unter dem Kopf. Der Platz ist ein
+   absolut gesetzter Streifen (styles.css, --kwreste): er verlaengert nur den
+   Rollbereich, nicht das Feld. Nur, wenn die Liste ohnehin rollt. */
+function kwReste(){
+  const l = document.getElementById("kwListe"), box = document.getElementById("fightList");
+  if(!l || !box || !l.clientHeight) return;
+  const h = l.clientHeight, lr = l.getBoundingClientRect();
+  const inhalt = box.getBoundingClientRect().bottom - lr.top + l.scrollTop;
+  const wert = inhalt > h + 0.5 ? Math.max(0, h - 66) + "px" : "0px";
+  if(l.style.getPropertyValue("--kwreste") !== wert) l.style.setProperty("--kwreste", wert);
 }
 
 /** Nach jedem Neubau der Liste (renderFights): filtern und die Anwahl halten. */
 export function kwNachRender(){
   if(!kampfwahlOffen()) return;
   kwFiltern();
+  kwReste();
   const alle = eintraege();
-  setzeAktiv(alle.find(e => e.id === aktivId) || alle.find(e => e.classList.contains("on")) || alle[0]);
+  const on = alle.find(e => e.classList.contains("on"));
+  setzeAktiv((aufGewaehltem && state.origin === "watch" && on) || alle.find(e => e.id === aktivId) || on || alle[0]);
 }
 
 export function kampfwahlOeffnen(){
@@ -177,13 +247,21 @@ export function kampfwahlSchliessen(fokusZurueck: boolean){
    nur, wenn sich etwas aendert - renderAll() laeuft im Live alle paar
    Sekunden. */
 let knopfZuletzt = "";
+/* Ohne Log und ohne Log-Ordner gibt es nichts zu waehlen (#155). Mit
+   Ordner bietet die Kampfwahl fruehere Tage an (Nachtraege N3). */
+const nichtsZuWaehlen = () => !state.parsed && !(SERVED && serverDir);
 export function syncKwKnopf(){
   neuerKampfPruefen();
   const seg = state.encounters[state.sel];
   let inhalt: string, name: string;
   if(!seg){
-    inhalt = esc(t("kw.choose"));
-    name = t("kw.choose");
+    /* #155: ohne Log gibt es nichts zu waehlen - die Pille sagt, was fehlt,
+       und ein Klick oeffnet das Log (setup). Ein Log ohne Kampf (geleert,
+       zu kurz) behaelt "Kampf waehlen", ebenso die App mit Log-Ordner: dort
+       stehen in der Kampfwahl die frueheren Tage (Entscheidung 06.10.). */
+    const ohne = nichtsZuWaehlen();
+    inhalt = esc(t(ohne ? "kw.keinLog" : "kw.choose"));
+    name = t(ohne ? "kw.keinLogName" : "kw.choose");
   } else {
     const s = seg.stats, b = seg.block;
     /* Ein Feldboss ist sein eigener Lauf ("Ramux" im Block "Ramux"): dann
@@ -205,6 +283,12 @@ export function syncKwKnopf(){
   const vorAus = !seg || state.sel >= n - 1, nachAus = !seg || state.sel <= 0;
   if(vor.disabled !== vorAus) vor.disabled = vorAus;
   if(nach.disabled !== nachAus) nach.disabled = nachAus;
+  /* Ohne Log tun Tasten, Gespeichert und Filter nichts (#155). */
+  const ohneLog = !state.parsed;
+  for(const id of ["kwTasten", "kwLaeufe", "filterBtn"]){
+    const e = document.getElementById(id);
+    if(e && e.hidden !== ohneLog) e.hidden = ohneLog;
+  }
   const sig = state.lang + "|" + inhalt + "|" + name;
   if(sig === knopfZuletzt) return;
   knopfZuletzt = sig;
@@ -224,7 +308,7 @@ export function syncKwKnopf(){
    gewaehlt (0.21). */
 export function waehleKampf(i: number){
   if(i < 0 || i >= state.encounters.length) return;
-  state.sel = i; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false;
+  state.sel = i; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
   ungelesenLesen();
   renderAll();
 }
@@ -273,8 +357,18 @@ function neuerKampfPruefen(){
   const neu = state.encounters.filter(seg => seg.start > vorher.start).length;
   if(!neu) return;
   gelesen = {name: neueste.stats.name, wann: Date.now()};
-  const imKampf = state.tab === "timeline" && !state.start && !state.einst && !state.weeklies && !state.rekorde;
+  const imKampf = state.tab === "timeline" && !state.start && !state.einst && !state.weeklies && !state.rekorde && !state.gilde;
   if(!imKampf || state.sel !== 0){ ungelesenN += neu; syncUngelesen(); }
+  /* #153: blieb die Auswahl beim aelteren Kampf, sagt der Vorleser den
+     neuen an; sprang sie mit, nennt ihn der Knopf schon. */
+  const ansage = $("#kwNeu");
+  if(state.sel !== 0){
+    const satz = t("kw.neuAnsage", {name: neueste.stats.name, dauer: state.noTime ? "" : dur(neueste.stats.seconds)}).replace(/, $/, "");
+    /* Erst leeren, dann im naechsten Bild setzen: derselbe Satz fuer den
+       zweiten neuen Kampf waere sonst keine Aenderung und bliebe stumm. */
+    ansage.textContent = "";
+    requestAnimationFrame(() => { ansage.textContent = satz; });
+  }
   /* Die grosse Zahl zaehlt schon von selbst hoch (setHeroDps, 20-meter-head.ts,
      auch der Sprung bei weniger Bewegung); hier gleitet die Pille. */
   pilleGleiten = true;
@@ -343,6 +437,13 @@ async function tageHolen(): Promise<LogTag[] | null> {
   tage = neu;
   syncTage();
   return tage;
+}
+/** Liegen diese Dateien im Log-Ordner? Nach der letzten Auflistung von
+    GET /api/logs; null, solange es keine gibt (dann prueft oeffneDateien
+    selbst und sagt "Datei fehlt"). */
+export function logOrdnerKennt(namen: readonly string[]): boolean | null {
+  if(!tage) return null;
+  return namen.every(n => tage!.some(x => x.dateien.some(d => d.name === n)));
 }
 /* Der Tag, auf dem die Kampfwahl steht: der geladene oder der neueste. */
 const jetzigerTag = () => ansicht && ansichtAktiv() ? ansicht.tag : tage?.[0]?.tag ?? "";
@@ -425,6 +526,8 @@ async function tagLaden(tag: string, namen: string[]){
   ansicht = {tag, namen};
   setLoadOrigin("file");
   loadText(texte.join("\n"), namen);
+  // jede Datei kam ganz von vorn: fuer "Zuletzt gelesen" in der Sprungliste (66)
+  namen.forEach(gelesenMelden);
   syncTage();
 }
 /* Ein Tag zurueck (1) oder vor (-1). Der neueste Tag ist "Heute". */
@@ -455,7 +558,7 @@ export async function oeffneDateien(namen: string[]){
   if(fehlt !== undefined){ toastFail(tt("land.dateiFehlt", {name: fehlt})); return; }
   /* Die Datei, die Live gerade liest: nichts zu laden, nur zeigen. */
   if(isWatching() && gleich(state.fileNames || [], namen)){
-    state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false;
+    state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
     renderAll();
     return;
   }
@@ -546,7 +649,12 @@ export async function streifenFolgt(k: {grund?: unknown; datei?: unknown; kampf?
 // what this part did at the top level, run where it stands in the order
 export function setup(): void {
   const knopf = $("#kwKnopf"), feld = suchfeld(), feldBox = $("#kampfwahl");
-  knopf.onclick = () => { if(kampfwahlOffen()) kampfwahlSchliessen(true); else kampfwahlOeffnen(); };
+  knopf.onclick = () => {
+    if(kampfwahlOffen()){ kampfwahlSchliessen(true); return; }
+    // ohne Log tut die Pille, was sie sagt (#155); Strg+K oeffnet weiter das Feld
+    if(nichtsZuWaehlen()){ $("#miOpenCombat").click(); return; }
+    kampfwahlOeffnen();
+  };
   feld.addEventListener("input", () => {
     const jetzt = kwSucheAktiv();
     if(jetzt !== suchteZuletzt){ suchteZuletzt = jetzt; renderFights(); }
@@ -611,12 +719,24 @@ export function setup(): void {
     if(!kampfwahlOffen() || !(e.target as HTMLElement).closest(".tact")) return;
     feld.focus({preventScroll: true});
   });
+  /* #154: ein Klick auf eine leere Stelle liess den Fokus auf der Seite;
+     er geht an den Knopf. Ein Klick auf ein anderes Bedienelement behaelt
+     seinen Fokus. Die Buehne ist ein Fokusziel (tabindex -1, fuer den
+     Sprunglink); ein Klick auf ihre leere Flaeche setzt den Fokus dorthin,
+     und das ist genauso "nirgends" wie BODY. Genannt wird nur dieses
+     "nirgends", keine Liste von Bedienelementen: Zeilen mit rollendem
+     tabindex (Schadenstafel, Glutring, Plan) behalten ihren Fokus. */
+  const fokusNachDraussen = (a: HTMLElement | null) => {
+    if(!a || a === document.body || feldBox.contains(a) || a.id === "stage")
+      knopf.focus({preventScroll: true});
+  };
   /* Nicht modal: verlaesst der Fokus das Feld (Tab), geht es zu. Nicht, wenn
      er an den Knopf, in die Meldung oder in einen Dialog geht. */
   feldBox.addEventListener("focusout", e => {
     const neu = e.relatedTarget as HTMLElement | null;
     if(!neu || feldBox.contains(neu) || neu === knopf || neu.closest("#toast, #modalBg, #filterBg")) return;
     kampfwahlSchliessen(false);
+    fokusNachDraussen(neu);
   });
   /* Ein Klick in die Liste - auf einen Eintrag oder eine leere Stelle des
      Feldes - nimmt der Suche den Fokus nicht. Knoepfe ausserhalb der Liste
@@ -637,7 +757,19 @@ export function setup(): void {
     if(!ziel || !ziel.isConnected || !ziel.closest) return;
     if(ziel.closest("#kampfwahl, #kwKnopf, #toast, #modalBg, #filterBg")) return;
     kampfwahlSchliessen(false);
+    fokusNachDraussen(document.activeElement as HTMLElement | null);
   });
+  /* Die Hoehe der Liste folgt dem Fenster (und dem Zoom), nicht nur dem
+     Inhalt: der Platz unter der letzten Zeile wird bei jeder Aenderung
+     nachgezogen. Der Streifen ist absolut und aendert die Hoehe nicht. */
+  /* Auch der Inhalt aendert sich ohne Neubau: Suche tippen und leeren
+     (kwFiltern verbirgt Zeilen), die Laeufe-Leiste (#kwRuns). Darum werden
+     Liste, Inhalt und Leiste beobachtet. Kein Kreis: der Streifen ist
+     absolut und aendert die Hoehe von #fightList nicht. */
+  if(typeof ResizeObserver !== "undefined"){
+    const ro = new ResizeObserver(() => { if(kampfwahlOffen()) kwReste(); });
+    ["kwListe", "fightList", "kwRuns"].forEach(id => { const e = document.getElementById(id); if(e) ro.observe(e); });
+  }
   /* Strg+K, auch im Browser und aus einem Eingabefeld heraus: das Kuerzel
      gehoert der App (preventDefault). Nicht im Kompakt und nicht, solange
      ein Dialog offen ist. */

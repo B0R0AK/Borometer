@@ -175,9 +175,10 @@ function schneiden(sn: Schnitt, k0: number){
     const prev = merged[merged.length-1];
     const t = mainTarget(s);
     s.parts = 1;
-    /* Ein Boss ohne Pause im Kampf (King Khanzaizin, wipeGap in der
-       Dungeon-Tabelle) beginnt schon nach kuerzerer Stille neu: dort ist
-       die Pause ein Wipe (Entscheidung 01.10.). Alle anderen: die Minute. */
+    /* Ein Boss ohne Pause im Kampf (King Khanzaizin, Limuny Bercant,
+       wipeGap in der Dungeon-Tabelle) beginnt schon nach kuerzerer Stille
+       neu: dort ist die Pause ein Wipe (Entscheidungen 01.10. und 04.10.).
+       Alle anderen: die Minute. */
     const near = prev && s.start - prev.end <= Math.min(bossGap, bossPause(t) * 1000);
     const phaseOf = prev && prev.encBoss && PHASE_TARGETS.get(prev.encBoss);
     const belongs = prev && (mainTarget(prev) === t ||

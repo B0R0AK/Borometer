@@ -49,8 +49,10 @@ because they are inside the shipped `.exe`:
 >
 > What the release downloads embed: 275 skill icons from questlog.gg's `getSkillSets`
 > feed (plus "Falling Flower", WM_Common_SKILL_009, from a screenshot by B0R0AK of
-> 01.10.2026), 34 skill core icons from cdn.questlog.gg (28 and 30.09.2026) and 38
-> enemy images, ten of them reduced screenshots, one (Vegamor as a whole, image
+> 01.10.2026), 34 skill core icons from cdn.questlog.gg (28 and 30.09.2026) and 55
+> enemy images, 27 of them reduced screenshots (17 of them from screenshots by B0R0AK
+> taken in the game on 03.10.2026, head cut square, 96 × 96 WebP, together 63.3 kB,
+> about 84 kB as Base64), one (Vegamor as a whole, image
 > `PT_NPC_M_Vagamont_Sprite` of the NPC `FD_L13_AB_M_SpiritTree_Vagamont_001`) from
 > cdn.questlog.gg on 01.10.2026; together with the other icons about 1.3 MB as
 > Base64 (counted on 30.09.2026).
@@ -60,7 +62,7 @@ because they are inside the shipped `.exe`:
 > (48 × 48 WebP, each with its id and path under `throne-and-liberty/assets/` as origin)
 > and **4 boss images** of the raid (Dragaryle, Zairos and Calanthia from screenshots
 > by B0R0AK from the game of 01.10.2026, Radeth from a screenshot by B0R0AK of
-> 02.10.2026, shown in the records), cut out and reduced (96 × 96 WebP); together
+> 02.10.2026, shown in the records and in the meter), cut out and reduced (96 × 96 WebP); together
 > 56.6 kB, about 77 kB as Base64. The Hall of Illusions, the Infinity Portal, the
 > region certificate and the dungeons of the dimensional trial carry drawn marks of
 > their own, no game image.

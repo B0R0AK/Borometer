@@ -86,11 +86,12 @@ Kennzahlen direkt gegenüber. Sind die Kämpfe verschieden lang, sagt es das und
 bietet an, beide auf den kürzeren zu kürzen. Ohne das vergleicht man Summen,
 die nur deshalb größer sind, weil länger gekämpft wurde.
 
-## Drei Themen
+## Vier Themen
 
-Dunkel, hell und ein drittes in den Farben des Spiels. Alle drei sind
-durchgemessen: der schlechteste Kontrast auf einem Balken liegt bei 4,5:1.
-Borometer übernimmt die Einstellung von Windows, oder du wählst sie fest.
+Dunkel, hell, ein drittes in den Farben des Spiels und Rauchglas, das unter
+Windows 11 verwischt durchscheinen lässt, was hinter dem Fenster liegt. Der
+Kontrast ist bei allen vieren durchgemessen. Borometer übernimmt die
+Einstellung von Windows, oder du wählst sie fest.
 
 [![Borometer, helles Thema](docs/bilder/meter-hell.png)](docs/bilder/meter-hell.png)
 
@@ -325,11 +326,10 @@ gedrückt wird, und über keine andere Taste etwas. Borometer liest die Tastatur
 nicht mit.
 
 Netz gibt es nur, wenn du es einschaltest. Im Normalbetrieb lauscht der lokale
-Helfer auf 127.0.0.1 und ruft nichts auf. Drei Dinge ändern das, jedes nur auf
+Helfer auf 127.0.0.1 und ruft nichts auf. Zwei Dinge ändern das, jedes nur auf
 dein Wort. Eine Gruppe: Hosten öffnet einen zweiten Port nach außen, Beitreten
 schickt deine Zahlen an den Host oder euren Gruppen-Server. Was dabei geht, sind
-die Werte, die auf dem Board stehen, nie eine Logdatei. Questlog, wenn du einen
-Build-Plan per Klick abrufst. Und der Update-Hinweis, ab Werk aus: eingeschaltet
+die Werte, die auf dem Board stehen, nie eine Logdatei. Und der Update-Hinweis, ab Werk aus: eingeschaltet
 fragt er einmal je Start dieses Repository nach dem neuesten Release.
 
 `npm run audit:safety` prüft diese Regeln mechanisch, an der Quelle, bei jeder
@@ -353,12 +353,12 @@ Borometer mehr könnte, als das Kampflog zu lesen. Unter seinen Regeln:
   keine DLL, kein Hook, kein Overlay; den Ordner des Spiels liest es nur;
 - die Seite hat kein Netz: sie spricht HTTP nur mit `127.0.0.1`, und jede Anfrage
   beginnt mit `/api/`;
-- der Hauptprozess geht nur an drei Stellen nach außen, und nur, wenn du es willst:
-  zu Questlog auf einen Klick und für den Update-Hinweis (ab Werk aus, eine Anfrage
-  nach dem neuesten Release dieses Repositorys), beide an genau eine feste Adresse;
+- der Hauptprozess geht nur an zwei Stellen nach außen, und nur, wenn du es willst:
+  für den Update-Hinweis (ab Werk aus, eine Anfrage nach dem neuesten Release
+  dieses Repositorys), an genau eine feste Adresse;
   und zum Gruppen-Server, dessen Adresse du selbst einträgst (für ihn prüft das
   Audit, dass kein Dateiinhalt hinausgeht und dass ihn nur POST-Routen erreichen);
-- der Hauptprozess löscht keine Datei, Builds, Pläne, beste Pulls und Weeklies
+- der Hauptprozess löscht keine Datei, beste Pulls und Weeklies
   werden nur gelöst, nie entfernt; Dateien
   schreibt es nur dorthin, wo Borometer seine eigenen ablegt;
 - der Quelltext enthält keine Spielbilder (sie kommen aus einem privaten Repository

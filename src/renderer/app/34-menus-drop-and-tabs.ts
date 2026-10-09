@@ -26,7 +26,6 @@ import { askPick, askText, openModal } from "./36-dialog";
 import { SERVED } from "./41-server-mode";
 import { renderParty, syncPartyPill } from "./42-party";
 import { syncTabs, toggleMore } from "./43-more-menu-and-dev-mode";
-import { renderBuilds } from "./51-plan";
 import { isWatching, liveSay, setWatching } from "./45-startup";
 import { syncTafel } from "./56-tafel";
 import { syncFelder } from "./58-felder";
@@ -166,7 +165,7 @@ export function setGroup(mode: string){
    Verlauf sitzt zwischen Vergleich und Log-Einrichtung, die Liste sagt das
    jetzt auch.
    Seit der Bereichsleiste (Instrumententafel 3.3) die Reihenfolge der Leiste von oben nach unten. */
-const TAB_ORDER = ["timeline","rotation","analysis","compare","history","party","builds","weapons","setup"];
+const TAB_ORDER = ["timeline","rotation","analysis","compare","history","party","weapons","setup"];
 /* Die zweite Ebene traegt den Namen des Reiters. Sie steht als erstes Kind
    der Tafel, damit die Reihenfolge stimmt, und wird bei jedem Sprachwechsel
    mitgezogen. */
@@ -219,7 +218,7 @@ export function switchTab(name: string, scrolled?: boolean){
      (Instrumententafel 3.3). Der Bereich darunter bleibt in state.tab; ein
      Klick auf einen Bereich oder ein Kampf aus der Kampfwahl fuehrt zurueck. */
   if(name === "start"){
-    state.start = true; state.einst = false; state.weeklies = false; state.rekorde = false;
+    state.start = true; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
@@ -228,7 +227,7 @@ export function switchTab(name: string, scrolled?: boolean){
      Kampf erreichbar, state.tab bleibt, und dieselben Wege fuehren hinaus
      (ein Bereich, ein Kampf aus der Kampfwahl, eine neue Datei). */
   if(name === "settings"){
-    state.einst = true; state.start = false; state.weeklies = false; state.rekorde = false;
+    state.einst = true; state.start = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
     renderAll();   // ruft renderEinst() selbst, wenn die Einstellungen stehen
     window.scrollTo(0, 0);
     einstOben();          // die Sprungleiste leuchtet wieder mit dem Rollen (57)
@@ -236,20 +235,27 @@ export function switchTab(name: string, scrolled?: boolean){
   }
   /* Weeklies (9.1): der vierte Ort, wie die Einstellungen. */
   if(name === "weeklies"){
-    state.weeklies = true; state.start = false; state.einst = false; state.rekorde = false;
+    state.weeklies = true; state.start = false; state.einst = false; state.rekorde = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
   }
   /* Rekorde (Spezifikation Rekorde 2a): der fuenfte Ort, wie die Weeklies. */
   if(name === "rekorde"){
-    state.rekorde = true; state.start = false; state.einst = false; state.weeklies = false;
+    state.rekorde = true; state.start = false; state.einst = false; state.weeklies = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
   }
-  const warStart = state.start || state.einst || state.weeklies || state.rekorde;
-  state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false;
+  /* Gilde (Spezifikation Gilde 5): der sechste Ort, wie die Weeklies. */
+  if(name === "gilde"){
+    state.gilde = true; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false;
+    renderAll();
+    window.scrollTo(0, 0);
+    return;
+  }
+  const warStart = state.start || state.einst || state.weeklies || state.rekorde || state.gilde;
+  state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
   // wer den Bereich Kampf oeffnet, hat den neuen Kampf gesehen (0.21)
   if(name === "timeline") ungelesenLesen();
   const back = TAB_ORDER.indexOf(name) < TAB_ORDER.indexOf(state.tab);
@@ -272,8 +278,6 @@ export function switchTab(name: string, scrolled?: boolean){
   if(name === "rotation"){ renderRotation(); setzeBlick($("#stackScroll")); }
   if(name === "analysis") renderAnalysis();
   if(name === "history") renderHistory();
-  // Builds: eine eigene Flaeche (Luecken 8.1), seit Aufgabe 12 Links zu Questlog (51-plan.ts)
-  if(name === "builds") renderBuilds();
   if(name === "weapons") renderWeapons();
   /* Wie die Zeilen darueber: die Flaeche wird beim Betreten gebaut, nicht bei
      jedem Durchlauf. renderAll() zeichnet sie weiter, solange man auf dem
@@ -283,6 +287,7 @@ export function switchTab(name: string, scrolled?: boolean){
   if(name === "compare") renderCompare();
   if(name === "setup") renderSetup();
   if(name === "party") renderParty();
+  if(name === "timeline") renderHead();
   // ohne Kampf oder von Start aus wechselt die ganze Flaeche (Startseite/Kampf)
   if(!state.encounters.length || warStart) renderAll();
   syncTafel(); syncFelder();
@@ -303,7 +308,7 @@ export function switchTab(name: string, scrolled?: boolean){
    den Tabstopp, statt auf den body zu fallen. */
 export function syncBereiche(fokusHielt?: boolean){
   const land = document.getElementById("land");
-  const hier = state.einst ? "settings" : state.weeklies ? "weeklies" : state.rekorde ? "rekorde"
+  const hier = state.einst ? "settings" : state.weeklies ? "weeklies" : state.rekorde ? "rekorde" : state.gilde ? "gilde"
     : state.start || (!!land && !land.hidden) ? "start" : state.tab;
   const knoepfe = [...document.querySelectorAll<HTMLButtonElement>("#bereiche .tab")];
   knoepfe.forEach(b => {
@@ -311,6 +316,14 @@ export function syncBereiche(fokusHielt?: boolean){
     b.classList.toggle("on", an);
     if(an) b.setAttribute("aria-current", "page"); else b.removeAttribute("aria-current");
   });
+  /* Der Sprunglink nennt den Bereich, in dem man steht (Issue #109): im
+     Kampf wie bisher, sonst mit dem Namen aus der Leiste, in der Sprache der
+     Seite (aus dem Schluessel, nicht aus dem Text des Knopfes). */
+  const sprung = document.querySelector<HTMLElement>(".skiplink");
+  if(sprung){
+    const name = knoepfe.find(b => b.dataset.tab === hier)?.querySelector<HTMLElement>(".vh")?.dataset.i18n;
+    sprung.textContent = hier === "timeline" || !name ? t("a11y.skip") : t("a11y.skipTo", {b: t(name)});
+  }
   const nutzbar = knoepfe.filter(b => !b.hidden && !b.disabled);
   const stopp = nutzbar.find(b => b.dataset.tab === hier) || nutzbar[0];
   knoepfe.forEach(b => { b.tabIndex = b === stopp ? 0 : -1; });
@@ -623,8 +636,8 @@ export function setup(): void {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".tab");
     if(!b || b.disabled) return;
     const name = b.dataset.tab!;
-    // ohne Kampf gehen nur Gruppe, Weeklies, Rekorde, Start und Einstellungen (und die Einrichtung, wenn sie da ist)
-    if(!state.encounters.length && !["party", "weeklies", "rekorde", "start", "settings", "setup"].includes(name)) return;
+    // ohne Kampf gehen nur Gruppe, Weeklies, Gilde, Rekorde, Start und Einstellungen (und die Einrichtung, wenn sie da ist)
+    if(!state.encounters.length && !["party", "weeklies", "gilde", "rekorde", "start", "settings", "setup"].includes(name)) return;
     switchTab(name, true);
   };
   $("#partyPill").onclick = () => {

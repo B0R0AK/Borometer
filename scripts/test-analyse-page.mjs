@@ -10,7 +10,7 @@
 //
 // Run:  npm run test:analyse-page     (baut die Seite zuerst)
 
-import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -230,7 +230,8 @@ try {
         [...li.children].map((c) => c.className + ":" + c.textContent)),
       krit: [...(w?.querySelectorAll(".fkrit") || [])].map((p) => p.textContent),
       urteil: document.querySelector("#analysisCall .uv")?.textContent || "",
-      note: document.querySelector("#analysisCall .un")?.textContent || "",
+      // der Satz ohne den Knopf "Zum Beleg" an seinem Ende (#107)
+      note: (() => { const e = document.querySelector("#analysisCall .un")?.cloneNode(true); e?.querySelectorAll("button").forEach((k) => k.remove()); return (e?.textContent || "").trim(); })(),
       glut: (() => {
         const u = document.querySelector("#analysisCall .uv"), a = q(".fant .v"), z = q(".fwerte .z");
         return u && a && z ? { urteil: getComputedStyle(u).color, antwort: getComputedStyle(a).color, kachel: getComputedStyle(z).color } : null;
@@ -280,7 +281,8 @@ try {
     assert(iD === 2 && iF === iD + 1 && f.fragen.length === iF + 1 &&
       JSON.stringify(f.fragen.slice(0, 3)) === JSON.stringify(["Wer trägt?", "Wie triffst du?", "Hast du durchgedrückt?"]),
       "die Frage steht direkt unter den drei Feldern (Ventius gibt es hier nicht)", f.fragen);
-    assert(/^Borometer hat das Fenster selbst gefunden: in den 6\u00a0s nach Detonierendes Mal trifft Schnellfeuer im Schnitt \d+\u00a0% st\u00e4rker \(\d+\.\dk statt \d+\.\dk\) \u2013 gemessen \u00fcber 6 Pulls mit diesem Build\.$/.test(f.gef),
+    // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar (diese Kaempfe haben keinen); vorher erkannter Build, der Satz endete auf "mit diesem Build."
+    assert(/^Borometer hat das Fenster selbst gefunden: in den 6\u00a0s nach Detonierendes Mal trifft Schnellfeuer im Schnitt \d+\u00a0% st\u00e4rker \(\d+\.\dk statt \d+\.\dk\) \u2013 gemessen \u00fcber 6 Pulls mit diesen Waffen\.$/.test(f.gef),
       "Satz: gefunden, 6 s nach Detonierendes Mal, ueber 6 Pulls", f.gef);
     assert(f.v === "30\u00a0% des Schadens von Schnellfeuer au\u00dferhalb des Fensters", "Antwort: 30 % aussen", f.v);
     assert(f.spurVerborgen && /^30\u00a0% au\u00dferhalb \u00b7 bester Pull \d+\u00a0%$/.test(f.wort), "Balken fuer Vorleser verborgen, das Wort nennt den besten Pull", f.wort);
@@ -291,17 +293,18 @@ try {
       f.kacheln[0][1] === "z:81.2k" && f.kacheln[1][1] === "z:45.5k" && f.kacheln[2][1] === "z:5,0" && f.kacheln.every((k) => k[2].startsWith("r:bester Pull ")),
       "Kacheln: 81.2k, 45.5k, 5,0 je Minute, je mit bestem Pull", f.kacheln);
     assert(f.krit.length === 1 && /^Kritisch: \d+\u00a0% im Fenster, \d+\u00a0% au\u00dferhalb\.$/.test(f.krit[0]), "Krit-Satz", f.krit);
-    assert(f.urteil === "Schnellfeuer au\u00dferhalb des Fensters nach Detonierendes Mal" &&
-      // Fixrunde 1 zu Aufgabe 5 (folgt Entwurf, Pruefung Befund 3): "Das kostet dich am meisten:" eroeffnet die Erklaerung
-      /^Das kostet dich am meisten: Etwa \d+\.\d+k Schaden, \d+\u00a0% des Kampfes: 30\u00a0% davon lag außerhalb, und dort traf es mit 45\.5k statt 81\.2k\.$/.test(f.note),
-      "Urteil: aussen nach dem Mal, mit den Staerken dieses Kampfes", [f.urteil, f.note]);
-    assert(f.zaehlt && f.glut && f.glut.antwort === f.glut.urteil && f.glut.kachel !== f.glut.urteil,
-      "Glut nur auf dem Urteil und der Antwort, die es nennt - nicht auf den Kacheln", f.glut);
+    /* Issue #108: der beste Pull (ein gewoehnlicher) hatte gut 40 % aussen, dieser 30 % - er war im
+       Fenster besser als der Bezug, also nennt das Urteil das Fenster nicht und nichts glueht dort.
+       Vorher rechnete es gegen 0 % aussen einen grossen Verlust. */
+    const bezug = /bester Pull (\d+)\u00a0%$/.exec(f.wort);
+    assert(!!bezug && +bezug[1] > 30, "#108: der Bezug hatte mehr aussen als dieser Kampf", f.wort);
+    assert(!f.urteil.includes("Fensters") && !/außerhalb/.test(f.note) && !f.zaehlt,
+      "#108: besser als der Bezug - kein Fenster-Urteil, keine Glut auf der Antwort", [f.urteil, f.note, f.zaehlt]);
     await sprache("en");
     const e = await fenster();
     assert(e.fragen.includes("Did you hit inside the window?") && e.v === "30% of Quick Fire's damage outside the window" &&
-      e.urteil === "Quick Fire outside the window after Detonation Mark" && /^30% outside \u00b7 best pull \d+%$/.test(e.wort),
-      "EN: Frage, Antwort, Urteil, Balkenwort", e);
+      /^30% outside \u00b7 best pull \d+%$/.test(e.wort),
+      "EN: Frage, Antwort, Balkenwort", e);
     await sprache("de");
     // 560 px: keine waagerechte Rolle, Kacheln untereinander; drei Themen mit Kontrast
     await page.setViewportSize({ width: 560, height: 900 });
@@ -335,6 +338,31 @@ try {
   }
   {
     await frisch();
+    /* #108 mit besserem Bezug: acht Pulls mit 40 Treffern innen und 12 aussen (gut 17 % des Schadens
+       aussen), der letzte mit 30 %. Das Urteil rechnet nur den Teil ueber dem Bezug und nennt ihn. */
+    await load(logFile("fenster-30-bezug.txt", serie(27, "Fellinex", 8, { setz: [40, 12, 100000, 70000] },
+      { setz: [34, 26, 81200, 45500] })), "Fellinex");
+    await tab("analysis");
+    const f = await fenster();
+    const q = /bester Pull (\d+)\u00a0%$/.exec(f.wort);
+    assert(!!q && +q[1] >= 15 && +q[1] <= 20, "#108: der Bezug hatte weniger aussen (um 17 %)", f.wort);
+    assert(f.urteil === "Schnellfeuer au\u00dferhalb des Fensters nach Detonierendes Mal" &&
+      /^Das kostet dich am meisten: Etwa \d+(\.\d+)?k Schaden, \d+\u00a0% des Kampfes, gerechnet gegen deinen besten Pull: 30\u00a0% davon lag außerhalb, dort nur (\d+)\u00a0%\. Außerhalb traf es mit 45\.5k statt 81\.2k\.$/.exec(f.note)?.[2] === q?.[1],
+      "#108: schlechter als der Bezug - das Urteil rechnet gegen ihn und nennt seinen Anteil", [f.urteil, f.note]);
+    // die Kosten: H aussen 26 x 45,5k mal (81,2k/45,5k - 1), davon der Anteil ueber dem Bezug (30 % - q) / 30 %
+    const k = /Etwa (\d+(?:\.\d+)?)k/.exec(f.note), aussen = /^(\d+)\u00a0%/.exec(f.v);
+    const soll = 26 * 45500 * (81200 / 45500 - 1) * (+aussen?.[1] - +q?.[1]) / +aussen?.[1] / 1000;
+    assert(!!k && Math.abs(+k[1] - soll) <= soll * 0.06, "#108: Kosten nur fuer den Teil ueber dem Bezug", { note: f.note, soll });
+    assert(f.zaehlt && f.glut && f.glut.antwort === f.glut.urteil && f.glut.kachel !== f.glut.urteil,
+      "Glut nur auf dem Urteil und der Antwort, die es nennt - nicht auf den Kacheln", f.glut);
+    await sprache("en");
+    const e = await fenster();
+    assert(e.urteil === "Quick Fire outside the window after Detonation Mark" && /counted against your best pull: 30% of it landed outside, there only \d+%\./.test(e.note),
+      "#108 EN: Urteil gegen den Bezug", [e.urteil, e.note]);
+    await sprache("de");
+  }
+  {
+    await frisch();
     // gleiche Staerke innen und aussen: kein Fenster, keine Ueberschrift
     await load(logFile("fenster-kein.txt", serie(23, "Fellinex", 6, { inDmg: 70000 })), "Fellinex");
     await tab("analysis");
@@ -350,9 +378,10 @@ try {
     await load(logFile("fellinex-erster.txt", serie(25, "Fellinex", 1, {})), "Fellinex");
     await tab("analysis");
     const f = await fenster();
-    assert(f.da && / gemessen \u00fcber 3 Pulls mit diesem Build\.$/.test(f.gef), "erster Pull: Fenster aus dem Pool ueber den Build (dieser und zwei gespeicherte)", f.gef);
+    // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar (diese Kaempfe haben keinen); vorher erkannter Build, der Satz endete auf "mit diesem Build."
+    assert(f.da && / gemessen \u00fcber 3 Pulls mit diesen Waffen\.$/.test(f.gef), "erster Pull: Fenster aus dem Pool ueber das Waffenpaar (dieser und zwei gespeicherte)", f.gef);
     assert(/^\d+\u00a0% au\u00dferhalb$/.test(f.wort) && f.kacheln.every((k) => k.length === 2) &&
-      f.krit.includes("Einen Vergleichswert gibt es ab dem zweiten Pull an Fellinex mit diesem Build."),
+      f.krit.includes("Einen Vergleichswert gibt es ab dem zweiten Pull an Fellinex mit diesen Waffen."),   // Builds-Reiter 6: ohne Build das Paar, vorher "mit diesem Build."
       "erster Pull: ohne Vergleichswerte, mit dem Satz dazu", [f.wort, f.kacheln, f.krit]);
   }
 
@@ -375,13 +404,11 @@ try {
     assert(z && z.sec === "Weitere Befunde" && /^\d+\.\dk$/.test(z.v) &&
       /^bester Pull \d+\.\dk \u00b7 Dein Start war deutlich schw\u00e4cher: \d+\u00a0% deines besten Pulls\.$/.test(z.n),
       "schwacher Start: Eintrag unter Weitere Befunde mit Wert, bestem Pull und Satz", z);
-    const s = await formSatz();
-    assert(/Dein Start war deutlich schw\u00e4cher: \d+\u00a0% deines besten Pulls\. Deine Einsätze der ersten Sekunden stehen in der Zeitleiste im Bereich Rotation\.$/.test(s),
-      // Neugestaltung 28.09.: der Trainer entfaellt (Spezifikation 3), der Satz verweist auf die Zeitleiste der Rotation
-      "schwacher Start: der Nebensatz unter der Form verweist auf die Zeitleiste der Rotation", s);
+    /* Issue #106: der Start steht genau einmal - unter "Weitere Befunde" (oben), nicht noch als
+       Nebensatz unter der Form (vorher mit dem Verweis auf die Zeitleiste der Rotation) */
+    assert(!/Start/.test(await formSatz()), "schwacher Start: kein zweiter Satz unter der Form (#106)", await formSatz());
     await sprache("en");
-    assert(/Your start was clearly weaker: \d+% of your best pull\. Your casts of the first seconds are in the timeline on the Rotation tab\.$/.test(await formSatz()),
-      "EN: Nebensatz unter der Form", await formSatz());
+    assert(!/start/i.test(await formSatz()), "EN: kein Start-Satz unter der Form (#106)", await formSatz());
     await sprache("de");
   }
   {
@@ -480,7 +507,8 @@ try {
     await load(logFile("scharfschuss.txt", tr), "Fellinex");
     await tab("analysis");
     const f = await fenster();
-    assert(/ nach Detonierendes Mal trifft Entschlossener Scharfschuss im Schnitt \d+\u00a0% st\u00e4rker .* gemessen \u00fcber 6 Pulls mit diesem Build\.$/.test(f.gef),
+    // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar (diese Kaempfe haben keinen); vorher erkannter Build, der Satz endete auf "mit diesem Build."
+    assert(/ nach Detonierendes Mal trifft Entschlossener Scharfschuss im Schnitt \d+\u00a0% st\u00e4rker .* gemessen \u00fcber 6 Pulls mit diesen Waffen\.$/.test(f.gef),
       "Scharfschuss unter zwei Client-Namen: ein Hauptschaden ueber sechs Pulls", f.gef);
   }
 
@@ -521,16 +549,26 @@ try {
        (64-glutring.ts) statt der breiten und der schmalen Tafel - bei jeder Breite dieselbe. Dieselben Zusagen,
        neu gemessen: die Spalten des Kopfs, Zellen je Zeile, Balken an derselben Kante als Spur mit Bahn, die Schrift
        der Zahl, Zeile 44 Punkt, Symbole ohne Farbring, Aufklappen in die Trefferarten mit einer Summenzeile, der
-       Fokus beim Neuzeichnen, Sortieren und kein Querrollen bei 620 und 560 Punkt. */
+       Fokus beim Neuzeichnen, Sortieren und kein Querrollen bei 620 und 560 Punkt.
+       folgt Spezifikation Feinschliff 4 (#100): der Kopf ist eine Zeile aus Name und Knopf "Ordnen" mit Menue. Die
+       Spalten zaehlen jetzt an den Zellen der ersten Zeile, der Kopf hat zwei Zellen, geordnet wird ueber das Menue,
+       die gewaehlte Ordnung steht im Menue (aria-checked) und auf dem Knopf. */
+    const ordne = async (k) => {
+      await page.evaluate(() => document.querySelector("#ringOrdnen").click());
+      await page.waitForTimeout(80);
+      await page.evaluate((k) => document.querySelector(`#ringOrdnenMenue [data-k="${k}"]`).click(), k);
+    };
     const tafel = () => page.evaluate(() => {
       const box = document.querySelector("#bars");
       const sichtbar = (e) => !!e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0;
-      const kopf = [...box.querySelectorAll(".bhead [role=columnheader]")];
       const zeilen = [...box.querySelectorAll(".row:not(.sub)")];
+      const kopf = zeilen[0] ? [...zeilen[0].querySelectorAll("[role=gridcell]")] : [];
       return {
-        kopfAlle: kopf.map((s) => s.dataset.k), kopf: kopf.filter(sichtbar).map((s) => s.dataset.k),
-        sortiert: box.querySelector(".bhead .sorted")?.dataset.k || "",
-        zellen: [...box.querySelectorAll("[role=row]")].map((r) => [r.classList.contains("catrow") ? "art" : r.classList.contains("bdetail") ? "summe" : "zeile",
+        kopfAlle: kopf.map((s) => s.dataset.k || "name"), kopf: kopf.filter(sichtbar).map((s) => s.dataset.k || "name"),
+        sortiert: document.querySelector('#ringOrdnenMenue [aria-checked="true"]')?.dataset.k || "",
+        knopf: document.querySelector("#ringOrdnen")?.textContent || "",
+        zellen: [...box.querySelectorAll("[role=row]")].map((r) => [r.classList.contains("catrow") ? "art" : r.classList.contains("bdetail") ? "summe" :
+          r.classList.contains("bhead") ? "kopf" : "zeile",
           r.querySelectorAll("[role=gridcell],[role=columnheader]").length]),
         balken: zeilen.map((z) => {
           const f = z.querySelector(".fill").getBoundingClientRect(), n = z.querySelector(".nmt").getBoundingClientRect(), d = z.querySelector(".v.dps").getBoundingClientRect();
@@ -544,8 +582,9 @@ try {
     let b = await tafel();
     assert(JSON.stringify(b.kopfAlle) === JSON.stringify(["name", "dps", "share", "hits", "critRate", "heavyRate"]),
       "Liste: Name, DPS, Anteil, Treffer, Kritisch, Stark", b.kopfAlle);
-    assert(b.zellen.every(([art, n]) => (art === "zeile" && n === 6) || (art === "art" && n === 3) || (art === "summe" && n === 1)),
-      "Liste: Kopf und Hauptzeilen sechs Zellen, Trefferarten drei (Name, Treffer, Schaden), die Summe eine ueber alle", b.zellen);
+    assert(b.zellen.every(([art, n]) => (art === "kopf" && n === 2) || (art === "zeile" && n === 6) || (art === "art" && n === 3) || (art === "summe" && n === 1)) &&
+      b.zellen.filter(([art]) => art === "kopf").length === 1,
+      "Liste: der Kopf zwei Zellen (Name, Ordnen), Hauptzeilen sechs, Trefferarten drei (Name, Treffer, Schaden), die Summe eine ueber alle", b.zellen);
     assert(b.balken.length >= 3 && b.balken.every((x) => x.links === b.balken[0].links && x.oben >= x.textUnten - 1 && x.hoch === 4 && x.rechts <= x.dpsRechts + 1),
       "Liste: alle Balken an derselben Kante, eine 4-px-Spur unter dem Namen, der volle endet mit der DPS-Zahl", b.balken);
     assert(b.bahn && !/rgba\(0, 0, 0, 0\)|transparent/.test(b.bahn), "Liste: hinter dem Balken eine Bahn", b.bahn);
@@ -590,7 +629,7 @@ try {
       d.vorher === d.arten[d.arten.length - 1], "Aufklappen: die vier Trefferarten, darunter die Summenzeile mit einer Zelle ueber alle Spalten", d);
     assert(d && /^\d+ Treffer gesamt \u00b7 gr\u00f6\u00dfter [\d.]+k? \u00b7 \u00d8 [\d.]+k? je Treffer \u00b7 Schaden [\d.]+[kM]?$/.test(d.text), "Summenzeile DE", d);
     b = await tafel();
-    assert(b.zellen.every(([art, n]) => (art === "zeile" && n === 6) || (art === "art" && n === 3) || (art === "summe" && n === 1)), "aufgeklappt: Zellen wie oben", b.zellen);
+    assert(b.zellen.every(([art, n]) => (art === "kopf" && n === 2) || (art === "zeile" && n === 6) || (art === "art" && n === 3) || (art === "summe" && n === 1)), "aufgeklappt: Zellen wie oben", b.zellen);
     const katQuoten = await page.evaluate(() => document.querySelectorAll('#bars .row.catrow [data-k="critRate"], #bars .row.catrow [data-k="heavyRate"]').length);
     assert(katQuoten === 0, "Trefferarten ohne Kritisch/Stark-Quote wie bisher", katQuoten);
     const subBahn = await page.evaluate(() => [...document.querySelectorAll("#bars .row.catrow")].map((z) => {
@@ -631,9 +670,12 @@ try {
       "620 px: dieselben sechs Spalten, kein Querrollen", b);
     r = await ringe();
     assert(r.length >= 3 && r.every((x) => BILDER ? !x : x.platte), "620 px: Symbole ebenfalls ohne Farbring" + (BILDER ? "" : ohneSym), r);
-    await page.evaluate(() => document.querySelector('#bars .bhead [data-k="share"]').click());
+    /* folgt Spezifikation Feinschliff 4: "Anteil" ordnet wie DPS und steht nicht mehr im Menue (F2); dieselbe Zusage
+       - bei 620 Punkt laesst sich die Liste umordnen - mit Kritisch */
+    await ordne("critRate");
     await page.waitForTimeout(120);
-    assert((await tafel()).sortiert === "share", "620 px: nach Anteil sortierbar wie heute");
+    b = await tafel();
+    assert(b.sortiert === "critRate" && b.knopf === "Ordnen: Kritisch \u2193", "620 px: ueber das Menue umzuordnen wie heute", b);
     await page.setViewportSize({ width: 560, height: 860 });
     await page.waitForTimeout(250);
     for (const theme of ["dark", "light", "tnl"]) {
@@ -643,14 +685,14 @@ try {
       assert(!b.rollt, `560 px, Thema ${theme}: kein waagerechtes Rollen`, b);
     }
     await page.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
-    await page.evaluate(() => document.querySelector('#bars .bhead [data-k="hits"]').click());
+    await ordne("hits"); // folgt Spezifikation Feinschliff 4: ueber das Menue statt ueber den Spaltenkopf
     await page.waitForTimeout(120);
     await page.setViewportSize({ width: 1280, height: 860 });
     await page.waitForTimeout(250);
     b = await tafel();
-    /* Die Probe "breit nach Sortierung auf Groesster Treffer: zurueck auf Schaden" entfaellt, Entscheidung 02.10.: die Ring-Liste hat
-       keine Spalte, die breit fehlt - es gibt keinen Weg mehr zu einer Ordnung ohne Spalte (Plan Glutring, Risiken). */
-    assert(b.sortiert === "hits" && b.kopfAlle.length === 6, "die Sortierung nach Treffer bleibt beim Breitenwechsel", b);
+    /* Probe 2.6 (Groesster Treffer faellt in der Gruppe auf DPS zurueck, Spezifikation Feinschliff 4.3, #86) steht in
+       test-tafel-page.mjs, Abschnitt 12: nur dort gibt es eine Gruppe. */
+    assert(b.sortiert === "hits" && b.knopf === "Ordnen: Treffer \u2193" && b.kopfAlle.length === 6, "die Sortierung nach Treffer bleibt beim Breitenwechsel", b);
 
     /* Kompakt folgt seit der Neugestaltung dem Entwurf (Overlay-Szene E:1017ff., Luecke 11.2): je Zeile Name
        und Schaden, Rang, DPS und Anteil gehen, der Balken ist die 3-Punkt-Spur unter dem Namen, die Zahl in
@@ -794,11 +836,15 @@ try {
       label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "" }));
     assert(!/39,1|38,\d/.test(ohneBand) && phaseForm.zonen.length === 0 && phaseForm.label.includes("keine Lücken"),
       "Unverwundbar: keine Luecke aus der Phase, die Saeulen sagen „keine Lücken“", { phaseForm, alles: an.alles.slice(0, 300) });
+    // #109: die Beschreibung nennt die Strecke, die im Bild steht
+    assert(phaseForm.label.endsWith("; Ziel unverwundbar 0:57\u20131:35"), "#109: die Saeulen-Beschreibung nennt die unverwundbare Strecke mit Zeit", phaseForm.label);
     assert(bf.some((b) => b === "Lücken ab 2\u00a0s | keine"), "Unverwundbar: keine Luecke", bf);
     // folgt Entwurf (Pruefung Befund 8): der Satz unter der Form nennt keine Luecke und keine Pause
-    assert(!!an.verdict && !/Lücke|Pause|ohne Treffer/.test(an.verdict) && phaseForm.zonen.length === 0,
+    // seit #106 darf der Satz fehlen (kein Krit, kein Haelftensatz beim 1,0-fachen) - steht er, nennt er keine Luecke
+    assert(!/Lücke|Pause|ohne Treffer/.test(an.verdict) && phaseForm.zonen.length === 0,
       "Unverwundbar: die Form zeigt keine Leerzeit - kein Band, kein Wort im Satz darunter", { verdict: an.verdict, phaseForm });
-    const faktor = Number((/(\d+,\d)-fachen/.exec(an.verdict) || [0, "9"])[1].replace(",", "."));
+    // kein Satz heisst seit #106: unter dem 1,15-fachen
+    const faktor = Number((/(\d+,\d)-fachen/.exec(an.verdict) || [0, "1,0"])[1].replace(",", "."));
     assert(faktor < 1.3, "Unverwundbar: der Haelftenvergleich rechnet ohne die Phase", an.verdict);
     // Fixrunde 1 zu Aufgabe 5 (Pruefung Befund 2): der Satz steht jetzt sichtbar dabei - geprueft werden wie vorher Begriff und Wert
     assert(!/Burst/.test(bf.map((b) => b.split(" | ").slice(0, 2).join(" | ")).join()), "Unverwundbar: die Phase macht die Skillung nicht zu Burst", bf);
@@ -1144,6 +1190,9 @@ try {
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent).find((x) => /^Lücken/.test(x)) || "",
         px: document.querySelector("#mechanikZeile") ? parseFloat(getComputedStyle(document.querySelector("#mechanikZeile")).fontSize) : 0,
         urteil: document.querySelector("#verdictText")?.hidden ? "" : document.querySelector("#verdictText")?.textContent || "",
+        weitere: document.querySelector("#weitereListe")?.textContent || "",
+        label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "",
+        rolle: document.querySelector("#mechanikZeile")?.getAttribute("role") || "",
         mechEintrag: [...document.querySelectorAll('#weitereListe .find[data-k="mechanik"]')]
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent),
         fuss: (() => { const e = document.querySelector("#fussMech"); return e && !e.hidden ? e.textContent : ""; })(),
@@ -1211,7 +1260,20 @@ try {
     assert(r.px >= 11, "Mechanik: die Zeile mindestens 11 px", r.px);
     /* Feinschliff 02.10., Abschnitt 3: der Befund als eigener Eintrag bei den weiteren
        Befunden, und der Fuss sagt, dass Borometer es aus deinen Pulls erkennt */
-    assert(r.mechEintrag.join() === "Mechanik | 0:24\u20130:30 \u00b7 in 5 von 5 Pulls", "Mechanik: eigener Eintrag bei den weiteren Befunden", r.mechEintrag);
+    /* #106 (Entscheidung vom 04.10.2026): die Mechanik steht genau einmal - als Zeile an der Form (oben
+       geprueft), nicht noch als Eintrag bei den weiteren Befunden */
+    assert(!r.mechEintrag.length && !/Mechanik/.test(r.weitere), "Mechanik: kein zweiter Eintrag bei den weiteren Befunden", r);
+    // #109: die Saeulen-Beschreibung nennt die Strecke, die Zeile ist eine Notiz fuer den Vorleser
+    assert(r.label.endsWith("; Mechanik 0:24\u20130:30") && r.rolle === "note", "#109: Saeulen-Beschreibung mit Mechanik, die Zeile mit role=note", r);
+    // #110: auch bei 2000 Punkt Breite hoechstens 70 Zeichen je Zeile
+    await m.setViewportSize({ width: 2000, height: 1480 });
+    await m.waitForTimeout(200);
+    const mz = await m.evaluate(() => { const inCh = (e) => { if (!e || !e.getClientRects().length) return -1; const m = document.createElement("span");
+          m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+          e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return e.getBoundingClientRect().width / ch; };
+      return inCh(document.querySelector("#mechanikZeile")); });
+    assert(mz > 0 && mz <= 70.5, "#110: die Zeile zur Mechanik hoechstens 70 Zeichen breit", mz);
+    await m.setViewportSize({ width: 1280, height: 860 });
     assert(r.fuss === " \u2013 au\u00dfer Borometer erkennt es aus deinen Pulls (Mechanik)", "Mechanik: der Fuss nennt die Erkennung", r.fuss);
     /* und im Kampf: die Kurve schraffiert die Strecke wie Analyse und Rotation, darunter
        eine leise Zeile, die Legende nennt sie; der Boss steht nicht als Urheber da */
@@ -1254,8 +1316,9 @@ try {
     r = await mAnalyse("your hits");
     assert(r.zeile === "Vulcanus: from about 0:24, your hits do hardly any damage for 6\u00a0s (in 5 of 5 of your loaded pulls). 0:24\u20130:30 not counted: mechanic.",
       "Mechanik: die Zeile auf Englisch", r.zeile);
-    assert(r.mechEintrag.join() === "Mechanic | 0:24\u20130:30 \u00b7 in 5 of 5 pulls" &&
-      r.fuss === " \u2013 unless Borometer recognises it from your pulls (mechanic)", "Mechanik: Eintrag und Fuss auf Englisch", r);
+    // #106: kein Eintrag, nur die Zeile (oben) und der Fuss
+    assert(!r.mechEintrag.length && !/Mechanic/.test(r.weitere) &&
+      r.fuss === " \u2013 unless Borometer recognises it from your pulls (mechanic)", "Mechanik: kein Eintrag, der Fuss auf Englisch", r);
     k = await mKampf();
     assert(k.zeile === "0:24\u20130:30 mechanic \u2013 not counted as a gap", "Mechanik im Kampf: die Zeile auf Englisch", k);
     await m.evaluate(() => document.querySelector("#btnLang").click());
@@ -1274,7 +1337,9 @@ try {
     await mLaden(mechLog("mech-lang.txt", 5, { von: 10000, bis: 40000 }), 5);
     r = await mAnalyse("Vulcanus");
     assert(r.mech.join() === "0:10\u20130:40", "Mechanik: die lange Strecke 0:10-0:40 erkannt", r);
-    assert(/dem 1,0-fachen der ersten/.test(r.urteil), "Mechanik: der Haelftenvergleich rechnet ohne die Strecke (1,0-fach)", r.urteil);
+    /* ohne die Strecke sind beide Haelften gleich: seit #106 steht beim 1,0-fachen kein Satz (mit der Strecke
+       waere die erste Haelfte deutlich schwaecher, und der Satz stuende da) */
+    assert(!/Hälfte/.test(r.urteil), "Mechanik: der Haelftenvergleich rechnet ohne die Strecke (gleich, also kein Satz)", r.urteil);
     assert(r.art === "Art deiner Skillung | Gleichm\u00e4\u00dfig", "Mechanik: die Schwankung rechnet ohne die Strecke (gleichmaessig)", r.art);
     /* Pruefung 01.10., M3: vier Pulls dieser Figur und einer einer anderen sind nicht
        "fuenf deiner Pulls" - keine Zeile, die Strecke bleibt eine Luecke */
@@ -1284,6 +1349,308 @@ try {
       "Mechanik: eine fremde Figur zaehlt nicht zu deinen Pulls", r);
     assert(!mErrors.length, "Mechanik: keine Fehler in der Seite", mErrors);
     await m.close();
+  }
+  /* Alte Zuordnung (#207): das Verzeichnis traegt b aus der Zeit des Builds-Reiters. Die Seite liest es nicht mehr, das
+     Fenster rechnet ueber das Waffenpaar, der Satz endet auf "mit diesen Waffen.", und /api/builds wird nie gefragt.
+     Dateiname und Startzeiten der sechs Pulls stimmen mit dem Log ueberein. */
+  {
+    const html = readFileSync(dist, "utf8");
+    const datei = logFile("fenster-build.txt", serie(26, "Fellinex", 6, {}));
+    const index = { "fenster-build.txt": { size: 1, fights: [0, 1, 2, 3, 4, 5].map((p) => ({ name: "Fellinex", dps: 1, dmg: 1, dur: 96, at: at(26, 20, p * 10), b: "bu00000000" })) } };
+    const g = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const gErrors = [], gAsked = [];
+    g.on("pageerror", (e) => gErrors.push(String(e)));
+    await g.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("boroLang", "de"); } catch { /* storage blocked */ } });
+    await g.route("http://boro.test/**", async (route) => {
+      const req = route.request(), path = new URL(req.url()).pathname;
+      const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+      if (/^\/api\/(builds|plans)/.test(path)) gAsked.push(path);
+      if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
+      if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, logIndex: index });
+      if (path.startsWith("/api/")) return json({ ok: true });
+      return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+    });
+    await g.goto("http://boro.test/index.html");
+    await g.waitForTimeout(500);
+    await g.setInputFiles("#fileInput", datei);
+    await g.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Fellinex"));
+    await g.waitForTimeout(300);
+    await g.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
+    await g.waitForTimeout(300);
+    const gef = await g.evaluate(() => document.querySelector("#findings .fwin .fgef")?.textContent || "");
+    assert(/ gemessen über 6 Pulls mit diesen Waffen\.$/.test(gef), "alte Zuordnung b im Verzeichnis: der Satz endet auf \"mit diesen Waffen.\", kein Build mehr", gef);
+    assert(!gAsked.length, "die Seite fragt weder /api/builds noch /api/plans (#207)", gAsked);
+    assert(!gErrors.length, "alte Zuordnung: keine Fehler in der Seite", gErrors);
+    await g.close();
+  }
+  /* Builds-Reiter 6 (Fixrunde 1, Ruling 13): Unbekanntes passt nie. Ein gespeicherter bester Pull, dessen Paar sich
+     weder aus dem Verzeichnis noch aus seinem Lauf lesen laesst, ist kein Bezug fuer einen Kampf mit bekanntem Paar:
+     die Start-Zeile entfaellt. Zur Gegenprobe dieselbe Lage mit lesbarem Lauf: die Zeile steht. */
+  {
+    const html = readFileSync(dist, "utf8");
+    const geoeffnet = async (best, bei) => {
+      const g = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      g.errors = [];
+      g.on("pageerror", (e) => g.errors.push(String(e)));
+      await g.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("boroLang", "de"); } catch { /* storage blocked */ } });
+      await g.route("http://boro.test/**", async (route) => {
+        const req = route.request(), path = new URL(req.url()).pathname;
+        const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) });
+        if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best });
+        if (path === "/api/best") { bei(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
+        if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true });
+        if (path.startsWith("/api/")) return json({ ok: true });
+        return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+      });
+      await g.goto("http://boro.test/index.html");
+      await g.waitForTimeout(500);
+      return g;
+    };
+    const ladeUndAnalyse = async (g, datei) => {
+      await g.setInputFiles("#fileInput", datei);
+      await g.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Fellinex"));
+      await g.waitForTimeout(300);
+      await g.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
+      await g.waitForTimeout(300);
+      return g.evaluate(() => [...document.querySelectorAll("#p-analysis .find")].some((x) => /^(Die ersten|The first) 10\u00a0s$/.test(x.querySelector(".k")?.textContent || "")));
+    };
+    let gespeichert = null;
+    const g1 = await geoeffnet({}, (b) => { gespeichert = b; });
+    await ladeUndAnalyse(g1, logFile("unbekannt-1.txt", serie(1, "Fellinex", 1, {})));
+    for (const ende = Date.now() + 10000; Date.now() < ende && !gespeichert;) await g1.waitForTimeout(200);
+    await g1.close();
+    assert(!!gespeichert?.key && !!gespeichert?.entry?.best?.run?.skills?.length, "unbekannter Bezug: ein bester Pull wurde festgehalten", gespeichert?.key);
+    // derselbe Pull, aber an einem anderen Zeitpunkt (kein Eintrag im Verzeichnis); mit oder ohne lesbaren Lauf
+    const entry = (ohneSkills) => {
+      const e = structuredClone(gespeichert.entry);
+      e.best.at += 864e5 * 40;
+      if (ohneSkills) e.best.run.skills = [];
+      return e;
+    };
+    const zweiter = logFile("unbekannt-2.txt", serie(2, "Fellinex", 1, { inDmg: 90000, outDmg: 60000 }));
+    const gA = await geoeffnet({ [gespeichert.key]: entry(false) }, () => {});
+    const mitLauf = await ladeUndAnalyse(gA, zweiter);
+    await gA.close();
+    const gB = await geoeffnet({ [gespeichert.key]: entry(true) }, () => {});
+    const ohneLauf = await ladeUndAnalyse(gB, zweiter);
+    assert(mitLauf, "lesbarer Lauf, gleiches Paar: der gespeicherte Pull ist der Bezug, die Start-Zeile steht", mitLauf);
+    assert(!ohneLauf, "Paar nicht lesbar: der gespeicherte Pull ist kein Bezug, die Start-Zeile entfaellt (Unbekanntes passt nie)", ohneLauf);
+    assert(!gB.errors.length, "unbekannter Bezug: keine Fehler in der Seite", gB.errors);
+    await gB.close();
+  }
+
+  /* --- 11 · Analyse-Feinschliff (Spezifikation 2026-10-04, #105-#110). Eine
+     eigene Seite, Deutsch. Die Kaempfe erzeugt flachLog: alle 500 ms ein
+     Treffer im Wechsel Schnellfeuer/Detonationsmal, 9000-11000 Schaden;
+     `delle` [von s, bis s, Faktor] schwaecht eine Strecke ab. */
+  {
+    const fp = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const fErrors = [];
+    fp.on("pageerror", (e) => fErrors.push(String(e)));
+    await fp.addInitScript(() => {
+      try { localStorage.clear(); localStorage.setItem("boroLang", "de"); } catch { /* storage blocked */ }
+    });
+    await fp.goto("file://" + dist);
+    const fLoad = async (file, name) => {
+      await fp.setInputFiles("#fileInput", file);
+      await fp.waitForFunction((n) => (document.querySelector("#hName")?.textContent || "").includes(n), name);
+      await fp.waitForTimeout(150);
+    };
+    const fTab = async (name) => { await fp.evaluate((n) => document.querySelector(`[data-tab="${n}"]`).click(), name); await fp.waitForTimeout(150); };
+    /* `pulls` (wahlweise) legt weitere Pulls desselben Logs davor, zehn Minuten auseinander, mit ihren
+       eigenen Optionen; `krit` macht jeden dritten Treffer kritisch (doppelter Schaden). */
+    let fTag = 0;
+    const flachLog = (name, boss, { pulls = [], ...letzter } = {}) => {
+      const tag = 10 + (fTag++), rows = [];
+      [...pulls, letzter].forEach(({ secs = 90, delle = null, krit = false }, p) => {
+        for (let k = 0; k * 500 < secs * 1000; k++) {
+          const t = k * 500, [skill, sid] = k % 2 ? DM : QF, kr = krit && k % 3 === 0;
+          let dmg = (9000 + (k * 7919 % 2001)) * (kr ? 2 : 1);
+          if (delle && t >= delle[0] * 1000 && t < delle[1] * 1000) dmg *= delle[2];
+          rows.push(`${stamp(at(tag, 20, p * 10) + t)},DamageDone,${skill},${sid},${Math.round(dmg)},${kr ? 1 : 0},0,${kr ? "kCritical" : "kNormalHit"},Tester,${boss}`);
+        }
+      });
+      const f = join(work, name);
+      writeFileSync(f, ["CombatLogVersion,4", ...rows].join("\n") + "\n");
+      return f;
+    };
+    const zaehle = (text, re) => (text.match(new RegExp(re.source, "g")) || []).length;
+    const fBefunde = () => fp.evaluate(() => [...document.querySelectorAll("#weitereListe .find")]
+      .map((f) => f.dataset.k + " | " + f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
+        (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
+    const fText = () => fp.evaluate(() => document.querySelector("#p-analysis").innerText);
+
+    // #105: ein gleichmaessiger Kampf - keine schwaechste Stelle, kein "Pruefe"
+    await fLoad(flachLog("flach.txt", "Fellinex"), "Fellinex");
+    await fTab("analysis");
+    let bf = await fBefunde(), alles = await fText();
+    assert(!bf.some((b) => b.startsWith("schwach |")) && !/Schwächste drei Sekunden/.test(alles),
+      "#105: gleichmaessiger Kampf ohne \"Schwaechste drei Sekunden\"", bf);
+    assert(!/Prüfe/.test(alles), "#105: gleichmaessiger Kampf ohne \"Pruefe\"", alles);
+    // eine Delle auf 40 %: unter dem halben Median, der Eintrag steht
+    await fLoad(flachLog("delle40.txt", "Fellinex", { delle: [40, 43, 0.4] }), "Fellinex");
+    await fTab("analysis");
+    bf = await fBefunde();
+    assert(bf.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)),
+      "#105: eine Strecke unter dem halben Median steht als schwaechste Stelle", bf);
+    // eine Delle auf 70 %: schwaecher als ueblich, aber nicht unter der Haelfte - kein Eintrag
+    await fLoad(flachLog("delle70.txt", "Fellinex", { delle: [40, 43, 0.7] }), "Fellinex");
+    await fTab("analysis");
+    bf = await fBefunde();
+    assert(!bf.some((b) => b.startsWith("schwach |")), "#105: 70 % des Medians ist keine schwaechste Stelle", bf);
+    assert(!/Die Stelle/.test(await fp.evaluate(() => document.querySelector("#analysisCall").textContent)),
+      "#105: 70 % des Medians auch nicht im Urteil", await fp.evaluate(() => document.querySelector("#analysisCall").textContent));
+
+    /* #106: jede Aussage einmal. Ein gleichmaessiger Kampf mit Krits: der Krit-Satz nur unter "Wie
+       triffst du?", ohne Luecken kein "Ohne die Luecken", kein Haelftensatz beim 1,0-fachen. */
+    await fLoad(flachLog("flach-krit.txt", "Fellinex", { krit: true }), "Fellinex");
+    await fTab("analysis");
+    alles = await fText();
+    const dWie = await fp.evaluate(() => document.querySelector("#dWie")?.innerText || "");
+    assert(zaehle(alles, /deines Schadens kamen aus Krits/) === 1 && /deines Schadens kamen aus Krits/.test(dWie),
+      "#106: der Krit-Satz steht genau einmal, unter \"Wie triffst du?\"", alles);
+    assert(/\d+\u00a0% deiner Treffer kritisch, \d+\u00a0% stark\./.test(dWie) && /Treffer, davon \d+\u00a0% kritisch/.test(alles),
+      "#106: jeder Krit-Wert sagt, worauf er sich bezieht (Treffer, Schaden)", dWie);
+    const d3 = await fp.evaluate(() => [...document.querySelectorAll("#dDurch .fein")].map((x) => x.textContent).join(" | "));
+    assert(!/Lücken/.test(d3) && /^\d+,\d je Minute\./.test(d3), "#106: ohne Luecken kein \"Ohne die Luecken ..., mit ihnen\"", d3);
+    assert(!/Hälfte|fachen/.test(alles), "#106: kein Haelftensatz beim 1,0-fachen", alles);
+    // eine deutlich staerkere zweite Haelfte steht da
+    await fLoad(flachLog("haelften.txt", "Fellinex", { delle: [0, 45, 0.6] }), "Fellinex");
+    await fTab("analysis");
+    assert(/Deine zweite Hälfte lief mit [\d.]+k, dem 1,\d-fachen der ersten\./.test(await fText()),
+      "#106: ab dem 1,15-fachen steht der Haelftensatz", await fp.evaluate(() => document.querySelector("#verdictText").textContent));
+    /* Der Start genau einmal: zwei Pulls, der zweite mit schwachem Start (die ersten 10 s auf 30 %).
+       Er steht unter "Weitere Befunde", nicht noch einmal unter der Form. */
+    await fLoad(flachLog("start.txt", "Fellinex", { pulls: [{}], delle: [0, 10, 0.3] }), "Fellinex");
+    await fTab("analysis");
+    alles = await fText();
+    bf = await fBefunde();
+    assert(bf.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)),
+      "#106: der schwache Start steht unter Weitere Befunde", bf);
+    assert(zaehle(alles, /Dein Start war deutlich schwächer/) === 1 && !/Start/.test(await fp.evaluate(() => document.querySelector("#verdictText").textContent)),
+      "#106: der Start steht genau einmal, nicht unter der Form", alles);
+
+    /* #109: ein h2 (der Name des Bereichs; mit Feldern steht er in der Kopfzeile, das h2 im Panel ist
+       dann nicht gezeichnet), darunter alle Felder als h3 auf einer Ebene - zuerst das Urteil, ganz unten
+       der Fuss; kein Sprung zurueck auf h2. Gezaehlt wird, was der Vorleser bekommt: was eine Box hat. */
+    const baum = await fp.evaluate(() => [...document.querySelectorAll("#bereichKopf h2, #p-analysis :is(h1,h2,h3,h4)")]
+      .filter((h) => h.getClientRects().length > 0).map((h) => h.tagName + " " + h.textContent.trim()));
+    assert(baum[0] === "H2 Analyse" && baum.slice(1).every((h) => h.startsWith("H3 ")) &&
+      baum[1] === "H3 Urteil" && baum[2] === "H3 Weitere Befunde" && baum[3] === "H3 Form des Kampfes" &&
+      baum.at(-1) === "H3 Was das Log nicht weiß", "#109: Ueberschriften h2 Analyse, dann nur h3 in der Reihenfolge der Seite", baum);
+    const sprung = async () => fp.evaluate(() => document.querySelector(".skiplink").textContent);
+    assert(await sprung() === "Zum Bereich Analyse springen", "#109: der Sprunglink nennt den Bereich Analyse", await sprung());
+    await fTab("rotation");
+    assert(await sprung() === "Zum Bereich Rotation springen", "#109: der Sprunglink folgt dem Bereich (Rotation)", await sprung());
+    await fTab("timeline");
+    assert(await sprung() === "Zum Kampf springen", "#109: im Bereich Kampf wie bisher", await sprung());
+    await fTab("analysis");
+    await fp.evaluate(() => document.querySelector("#btnLang").click());
+    await fp.waitForTimeout(200);
+    assert(await sprung() === "Skip to Analysis", "#109: der Sprunglink folgt der Sprache", await sprung());
+    await fp.evaluate(() => document.querySelector("#btnLang").click());
+    await fp.waitForTimeout(200);
+
+    /* #107: vom Urteil zum Beleg und in die Rotation. Ein Kampf mit einer Luecke 0:40-0:46 (nichts
+       trifft): das Urteil nennt die Leerzeit, "Zum Beleg" fuehrt zur Form und setzt den Fokus dorthin. */
+    const weg = () => fp.evaluate(() => {
+      const a = document.activeElement;
+      const r = a ? a.getBoundingClientRect() : null;
+      return {
+        tab: document.querySelector(".panel.on")?.id || "",
+        fokus: a ? (a.id ? "#" + a.id : a.className || a.tagName) : "",
+        sichtbar: !!r && r.top < innerHeight && r.bottom > 0,
+        von: document.querySelector("#p-rotation .vfrom")?.value || "", bis: document.querySelector("#p-rotation .vto")?.value || "",
+        ganz: document.querySelector("#analysisCall .ganz")?.textContent || "",
+      };
+    });
+    await fLoad(flachLog("luecke.txt", "Fellinex", { delle: [40, 46, 0] }), "Fellinex");
+    await fTab("analysis");
+    const zb = await fp.evaluate(() => { const k = document.querySelector("#analysisCall button.zubeleg");
+      return k ? { text: k.textContent, typ: k.type } : null; });
+    assert(zb?.text === "Zum Beleg ›" && zb.typ === "button", "#107: unter dem Urteil der Knopf \"Zum Beleg\"", zb);
+    await fp.evaluate(() => document.querySelector("#analysisCall button.zubeleg").click());
+    await fp.waitForTimeout(400);
+    let w = await weg();
+    assert(w.tab === "p-analysis" && w.fokus === "#verdict" && w.sichtbar, "#107: \"Zum Beleg\" rollt zur Form und setzt den Fokus darauf", w);
+    // an "Luecken ab 2 s": die laengste Luecke in der Rotation, mit 2 s Rand
+    const lb = await fp.evaluate(() => { const k = document.querySelector('#weitereListe .find[data-k="luecken"] button.inrot');
+      return k ? { text: k.textContent, label: k.getAttribute("aria-label") } : null; });
+    assert(lb?.text === "In der Rotation zeigen ›" && lb.label === "Längste Lücke 0:40\u20130:46 in der Rotation zeigen",
+      "#107: an den Luecken der Knopf mit der Strecke im Vorlesenamen", lb);
+    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="luecken"] button.inrot').click());
+    await fp.waitForTimeout(500);
+    w = await weg();
+    assert(w.tab === "p-rotation" && w.von === "0:38" && w.bis === "0:48" && w.fokus === "#deineRotScroll",
+      "#107: die Rotation oeffnet mit Von/bis 0:38-0:48, Fokus auf der Zeitleiste", w);
+    // zurueck in der Analyse: sie sagt, dass sie den ganzen Kampf liest
+    await fTab("analysis");
+    w = await weg();
+    assert(w.ganz === "Die Analyse liest den ganzen Kampf. Von/bis 0:38\u20130:48 gilt nur in der Rotation.",
+      "#107: mit Von/bis in der Rotation sagt die Analyse, dass sie den ganzen Kampf liest", w);
+    // "Die Folge in der Rotation" unter "Hast du durchgedrueckt?"
+    const fo = await fp.evaluate(() => document.querySelector("#dDurch button.inrot")?.textContent || "");
+    assert(fo === "Die Folge in der Rotation ›", "#107: der Verweis auf die Folge ist ein Knopf", fo);
+    await fp.evaluate(() => document.querySelector("#dDurch button.inrot").click());
+    await fp.waitForTimeout(400);
+    assert((await weg()).tab === "p-rotation", "#107: \"Die Folge in der Rotation\" oeffnet die Rotation", await weg());
+    /* Tastatur: von der Bereichsleiste aus erreicht Tab "Zum Beleg" und die Knoepfe in den Befunden */
+    await fTab("analysis");
+    await fp.evaluate(() => document.querySelector('#bereiche [data-tab="analysis"]').focus());
+    const erreicht = new Set();
+    for (let i = 0; i < 60; i++) {
+      await fp.keyboard.press("Tab");
+      const k = await fp.evaluate(() => { const a = document.activeElement;
+        return a?.closest("#p-analysis") ? (a.classList.contains("zubeleg") ? "beleg" : a.closest(".find")?.dataset.k || a.closest("section")?.id || "") : ""; });
+      if (k) erreicht.add(k);
+    }
+    assert(erreicht.has("beleg") && erreicht.has("luecken") && erreicht.has("dDurch"), "#107: alle neuen Wege mit Tab erreichbar", [...erreicht]);
+    // die schwaechste Stelle: ihr Knopf nennt die Strecke, die Rotation zeigt sie mit Rand
+    await fLoad(flachLog("delle40b.txt", "Fellinex", { delle: [40, 43, 0.4] }), "Fellinex");
+    await fTab("analysis");
+    const sb = await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="schwach"] button.inrot')?.getAttribute("aria-label") || "");
+    assert(sb === "Die Stelle 0:40\u20130:43 in der Rotation zeigen", "#107: an der schwaechsten Stelle der Knopf", sb);
+    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="schwach"] button.inrot').click());
+    await fp.waitForTimeout(500);
+    w = await weg();
+    assert(w.tab === "p-rotation" && w.von === "0:38" && w.bis === "0:45", "#107: die Stelle in der Rotation mit 2 s Rand", w);
+    // ein neuer Kampf ohne Von/bis: kein Hinweis; ein ruhiges Urteil: kein "Zum Beleg"
+    await fLoad(flachLog("flach2.txt", "Fellinex"), "Fellinex");
+    await fTab("analysis");
+    w = await weg();
+    assert(!w.ganz && !(await fp.evaluate(() => !!document.querySelector("#analysisCall .zubeleg"))),
+      "#107: ohne Von/bis kein Hinweis, ohne Urteil kein \"Zum Beleg\"", w);
+    // der schwache Start: sein Knopf zeigt die ersten 10 s
+    await fLoad(flachLog("start2.txt", "Fellinex", { pulls: [{}], delle: [0, 10, 0.3] }), "Fellinex");
+    await fTab("analysis");
+    const st = await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="start"] button.inrot')?.getAttribute("aria-label") || "");
+    assert(st === "Die ersten 10\u00a0s in der Rotation zeigen", "#107: am schwachen Start der Knopf", st);
+    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="start"] button.inrot').click());
+    await fp.waitForTimeout(500);
+    w = await weg();
+    assert(w.tab === "p-rotation" && w.von === "0:00" && w.bis === "0:12", "#107: der Start in der Rotation, 0:00-0:12", w);
+    // Englisch
+    await fTab("analysis");
+    await fp.evaluate(() => document.querySelector("#btnLang").click());
+    await fp.waitForTimeout(200);
+    const en = await fp.evaluate(() => ({ ganz: document.querySelector("#analysisCall .ganz")?.textContent || "",
+      start: document.querySelector('#weitereListe .find[data-k="start"] button.inrot')?.getAttribute("aria-label") || "" }));
+    assert(en.ganz === "The analysis reads the whole fight. From/to 0:00\u20130:12 only applies in Rotation." &&
+      en.start === "Show the first 10\u00a0s in Rotation", "#107 EN: Hinweis und Knopf", en);
+    await fp.evaluate(() => document.querySelector("#btnLang").click());
+    await fp.waitForTimeout(200);
+
+    /* #110 bei 2000 \u00d7 1480: die Ziele ("Wohin ging der Schaden?") hoechstens 900 Punkt breit */
+    await fp.setViewportSize({ width: 2000, height: 1480 });
+    const zk = nebenKampf(at(28, 20, 0), "Fellinex", [["Ziel Zwei", 0.3, 5000, 50000]]);
+    await fLoad(logFile("ziele.txt", zk.tr), "Fellinex");
+    await fTab("analysis");
+    const ts = await fp.evaluate(() => document.querySelector("#findings .tsplit")?.getBoundingClientRect().width || -1);
+    assert(ts > 0 && ts <= 900.5, "#110: die Ziele hoechstens 900 Punkt breit", ts);
+    await fp.setViewportSize({ width: 1280, height: 860 });
+
+    assert(!fErrors.length, "Feinschliff: keine Fehler in der Seite", fErrors);
+    await fp.close();
   }
 } finally {
   await browser.close();

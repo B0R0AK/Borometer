@@ -10,11 +10,13 @@ import {
   unverwundbareSekunden, zaehlung
 } from "./16-fight-analysis";
 import { $, clock, esc } from "./18-interface-basics";
+import { rotWindow } from "./25-rotation";
+import { switchTab } from "./34-menus-drop-and-tabs";
 import { catOf, HIT_CATS } from "./19-grouping-and-party-fights";
-import { fensterAbschnitt, fensterStand, nebenzielAnalyse, startNebensatz, startZeile, type FensterStand } from "./53-fenster";
+import { fensterAbschnitt, fensterStand, inRotationKnopf, nebenzielAnalyse, startZeile, type FensterStand } from "./53-fenster";
 import { gedrueckteEinsaetze } from "./54-deine-rotation";
 import { mechanikSekunden, mechanikStand, mechanikStempel } from "./61-mechanik";
-import { fensterUrteil, jeMinute, luecken, type Luecken } from "../analyse-core";
+import { fensterKosten, fensterUrteil, haelften, jeMinute, luecken, schwacheStelle, type Luecken } from "../analyse-core";
 import type { CombatEvent, Fight, Insight } from "../types";
 
 /* ---------- analysis ----------
@@ -52,8 +54,14 @@ export function renderAnalysis(){
      (urteilHtml); die Tafel im Bereich Kampf zeigt dasselbe Urteil. */
   const u = urteilHtml(seg, true);
   const kasten = $("#analysisCall");
-  if(kasten){ kasten.hidden = false; kasten.className = u.klasse; kasten.innerHTML = u.html; }
+  // das unsichtbare h3 "Urteil" (Issue #109): der Vorleser findet das Feld im Ueberschriftenbaum
+  if(kasten){ kasten.hidden = false; kasten.className = u.klasse;
+    /* "Zum Beleg" steht am Ende der Erklaerung wie ein Verweis im Satz, nicht
+       in einer eigenen Zeile: bei 2000 x 1480 bleibt der Fuss so im Blick. */
+    const beleg = u.teuer ? ' <button type="button" class="zubeleg" data-weg="beleg" data-ziel="'+esc(u.teuer)+'">'+esc(t("analysis.zumBeleg"))+"</button>" : "";
+    kasten.innerHTML = '<h3 class="vh">'+esc(t("tafel.urteil"))+"</h3>"+u.html.replace(/<\/p>$/, beleg+"</p>")+ganzerKampf(seg); }
   const {gefunden, fenster, teuer} = u;
+  wegeBinden();
 
   renderVerdict(seg, lk);
   renderWeitere(seg, gefunden, teuer, lk);
@@ -80,6 +88,28 @@ export function renderAnalysis(){
     fensterAbschnitt(fenster, teuer === "window")+"</section>";
   html += ventiusBlock(seg, gefunden, teuer === "ventiusPos");
   $("#findings").innerHTML = html;
+  formFuellen();
+}
+
+/* ---------- die Form im grossen Fenster (Issue #110) ----------
+   Ab 1200 Punkt Fensterhoehe nimmt die Form den Platz, der da ist: sie
+   waechst in das, was unter dem Fuss frei bliebe (im Mechanik-Fall blieben
+   bei 2000 x 1480 sonst etwa 650 Punkt leer), hoechstens auf FORM_MAX, und
+   gibt nach, wo der Fuss sonst unter die Statusleiste rutschte, hoechstens
+   bis FORM_MIN (gewuenscht: "Was das Log nicht weiss" ohne Rollen bei
+   2000 x 1480). Die Saeulen sind ein SVG ohne festes Seitenverhaeltnis, sie
+   folgen ohne neues Zeichnen; renderAnalysis laeuft bei jeder Fenstergroesse. */
+const FORM_MIN = 112, FORM_MAX = 320, FORM_AB_H = 1200;
+function formFuellen(){
+  const box = $("#saeulen"), fuss = $("#afuss"), leiste = $("#statusleiste");
+  if(!box) return;
+  box.style.height = "";
+  const hoch = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--winh")) || innerHeight;
+  if(hoch < FORM_AB_H || !fuss || !leiste || !box.getClientRects().length) return;
+  const frei = leiste.getBoundingClientRect().top - fuss.getBoundingClientRect().bottom - 8;
+  const jetzt = box.getBoundingClientRect().height;
+  const soll = Math.max(FORM_MIN, Math.min(FORM_MAX, jetzt + frei));
+  if(Math.abs(soll - jetzt) >= 1) box.style.height = soll.toFixed(0) + "px";
 }
 
 /* ---------- die Luecken nach dem Median ----------
@@ -120,23 +150,22 @@ function renderWeitere(seg: Fight, gefunden: Insight[], teuer: string, lk: Lueck
   const s = seg.stats;
   const hol = (k: string) => gefunden.find(x => x.key === k);
   // data-k benennt den Eintrag; zaehlt traegt er, wenn das Urteil oben ihn nennt (der Schluessel des Kandidaten)
-  const eintrag = (k: string, dt: string, v: string, n = "", kandidat = k) =>
+  const eintrag = (k: string, dt: string, v: string, n = "", kandidat = k, weg = "") =>
     '<div class="find'+(teuer === kandidat ? " zaehlt" : "")+'" data-k="'+k+'">'+
-    '<dt class="k">'+esc(dt)+'</dt><dd class="v">'+esc(v)+"</dd>"+(n ? '<dd class="n">'+esc(n)+"</dd>" : "")+"</div>";
+    '<dt class="k">'+esc(dt)+'</dt><dd class="v">'+esc(v)+"</dd>"+(n ? '<dd class="n">'+esc(n)+"</dd>" : "")+weg+"</div>";
   let h = "";
   const zaehl = hol("thinCounts");
   if(zaehl){
     liste.innerHTML = eintrag("gezaehlt", t("insight.thinCounts.label"), t("insight.thinCounts.value", zaehl.vars), t("insight.thinCounts.note", zaehl.vars));
     return;
   }
+  // die laengste Luecke in der Rotation (Issue #107)
   if(lk) h += eintrag("luecken", t("analysis.wb.luecken"), lk.luecken.length ? String(lk.luecken.length) : t("analysis.wb.keine"),
-    lk.luecken.length ? t("analysis.wb.lueckenSumme", {s: lk.summe + "\u00a0s"}) : "");
-  /* Erkannte Mechanik als eigener Eintrag (Feinschliff 02.10., Abschnitt 3):
-     "Mechanik | 0:24-0:30 \u00b7 in 6 von 6 Pulls", nur fuer Strecken in diesem Pull. */
-  const mst = mechanikStand(seg);
-  if(mst) for(const {m, strecken} of mst.liste) if(strecken.length)
-    h += eintrag("mechanik", t("analysis.wb.mechanik"), t("analysis.wb.mechanikWert",
-      {zeiten: strecken.map(g => clock(g.von)+"\u2013"+clock(g.bis)).join(", "), mit: m.mit, n: m.pulls}));
+    lk.luecken.length ? t("analysis.wb.lueckenSumme", {s: lk.summe + "\u00a0s"}) : "", "luecken",
+    lk.laengste ? inRotationKnopf(lk.laengste[0], lk.laengste[1], "analysis.inRotation.luecke") : "");
+  /* Die erkannte Mechanik steht nicht hier, sondern einmal als Zeile an der
+     Form, neben ihrem Band (Issue #106, Entscheidung vom 04.10.2026; vorher
+     zusaetzlich als Eintrag "Mechanik", Feinschliff 02.10.). */
   if(s.max > 0){
     // die Faehigkeit mit dem groessten einzelnen Treffer, ihr Name in der Sprache der Seite
     const e = seg.events.reduce<CombatEvent | null>((a, x) => !a || x.dmg > a.dmg ? x : a, null);
@@ -152,10 +181,14 @@ function renderWeitere(seg: Fight, gefunden: Insight[], teuer: string, lk: Lueck
   if(ein && ein.mit != null) h += eintrag("jeMinute", t("analysis.wb.jeMinute"), num1(ein.mit));
   const art = hol("consistency");
   if(art) h += eintrag("skillung", t("insight.consistency.label"), t("insight.consistency.value", art.vars), t("insight.consistency.note", art.vars));
-  const schwach = hol("weakestWindow");
-  if(schwach){
+  /* Nur eine wirklich schwache Stelle (Issue #105): dieselbe Grenze wie im
+     Urteil, unter dem halben Median. Sonst stand hier "Pruefe ..." bei einer
+     Stelle auf dem Median. */
+  const schwach = hol("weakestWindow"), stelle = schwach && lk ? schwaechstesFenster(seg) : null;
+  if(schwach && stelle && lk && schwacheStelle(stelle.dps, lk.median)){
     const v = {...schwach.vars, drove: schwach.vars.drove ? skillLabel(schwach.vars.drove, schwach.vars.droveSid) : ""};
-    h += eintrag("schwach", t("insight.weakestWindow.label"), t("insight.weakestWindow.value", v), t("insight.weakestWindow.note", v), "weakestWindow");
+    h += eintrag("schwach", t("insight.weakestWindow.label"), t("insight.weakestWindow.value", v), t("insight.weakestWindow.note", v), "weakestWindow",
+      inRotationKnopf(stelle.von, stelle.bis, "analysis.inRotation.schwach"));
   }
   if(!state.noTime) h += startZeile(seg);
   const unv = hol("invulnCasts");
@@ -165,6 +198,68 @@ function renderWeitere(seg: Fight, gefunden: Insight[], teuer: string, lk: Lueck
     h += eintrag("unverwundbar", t("insight.invulnCasts.label"), t("insight.invulnCasts.value", v), t("insight.invulnCasts.note", v));
   }
   liste.innerHTML = h;
+}
+
+/* ---------- Wege vom Urteil zum Beleg und in die Rotation (Issue #107) ----------
+   Die Analyse war eine reine Leseflaeche: kein fokussierbares Element, und
+   "steht unter Rotation" war Text, kein Weg. Jetzt:
+   - "Zum Beleg" unter dem Urteil rollt zum Feld, das es belegt, und setzt
+     den Fokus darauf;
+   - "In der Rotation zeigen" an der laengsten Luecke, der schwaechsten
+     Stelle und dem schwachen Start setzt Von/bis der Rotation auf die
+     Strecke (2 s Rand) und oeffnet sie, der Fokus geht auf die Zeitleiste;
+   - ist dort ein Von/bis gesetzt, sagt die Analyse, dass sie trotzdem den
+     ganzen Kampf liest.
+   Die Klicks laufen ueber einen Hoerer am Panel (data-weg), denn der Inhalt
+   wird bei jedem Zeichnen neu geschrieben. Den Knopf in die Rotation baut
+   inRotationKnopf (53-fenster.ts), der Start-Eintrag dort braucht ihn auch. */
+const RAND_S = 2;
+/* Wohin "Zum Beleg" fuehrt: das Feld, aus dem der teuerste Kandidat kommt. */
+const BELEG: Record<string, string> = {
+  luecken: "#verdict",
+  weakestWindow: '#weitereListe .find[data-k="schwach"]',
+  missed: '#weitereListe .find[data-k="fehl"]',
+  ventiusPos: "#findings .vfeld",
+  window: "#findings .fsec:has(#fensterH)",
+};
+function ganzerKampf(seg: Fight): string {
+  if(state.rotSegStart !== seg.start || (state.rotFrom == null && state.rotTo == null)) return "";
+  const T = seg.stats.seconds || 0;
+  const a = Math.max(0, state.rotFrom ?? 0), b = Math.min(T, state.rotTo ?? T);
+  return '<p class="ganz">'+esc(t("analysis.ganzerKampf", {z: clock(a)+"\u2013"+clock(b)}))+"</p>";
+}
+function zurRotation(){
+  switchTab("rotation");
+  // wie "Zeitverlauf und Rotation" im Kampf (56-tafel.ts): der Fokus auf die Zeitleiste, ohne sie auf den Bereich
+  const leiste = $("#deineRotScroll");
+  (leiste && !leiste.closest("[hidden]") ? leiste : $('#bereiche [data-tab="rotation"]')).focus();
+}
+let wegeGebunden = false;
+function wegeBinden(){
+  const panel = $("#p-analysis");
+  if(wegeGebunden || !panel) return;
+  wegeGebunden = true;
+  panel.addEventListener("click", (e: MouseEvent) => {
+    const k = (e.target as HTMLElement).closest<HTMLElement>("[data-weg]");
+    if(!k || !panel.contains(k)) return;
+    const seg = state.encounters[state.sel];
+    if(k.dataset.weg === "beleg"){
+      const ziel = panel.querySelector<HTMLElement>(BELEG[k.dataset.ziel || ""] || "");
+      if(!ziel) return;
+      if(ziel.tabIndex < 0) ziel.tabIndex = -1;
+      const ruhig = matchMedia("(prefers-reduced-motion: reduce)").matches;
+      ziel.scrollIntoView({block: "center", behavior: ruhig ? "auto" : "smooth"});
+      ziel.focus({preventScroll: true});
+      return;
+    }
+    if(!seg) return;
+    if(k.dataset.weg === "rot"){
+      const {T} = rotWindow(seg);   // setzt Von/bis zurueck, wenn sie zu einem anderen Kampf gehoerten
+      state.rotFrom = Math.max(0, Number(k.dataset.von) - RAND_S);
+      state.rotTo = Math.min(T, Number(k.dataset.bis) + RAND_S);
+    }
+    zurRotation();
+  });
 }
 
 /* ---------- die drei Felder ----------
@@ -213,7 +308,12 @@ function dreiFelder(seg: Fight, gefunden: Insight[], lk: LueckenStand | null): s
   if(lk){
     const n = gedrueckteEinsaetze(seg), r = jeMinute(n, s.seconds, lk.summe);
     d3 = '<p class="ant">'+esc(t("analysis.d3.ant", {n: anzahl(n), dauer: dur(s.seconds)}))+"</p>"+
-      (r.mit != null ? '<p class="fein">'+esc(t("analysis.d3.leise", {ohne: r.ohne != null ? num1(r.ohne) : "\u2013", mit: num1(r.mit)}))+"</p>" : "");
+      /* "ohne die Luecken / mit ihnen" nur, wenn es Luecken gab (Issue #106);
+         dahinter der Weg zur Folge in der Rotation statt eines Satzes (Issue #107) */
+      '<p class="fein">'+(r.mit != null ? esc(lk.summe > 0
+        ? t("analysis.d3.leise", {ohne: r.ohne != null ? num1(r.ohne) : "\u2013", mit: num1(r.mit)})
+        : t("analysis.d3.leiseOhne", {mit: num1(r.mit)}))+" " : "")+
+      '<button type="button" class="inrot" data-weg="folge">'+esc(t("analysis.folgeRotation"))+"</button></p>";
   }
   return '<div class="drei" id="drei">'+feld("dTraegt", "analysis.d1", d1)+feld("dWie", "analysis.d2", d2)+
     (d3 ? feld("dDurch", "analysis.d3", d3) : "")+"</div>";
@@ -294,7 +394,8 @@ function urteilRechnen(seg: Fight, gefunden: Insight[], fenster: FensterStand | 
     return {klasse: "urteil ruhig", teuer: "",
             html: '<p class="uv">'+esc(t("analysis.call.thin", {n: anzahl(s.hits), min: LIEST_AB_TREFFER}))+"</p>"};
   const hat = (k: string) => gefunden.some(f => f.key === k);
-  const kandidaten: { key: string; art: string; verlust: number; vars: Record<string, unknown> }[] = [];
+  // note: ein eigener Erklaersatz statt "analysis.call.<art>.note" (das Fenster gegen den Bezug)
+  const kandidaten: { key: string; art: string; verlust: number; note?: string; vars: Record<string, unknown> }[] = [];
   /* Die Form des Entwurfs (DECISION 4.2): "18 Sekunden ohne Treffer",
      gemessen an der gewoehnlichen Sekunde, mit der laengsten Luecke. */
   const lk = lueckenStand(seg);
@@ -306,10 +407,15 @@ function urteilRechnen(seg: Fight, gefunden: Insight[], fenster: FensterStand | 
     if(v) kandidaten.push({key:"ventiusPos", art:"ventius", verlust: v.von,
       vars:{n: v.fehlen, skill: skillLabel(VENTIUS_NAME, VENTIUS_ID)}});
   }
-  if(fenster && fensterUrteil(fenster.werte, gesamt, URTEIL_AB)){
+  /* Gegen den Bezugspull, wo er das Fenster kennt (Issue #108): dann zaehlt
+     nur der Anteil ausserhalb, der ueber seinem liegt, und der Satz nennt
+     ihn. Ohne Bezug gegen alles im Fenster, und der Satz sagt das. */
+  const bezugAussen = fenster && fenster.bezug ? fenster.bezug.aussen : null;
+  if(fenster && fensterUrteil(fenster.werte, gesamt, URTEIL_AB, bezugAussen)){
     const w = fenster.werte;
-    kandidaten.push({key:"window", art:"window", verlust: w.kosten,
-      vars:{h: fenster.hName, f: fenster.fName, p: pct(w.aussen), out: fmt(w.kAus), in: fmt(w.kIn)}});
+    kandidaten.push({key:"window", art:"window", verlust: fensterKosten(w, bezugAussen), note: bezugAussen == null ? "" : "noteRef",
+      vars:{h: fenster.hName, f: fenster.fName, p: pct(w.aussen), out: fmt(w.kAus), in: fmt(w.kIn),
+        q: bezugAussen == null ? "" : pct(bezugAussen), zweit: fenster.zweit}});
   }
   /* Die schwaechste Stelle misst mit demselben Massstab wie die Leerzeit:
      jede ihrer Sekunden gegen den Median der Sekunden mit Treffern, so
@@ -319,7 +425,8 @@ function urteilRechnen(seg: Fight, gefunden: Insight[], fenster: FensterStand | 
      Leerzeit fast immer gegen die Stelle direkt daneben. */
   if(hat("weakestWindow") && lk && lk.median > 0){
     const w = schwaechstesFenster(seg);
-    if(w && lk.median > w.dps) kandidaten.push({key:"weakestWindow", art:"weak",
+    // dieselbe Grenze wie der Eintrag unter "Weitere Befunde" (Issue #105)
+    if(w && schwacheStelle(w.dps, lk.median)) kandidaten.push({key:"weakestWindow", art:"weak",
       verlust: (lk.median - w.dps)*(w.bis - w.von),
       vars:{from: clock(w.von), to: clock(w.bis), med: fmt(lk.median, 1e3)}});
   }
@@ -344,7 +451,7 @@ function urteilRechnen(seg: Fight, gefunden: Insight[], fenster: FensterStand | 
   const vars = Object.assign({dmg: fmt(erst.verlust), pct: pct(erst.verlust/gesamt, 0)}, erst.vars);
   /* "Das kostet dich am meisten:" eroeffnet die Erklaerung wie im Entwurf -
      keine eigene kleine Zeile ueber der Schlagzeile (Pruefung Befund 3). */
-  const note = t("analysis.call."+erst.art+(mitForm && erst.art === "leer" ? ".noteForm" : ".note"), vars);
+  const note = t("analysis.call."+erst.art+"."+(erst.note || (mitForm && erst.art === "leer" ? "noteForm" : "note")), vars);
   return {klasse: "urteil", teuer: erst.key,
     html: '<p class="uv">'+esc(t("analysis.call."+erst.art+".value", vars))+"</p>"+
       '<p class="un">'+esc(t("analysis.call.label")+" "+note)+"</p>"};
@@ -378,26 +485,15 @@ function renderVerdict(seg: Fight, lk: LueckenStand | null){
   const aus = unverwundbareSekunden(seg, lk.T).map((x, i) => x || mech[i]!);
   const sek: number[] = [];
   for(let i=0;i<lk.T;i++) if(!aus[i]) sek.push(lk.sek[i]!);
-  const N = sek.length;
-  const halb = Math.floor(N/2) || 1;
-  let e1 = 0, e2 = 0;
-  for(let i=0;i<N;i++) (i < halb ? (e1 += sek[i]!) : (e2 += sek[i]!));
-  const erste = e1/Math.max(1,halb), zweite = e2/Math.max(1,N-halb);
-  const kritAnteil = 100*(s.critDmgShare || 0);
   const teile = [];
-  // unter der Schwelle kein Haelftenvergleich und kein Anteil
-  const duenn = s.hits < LIEST_AB_TREFFER;
-  if(!duenn && erste > 0 && zweite > 0)
-    teile.push(t(zweite >= erste ? "analysis.halfUp" : "analysis.halfDown", {
-      strong: axisNum(Math.max(erste, zweite)),
-      x: num1(Math.max(erste,zweite)/Math.min(erste,zweite))
-    }));
-  if(!duenn && kritAnteil > 0) teile.push(t("analysis.critSum", {pct: pctOf(kritAnteil, 0)}));
-  /* Nur bei deutlich schwaecherem Start (unter 80 % des Vergleichspulls):
-     dann gehoert er zur Form des Kampfes. "Wie ueblich" steht nur in der
-     Zeile unter "Weitere Befunde". */
-  const start = duenn ? "" : startNebensatz(seg);
-  if(start) teile.push(start);
+  /* Unter der Schwelle kein Haelftenvergleich; darueber nur, wenn eine
+     Haelfte deutlich staerker war (haelften, ab dem 1,15-fachen, Issue #106).
+     Der Krit-Anteil steht nur unter "Wie triffst du?", der Start nur unter
+     "Weitere Befunde" - jede Zahl einmal (Issue #106). */
+  const h = s.hits < LIEST_AB_TREFFER ? null : haelften(sek);
+  if(h) teile.push(t(h.staerker === "zweite" ? "analysis.halfUp" : "analysis.halfDown", {
+    strong: axisNum(Math.max(h.erste, h.zweite)), x: num1(h.x)
+  }));
   const text = $("#verdictText");
   text.textContent = teile.join(" ");
   text.hidden = !teile.length;
@@ -446,7 +542,12 @@ function zeichneForm(seg: Fight, lk: LueckenStand){
   box.innerHTML = zonen + invz + mechz +
     '<svg viewBox="0 0 '+T+' 100" preserveAspectRatio="none" aria-hidden="true" focusable="false"><g class="sbalken">'+saeulen+"</g></svg>" + med;
   const zeiten = lk.luecken.map(([a, b]) => clock(a)+"\u2013"+clock(b));
-  box.setAttribute("aria-label", t("analysis.saeulenLabel", {dauer: dur(seg.stats.seconds), n: lk.luecken.length, liste: zeiten.join(", ")}));
+  /* Die Beschreibung nennt alles, was im Bild steht (Issue #109): auch die
+     Strecken, in denen das Ziel unverwundbar war, und die erkannte Mechanik. */
+  const strecke = (von: number, bis: number) => clock(von)+"\u2013"+clock(bis);
+  box.setAttribute("aria-label", t("analysis.saeulenLabel", {dauer: dur(seg.stats.seconds), n: lk.luecken.length, liste: zeiten.join(", "),
+    unv: unverwundbar.map(g => strecke(g.from, Math.min(T, g.to))).join(", "),
+    mech: mech.map(g => strecke(g.von, Math.min(T, g.bis))).join(", ")}));
   /* Die Legende nennt, was gezeichnet wurde, und sonst nichts. */
   const legS = $("#vlegAvg"); if(legS) legS.hidden = !med;
   const legSText = $("#vlegAvgText"); if(legSText) legSText.textContent = t("analysis.legendMedian", {x: fmt(lk.median, 1e3)});

@@ -227,9 +227,20 @@ export function fensterLesen(p: FPull, fe: Fenster): FensterWerte | null {
   };
 }
 
-/** Kandidat fuers eine Urteil: erst ab 20 % ausserhalb und ab `ab` (2 %) des Kampfes. */
-export function fensterUrteil(w: FensterWerte, gesamt: number, ab = 0.02): boolean {
-  return w.aussen >= FENSTER_URTEIL_AB && gesamt > 0 && w.kosten >= ab * gesamt;
+/* Wogegen die Kosten rechnen (Issue #108). Ohne Bezug gegen alles im
+   Fenster (w.kosten). Mit Bezugspull nur der Teil ausserhalb, der ueber
+   dessen Anteil liegt: bei einem Boss, dessen Fenster nur einen Teil des
+   Kampfes offen ist, erreicht niemand 0 % - gegen 0 % gerechnet hiess ein
+   Kampf mit 30 % aussen teuer, obwohl der beste Pull 41 % hatte. */
+export function fensterKosten(w: FensterWerte, bezugAussen: number | null): number {
+  if(bezugAussen == null) return w.kosten;
+  if(!(w.aussen > bezugAussen) || !(w.aussen > 0)) return 0;
+  return w.kosten * (w.aussen - bezugAussen) / w.aussen;
+}
+/** Kandidat fuers eine Urteil: erst ab 20 % ausserhalb, schlechter als der Bezug (wenn es einen gibt) und ab `ab` (2 %) des Kampfes. */
+export function fensterUrteil(w: FensterWerte, gesamt: number, ab = 0.02, bezugAussen: number | null = null): boolean {
+  return w.aussen >= FENSTER_URTEIL_AB && gesamt > 0 && (bezugAussen == null || w.aussen > bezugAussen) &&
+    fensterKosten(w, bezugAussen) >= ab * gesamt;
 }
 
 /* Nebenziele (4.4): Schaden auf alles, was nicht Hauptziel ist, als Anteil
@@ -307,4 +318,35 @@ export function luecken(sek: readonly number[], aus: readonly boolean[] = []): L
 /** Einsaetze je Minute ueber die ganze Zeit und ohne die Luecken. */
 export function jeMinute(n: number, sekunden: number, leer: number): { mit: number | null; ohne: number | null } {
   return {mit: sekunden > 0 ? n / sekunden * 60 : null, ohne: sekunden - leer > 0 ? n / (sekunden - leer) * 60 : null};
+}
+
+/* ---------- die schwaechste Stelle (Issue #105) ----------
+   Drei Sekunden gelten erst als schwach, wenn sie unter der Haelfte der
+   gewoehnlichen Sekunde liegen (Median der Sekunden mit Treffern;
+   Entscheidung vom 04.10.2026). Vorher stand der Eintrag "Schwaechste drei Sekunden" mit
+   "Pruefe, was dort im Cooldown war" auch bei 84.8k gegen einen Median von
+   84.8k da. Eintrag und Urteil fragen dieselbe Grenze. */
+export const SCHWACH_ANTEIL = 0.5;
+export function schwacheStelle(dps: number, median: number): boolean {
+  return median > 0 && dps < SCHWACH_ANTEIL * median;
+}
+
+/* ---------- die Haelften (Issue #106) ----------
+   Der Satz ueber die Haelften steht nur, wenn eine deutlich staerker war:
+   ab dem 1,15-fachen der anderen (gleichbedeutend: die schwaechere unter dem
+   0,87-fachen). "Dem 1,0-fachen der ersten" war keine Aussage. sek sind die
+   Sekunden ohne Unverwundbar und Mechanik; bei ungerader Zahl ist die erste
+   Haelfte die kleinere. Eine leere Haelfte (Schnitt 0) sagt nichts. */
+export const HAELFTE_AB = 1.15;
+export function haelften(sek: readonly number[]):
+    { erste: number; zweite: number; x: number; staerker: "erste" | "zweite" } | null {
+  const n = sek.length, halb = Math.floor(n / 2);
+  if(!halb) return null;
+  let a = 0, b = 0;
+  for(let i = 0; i < n; i++) i < halb ? (a += sek[i]!) : (b += sek[i]!);
+  const erste = a / halb, zweite = b / (n - halb);
+  if(!(erste > 0) || !(zweite > 0)) return null;
+  const x = Math.max(erste, zweite) / Math.min(erste, zweite);
+  if(x < HAELFTE_AB) return null;
+  return {erste, zweite, x, staerker: zweite >= erste ? "zweite" : "erste"};
 }

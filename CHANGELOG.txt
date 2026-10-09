@@ -1,6 +1,87 @@
 BOROMETER — CHANGELOG
 =====================
 
+v1.10
+-----
+  - A fourth theme, Smoked glass. On Windows 11 the big window lies on Acrylic:
+    what is behind it shows through, blurred, while the bars, lists and curves
+    sit on a dark pane so every text stays readable. The compact strip uses the
+    same glass. In the browser, before Windows 11 22H2 or with transparency
+    effects off, it is a calm smoky grey instead. Pick it in Settings under
+    look.
+  - One rule for the best pull, in the fight picker, the board, Records and
+    History. A pull counts from 60 s; for bosses that fall faster, half the
+    length of the longest pull is enough. The one with the most DPS wins, the
+    earlier on a tie, and there is a best pull once a boss has at least two
+    pulls. A 14-second false start no longer takes the gold dot. In the
+    comparison the mark now says “highest”, because it shows the highest DPS.
+  - Weeklies rebuilt: every character is a card with a ring that shows how far
+    along they are and a line such as “7 left · today 2/2”. A finished area
+    folds shut and shows a tick, and you can open it again. Counters can be
+    typed in, Shift+click counts ten. Last week stays visible under the band
+    until something is ticked in the new week. The bell sets your own reminders,
+    for example Tuesday 18:00 as a Windows notification, with your own text and,
+    if you want, only when something is still open. Reminders only run while
+    Borometer is running
+  - New area Guild, for leaders: a member list with weapons and role,
+    appointments that repeat (for example every Sunday), attendance to tick per
+    appointment (there, not there, excused) and an overview with attendance
+    rate, streak and last attendance, without colours or ranks. Copy the list as
+    text or image for the guild chat, or save a calendar file (.ics). Everything
+    stays on your own PC in boro-gilde.json, the names are only the ones you
+    type in, and nothing is sent anywhere. Nothing is deleted: members and
+    series are set aside and can be brought back
+  - Fight picker on a wipe night: consecutive pulls in the same place sit under
+    one head, even when the bosses change, and each row reads “Pull 14” with its
+    length and a small bar against the longest pull. Screen readers still hear
+    the full name. With no log it says “No log · Open log”.
+  - Live stays on the older fight you are reading. A new fight no longer pulls
+    the selection away: the unread pill counts, and screen readers hear “New
+    fight”. It only follows when the newest one was selected before.
+  - The fight picker is a tree for screen readers, with locations that open and
+    close. End then Home shows the first entry, and after a click outside, focus
+    goes back to the button.
+  - Records: the medallion is a button now and opens the fight, or the boss's
+    History if the log cannot be opened. Medallion and board show the same
+    number.
+  - Windows integration, off by default except the tray icon: a notification
+    after each fight (also only for a new best), a tray icon with a menu, a jump
+    list on the taskbar icon with the three logs read last, a progress bar while
+    a big log loads, and start with Windows. See Settings › Windows.
+  - Compact window: Ctrl+Shift+D makes the strip at least 40 % see-through, with
+    Acrylic only the ground is tinted. While the newest fight is still growing
+    it says “Fight running” and waits with the comparison. The comparison to the
+    last pull has its own line, a dot shows that Live is running, and under the
+    top 5 a row sums up the rest. The buttons at the top right stay visible when
+    the pointer is over them.
+  - The Builds tab has been removed.
+  - Fight ring and race: in a group “Replay the fight” lets the members race,
+    one lane each in their colour, lined up on the game's clock. The ring draws
+    quietly when there are fewer than 20 hits, folds everything after the
+    twelfth skill into one arc, and the list beside it has a sort menu instead
+    of column heads that were not there.
+  - Groups: the others now see your curve by skill and your rotation as soon as
+    the fight is over, not only after a forced report. The code shows the title
+    “Party code”, and the sentence under “Start a party” says what is really
+    sent. The party server limits requests to 256 kB, drops silent connections
+    after 10 s and takes 40 names per room.
+  - Every boss Borometer knows has a face now, also in the German client, with
+    17 new portraits. Halls of Illusion is in the dungeon table with all four
+    bosses (Haylock and Gaudian from Thursday, 8 Oct) and its own group in
+    Records.
+  - Fights are told apart better: Limuny Bercant wipes are their own fights,
+    Fellini on the way to the boss is trash and no longer lands in Fellinex's
+    History, and Corridor of Agony and Altar of Rebirth stay two blocks.
+  - Analysis says only what is true: “Weakest three seconds” shows up only when
+    that stretch is under half of a usual second, the window verdict compares
+    against your best pull, and every statement appears once. From a verdict a
+    link leads to the evidence or opens the Rotation on that stretch.
+  - Fixes: a file that is read after only a few lines and keeps growing re-maps
+    its columns, so damage no longer lands in the wrong column. Fights from a
+    log without a date no longer show up in History and Records as 01.01. The
+    compact strip learns the state as soon as it opens. Vegamor in the German
+    client keeps its claw and its warriors in the fight
+
 v1.9
 ----
   - Fight now shows the damage as a glowing ring. Each skill is an arc around

@@ -704,8 +704,17 @@
      unter Simulation 12,0 (vorher #e0a017: 2,3 / 1,9); die Baender bei .35
      multipliziert 5,1 / 4,4 statt 1,2 / 0,4. Name (--text) auf dem Band
      9,0:1 (vorher 10,5), kompakt 7,7 (vorher 9,6) - weit ueber AA. Gegen
-     Weiss 3,11:1 statt 1,71. Zu --neg 11,0, zu --danger 12,4. */
-  --cat-normal:#7d8a86; --cat-crit:#d99a2e; --cat-heavy:#93a09b; --cat-critheavy:#d35503;
+     Weiss 3,11:1 statt 1,71. Zu --neg 11,0, zu --danger 12,4.
+     Nachtrag 04.10. (#101): Normal war #7d8a86 und lag auf dem Aussenrand
+     des Rings 7,2 dE neben Stark. Jetzt #5f6e70: dunkler und kuehler, zu
+     Stark (#93a09b) 16,8 dE, zu Kritisch 25,3, zu Kritisch stark 20,8; die
+     engste Spanne im Thema ist Kritisch/Stark mit 14,5. Gegen --comb
+     (#e8efee) 4,56:1 statt 3,08. Name (--text) auf dem Normal-Band, so
+     gerechnet wie am 03.10. (Farbe mit dem Glanz .14 Weiss, multipliziert
+     auf --pitch): bei .35 8,97:1 (vorher 9,71), kompakt bei .48 7,62
+     (vorher 8,55) - so hoch wie auf Kritisch stark (8,96 / 7,66), weit
+     ueber AA. Kritisch 10,40 / 9,45, Stark 10,32 / 9,32. */
+  --cat-normal:#5f6e70; --cat-crit:#d99a2e; --cat-heavy:#93a09b; --cat-critheavy:#d35503;
   --cat-shield:#74959f;
   --shield-ink:#2c5762; --shield-tint:rgba(70,110,122,.13);
   --shield-ring:rgba(70,110,122,.38);
@@ -1080,6 +1089,230 @@
   --tint-hover-soft-045:rgba(196,107,176,.07);
   --tint-hover-soft-07:rgba(196,107,176,.07);
   --tint-neg-07:rgba(224,100,79,.08);
+}
+
+:root[data-theme="glas"]{
+  color-scheme:dark;
+
+  /* Rauchglas (Spezifikation Rauchglas 4.1, #55). Dieser Block ist der
+     Rueckfall: deckendes Rauchgrau, wie dunkles Mica ohne Hintergrundbild
+     aussieht. Liegt das Fenster wirklich auf Mica, macht die Schicht
+     html.mica (weiter unten) einige Flaechen durchsichtig; dieser Block
+     bleibt dabei, wie er ist. Ton fast neutral (Buntheit unter 0,01), damit
+     das Gold darauf Farbe bleibt. Gold, Glut und die Reihenfarben wie im
+     dunklen Thema (Regel vom festen Akzent). */
+  --glass:31,29,28;    /* Kompakt auf Acrylic, Kanaele von --comb */
+  --pitch:#1a1817; --comb:#1f1d1c; --comb2:#262423; --raise:#302d2c;
+  /* --ridge / --ridge-soft: Weiss 12 / 7 % ueber --comb, deckend */
+  --ridge:#3a3837; --ridge-soft:#2f2d2c;
+  --series-rest:#bcb6b1;   /* wie dunkel; 8,37:1 auf --comb */
+
+  /* Die Reihe des dunklen Themas. Auf --comb #1f1d1c lag der kleinste Wert
+     bei 2,63:1 gegen 3,09 im dunklen Thema - Rauchgrau ist heller als Pech.
+     Angehoben sind die vier, die darunter lagen, Ton gehalten (hoechstens
+     0,4 Grad), OKLCH-L hoeher:
+
+       Rang 2   #8e2dc3 -> #993bcf   2,65 -> 3,10
+       Rang 5   #5c5898 -> #6663a4   2,64 -> 3,11
+       Rang 7   #b6007f -> #c41e8b   2,63 -> 3,12
+       Rang 11  #3c4dff -> #3f53ff   2,96 -> 3,11
+
+     Dazu Rang 10, nicht wegen des Kontrasts (dunkel 4,77:1), sondern wegen
+     des Abstands: die angehobenen Rang 7 und Rang 5 rueckten an ihn heran
+     (volle Sicht 10,2 zu Rang 7, protan 4,7 zu Rang 5). Eine Stufe heller
+     und eine Spur bunter, Ton +0,04 Grad:
+
+       Rang 10  #e052ac -> #e956b3   OKLCH L 0,655 -> 0,675, C 0,200 -> 0,205,
+                                     4,77 -> 5,15:1
+
+     Gesucht als kleinste Verschiebung, die alle vier Boeden haelt; mit nur
+     einem bewegten Rang geht es ausschliesslich mit Rang 10. Die uebrigen
+     sieben Byte fuer Byte wie dunkel; der kleinste von ihnen ist Rang 9 mit
+     3,11:1.
+     Abstand untereinander (Spezifikation 5.2, Nachtrag 04.10.: OKLab x 100,
+     kleinstes Paar ueber alle 66, Simulation Machado 1,0 in linearem RGB;
+     der Boden je Mass ist der schwaechere Wert von dunkel und TnL; in
+     Klammern die Raenge):
+
+                   glas            dunkel          TnL           Boden
+       volle Sicht 12,1 (7/10)     12,8 (1/3)      11,4 (2/5)    11,4
+       protan       6,4 (3/10)      7,3 (5/7)       5,9 (5/10)    5,9
+       deutan       6,8 (7/12)      7,3 (2/5)       5,0 (2/5)     5,0
+       tritan       4,0 (3/6)       4,0 (3/6)       4,0 (3/6)     4,0
+       Nachbarn    22,4 / 13,6 / 10,2 / 14,6 (dunkel 24,5 / 14,2 / 13,1 / 14,6) */
+  --series-1:#6baffa; --series-2:#993bcf; --series-3:#0094c1; --series-4:#e60012;
+  --series-5:#6663a4; --series-6:#51ac61; --series-7:#c41e8b; --series-8:#8d7af7;
+  --series-9:#447700; --series-10:#e956b3; --series-11:#3f53ff; --series-12:#ac5f66;
+
+  /* Tinte nach dem Entwurf. Gemessen auf --comb: --text 14,91, --ink-hi
+     16,79, --ink-soft 11,64, --dim 8,20, --dimmer 6,58:1 (auf --raise 5,36,
+     auf --ridge 4,57). */
+  --text:#f5f1ea; --dim:#bdb4a7; --dimmer:#aaa194;
+  --ink-hi:#ffffff; --ink-soft:#ddd6cb;
+  /* Zwischen --dim und --dimmer wie im dunklen Thema: --ink-sub 8,10,
+     --ink-compact 8,38, --ink-faint 6,43:1 auf --comb (auf --raise 5,23). */
+  --ink-sub:#bcb3a6; --ink-compact:#bfb6a9;
+  --bar-name-ink:var(--text);
+  --ink-faint:#a89f92; --ink-badge:#e8dfd2;
+
+  /* Gold bleibt Gold, Byte fuer Byte wie dunkel: 7,77:1 auf --comb. */
+  --amber:#c8791e; --gold:#e0a64a; --lite:#efc078; --deep:#8a5314;
+  --gold-ink:var(--gold); --lite-ink:var(--lite);
+  --neg:#e0644f; --neg-deep:#8c3227; --info:#6fa8d8; --pos:#8cc169;
+  /* "Live gestoert" stand in --neg auf dem Knopf (--lift-2 oben #2b2827)
+     bei 4,25:1, unter dem Zeiger (--lift-3 oben #322f2e) 3,86 - dunkel
+     sind es 5,33 / 5,05. Derselbe Wert wie in TnL, gleicher Ton heller:
+     5,62 / 5,10:1. Der Ring am Punkt bleibt --neg. */
+  --neg-ink:#f0816d;
+  --pick-wash:linear-gradient(90deg,rgba(224,166,74,.18),rgba(224,166,74,.045));
+
+  /* Gold sagt "gewaehlt", wie im dunklen Thema. */
+  --pick:var(--gold);
+  --focus:var(--gold);
+
+  /* Dieselben drei Verlaeufe wie dunkel, aus den Grundstufen gebaut (die
+     Stopps des dunklen Themas in OKLab-Helligkeit auf die Stufen von glas
+     gelegt, Ton von --comb). */
+  --lift-1:linear-gradient(180deg,#232120,#1e1c1b);
+  --lift-2:linear-gradient(180deg,#2b2827,#211f1e);
+  --lift-3:linear-gradient(180deg,#322f2e,#262423);
+  --edge-lit:inset 0 1px 0 rgba(224,166,74,.16);
+  --edge-lit-strong:inset 0 1px 0 rgba(224,166,74,.32);
+  --cast:0 1px 2px rgba(0,0,0,.5), 0 8px 24px -12px rgba(0,0,0,.7);
+  --cast-ctl:0 1px 2px rgba(0,0,0,.55);
+  --cast-ctl-hi:0 2px 5px -1px rgba(0,0,0,.6);
+  --cast-lifted:0 2px 4px rgba(0,0,0,.55), 0 18px 40px -16px rgba(0,0,0,.8);
+  --ember:rgba(200,121,30,.12);
+
+  /* Flaechen flach wie in TnL: eine Scheibe aus Rauchglas hat keinen
+     Lichtpunkt in der Mitte. Jeder Wert ist der Mittelwert des Verlaufs des
+     dunklen Themas, auf dieselbe Weise auf die Stufen von glas gelegt. */
+  --surf-bar:#211f1e;
+  --surf-rail:#1e1c1b;
+  --surf-menu:#272423;
+  --surf-tip:#222020;
+  --surf-seg:#302e2d;    /* --dimmer darauf 5,30:1 */
+  --surf-seg2:#2e2c2b;
+  --surf-hero:#201e1d;
+  --surf-hero2:#211f1e;
+  --surf-chip:#2b2827;
+  --surf-btn:#2b2827;    /* --gold darauf 6,77:1 */
+  --surf-card2:#272524;
+  --surf-nest:#2c2928;
+  --surf-on:#312e2d;
+
+  --grad-mark:linear-gradient(180deg,#f7d9a4 8%,var(--gold) 55%,var(--deep));
+  --mark-stroke:rgba(239,192,120,.35); --hero-stroke:rgba(251,228,184,.28);
+  --hero-glow:drop-shadow(0 4px 18px rgba(200,121,30,.42));
+  --hero-glow-tick:drop-shadow(0 4px 26px rgba(239,192,120,.85));
+  --glutring-schein:26; --glutring-innen:.5;
+  --code-glow:0 0 26px rgba(224,166,74,.28);
+
+  /* Felder dunkler als die Karte wie im dunklen Thema: --dim auf --field-bg
+     8,46:1, --text auf --field-hover 8,08:1. */
+  --field-bg:#1c1a19; --field-hover:#4a4847; --opt-bg:#262423;
+  --thumb:#454342; --thumb-hover:#585554; --dot-off:#494746;
+  --sel-bg:var(--deep); --sel-ink:var(--text);   /* 5,60:1 */
+  /* Gut und schlecht behalten den Ton des dunklen Themas (OKLab a/b), die
+     Helligkeit kommt von den Grundstufen. */
+  --delta-bg:#343231; --delta-good-bg:#383c29; --delta-bad-bg:#412924;
+  --danger:#b4352a;
+  --ring-neutral:rgba(232,223,210,.3); --tint-neutral:rgba(255,255,255,.07);
+  --twist-ink:#fff8ee; --ink-halo:rgba(0,0,0,.9);
+  --ink-halo-wide:rgba(0,0,0,.7);
+
+  --well:rgba(0,0,0,.34); --well-deep:rgba(0,0,0,.44);
+  --rot-kopf:var(--gold);
+  --sh-hair:rgba(0,0,0,.6); --sh-near:rgba(0,0,0,.5); --sh-inset:rgba(0,0,0,.6);
+  --sh-bar:rgba(0,0,0,.9);
+  --sh-cast:rgba(0,0,0,.8); --sh-cast-strong:rgba(0,0,0,.85);
+  --scrim:rgba(10,9,9,.72); --scrim-solid:rgba(10,9,9,.92);
+  --tip-top:rgba(38,36,35,.94); --tip-bottom:rgba(28,26,25,.88);
+  --canvas-rule:#33302f;
+  --canvas-chip:rgba(30,28,27,.86); --canvas-chip-ink:#e0a64a;
+  --avg-line:rgba(224,166,74,.45);
+  --gap-band:rgba(224,100,79,.13); --gap-edge:rgba(224,100,79,.72);
+  --weak-band:rgba(126,214,196,.14); --weak-edge:rgba(126,214,196,.62);
+  /* Unverwundbar: das Grau von --dim, wie dunkel. */
+  --invuln-band:rgba(189,180,167,.12); --invuln-edge:rgba(189,180,167,.6);
+
+  /* Trefferarten wie im dunklen Thema. */
+  --cat-normal:#6b5f4f; --cat-crit:#e0a64a; --cat-heavy:#cbbca6; --cat-critheavy:#d35503;
+  --cat-shield:#6f8f99;
+  --shield-ink:#9fc3cd; --shield-tint:rgba(111,143,153,.16);
+  --shield-ring:rgba(111,143,153,.44);
+  --core-fill:#9fb4c4; --core-ink:#0d1a22;
+  --core-ring:rgba(120,150,170,.55);
+  --icon-plate:#1d1b1a; --icon-ring:rgba(160,154,146,.42);
+  --icon-drop:rgba(0,0,0,.55);
+
+  --fill-blend:normal;
+  /* Gesucht wie im dunklen Thema: die hoechste Deckung, bei der der Name
+     (--text) gegen die schlimmste der dreizehn Balkenfarben (--series-rest)
+     noch 4,5:1 haelt, minus eine Stufe Spielraum. Auf dem helleren Grund
+     liegt die Grenze tiefer: 0,54 auf --pitch, 0,525 auf --comb (dunkel
+     0,575 / 0,56). Darum .51 statt .54, kompakt auf --glass .49 statt .52,
+     die Unterzeilen .41 statt .43. */
+  --fill-op:.51; --fill-op-hover:.51; --fill-op-sub:.41; --fill-op-compact:.49;
+
+  /* Kanten: Weiss statt des kalten Metalls des dunklen Themas, die Deckung
+     des dunklen Themas mal 0,9 (Weiss ist heller als das Metall); die
+     beiden Haarlinien des Entwurfs genau mit .09 und .15. Die Knopfkante
+     braucht 3:1 und behaelt die Deckung: .45 auf --lift-2 oben 4,19:1,
+     auf --lift-3 oben 4,00:1. */
+  --ctl-edge:rgba(255,255,255,.45); --ctl-edge-hi:rgba(255,255,255,.72);
+  --hair-box-soft:rgba(255,255,255,.077);
+  --hair-box:rgba(255,255,255,.117);
+  --hair-box-lg:rgba(255,255,255,.142);
+  --hair-box-strong:rgba(255,255,255,.266);
+  --hair-edge:rgba(255,255,255,.077);
+  --hair-edge-mid:rgba(255,255,255,.059);
+  --hair-edge-soft:rgba(255,255,255,.036);
+  --hair-rule:rgba(255,255,255,.09);
+  --hair-rule-mid:rgba(255,255,255,.104);
+  --hair-rule-strong:rgba(255,255,255,.15);
+  --ring-float:rgba(255,255,255,.065);
+  --ring-float-strong:rgba(255,255,255,.117);
+  --ring-accent:rgba(224,166,74,.30);
+  --ring-accent-hi:rgba(224,166,74,.345);
+  --live-wash:rgba(224,166,74,.13);
+  --live-ring:rgba(224,166,74,.42);
+  --live-ink:var(--lite-ink);
+  --tint-hover:rgba(224,166,74,.12);
+  --tint-hover-soft:rgba(224,166,74,.06);
+  --tint-accent:rgba(224,166,74,.085);
+  --ring-pos:rgba(140,193,105,.22);
+  --ring-pos-soft:rgba(140,193,105,.14);
+  --tint-neg:rgba(224,100,79,.08);
+  --tint-neg-hi:rgba(224,100,79,.12);
+  --ring-neg:rgba(224,100,79,.18);
+  --ring-neg-strong:rgba(224,100,79,.28);
+  --tint-warn:rgba(200,121,30,.09);
+  --wash:rgba(200,121,30,.09);
+  --wash-strong:rgba(200,121,30,.20);
+  --ember-strong:rgba(200,121,30,.32);
+  --hair-box-16:rgba(255,255,255,.104);
+  --hair-box-soft-1:rgba(255,255,255,.065);
+  --hair-box-soft-11:rgba(255,255,255,.071);
+  --hair-box-soft-13:rgba(255,255,255,.085);
+  --hair-box-soft-14:rgba(255,255,255,.091);
+  --hair-box-strong-4:rgba(255,255,255,.259);
+  --hair-box-strong-42:rgba(255,255,255,.272);
+  --hair-edge-11:rgba(255,255,255,.071);
+  --hair-edge-14:rgba(255,255,255,.091);
+  --hair-edge-soft-05:rgba(255,255,255,.032);
+  --hair-edge-soft-06:rgba(255,255,255,.039);
+  --hair-edge-soft-07:rgba(255,255,255,.045);
+  --ring-accent-hi-34:rgba(224,166,74,.34);
+  --ring-accent-hi-35:rgba(224,166,74,.35);
+  --ring-float-09:rgba(255,255,255,.059);
+  --tint-accent-08:rgba(224,166,74,.08);
+  --tint-accent-09:rgba(224,166,74,.09);
+  --tint-hover-1:rgba(224,166,74,.1);
+  --tint-hover-14:rgba(224,166,74,.14);
+  --tint-hover-soft-045:rgba(224,166,74,.045);
+  --tint-hover-soft-07:rgba(224,166,74,.07);
+  --tint-neg-07:rgba(224,100,79,.07);
 }
 
 *{box-sizing:border-box}
@@ -1518,7 +1751,11 @@ body:not(.compact) .top .moremenu:not(.openmenu){display:none}
 .esw[aria-checked="true"] .esw-t::after{left:24px;background:var(--comb)}
 .esw:focus-visible{outline:none}
 .esw:focus-visible .esw-t{outline:2px solid var(--focus);outline-offset:2px}
-.esw:disabled{opacity:.4;cursor:default}
+.esw:disabled,.esw[aria-disabled="true"]{opacity:.4;cursor:default}
+.esw[aria-disabled="true"]:hover .esw-t{background:transparent}
+/* Ein abhaengiger Schalter steht eingerueckt unter seinem Hauptschalter
+   (Windows: Nur bei neuem Bestwert unter Melden), um den Spaltenabstand. */
+.ezeile.eein{padding-inline-start:20px}
 @media (prefers-reduced-motion:reduce){.esw-t,.esw-t::after{transition:none}}
 /* Sicherheit: nur Text, eine Liste wie im Entwurf (.v2-sich) - links was,
    rechts der Satz, Haarlinien wie die Zeilen. Die Symbole in --dim. */
@@ -1534,7 +1771,7 @@ body:not(.compact) .top .moremenu:not(.openmenu){display:none}
    Farben ihres Themas - fest, weil sie das Thema zeigt, nicht das jetzige
    (Werte aus DESIGN.md). Auto halb dunkel, halb hell, "wie Windows". Die
    gewaehlte Kachel traegt die Farbe der Auswahl als Rand. */
-.themen{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px}
+.themen{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:12px}
 .thk{display:flex;flex-direction:column;gap:8px;padding:8px;border:0;border-radius:var(--r-surface);cursor:pointer;
   background:transparent;color:var(--text);font:inherit;text-align:left;box-shadow:inset 0 0 0 1px var(--hair-rule)}
 .thk:hover{box-shadow:inset 0 0 0 1px var(--hair-rule-strong)}
@@ -1553,6 +1790,10 @@ body:not(.compact) .top .moremenu:not(.openmenu){display:none}
 .thv-light .z{color:#a86404}.thv-light .b2{background:#0f1a19}.thv-light .b1{background:#0f90fe}
 .thv-tnl{background:#262c45}.thv-tnl i:nth-child(1){background:#0e1122}.thv-tnl i:nth-child(2){background:#171b30}
 .thv-tnl .z{color:#e0a64a}.thv-tnl .b2{background:#e8e2d4}.thv-tnl .b1{background:#6baffa}
+/* Rauchglas: ein gemalter Desktop unter der Scheibe, wie im Entwurf */
+.thv-glas{background:linear-gradient(140deg,#643815,#3a2a2c 45%,#1f3a5a 75%,#4a1f45)}   /* die Zahl in Gold auf der hellsten Stufe 4,59:1 */
+.thv-glas i:nth-child(1){background:rgba(10,10,12,.35)}.thv-glas i:nth-child(2){background:rgba(24,22,22,.45)}
+.thv-glas .z{color:#e0a64a}.thv-glas .b2{background:#f5f1ea}.thv-glas .b1{background:#6baffa}
 .thv-auto{background:linear-gradient(135deg,#0f0a05 50%,#e8efee 50%)}
 .thk .tn2{display:flex;align-items:baseline;justify-content:space-between;gap:6px;padding:0 4px 2px;font-size:var(--fs-sm);font-weight:600}
 .thk .tn2 small{font-weight:400;color:var(--dim);font-size:var(--fs-xs)}
@@ -1720,19 +1961,34 @@ body.compact :is(#kurveFeld,#urteilFeld,#zeitAuf,#spurenAuf){display:none}
    Punkt in drei Lagen - Zeichen, Name und DPS; der Balken in der Reihenfarbe
    als 4-Punkt-Spur ueber eine Bahn; leise Anteil, Treffer, Kritisch, Stark.
    Aufgeklappt die Trefferarten (30 Punkt) und eine Summenzeile. Der Kopf ist
-   eine schmale Zeile mit den sortierbaren Spalten; die Zellen stehen in der
-   Zeile anders als im Kopf, gelesen werden sie gleich. */
+   eine schmale Zeile (Feinschliff 4, #100): links der Name der Spalte mit
+   "9 von 12 sichtbar", rechts der Knopf "Ordnen" mit seinem Menue. */
 #bars.ring{padding:0}
-#bars.ring .bhead{position:sticky;top:0;z-index:1;display:flex;flex-wrap:wrap;align-items:center;gap:0 2px;min-height:28px;
+#bars.ring .bhead{position:sticky;top:0;z-index:1;display:flex;flex-wrap:nowrap;align-items:center;justify-content:space-between;gap:0 8px;min-height:28px;
   padding:0 8px;background:var(--comb);box-shadow:inset 0 -1px 0 var(--hair-rule);font-size:var(--fs-xs);color:var(--dim)}
-#bars.ring .bhead > [data-k="name"]{margin-right:auto}
-/* Nur die sortierbaren Kopfzellen (mit tabindex) sind Knoepfe: "Klasse" in der Gruppe nicht. */
-#bars.ring .bhead > span{padding:2px 5px;border-radius:var(--r-control);white-space:nowrap}
-#bars.ring .bhead > span[tabindex]{cursor:pointer}
-#bars.ring .bhead > span[tabindex]:hover{color:var(--text);background:var(--tint-hover)}
-#bars.ring .bhead > span:not([tabindex]){cursor:default;color:inherit}
-#bars.ring .bhead > .sorted{color:var(--text)}
-#bars.ring .bhead > span:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+#bars.ring .bhead > span{padding:2px 5px;white-space:nowrap;cursor:default}
+#bars.ring .bhead > [data-k="name"]{min-width:0;overflow:hidden;text-overflow:ellipsis}
+#bars.ring .bhead > .ordnenzelle{flex:none;padding:0}
+/* Der Knopf im Ton von .zeitauf: ruhig in --dim, beim Zeigen der Hover-Ton. */
+#ringOrdnen{display:inline-flex;align-items:center;gap:4px;min-height:24px;padding:0 6px;border:0;border-radius:var(--r-control);
+  background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-xs);white-space:nowrap;cursor:pointer}
+#ringOrdnen:hover,#ringOrdnen[aria-expanded="true"]{color:var(--text);background:var(--tint-hover)}
+#ringOrdnen:focus-visible{outline:2px solid var(--focus);outline-offset:0}
+/* Das Menue liegt neben #bars in .table (64 setzt top und right unter den
+   Knopf). Eintraege 32 Punkt hoch, der gewaehlte mit Haken wie .micheck. */
+body.tafel.glut .table{position:relative}
+.ordnenmenue{position:absolute;z-index:46;min-width:180px;max-width:calc(100% - 16px);box-sizing:border-box;padding:4px;
+  display:flex;flex-direction:column;gap:1px;background:var(--surf-menu);border:1px solid var(--hair-edge);border-radius:var(--r-popover);
+  box-shadow:var(--edge-lit), 0 22px 44px -14px var(--sh-cast), 0 0 0 1px var(--ring-float)}
+.ordnenmenue[hidden]{display:none}
+.ordnenmenue [role=menuitemradio]{display:flex;align-items:center;justify-content:space-between;gap:12px;height:32px;box-sizing:border-box;
+  padding:0 10px;border:0;border-radius:var(--r-nest);background:transparent;color:var(--text);font:inherit;font-size:var(--fs-sm);
+  text-align:left;white-space:nowrap;cursor:pointer;flex:none}
+.ordnenmenue [role=menuitemradio]::after{content:"\2713";color:transparent;font-size:var(--fs-sm);flex:none}
+.ordnenmenue [role=menuitemradio][aria-checked="true"]{color:var(--lite-ink)}
+.ordnenmenue [role=menuitemradio][aria-checked="true"]::after{color:var(--gold-ink)}
+.ordnenmenue [role=menuitemradio]:hover{background:var(--tint-hover-1)}
+.ordnenmenue [role=menuitemradio]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 #bars.ring .ringzeile{display:grid;grid-template-columns:repeat(4,auto) minmax(0,1fr) auto;grid-template-rows:18px 4px 13px;
   column-gap:10px;row-gap:2px;align-items:center;height:44px;box-sizing:border-box;padding:3px 12px 2px;cursor:default}
 #bars.ring .ringzeile.has-sub{cursor:pointer}
@@ -1765,7 +2021,7 @@ body.compact :is(#kurveFeld,#urteilFeld,#zeitAuf,#spurenAuf){display:none}
 #bars.ring .row.bdetail .dz{display:block;padding-left:0;overflow:visible;white-space:normal;text-overflow:clip;line-height:15px}
 /* Die Sprossen der alten Tafel (w-max-640, w-max-560) blenden Kopf- und
    Zahlenzellen nach ihrer Kindnummer aus; die Liste zeigt bei jeder Breite
-   alle sechs Spalten. */
+   alle sechs Spalten und den ganzen Kopf. */
 #bars.ring .bhead > span,#bars.ring .ringzeile > .v{display:block}
 /* Die Zeilen rasten unter dem klebenden Kopf ein (.table #bars, scroll-snap):
    dort 24 Punkt, hier 28 - sonst stand die Liste nach dem Oeffnen 4 Punkt
@@ -1791,11 +2047,15 @@ body.tafel.glut .headwrap{display:none}
 body.tafel.glut #ringFeld{grid-area:ring;display:block;position:relative;min-width:0;min-height:0;background:var(--comb)}
 body.tafel.glut .table{grid-area:liste;display:flex;flex-direction:column;min-height:0;max-height:none;contain:none;border-radius:0;background:var(--comb)}
 /* Die Spalte reicht bis zur Unterkante des Rasters, ihr Grund (--comb) laeuft
-   durch: ist die Liste kuerzer als die Spalte, steht das Urteil unten in ihr
-   (margin-top:auto), die Zeilen bleiben 44 Punkt (Entscheidung 03.10.). */
+   durch: ist die Liste kuerzer als die Spalte, folgt das Urteil ihr direkt und
+   darunter bleibt Grund; die Zeilen bleiben 44 Punkt, mehr Hoehe heisst mehr
+   Zeilen, nie hoehere (Spezifikation Feinschliff 6.1, Entscheidung 04.10.;
+   vorher 03.10. Urteil unten in der Spalte). Rollt die Liste, fuellt sie die
+   Spalte und das Urteil steht am Ende. */
 body.tafel.glut .table::after{content:none}
 :where(html:not(.w-max-899):not(.h-max-699)) body.tafel.glut .table #bars{flex:0 1 auto;min-height:0;max-height:none;overflow:auto}
-body.tafel.glut #urteilFeld{display:block;flex:none;margin-top:auto;box-shadow:inset 0 1px 0 var(--hair-rule);background:var(--comb)}
+body.tafel.glut #bars.rollt ~ #urteilFeld{margin-top:auto}
+body.tafel.glut #urteilFeld{display:block;flex:none;box-shadow:inset 0 1px 0 var(--hair-rule);background:var(--comb)}
 /* Neben dem 1680-Punkt-Raster (DESIGN.md) liegt die Flaeche im Ton der Felder:
    auf --comb2 stand dort im hellen Thema ein heller Streifen von 120 Punkt. */
 body.tafel.glut .stage{background:var(--comb)}
@@ -1825,7 +2085,7 @@ body.tafel.glut #ringMitte{position:absolute;left:50%;top:var(--ring-cy,calc(50%
 body.tafel.glut #ringMitte .big{min-width:0;flex-direction:column;align-items:center;gap:6px}
 body.tafel.glut #ringMitte .big .v{font-size:var(--ring-zahl,60px)}
 body.tafel.glut #ringMitte .big :is(.prevline,.sideline){flex:none;margin-top:0;max-width:none}
-/* Das Band unter dem Ringfeld (E 10): Kopf in einer Zeile, Kurve 78 Punkt, aufgeklappt 200 */
+/* Das Band unter dem Ringfeld (E 10): Kopf in einer Zeile, Kurve 78 Punkt (ab 1200 Punkt Fensterhoehe 150), aufgeklappt 200 */
 body.tafel.glut #kurveFeld{grid-area:band;display:flex;flex-direction:column;gap:4px;min-height:0;padding:8px 16px;background:var(--comb)}
 body.tafel.glut #kurveFeld .feldkopf{flex-wrap:nowrap;align-items:center;gap:4px 14px;margin:0;min-width:0}
 body.tafel.glut #kurveFeld .feldkopf h2{flex:none}
@@ -1835,7 +2095,11 @@ body.tafel.glut #kurveFeld .kfuss{margin:0;flex:none;flex-wrap:nowrap}
 body.tafel.glut #kurveFeld .zeitauf{margin-left:0}
 body.tafel.glut #kurve{flex:none;height:78px;min-height:0}
 body.tafel.glut.kurvegross #kurve{height:200px}
+/* Hohes Fenster (ab 1200 Punkt): das Band waechst auf 150; aufgeklappt (200) gewinnt, die Stufe steht in :where */
+:where(html.h-min-1200) body.tafel.glut:not(.kurvegross) #kurve{height:150px}
 /* Gestapelt (unter 900 Punkt Breite oder 700 Hoehe, E 8): Ringfeld, Liste, Band; die Seite rollt */
+/* Feinschliff 4.4: gestapelt hat die Liste keine eigene Hoehengrenze und rollt nicht in sich (16 schneidet dort nicht) */
+:where(html.w-max-899, html.h-max-699) body.tafel.glut .table #bars{max-height:none;overflow:visible}
 :where(html.w-max-899, html.h-max-699) body.tafel.glut #app{height:auto;overflow:visible;grid-template-columns:minmax(0,1fr);
   grid-template-rows:auto auto auto 0;grid-template-areas:"ring" "liste" "band" "panel"}
 :where(html.w-max-899, html.h-max-699) body.tafel.glut #ringFeld{display:flex;flex-direction:column;gap:10px;padding:14px 16px 0}
@@ -1850,17 +2114,17 @@ body.tafel.glut.kurvegross #kurve{height:200px}
    - Die Liste ist hier 340 Punkt schmal: der Kopf der Liste bleibt eine
      Zeile (sonst lag "Stark" auf der ersten Zeile, und scroll-padding 28
      stimmte nicht mehr); der Name kuerzt sich mit Auslassungspunkten.
+     Beides steht oben bei #bars.ring .bhead.
    - Keine Luft unter der letzten Zeile: die Liste ist nicht hoeher als ihr
-     Inhalt. Das Urteil steht seit Aufgabe 10 unten in der Spalte, so hoch
-     wie das Band (fussAngleichen, 64): eine Fuge quer ueber das Raster.
+     Inhalt. Das Urteil steht unter der Liste (Feinschliff 6.1); unten in
+     der Spalte und so hoch wie das Band (fussAngleichen, 64) nur, wenn die
+     Liste rollt - dann laeuft eine Fuge quer ueber das Raster.
    - 900 bis 1099 Punkt: das Band ist dort zu schmal fuer Ueberschrift,
      Legende und beide Knoepfe in einer Zeile; zwei Zeilen machten es
      150 Punkt hoch. Darum bleibt der Kopf eine Zeile, die Legende kuerzt
      sich, und "Zeitverlauf ausklappen" steht nur als Pfeil - das Wort
      bleibt der Name des Knopfs (wie .vh). */
 body.tafel.glut #ringMitte .big{flex-wrap:nowrap}
-#bars.ring .bhead{flex-wrap:nowrap}
-#bars.ring .bhead > [data-k="name"]{min-width:0;overflow:hidden;text-overflow:ellipsis}
 body.tafel.glut .table #bars{padding-bottom:0}
 :where(html.w-max-1099) body.tafel.glut #kurveFeld .feldleg{flex:0 1 auto;min-width:0;overflow:hidden;white-space:nowrap}
 :where(html.w-max-1099) body.tafel.glut #zeitAufText{position:absolute;width:1px;height:1px;margin:-1px;padding:0;border:0;
@@ -1868,6 +2132,8 @@ body.tafel.glut .table #bars{padding-bottom:0}
 /* Die Erzaehlung in der Mitte (Aufgabe 6) */
 body.tafel.glut #ringFokus{min-height:38px;margin:2px 0 0;font-size:var(--fs-sm);line-height:1.4;color:var(--text)}
 body.tafel.glut #ringFokus span{color:var(--dim)}
+body.tafel.glut #ringMitteHinweis{margin:0;font-size:var(--fs-sm);color:var(--ink-soft);max-width:24ch}
+body.tafel.glut #ringMitteHinweis[hidden]{display:none}
 /* ---------- Glutring in der Gruppe (Spezifikation 5): Mitglieder in der Liste, Mitte und Band ---------- */
 #bars.ring .mitglied > [data-k="klasse"]{grid-column:2 / 6;grid-row:3;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #bars.ring .mitglied .rang{flex:none;min-width:14px;font-family:var(--display);color:var(--dim);text-align:right}
@@ -1896,7 +2162,7 @@ body.tafel.glut #ringZurueck[hidden]{display:none}
    Bahnen (hoechstens 44 Punkt, sie ueberholen sich), unten Abspielen, die
    Leiste mit der Kurve darin und das Tempo, am Ende die Siegerehrung. Gold
    nur auf dem Abzeichen von Platz 1; kein Schein. */
-body.tafel.glut.rennt :is(#ringBuehne,#ringLinks){display:none}
+body.tafel.glut.rennt :is(#ringBuehne,#ringLinks,#ringLegende){display:none}
 body.tafel.glut #rennen{position:absolute;inset:0;z-index:1;display:flex;flex-direction:column;gap:8px;padding:18px 22px 14px}
 body.tafel.glut #rennen[hidden]{display:none}
 #rennen .rkopf{display:flex;align-items:flex-end;flex-wrap:wrap;gap:8px 26px;padding-right:min(40%,380px)}
@@ -1914,11 +2180,14 @@ body.tafel.glut #rennen[hidden]{display:none}
 #rennen .rpos{font:var(--fs-md)/1 var(--display);color:var(--dim);text-align:center}
 #rennen .rbahn.vorn .rpos{color:var(--text)}
 #rennen .rwer{display:flex;align-items:center;gap:8px;min-width:0}
+#rennen .rbahn.rest{opacity:.62}
+#rennen .rbahn.rest .rname{font-weight:400;color:var(--dim)}
 #rennen .rname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600;font-size:var(--fs-sm)}
-#rennen .rspur{position:relative;height:calc(var(--bh,40px) - 16px);border-radius:var(--r-mark);background:var(--tint-hover-soft-045)}
-#rennen .rfill{position:absolute;left:0;top:0;bottom:0;width:0;border-radius:var(--r-mark);
+#rennen .rwer .wpair{display:inline-flex;align-items:center;flex:none;gap:2px}
+#rennen .rspur{--rwert-platz:calc(4.6em + 10px);position:relative;height:calc(var(--bh,40px) - 16px);border-radius:var(--r-mark);background:var(--tint-hover-soft-045)}
+#rennen .rfill{position:absolute;left:0;top:0;bottom:0;width:calc((100% - var(--rwert-platz)) * var(--f,0));border-radius:var(--r-mark);
   background:linear-gradient(90deg,color-mix(in srgb,var(--c) 45%,transparent),var(--c))}
-#rennen .rwert{position:absolute;top:50%;transform:translateY(-50%);padding-left:10px;font:var(--fs-sm)/1 var(--display);white-space:nowrap;color:var(--text)}
+#rennen .rwert{left:calc((100% - var(--rwert-platz)) * var(--f,0));position:absolute;top:50%;transform:translateY(-50%);padding-left:10px;font:var(--fs-sm)/1 var(--display);white-space:nowrap;color:var(--text)}
 #rennen .medaille{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;font:12px/1 var(--display);
   color:var(--text);background:var(--raise);box-shadow:inset 0 0 0 1px var(--ridge)}
 #rennen .medaille.m1{background:var(--gold);color:var(--ink-on-gold,#180d02);box-shadow:none}
@@ -1932,7 +2201,11 @@ body.tafel.glut #rennen[hidden]{display:none}
 #rennen .rspul canvas{position:absolute;inset:0;width:100%;height:100%}
 #rennen .rspul input{position:absolute;inset:0;width:100%;height:100%;margin:0;opacity:0;cursor:pointer}
 #rennen .rspul:focus-within{outline:2px solid var(--focus);outline-offset:2px;border-radius:var(--r-control)}
-#rennen .rfinale{margin:0;min-height:22px;font-size:var(--fs-base);max-width:70ch}
+#rennen .rluecke{margin:4px 0 0;font-size:12px;color:var(--muted)}
+.ringhinweis{font-size:12px;color:var(--muted)}
+.ringhinweis:empty{display:none}
+/* zwei Zeilen von Anfang an frei, damit der Schlusssatz am Ende keine Bahn verdeckt (Feinschliff 1.2) */
+#rennen .rfinale{margin:0;min-height:2.9em;min-height:calc(2lh);font-size:var(--fs-base);max-width:70ch}
 @media (prefers-reduced-motion:reduce){#rennen .rbahn{transition:none}}
 :where(html.w-max-899, html.h-max-699) body.tafel.glut #rennen{position:static;padding:0 0 14px}
 :where(html.w-max-899, html.h-max-699) #rennen .rkopf{padding-right:0}
@@ -1970,6 +2243,12 @@ body:not(.compact) #hMeta .scope + .f{margin-left:0;padding-left:0;border-left:0
 #urteilFeld .usatz{font-family:var(--display);font-size:var(--fs-lg);line-height:1.3;margin:0 0 14px;max-width:34ch}
 #urteilFeld .usatz b{color:var(--gold-ink);font-weight:inherit}
 #urteilFeld .ubezug,#urteilFeld .ulog{font-size:var(--fs-xs);color:var(--ink-soft);margin:8px 0 0;max-width:52ch;line-height:1.45}
+/* Bezug ohne gespeicherten Lauf (Bester Pull 5.2): der Satz unter der
+   Zeile des Bezugs in derselben leisen Tinte, daneben "Log oeffnen". Der
+   Knopf bricht mit um, statt die Zeile zu verbreitern (560 px). */
+#urteilFeld .ohnelauf{display:flex;flex-wrap:wrap;align-items:center;column-gap:6px;row-gap:2px;
+  font-size:var(--fs-xs);color:var(--ink-soft);margin:4px 0 0;max-width:52ch;line-height:1.45}
+#urteilFeld .ohnelauf .leise{margin-left:-6px}
 /* Ein Raster fuer beide Belegzeilen, jede Zeile als Untergitter: Symbol,
    Name mit Mass, Bahn, Zahl. So beginnen die Bahnen untereinander, auch
    wenn die Zahlen rechts verschieden breit sind. */
@@ -1992,8 +2271,6 @@ body:not(.compact) #hMeta .scope + .f{margin-left:0;padding-left:0;border-left:0
 #urteilFeld .uanalyse[hidden]{display:none}
 #urteilFeld .uanalyse:hover{color:var(--text)}
 #urteilFeld .uanalyse:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-/* "Build in Questlog" ist ein Link (51-plan.ts), sieht aber aus wie die zwei Knoepfe daneben */
-#urteilFeld a.uanalyse{display:inline-block;text-decoration:none}
 /* ---------- Felder (Instrumententafel Stufe 4) ----------
    Nur mit body.felder (58-felder.ts): jeder Bereich ausser Kampf in der
    vollen Ansicht. Kein Zahlenstreifen und keine Schadenstafel (die gehoeren
@@ -2071,10 +2348,6 @@ body.felder .cmpband > .cmpcontrib{margin:16px -16px 0;padding:14px 16px 0;box-s
 body.felder #histWrap{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--hair-rule)}
 body.felder #histWrap[hidden]{display:none}
 body.felder #histWrap > *{border-radius:0;background:var(--comb);box-shadow:none;min-width:0}
-/* Der Bereich Builds (#bauBody, 51-plan.ts) ist ein Feld ohne eigene Karte:
-   derselbe Innenabstand wie die anderen Felder (Querschnitt Aufgabe 5); die
-   Karten der Links stehen darin. */
-body.felder #bauBody{padding:14px 16px}
 /* rounded window: the page paints the corners, since the OS frame is gone.
    10px steht ausserhalb der Radienskala: das ist die Ecke des Fensters,
    nicht die einer Flaeche darin (DESIGN.md, Shapes). Nur noch ohne nativen
@@ -2231,6 +2504,10 @@ body.watching::after{
      Neugestaltung 28.09., Aufgabe 9); der Ring sagt es allein */
 }
 body.frameless.watching::after{border-radius:10px}
+/* Im Streifen sagt es der Punkt vor Uhrzeit und Dauer (#158): der Rahmen hielt
+   gegen den eigenen Grund nur 1,84 bis 2,02 zu 1 und war ueber dem Spiel kaum
+   zu sehen. In der Vollansicht bleibt er. */
+body.compact.watching::after{display:none}
 
 /* the banner that appears the moment watching starts */
 .watchpop{
@@ -3138,7 +3415,7 @@ button.zr:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
   box-shadow:inset 0 0 0 1px var(--ctl-edge);
 }
 
-/* ---------- Verlauf: die Tabelle (auch fuer "Deine Builds", 47-builds.ts) ---------- */
+/* ---------- Verlauf: die Tabelle ---------- */
 .histtab{width:100%;border-collapse:collapse;font-size:var(--fs-sm)}
 .histtab th{text-align:right;color:var(--dimmer);font-weight:400;font-size:var(--fs-xs);
   padding:0 0 5px;box-shadow:inset 0 -1px 0 var(--hair-edge)}
@@ -3168,32 +3445,28 @@ body.compact .sideline{display:none}
 /* "+7 % zum letzten Pull" unter der grossen Zahl (Feinschliff 02.10.,
    Abschnitt 2): eine eigene Zeile vor der Nebenziel-Zeile, leise wie sie,
    ohne Gold, Rot oder Gruen - die Richtung traegt das Vorzeichen. Im
-   Kompakt steht dieselbe Angabe in der Lesezeile (#hCompact). */
+   Kompakt steht sie im Streifen unter der Zahl, rechts (#157). */
 .big .prevline{flex:0 0 100%;margin-top:4px;font-size:var(--fs-sm);line-height:1.4;color:var(--ink-soft);
   white-space:nowrap;font-variant-numeric:tabular-nums}
-body.compact .prevline{display:none}
+/* Im Streifen steht der Vergleich zum letzten Pull unter der Zahl, rechts
+   (Spezifikation Kompakt-Fenster 7, #157); die Lesezeile hat die Breite. */
+body.compact .big .prevline:not([hidden]){display:block;order:3;flex:0 0 100%;margin-top:1px;text-align:right;
+  font-size:var(--fs-xs);line-height:1.2;color:var(--ink-soft);white-space:nowrap}
 /* Aus demselben Grund wie das Urteil darueber: in der Ueberlagerung hat
    die Kopfzeile rund 200 Punkt, und ein ganzer Satz darin waere entweder
    nach vier Woertern abgeschnitten oder wuerde das Fenster aufziehen. */
 body.compact .readline{display:none}
 /* Dafuer die Kurzzeile, nur hier: ueber die volle Breite des Streifens statt
    in den 200 Punkt der Kopfzeile, eine Zeile, und was nicht passt, geht auf
-   Ellipse - der ganze Satz steht im title. Die Differenz zum Pull davor
-   steht neutral in der Farbe der Zeile, wie im Abend: die Richtung traegt
-   das Vorzeichen (+ oder U+2212), keine Urteilsfarbe (Issue #39). Die
-   Klassen up/down bleiben fuer Tests und Lesbarkeit im Code, sie faerben
-   nicht. */
+   Ellipse - der ganze Satz steht im title. Der Vergleich zum Pull davor
+   steht nicht hier, sondern unter der Zahl (.big .prevline, #157); die
+   Richtung traegt dort das Vorzeichen (+ oder U+2212), keine Urteilsfarbe
+   (Issue #39). */
 .compactread{display:none}
 body.compact .compactread:not([hidden]){display:flex;gap:0;align-items:baseline;
   margin:1px 0 0;min-width:0;font-size:var(--fs-sm);line-height:1.35;color:var(--dim);
   white-space:nowrap}
 body.compact .compactread > span:first-child{min-width:0;overflow:hidden;text-overflow:ellipsis}
-body.compact .compactread .cdelta{flex:none;font-variant-numeric:tabular-nums}
-/* Der Trenner ist " \00b7 " mit je einem Leerzeichen wie ueberall in der App;
-   pre haelt die zwei Leerzeichen am Rand des Kastens, und die Zeile selbst
-   hat keinen Zwischenraum mehr - vorher kamen 9 Punkte dazu, doppelt
-   Abstand (Issue #39). */
-body.compact .compactread .csep{flex:none;white-space:pre}
 
 /* ---------- comb bars ---------- */
 /* A table has a measure, the way a paragraph has one. Nothing here capped
@@ -3309,17 +3582,15 @@ body.compact .table{display:contents}
   background:var(--well);box-shadow:inset 0 -1px 0 var(--hair-edge-mid)}
 .bhead span:not(:nth-child(1)):not(:nth-child(2)){text-align:right}
 /* Die Spanne fuellt die Kopfzeile, statt auf ihrer Zeilenhoehe zu sitzen.
-   Sie ist der Knopf zum Sortieren; 18 Punkt hoch war sie kleiner als das
-   Feld, in dem sie steht, und kleiner als die 24 Punkt, die WCAG 2.2 fuer
-   ein Ziel verlangt. Die Schrift bewegt sich dabei nicht: 24 Punkt
-   Zeilenhoehe in einem 24 Punkt hohen Kasten liegt auf derselben
-   Grundlinie wie 18 Punkt mittig in derselben Zeile. */
-.bhead span{cursor:pointer;user-select:none;text-align:right;
+   Sortiert wird nicht mehr ueber die Spaltenkoepfe: im Glutring traegt der
+   Kopf den Knopf "Ordnen" (64), im Kompakt ist er nur fuer den Vorleser da.
+   Die Schrift bewegt sich dabei nicht: 24 Punkt Zeilenhoehe in einem 24
+   Punkt hohen Kasten liegt auf derselben Grundlinie wie 18 Punkt mittig in
+   derselben Zeile. */
+.bhead span{user-select:none;text-align:right;
   align-self:stretch;line-height:24px}
 .bhead span:nth-child(1){text-align:center}
 .bhead span:nth-child(2){text-align:left}
-.bhead span:hover{color:var(--text)}
-.bhead span.sorted{color:var(--gold-ink)}
 /* the single biggest hit in a fight is worth calling out — give it a
    warm tint even when it is not the active sort column */
 /* Biggest Hit used to be gold in the header and gold down the column,
@@ -3592,65 +3863,15 @@ body.compact .row .v.dps{font-size:inherit}         /* compact rows set their ow
    log writes one outcome per hit and "shield" is not "crit". Heavy is an
    independent flag and crosses every hit type, so it is a real figure. */
 .row.sub.catrow.shieldrow .v[data-k="heavyRate"]{visibility:visible}
-/* ---------- Die breite Tafel (Neugestaltung 28.09., Luecke 2.8) ----------
-   Breit (#bars.breit, renderBars setzt es ueber 640 Punkt und nicht im
-   Kompaktmodus) wie im Entwurf: keine Rangspalte, der Balken ist eine
-   4-Punkt-Spur unter dem Namen, in der Namensspalte - keine eigene Spalte
-   mehr (Issue #53 hatte ihn zwischen Name und Zahlen gestellt). Jede Zeile
-   ist fest 44 Punkt hoch und wird nie gestreckt (Entscheidung 28.09.). Fuenf
-   Zahlenspalten; Anteil und Groesster Treffer stehen in der aufgeklappten
-   Zeile (.bdetail). Die Spur und ihre Bahn (::before) sind absolut gesetzt
-   und tragen grid-column, damit ist ihr Bezugskasten die Namensspalte; sie
-   beginnen, wo der Name beginnt (--spur-l: Pfeil, Symbol und Luecken). */
-#bars.breit .bhead,#bars.breit .row{--spur-l:46px;
-  grid-template-columns:minmax(120px,1fr) 74px 62px 52px 58px 52px}
-/* 1000 Punkt (nebeneinander, schmale Spalte): ohne Treffer und Stark wie
-   im Entwurf; gestapelt (bis 832) ist wieder Platz fuer Treffer. */
-:where(html.w-max-1099:not(.w-max-832)) #bars.breit :is(.bhead,.row){grid-template-columns:minmax(120px,1fr) 74px 62px 58px}
-:where(html.w-max-1099:not(.w-max-832)) #bars.breit :is(.bhead,.row) > [data-k="hits"],
-:where(html.w-max-1099) #bars.breit :is(.bhead,.row) > [data-k="heavyRate"]{display:none}
-:where(html.w-max-832) #bars.breit :is(.bhead,.row){grid-template-columns:minmax(120px,1fr) 74px 62px 52px 58px}
-/* Der Kopf der Namensspalte beginnt, wo die Namen beginnen (ohne Rang
-   stand er sonst mittig ueber der Spalte). */
-#bars.breit .bhead > span:nth-child(1){text-align:left;padding-left:var(--spur-l)}
-/* Der Hof um Pfeil, Namen und Zahlen der Unterzeilen stand da, weil der
-   Balken unter der Schrift lag; breit liegt die Spur unter dem Namen, der
-   Schein hat keine Aufgabe mehr (Pruefung 29.09.). */
-#bars.breit :is(.twist,.row.sub .nm,.row.sub .v){text-shadow:none}
-#bars.breit .row{height:44px}
-#bars.breit .row.sub{height:30px}
-/* Der Name steht ueber der Spur: die Namenszelle fuellt die Zeile und laesst
-   unten Platz fuer sie. */
-#bars.breit .row:not(.sub) .nm{align-self:stretch;padding-bottom:12px}
-#bars.breit .row.sub:not(.bdetail) .nm{align-self:stretch;padding-bottom:8px}
-#bars.breit .row .fill{grid-column:1 / 2;grid-row:1 / 2;left:calc(var(--spur-l) + var(--ind));top:auto;bottom:9px;height:4px;margin:0;
-  width:calc(var(--w,0) * (100% - var(--spur-l) - var(--ind) - 8px))}
-#bars.breit .row.sub .fill{height:3px;bottom:6px}
-/* Die Bahn: derselbe Hauch, den eine Zeile unter dem Zeiger bekommt, bis
-   zum Ende der Namensspalte - so hat 100 % einen Ort, in allen drei Themen. */
-#bars.breit .row:not(.sub)::before{content:"";position:absolute;grid-column:1 / 2;grid-row:1 / 2;
-  left:calc(var(--spur-l) + var(--ind));right:8px;top:auto;bottom:9px;height:4px;border-radius:var(--r-mark);pointer-events:none;
-  background:var(--tint-hover-soft-045)}
-/* Dieselbe Bahn hinter den Spuren der Unterzeilen. Nicht hinter der
-   Detailzeile - die hat keinen Balken. */
-#bars.breit .row.sub:not(.bdetail)::before{content:"";position:absolute;grid-column:1 / 2;grid-row:1 / 2;
-  left:calc(var(--spur-l) + var(--ind));right:8px;top:auto;bottom:6px;height:3px;border-radius:var(--r-mark);pointer-events:none;
-  background:var(--tint-hover-soft-045)}
 /* Die Farbe traegt jetzt der Balken; der Farbring ums Symbol sagte es ein
    zweites Mal - breit wie schmal, dort als Faden. Die volle Platte ohne
    Bild (.sic.leer) bleibt, sie ist kein Ring. Kompakt behaelt den Ring:
    sein Balken liegt unter dem Namen und traegt die Farbe anders. */
 body:not(.compact) #bars .row .nm img.sic{box-shadow:0 1px 3px var(--icon-drop)}
-/* Die aufgeklappte Zeile: was aus den Spalten gewandert ist, in einem Satz
-   ueber den Unterzeilen. Die Zahlen vorn und in --text, damit das Auge sie
-   findet; der Rest leiser. */
-#bars.breit .row.bdetail{grid-template-columns:minmax(0,1fr);height:30px;cursor:default}
+/* Die Summenzeile unter den Trefferarten der Liste neben dem Ring (64): eine
+   Zelle ueber alle Spalten, leiser als die Zeilen. */
 #bars .row.bdetail .dz{grid-column:1 / -1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
   padding-left:31px;font-size:var(--fs-xs);color:var(--ink-soft)}
-#bars.breit .row.bdetail .dz{padding-left:calc(var(--spur-l) + 14px)}
-#bars .row.bdetail .dz b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
-#bars .row.bdetail .dzsep{margin:0 5px;color:var(--dim)}
-#bars .row.bdetail .dzkat{font-size:var(--fs-2xs);letter-spacing:.06em;text-transform:uppercase}
 /* Das Kern-Symbol von questlog (Luecke 2.10): 18 Punkt, 4 Punkt Rundung,
    an der Stelle der gezeichneten Marke, mit demselben Tooltip. */
 .cmark.kernbild{padding:0;background:none;box-shadow:none;border-radius:4px}
@@ -3665,11 +3886,6 @@ body:not(.compact) .row .fill{mix-blend-mode:normal;opacity:.9;box-shadow:none;b
 body:not(.compact) .row .fill.aus{-webkit-mask-image:none;mask-image:none}
 body:not(.compact) .row:hover .fill{opacity:1;filter:none}
 body:not(.compact) .row.sub .fill{opacity:.8}
-/* Schmal (bis 640) fehlt der Platz fuer eine eigene Spalte: ein 3-px-Faden
-   unten in der Namensspalte, links und breit wie bisher. Die Liste neben dem
-   Glutring (#bars.ring) legt ihren Balken selbst; :not(a,b) wiegt wie eine
-   Klasse, die Gewichtung bleibt. */
-body:not(.compact) #bars:not(.breit,.ring) .row .fill{top:auto;bottom:2px;height:3px}
 /* Nur Schaden in der Anzeigeschrift; DPS steht daneben in Plex. */
 body:not(.compact) .row:not(.sub) .v.dps{font-family:var(--sans);font-weight:500;color:var(--ink-soft);
   letter-spacing:0;font-size:inherit}
@@ -3814,19 +4030,37 @@ body:not(.compact) .row:not(.sub) .v.dps{font-family:var(--sans);font-weight:500
 body.felder #p-analysis > .urteil{max-width:none;padding:16px 22px 14px}
 body.felder #p-analysis > .urteil > *{max-width:62ch}
 
-/* Weitere Befunde: eine Zeile unter dem Urteil, Begriff ueber Wert. */
-.neben{display:flex;flex-wrap:wrap;align-items:center;gap:8px 32px;padding:10px 22px}
+/* Wege vom Urteil zum Beleg und in die Rotation (Issue #107): leise Knoepfe
+   wie "Ganze Analyse" im Bereich Kampf - Textfarbe gedaempft, ohne Platte,
+   beim Zeigen in Textfarbe. Kein Gold: sie sind Wege, kein Befund. Das Feld,
+   auf das "Zum Beleg" den Fokus setzt, zeigt ihn mit derselben Fokuslinie. */
+#p-analysis .zubeleg,#p-analysis .inrot{border:0;background:transparent;color:var(--dim);font:inherit;
+  font-size:var(--fs-sm);line-height:1.4;padding:4px 0;cursor:pointer;text-align:left}
+#p-analysis .zubeleg:hover,#p-analysis .inrot:hover{color:var(--text)}
+#p-analysis .zubeleg:focus-visible,#p-analysis .inrot:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.urteil .zubeleg,.drei .inrot{padding:0 2px;font-size:inherit}
+.urteil .ganz{margin:8px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--dim)}
+.neben .find dd.w{margin:2px 0 0}
+.neben .find .inrot{font-size:var(--fs-xs);padding:2px 0}
+#p-analysis [tabindex="-1"]:focus{outline:none}
+#p-analysis [tabindex="-1"]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+
+/* Weitere Befunde unter dem Urteil, Begriff ueber Wert. Die Ueberschrift
+   steht immer darueber, die Befunde in einem festen Raster (Issue #110):
+   vorher ein Umbruch mit Flexbox, in dem je nach Breite ein Eintrag allein
+   rechts stand und bei nur einem Eintrag die Ueberschrift daneben rutschte. */
+.neben{display:block;padding:10px 22px}
 .neben[hidden]{display:none}
-.neben h3{margin:0;font:400 var(--fs-md)/1.2 var(--display);color:var(--text)}
-.neben dl{margin:0;display:flex;flex-wrap:wrap;align-items:flex-start;gap:8px 32px;min-width:0}
-.neben .find{display:flex;flex-direction:column;gap:1px;min-width:0;max-width:54ch}
+.neben h3{margin:0 0 6px;font:400 var(--fs-md)/1.2 var(--display);color:var(--text)}
+.neben dl{margin:0;display:grid;grid-template-columns:repeat(auto-fill,minmax(30ch,1fr));align-items:start;gap:10px 32px;min-width:0}
+.neben .find{display:flex;flex-direction:column;gap:1px;min-width:0}
 .neben .find dt{color:var(--dim);font-size:var(--fs-sm);line-height:1.4}
 .neben .find dd{margin:0}
 .neben .find .v{color:var(--text);font-size:var(--fs-sm);font-weight:500;line-height:1.4;font-variant-numeric:tabular-nums}
 .neben .find .n{color:var(--dimmer);font-size:var(--fs-xs);line-height:1.4}
 /* Gold nur fuer den Befund, den das Urteil oben nennt. */
 .neben .find.zaehlt .v{color:var(--lite-ink)}
-.neben .noclock{flex-basis:100%;margin:0}
+.neben .noclock{margin:8px 0 0}
 
 /* Die Form des Kampfes: Saeulen je Sekunde, Luecken hinterlegt, Median
    gestrichelt. Die Hoehe waechst mit dem Fenster (grosse Fenster nutzen
@@ -3835,9 +4069,11 @@ body.felder #p-analysis > .urteil > *{max-width:62ch}
 .form{padding:12px 22px 12px}
 .form[hidden]{display:none}
 .form .fkx{display:flex;align-items:baseline;gap:6px 12px;margin-bottom:4px;flex-wrap:wrap}
-.form h2{margin:0;font:400 var(--fs-lg)/1.2 var(--display);color:var(--ink-soft)}
+.form #formTitel{margin:0;font:400 var(--fs-lg)/1.2 var(--display);color:var(--ink-soft)}
 .form p.fein{margin:0;color:var(--dim);font-size:var(--fs-xs);line-height:1.45;max-width:none}
-.form #lueckeDef{margin-bottom:10px}
+/* Die Erklaersaetze laufen nicht ueber die ganze Flaeche (Issue #110): wie
+   #verdictText hoechstens etwa 70 Zeichen je Zeile. */
+.form #lueckeDef{margin-bottom:10px;max-width:70ch}
 .form #verdictText{margin-top:10px;font-size:var(--fs-sm);color:var(--ink-soft);max-width:78ch}
 .vform{position:relative}
 .saeulen{position:relative;height:clamp(112px,calc(var(--winh,100vh) * .14),240px);
@@ -3879,7 +4115,7 @@ body.felder #p-analysis > .urteil > *{max-width:62ch}
 .vleg i.lpause{background-image:linear-gradient(var(--gap-band),var(--gap-band))}
 .vleg i.linvuln{background-image:linear-gradient(var(--invuln-band),var(--invuln-band))}
 .vleg i.lmech{background-image:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 4px),linear-gradient(var(--invuln-band),var(--invuln-band))}
-.form #mechanikZeile{margin-bottom:10px}
+.form #mechanikZeile{margin-bottom:10px;max-width:70ch}
 .form #mechanikZeile[hidden]{display:none}
 
 /* #findings: die Felder darunter, mit Fugen wie das Panel. */
@@ -3909,6 +4145,16 @@ body.felder #findings > .drei{background:var(--hair-rule)}
 .art-crit{background:var(--cat-crit)}
 .art-heavy{background:var(--cat-heavy)}
 .art-critheavy{background:var(--cat-critheavy)}
+/* Legende des Aussenrands (#101): vier Punkte (Schild als fuenfter nur mit Schildtreffern), nebeneinander unten links im Ringfeld,
+   gestapelt unter der Buehne. */
+.ringlegende ul{list-style:none;margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 12px}
+.ringlegende{margin:0;padding:0;display:flex;flex-wrap:wrap;gap:4px 12px;align-items:center;font-size:var(--fs-xs);color:var(--dim);position:absolute;left:22px;bottom:14px;z-index:2;max-width:calc(100% - 44px)}
+.ringlegende[hidden]{display:none}
+.ringlegende li{display:inline-flex;align-items:center;gap:5px}
+.ringlegende li[hidden]{display:none}
+.ringlegende i{display:inline-block;width:8px;height:8px;border-radius:50%}
+.ringlegende .rltitel{font-variant:small-caps;letter-spacing:.04em}
+:where(html.w-max-899, html.h-max-699) .ringlegende{position:static;margin:6px 22px 0}
 .art-shield{background:var(--cat-shield,var(--dimmer))}
 :where(html.w-max-832) .drei{grid-template-columns:minmax(0,1fr)}
 
@@ -3926,7 +4172,7 @@ body.felder #findings > .drei{background:var(--hair-rule)}
 .salven i{flex:1;max-width:26px;min-width:3px;border-radius:2px 2px 0 0;background:var(--cat-normal)}
 .salven i.best{background:var(--amber)}
 .salven i.leer{background:none;box-shadow:inset 0 0 0 1px var(--ridge)}
-.salvenwort{margin:0 0 12px;font-size:var(--fs-xs);color:var(--dim);font-variant-numeric:tabular-nums}
+.salvenwort{margin:0 0 12px;max-width:70ch;font-size:var(--fs-xs);color:var(--dim);font-variant-numeric:tabular-nums}
 .vkz{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;padding-top:12px;box-shadow:inset 0 1px 0 var(--hair-rule)}
 .vkz dt{font-size:var(--fs-xs);color:var(--dim)}
 .vkz dd{margin:0}
@@ -3943,7 +4189,9 @@ body.felder #findings > .drei{background:var(--hair-rule)}
    im schmalen tritt sie beiseite und die Zahl uebernimmt. */
 .vpips b{display:none;font-family:var(--display);font-size:var(--fs-base);
   font-weight:400;color:var(--text);font-variant-numeric:tabular-nums}
-.vtab{margin-top:16px;padding-top:12px;box-shadow:inset 0 1px 0 var(--hair-rule)}
+/* Hoechstens 900 Punkt breit (Issue #110): bei 2000 x 1480 lagen Name und
+   Punkte sonst etwa 1250 Punkt auseinander. Die Zeilen bleiben 36 hoch. */
+.vtab{margin-top:16px;padding-top:12px;box-shadow:inset 0 1px 0 var(--hair-rule);max-width:900px}
 .vtabkopf,.vtabzeile{display:grid;
   grid-template-columns:30px minmax(0,1fr) 128px 46px 118px;gap:12px;
   align-items:center}
@@ -3979,7 +4227,7 @@ body.felder #findings > .drei{background:var(--hair-rule)}
 
 /* Was das Log nicht weiss: der Fuss, vier Punkte in zwei Spalten. */
 .afuss{padding:12px 22px 14px;display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 14px;align-items:start}
-.afuss h2{margin:0;font:400 var(--fs-md)/1.3 var(--display);color:var(--ink-soft)}
+.afuss #afussTitel{margin:0;font:400 var(--fs-md)/1.3 var(--display);color:var(--ink-soft)}
 .afuss ul{margin:0;padding:0;list-style:none;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 24px;color:var(--ink-soft);font-size:var(--fs-sm)}
 .afuss li{display:flex;gap:8px;align-items:flex-start}
 .afuss li svg{width:14px;height:14px;margin-top:3px;flex:none;color:var(--dim)}
@@ -4810,7 +5058,7 @@ td{font-variant-numeric:tabular-nums}
    than standing on a plinth of its own. */
 
 /* per-target split, only rendered when a fight had more than one enemy */
-.tsplit{margin-top:16px}
+.tsplit{margin-top:16px;max-width:900px}
 .tsk{color:var(--dim);font-size:var(--fs-sm);margin-bottom:8px}
 /* Eine Spalte fuer das Bossbild davor. Die Bilder stecken seit dem
    Bossbilder-Einbau in der App und tauchten in der Analyse nirgends auf;
@@ -5501,11 +5749,27 @@ body.compact #bars::-webkit-scrollbar-thumb{background:transparent;border:0}
 body.compact .top > *{opacity:.50;transition:opacity .16s ease}
 :root[data-theme="light"] body.compact .top > *{opacity:.60}
 :root[data-theme="tnl"] body.compact .top > *{opacity:.55}
-body.compact:hover .top > *,body.compact:focus-within .top > *{opacity:1}
+/* Rauchglas: auf Acrylic (Toenung --glass .8 ueber #4a4a4a) mass die Leiste
+   bei .50 4,62 gegen 4,71 dunkel, deckend 4,79 gegen 4,68 - die Tinte gegen
+   die Leiste, schwaechste Schrift "Live logging off". .52: 4,88 / 5,07. */
+:root[data-theme="glas"] body.compact .top > *{opacity:.52}
+/* Mit :root davor so spezifisch wie die Themenregeln darueber und spaeter
+   als sie: sonst blieb die Leiste in hell, tnl und glas auch beim Zeigen
+   und bei Fokus gedimmt (#159). */
+:root body.compact:hover .top > *,:root body.compact:focus-within .top > *{opacity:1}
+/* Geist und ohne Kampf (#182): dieselbe Ursache wie #159. Die Themenregel
+   fuer den Geist im hellen Thema (.274, 0,5,1) und die Ruheregeln je Thema
+   (0,4,1) gewannen gegen Zeigen, Fokus und noFight. Mit :root davor gleich
+   spezifisch und spaeter. Der Durchklick steht danach und bleibt beim
+   Zeigen gedimmt, wie bisher. */
+:root body.compact.ghost:hover .top > *,:root body.compact.ghost:focus-within .top > *{opacity:1}
+:root body.compact.noFight .top > *,:root body.compact.ghost.noFight .top > *{opacity:1}
+:root body.compact.ghost.through:hover .top > *{opacity:.317}
+:root body.compact.ghost.through:hover .top #throughHint{opacity:1}
 /* Der Ziehgriff ist unsichtbar und soll es bleiben; ihn zu dimmen und wieder
    aufzuhellen waere eine Bewegung an einer Stelle, an der nichts zu sehen
    ist. */
-body.compact .top .tdrag{opacity:1}
+:root body.compact .top .tdrag{opacity:1}
 /* Ausser dem Umschalter "Live": ob aufgezeichnet wird, ist die Frage, fuer
    die das Overlay da ist, und sie war bei .50 das blasseste im Streifen
    ("LIVE AUS", Critique 23.09.2026). Aus steht er in Rauch und ist damit
@@ -5525,11 +5789,20 @@ body.compact .top{
    sits after the controls here, not before them. Full view has the mark on
    the left to hold that end of the bar; compact hides it, so a drag strip
    ordered first would be a gap at the left edge with everything shoved right.
-   order:2 rather than a number of its own, because that is the controls' own
-   order and the strip is appended after them in the document — which is what
-   puts it last among them and still ahead of the window buttons at 3. A
-   higher number looks tidier and puts the buttons in the middle of the bar. */
-body.compact .top .tdrag{order:2;min-width:18px;height:26px;align-self:auto}
+   order:3, the window buttons' own number: the strip now stands first in the
+   document (placeWindowChrome, #188), so among the controls at 2 it would
+   come first; at 3 it comes after all of them and, being earlier in the
+   document, still ahead of the window buttons. */
+body.compact .top .tdrag{order:3;min-width:18px;height:26px;align-self:auto}
+/* Kein Knopf der Leiste im Ziehbereich (#188). Electron baut den Bereich in
+   der Reihenfolge des Dokuments: drag fuegt hinzu, no-drag zieht ab, das
+   Spaetere gilt. Mit einem Kampf liegen Vollansicht, Anheften, Durchklick
+   und ⋯ absolut ueber dem Griff; standen sie im Ziehbereich, nahm Windows
+   der Seite die Maus, :hover fiel weg und die Leiste verschwand unter dem
+   Zeiger. Darum steht der Griff vorn im Dokument und die Knoepfe sagen
+   no-drag - beides zusammen, eins allein reicht nicht. */
+body.compact .top :is(button,a,input,select,label,.morepanel,.partyswitch){
+  -webkit-app-region:no-drag;app-region:no-drag}
 body.compact .top .wbtns{height:26px;margin-block:0}
 body.compact .wctl{width:28px;height:26px}
 body.compact .wctl svg{width:10px;height:10px}
@@ -5705,8 +5978,8 @@ body.compact .moremenu{opacity:1}
    des Vorlesers; der Entwurf stellt die Dauer vorn), Ort, Schaden und
    Treffer gehen. Die Zahl ohne Schein - Glut als Farbe, nicht als Leuchten. */
 body.compact .head{clip-path:none;border-radius:0;margin:0;padding:6px 11px 4px;gap:0;background:none;box-shadow:none}
-body.compact .headtop{flex-direction:row;flex-wrap:nowrap;align-items:center;gap:10px}
-body.compact .headmeta{order:1;flex:1 1 auto;min-width:0;margin:0;padding:0;border-left:0;text-align:left;
+body.compact .headtop{flex-direction:row;flex-wrap:wrap;align-items:center;gap:0}
+body.compact .headmeta{order:1;flex:1 1 0;min-width:0;margin:0 10px 0 0;padding:0;border-left:0;text-align:left;
   display:grid;grid-template-columns:20px auto minmax(0,1fr);column-gap:8px;row-gap:1px;align-items:center;overflow:hidden}
 body.compact .headmeta::before{display:none}
 body.compact #hName{display:contents}
@@ -5724,18 +5997,38 @@ body.compact #hMeta:not(:has([data-f="zeit"])) .scope{display:inline;margin:0;pa
 body.compact #hMeta:not(:has([data-f="zeit"])) .scope + .f::before{content:"\0020\00b7\0020";white-space:pre}
 body.compact #hMeta [data-f="dauer"]::before{content:"\0020\00b7\0020";white-space:pre}
 body.compact #hMeta .wt{font-style:normal}
+/* Live im Streifen (#158, Glut-Regel): ein ruhiger Punkt in Goldtinte vor
+   Uhrzeit und Dauer, ohne Atmen und ohne Schein; gestoert ein Ring in --neg
+   wie in der Statusleiste. Ein Pseudo-Element ohne Text: kein Vorleser liest
+   es, den Zustand sagt #live. */
+body.compact.watching #hMeta::before{content:"";flex:none;align-self:center;width:6px;height:6px;margin-right:6px;
+  border-radius:50%;background:var(--gold-ink)}
+body.compact.watching.livestoer #hMeta::before{box-sizing:border-box;background:transparent;border:1.5px solid var(--neg)}
+/* Im hellen Thema die Tinte der Zahl daneben (#6d3c00): --gold-ink hielt ueber
+   einer dunklen Szene nur 2,86 zu 1 (Entscheidung vom 04.10.). Gestoert bleibt der Ring.
+   Der Wert steht einmal, bei der Zahl unten (--kompakt-zahl-ink). */
+:root[data-theme="light"] body.compact.watching:not(.livestoer) #hMeta::before{background:var(--kompakt-zahl-ink)}
 #hMeta .dmgk{display:none}
 /* Ein Teil, der nicht mehr ganz hineinpasst. kopfBeschneiden() setzt die
    Klasse; sie steht hier, damit die Regel bei der Zeile bleibt, zu der
    sie gehoert. */
 #hMeta .zuEng{display:none}
-body.compact .big{order:2;margin-left:auto;min-width:0;flex:none;align-items:baseline;gap:3px}
-body.compact .big .v{font-size:24px;line-height:1;letter-spacing:-.02em;filter:none;color:var(--hero-ink)}
+/* Die Zahl und ihre Einheit sind Kinder der Kopfzeile selbst (.big loest sich
+   auf), damit der Vergleich zum letzten Pull als eigene Zeile darunter
+   steht und der linken Spalte (Boss, Uhrzeit, Dauer) keine Breite nimmt
+   (#157). Zahl und Einheit teilen sich die Grundlinie. */
+body.compact .big{display:contents}
+/* Die leere Gruppenansicht zeigt keine Zahl (body.partyEmpty .big, oben): display:contents darf das nicht wieder aufheben. */
+body.compact.partyEmpty .big{display:none}
+body.compact .big .v,body.compact .big .ukurz{order:2;align-self:baseline}
+body.compact .big .v{margin-left:auto;margin-top:3px;font-size:24px;line-height:1;letter-spacing:-.02em;filter:none;color:var(--hero-ink)}
 /* Die eine Zahl, fuer die das Overlay da ist, hielt im hellen Thema
-   deckend 3,51 zu 1: eine eigene, dunklere Tinte nur fuer diese Zahl. */
-:root[data-theme="light"] body.compact .big .v{color:#6d3c00}
+   deckend 3,51 zu 1: eine eigene, dunklere Tinte nur fuer diese Zahl. Dieselbe
+   Tinte traegt der Live-Punkt im Kopf (eine Quelle, ein Wert). */
+:root[data-theme="light"]{--kompakt-zahl-ink:#6d3c00}
+:root[data-theme="light"] body.compact .big .v{color:var(--kompakt-zahl-ink)}
 .ukurz{display:none}
-body.compact .big .ukurz{display:inline;font-size:var(--fs-xs);color:var(--dim);letter-spacing:0}
+body.compact .big .ukurz{display:inline;margin-left:3px;font-size:var(--fs-xs);color:var(--dim);letter-spacing:0}
 
 /* the list: 20px rows, four columns that never move */
 /* Name takes the slack rather than a fixed width: German skill names run
@@ -5794,6 +6087,9 @@ body.compact .row{height:24px;font-size:var(--fs-xs);padding:0 6px;
 body.compact .row:last-child{margin-bottom:0}
 body.compact .row:hover{background:var(--tint-hover-soft)}
 body.compact .row.sub{height:22px;font-size:var(--fs-2xs)}
+/* Zeilen schrumpfen nicht mit der Fensterhoehe (so entschieden 04.10.):
+   die Streifenhoehe haengt sonst von der gerade gemessenen Fenstergroesse ab */
+body.compact #bars .row{flex-shrink:0}
 /* The rank keeps its numeral — in party view "am I third?" is the whole
    question — but loses the box and the lit edge it wore in full view.
    Position is already carried by the row order and the bar length; the
@@ -5881,6 +6177,9 @@ body.compact .row:hover .fill{opacity:var(--fill-op-compact);filter:none}
 body.compact .catb{font-size:var(--fs-micro);padding:0 4px}
 body.compact .watchpop{top:8px;padding:6px 13px 6px 11px}
 body.compact .watchpop b,body.compact .watchpop span{font-size:var(--fs-2xs)}
+/* Kein Band im Streifen (#161): es brach bei 300 Punkt um und deckte den
+   Randlos-Hinweis; dort sagt es der Punkt, die Datei steht im title. */
+body.compact .watchpop{display:none}
 /* Kompakt auf Acrylic: Windows zeichnet das Spiel unscharf hinter das
    Fenster, der Grund der Seite wird eine Toenung darueber. Zahlen, Namen,
    Balken und Gold bleiben voll deckend - durchscheinen soll das Spiel, nicht
@@ -5934,45 +6233,6 @@ html.acrylic body.compact .row:hover{background:var(--tint-hover-soft)}
   :where(html.w-max-640) .bhead,:where(html.w-max-640) .row{--numw:204px;grid-template-columns:var(--rankw) minmax(90px,1fr) 66px 62px 48px}
   :where(html.w-max-640) .bhead span:nth-child(n+6){display:none}
   :where(html.w-max-640) .row .v:nth-child(n+7){display:none}
-/* ...ausser der Spalte, nach der die Liste geordnet ist. Genau der Fehler, den
-   der Kompaktmodus weiter oben schon behoben hat, nur eine Ansicht daneben:
-   nach Treffer sortieren und dann die Treffer-Spalte ausblenden liess eine
-   Ordnung stehen, fuer die nichts auf dem Bildschirm einstand. Gemessen bei
-   880 Layoutpunkten - Kopfzelle weg, Werte weg, Reihenfolge anders - und der
-   Pfeil verschwand mit, waehrend aria-sort weiter auf der unsichtbaren Zelle
-   sass und einem Vorleser eine Sortierung meldete, die niemand sehen konnte.
-
-   Die Bedingung ist die Ausblendregel darueber, ein zweites Mal gelesen: traegt
-   die Kopfzelle mit .sorted eine Kindnummer, die diese Sprosse ausblendet, dann
-   ist die Sortierung unsichtbar. Keine Liste von Schluesseln, die neben der in
-   renderBars() veralten koennte. :has steht auf #bars, dem einzigen Elternteil
-   von .bhead und allen .row, also einmal je Neuzeichnen statt einmal je Zeile.
-
-   Gestellt wird nichts. Die Leiter blendet immer einen Schwanz von Spalten aus,
-   die zurueckgeholte steht also im Baum hinter allen, die noch stehen, und .fill
-   ist absolut positioniert und belegt keine Spur - die automatische Platzierung
-   legt sie von selbst in die neue letzte. Der Kompaktmodus braucht seine zehn
-   grid-column-Zeilen nur, weil er die Spalte VOR Schaden und DPS haben will.
-
-   76px ist die Untergrenze, die "Groesster Treffer" im Grundraster hat, und das
-   ist die breiteste der vier. Eine feste Spur fuer alle vier, damit das Raster
-   beim Umsortieren nicht springt - dieselbe Regel, die schon ueber dem
-   Kompaktraster steht. Die Kopfzeile "Groesster Treffer" traegt mit ihrem Pfeil
-   rund 80px und haengt damit etwa 4px nach links in die ungenutzte Breite der
-   Anteil-Spur; .bhead span schneidet nicht ab, die Beschriftung bleibt ganz.
-
-   --numw: 66+62+48+76 = 252 Zahlenspalten, vier Abstaende 24, rechter Rand 10
-   = 286. Die Zahl zieht .row .fill ab, damit der Balken weiter dort endet, wo
-   der Name endet. Der Name verliert dadurch 82px.
-
-   Die drei Regeln muessen unter den zwei Ausblendregeln stehen bleiben: die
-   Rasterregel gewinnt gegen die Sprossenregel darueber nur ueber die
-   Reihenfolge in der Datei, bei gleicher Gewichtung 0,1,0. */
-  :where(html.w-max-640) :where(#bars:has(.bhead span:nth-child(n+6).sorted)) .bhead,
-  :where(html.w-max-640) :where(#bars:has(.bhead span:nth-child(n+6).sorted)) .row{
-    --numw:286px;grid-template-columns:var(--rankw) minmax(90px,1fr) 66px 62px 48px 76px}
-  :where(html.w-max-640) .bhead span:nth-child(n+6).sorted{display:block}
-  :where(html.w-max-640) .row .v:nth-child(n+7).showsort{display:block}
   :where(html.w-max-900) .stage{padding:12px 11px 28px}
   :where(html.w-max-900) .big .v{font-size:var(--fs-3xl)}
 /* ---------- die kompakte Kopfplatte ----------
@@ -6030,34 +6290,6 @@ html.acrylic body.compact .row:hover{background:var(--tint-hover-soft)}
   :where(html.w-max-560) .bhead,:where(html.w-max-560) .row{--rankw:24px;--numw:138px;grid-template-columns:var(--rankw) minmax(70px,1fr) 60px 56px}
   :where(html.w-max-560) .bhead span:nth-child(n+5){display:none}
   :where(html.w-max-560) .row .v:nth-child(n+6){display:none}
-/* Dasselbe eine Sprosse tiefer. Hier faellt eine Spalte mehr weg, also kann auch
-   Anteil die sortierte sein: der Vergleich heisst n+5 statt n+6, wieder die
-   Ausblendregel darueber, noch einmal gelesen. n+5 schliesst n+6 ein, diese
-   Sprosse behaelt also immer das letzte Wort, wenn beide an sind.
-
-   54px statt 76: das ist die Obergrenze, die Anteil im Grundraster hat, und
-   Anteil traegt mit "100,0 %" den laengsten WERT dieser fuenf Spalten. Der Wert
-   entscheidet ueber die Breite, denn .row .v kuerzt mit Auslassungszeichen und
-   eine abgeschnittene Ziffer ist ein verlorener Wert. Die Kopfzeile haengt
-   stattdessen nach links ueber, in den Abstand und in die ungenutzte Breite der
-   DPS-Spur daneben - "Groesster Treffer" mit Pfeil ragt dort rund 26px in rund
-   41px Luft.
-
-   Der Name bleibt auf minmax(70px,1fr). Ihn auf minmax(0,1fr) zu setzen haette
-   Platz fuer die neue Spur geschaffen, aber bei 280 Layoutpunkten bliebe vom
-   Faehigkeitsnamen ein Auslassungszeichen. #bars steht schon auf
-   overflow-x:auto - die Zeile wird dort also breiter als die Tabelle und die
-   Tabelle rollt waagerecht, mit Kopfzeile. Gerechnet: 24+70+60+56+54 plus vier
-   Abstaende 24 plus 20 Rand = 308px Mindestbreite. Die Tabelle ist
-   Fensterbreite minus 22; der Rollbalken erscheint also erst unter 330
-   Layoutpunkten. Bei 560 steht der Name auf 300px und nichts aendert sich.
-
-   --numw: 60+56+54 = 170, drei Abstaende 18, rechter Rand 10 = 198. */
-  :where(html.w-max-560) :where(#bars:has(.bhead span:nth-child(n+5).sorted)) .bhead,
-  :where(html.w-max-560) :where(#bars:has(.bhead span:nth-child(n+5).sorted)) .row{
-    --numw:198px;grid-template-columns:var(--rankw) minmax(70px,1fr) 60px 56px 54px}
-  :where(html.w-max-560) .bhead span:nth-child(n+5).sorted{display:block}
-  :where(html.w-max-560) .row .v:nth-child(n+6).showsort{display:block}
   :where(html.w-max-560) .headtop{flex-wrap:wrap;gap:10px}
   :where(html.w-max-560) .headact{width:100%;order:3;justify-content:flex-start;padding-bottom:11px}
   :where(html.w-max-560) .big .v{font-size:var(--fs-2xl)}
@@ -6160,6 +6392,7 @@ html.acrylic body.compact .row:hover{background:var(--tint-hover-soft)}
 :root{--flaeche-luft:8px;--r-flaeche:12px;--kw-grund:#1b1309;--acc-on:var(--gold)}
 :root[data-theme="light"]{--kw-grund:#ffffff;--acc-on:var(--hero-ink)}
 :root[data-theme="tnl"]{--kw-grund:#212640}
+:root[data-theme="glas"]{--kw-grund:#272423}   /* Rauchglas: = --surf-menu, deckend wie in TnL */
 body.compact{--flaeche-luft:0px}
 
 /* ----- Titelzeile (0.1, 0.2, 0.3, 0.13, 0.14) ----- */
@@ -6235,10 +6468,19 @@ body:not(.compact) .kwknopf[aria-expanded="true"]{box-shadow:inset 0 0 0 1px var
 .kwlive.on .ldot{background:var(--gold-ink);box-shadow:none}
 .kwlive.err .ldot{box-shadow:inset 0 0 0 1.5px var(--neg)}
 .kwlive.err{color:var(--neg-ink)}
-/* Die Liste rastet an Zeilen; oben beginnt eine Zeile unter dem haftenden Kopf
-   (36 Punkt, einzeilig - Feinschliff 02.10., Abschnitt 5: vorher 30 unter
-   einem zweizeiligen Kopf, und die gewaehlte Zeile stand halb dahinter). */
-.kwliste{scroll-snap-type:y proximity;scroll-padding-top:36px}
+/* Die Liste rastet fest an Zeilen, wie die Schadenstafel (#154): mit
+   proximity blieb eine Zeile nach dem Rollen von Hand halb unter dem
+   klebenden Kopf (36 Punkt) stehen. Eine Zeile rastet unter dem Kopf ein,
+   eine Gruppe mit ihrem Anfang - so zeigt Pos1 den ersten Kopf. */
+.kwliste{scroll-snap-type:y mandatory;scroll-padding-top:0}
+.kampfwahl .blockgroup :is(.fight,.trashhead){scroll-margin-top:36px}
+/* Platz unter der letzten Zeile, damit auch sie unter dem Kopf einrasten
+   kann (kwReste in 23-kampfwahl.ts setzt --kwreste). Absolut gesetzt: er
+   verlaengert den Rollbereich, nicht die Hoehe des Feldes. */
+.kampfwahl .fightlist{position:relative}
+.kampfwahl .fightlist::after{content:"";position:absolute;left:0;top:100%;width:1px;height:var(--kwreste,0px);pointer-events:none}
+.kampfwahl .blockgroup{scroll-snap-align:start;scroll-margin-top:0}
+.kampfwahl .trashhead{scroll-snap-align:start}
 .kampfwahl .fightlist{padding:0 8px}
 /* Der Kopf je Ort, einzeilig: "Frostatemhoehle, Sterne, Dungeon" links,
    "6 Kaempfe, 19:04-19:20" rechts. Wird es eng, kuerzt erst die
@@ -6267,6 +6509,17 @@ body:not(.compact) .kwknopf[aria-expanded="true"]{box-shadow:inset 0 0 0 1px var
 .kampfwahl .fight .a b{font-weight:600;font-size:var(--fs-sm);color:inherit}
 .kampfwahl .fight .b{grid-column:2;grid-row:2;min-width:0;font-size:var(--fs-xs);line-height:1.25;color:var(--dim);
   white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+/* #152: ohne Portraet keine leere Bildspalte - Name und Zeile beginnen vorn. */
+.kampfwahl .fight.ohnebild{grid-template-columns:minmax(0,1fr) auto}
+.kampfwahl .fight.ohnebild :is(.a,.b){grid-column:1}
+.kampfwahl .fight.ohnebild .kd{grid-column:2}
+/* Der Laengenbalken einer Pull-Zeile: hoechstens 40 Punkt, so lang wie der
+   Anteil am laengsten Pull des Kopfes. Gedaempft - lang heisst weit
+   gekommen, nicht gut oder schlecht. */
+.kampfwahl .fight .lbar{display:inline-block;width:40px;height:3px;margin-right:6px;vertical-align:middle;border-radius:2px;
+  background:linear-gradient(90deg,var(--dimmer) calc(var(--l,0) * 100%),var(--ridge) 0)}
+/* #155: der Trash-Kopf nicht groesser als der Ortskopf. */
+.kampfwahl .trashhead{font-size:var(--fs-xs)}
 .kampfwahl .fight .kd{grid-column:3;grid-row:1 / span 2;display:flex;align-items:center;gap:6px;
   font-family:var(--display);font-size:var(--fs-sm);color:var(--ink-soft);white-space:nowrap}
 .kampfwahl .fight .best{width:5px;height:5px;border-radius:50%;flex:none;background:var(--gold-ink)}
@@ -6375,19 +6628,25 @@ body:not(.compact) .stage > :is(#app,#weeklies){max-width:1680px;margin-inline:a
 /* Reiter je Charakter: eine Mulde wie Ich | Gruppe, der gewaehlte in der Farbe der Auswahl, je ein kleiner Ring;
    rechts davon Umbenennen, Anpassen und Loesen */
 .wkleiste{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;margin:0 0 12px}
-.wkreiter{display:flex;flex-wrap:wrap;gap:3px;min-width:0;max-width:100%;padding:3px;box-sizing:border-box;border-radius:var(--r-control);background:var(--well)}
-.wkreiter [role="tab"]{display:inline-flex;align-items:center;gap:8px;min-width:0;max-width:100%;height:32px;padding:0 12px 0 9px;border:0;border-radius:4px;
-  background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-sm);cursor:pointer;transition:background .14s ease,color .14s ease}
-.wkreiter [role="tab"]:hover{background:var(--tint-hover-soft);color:var(--text)}
-.wkreiter [role="tab"][aria-selected="true"]{background:var(--surf-on);color:var(--lite-ink);box-shadow:inset 0 -2px 0 var(--pick)}
-:root[data-theme="tnl"] .wkreiter [role="tab"][aria-selected="true"]{color:var(--ink-hi)}
-.wkreiter [role="tab"]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
-.wkrname{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.wkfort{flex:none;font-size:var(--fs-xs);color:var(--dim)}
-.wkfort b{font-weight:500;color:inherit}
-.wkreiter [aria-selected="true"] .wkfort{color:inherit}
-.wkreiter [aria-selected="true"] .wkfort b,.wkreiter .fertig .wkfort{color:var(--gold-ink)}
-.wkreiter [aria-selected="true"] .wkfort b{font-weight:600}
+.wkkarten{display:grid;grid-template-columns:repeat(auto-fill,minmax(210px,1fr));gap:8px;margin:0 0 10px}
+.wkkarte{display:grid;grid-template-columns:auto minmax(0,1fr);align-items:center;gap:2px 11px;min-width:0;padding:9px 12px;border:0;border-radius:var(--r-surface);
+  background:var(--comb);color:var(--text);text-align:left;font:inherit;cursor:pointer;box-shadow:inset 0 0 0 1px var(--hair-rule);transition:background .2s ease,box-shadow .2s ease}
+.wkkarte:hover{background:var(--comb2)}
+.wkkarte[aria-selected="true"]{background:var(--surf-on);box-shadow:inset 0 0 0 1px var(--pick),var(--edge-lit)}
+.wkkarte:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wkscheibe{grid-row:1/3;position:relative;width:44px;height:44px;display:grid;place-items:center}
+.wkscheibe .wkring{position:absolute;inset:0}
+.wkscheibe b{font:400 var(--fs-md)/1 var(--display);color:var(--text)}
+.wkhk{width:20px;height:20px;flex:none;fill:none;stroke:var(--gold-ink);stroke-width:2.4;stroke-linecap:round;stroke-linejoin:round}
+.wkscheibe .wkhk{position:absolute;inset:0;margin:auto}
+.wkkname{min-width:0;align-self:end;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-size:var(--fs-base)}
+.wkkstand2{min-width:0;align-self:start;font-size:var(--fs-xs);line-height:1.35;color:var(--dim)}
+.wkkarte.fertig:not([aria-selected="true"]) .wkkstand2{color:var(--gold-ink)}
+.wkkarte[aria-selected="true"] .wkkstand2{color:var(--ink-soft)}
+:root[data-theme="tnl"] .wkkarte[aria-selected="true"] .wkkstand2{color:var(--ink-hi)}
+.wknur{display:inline-flex;align-items:center;gap:8px;height:var(--ctl-h-sm);padding:0 4px;color:var(--dim);font-size:var(--fs-sm);cursor:pointer}
+.wknur input{margin:0;accent-color:var(--gold-ink);cursor:pointer}
+.wknur input:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 /* der Satz bei sechs (Pruefung W3, W1: eigene Klasse, nicht die des Knopfs "voll") */
 .wksechs{margin:0;max-width:60ch;color:var(--dim);font-size:var(--fs-sm)}
 .wkform{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 10px;max-width:560px;margin:0 0 12px}
@@ -6484,9 +6743,6 @@ body:not(.compact) .stage > :is(#app,#weeklies){max-width:1680px;margin-inline:a
 .wkhaken:hover .wkname{text-decoration:underline;text-decoration-color:var(--ridge);text-underline-offset:3px}
 .wkpunkt input[type=checkbox]{flex:none;width:18px;height:18px;margin:0 4px 0 0;accent-color:var(--gold-ink);cursor:pointer}
 .wkpunkt input[type=checkbox]:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-button.wkname{flex:1 1 auto;padding:0;border:0;background:none;font:inherit;text-align:left;cursor:pointer}
-button.wkname:disabled{cursor:default}
-button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-color:var(--ridge);text-underline-offset:3px}
 .wkpunkt.fertig .wkname{color:var(--dim)}
 .wktag{flex:none;padding:1px 6px;border-radius:var(--r-control);background:var(--well);color:var(--ink-soft);font-size:var(--fs-xs);line-height:1.3}
 .wkzahl{display:inline-flex;align-items:center;gap:4px;flex:none;margin-left:auto}
@@ -6585,7 +6841,67 @@ button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-col
 .wkausliste li{display:flex;align-items:center;gap:10px;min-height:32px;padding:3px 10px;border-radius:var(--r-control);background:var(--well);font-size:var(--fs-sm)}
 .wkausname{flex:1 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .wkhinweis{margin:6px 0 0;color:var(--dim);font-size:var(--fs-xs)}
-@media (prefers-reduced-motion:reduce){.wkreiter [role="tab"],.wkfeld,.wkring .rf,.wkzelle,.wkhaekchen{transition:none}}
+/* ist der Raid zu, steht er nur als Kopfzeile ueber die volle Breite und die anderen Kacheln ruecken nach (statt einer leeren Flaeche neben ihnen) */
+@container wk (min-width:1000px){
+  .wkwaben.raidzu{grid-template-areas:"band band band" "raid raid raid" "geheimdungeon events dimension" "haendler haendler haendler"}
+}
+@container wk (min-width:1400px){
+  .wkwaben.raidzu{grid-template-areas:"band band band band" "raid raid raid raid" "geheimdungeon events dimension dimension" "haendler haendler haendler haendler"}
+}
+/* Kopf eines Bereichs: ein Knopf (klappt auf und zu), Name, Ring und Stand, Pfeil (Spezifikation Weeklies neu, 3.5) */
+.wkkkopf h3{flex:1 1 auto}
+.wkbk{display:flex;align-items:center;gap:10px;width:100%;min-height:30px;margin:0;padding:0;border:0;border-radius:var(--r-control);background:none;color:inherit;font:inherit;text-align:left;cursor:pointer}
+.wkbk:hover .wkbname{text-decoration:underline;text-decoration-color:var(--ridge);text-underline-offset:3px}
+.wkbk:focus-visible{outline:2px solid var(--focus);outline-offset:3px}
+.wkbname{flex:1 1 auto;min-width:0;font:400 var(--fs-md)/1.25 var(--display);color:var(--text)}
+.wkbk .wkkstand{margin-left:0}
+.wkpfeil{width:14px;height:14px;flex:none;fill:none;stroke:var(--dim);stroke-width:2;stroke-linecap:round;stroke-linejoin:round;transition:transform .2s ease}
+.wkgruppe:not(.zu) .wkpfeil{transform:rotate(90deg)}
+.wkgruppe.zu .wkkkopf{margin-bottom:0}
+.wkbody[hidden]{display:none}
+/* der Stand eines Zaehlers: ein Feld zum Eintippen, daneben "/Menge"; unter grossen Zaehlern ein Balken nach Menge */
+.wkzahl .wkstand{width:44px;min-width:0;height:26px;padding:0 4px;box-sizing:border-box;border:0;text-align:right;font:inherit;font-size:var(--fs-sm);font-variant-numeric:tabular-nums}
+.wkvon{min-width:3ch;margin:0 4px 0 1px;font-size:var(--fs-xs);color:var(--dim)}
+.wkzehn{padding:0 6px;font-size:var(--fs-xs)}
+.wkpunkt{position:relative}
+.wkbalken{position:absolute;left:0;right:0;bottom:0;height:3px;overflow:hidden;border-radius:2px;background:var(--ridge)}
+.wkbalken i{display:block;height:100%;background:var(--gold-ink);transition:width .25s cubic-bezier(.16,1,.3,1)}
+:root[data-theme="light"] .wkbalken{background:var(--hair-rule-strong)}
+/* Letzte Woche: eine leise Zeile unter dem Band, bis in der neuen Woche etwas gesetzt ist (123) */
+.wkletzte{margin:8px 0 0;font-size:var(--fs-xs);color:var(--dim)}
+.wkletzte b{font-weight:500;color:var(--ink-soft)}
+@container wk (max-width:640px){ .wkkarten{grid-template-columns:repeat(2,minmax(0,1fr))} .wkzehn{display:none} }
+@container wk (max-width:420px){ .wkkarten{grid-template-columns:minmax(0,1fr)} }
+/* Erinnerungen (Spezifikation Weeklies neu, 3.6): die Glocke im Kopf und der Dialog darueber */
+.wkglocke{display:inline-flex;align-items:center;gap:7px}
+.wkglocke svg{width:15px;height:15px;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.wkgz{min-width:18px;height:18px;padding:0 5px;box-sizing:border-box;display:inline-grid;place-items:center;border-radius:9px;background:var(--surf-on);box-shadow:inset 0 0 0 1px var(--pick);
+  color:var(--gold-ink);font-size:var(--fs-xs)}
+.wkschein{position:fixed;inset:0;z-index:60;display:grid;place-items:start center;padding:56px 12px 12px;overflow:auto;background:var(--scrim)}
+.wkschein[hidden]{display:none}
+.wkdlg{width:min(680px,100%);box-sizing:border-box;padding:16px 18px 18px;border-radius:var(--r-hero);background:var(--surf-menu);box-shadow:inset 0 0 0 1px var(--hair-rule-strong),var(--cast-lifted)}
+.wkdlg h3{margin:0 0 4px;font:400 var(--fs-lg)/1.2 var(--display);color:var(--text)}
+.wkdlg h3::before{display:none}
+.wkdlg > .wksatz{margin:0 0 10px}
+.wkehrlich{margin:0 0 12px;padding:9px 12px;border-radius:var(--r-control);background:var(--well);box-shadow:inset 0 0 0 1px var(--hair-rule-strong);font-size:var(--fs-sm);color:var(--text);max-width:62ch}
+.wkehrlich b{font-weight:500;color:var(--text)}
+.wkehrlich ul{margin:4px 0 0;padding-left:18px;color:var(--ink-soft);font-size:var(--fs-xs)}
+.wkerin{display:grid;gap:8px;margin:0 0 8px;padding:10px 12px;border-radius:var(--r-surface);background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+.wkerin.aus{opacity:.7}
+.wkerin .z1{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px}
+.wkerin .tage{display:flex;flex-wrap:wrap;gap:3px}
+.wkerin .tage button{height:28px;min-width:34px;padding:0 6px;border:0;border-radius:var(--r-control);background:var(--well);color:var(--dim);font:inherit;font-size:var(--fs-xs);cursor:pointer}
+.wkerin .tage button[aria-pressed="true"]{background:var(--surf-on);color:var(--gold-ink);box-shadow:inset 0 -2px 0 var(--pick)}
+.wkerin .tage button:focus-visible,.wkerin input:focus-visible,.wkdlg .esw:focus-visible .esw-t{outline:2px solid var(--focus);outline-offset:2px}
+.wkerin input[type=time],.wkerin input[type=text]{height:28px;box-sizing:border-box;border:0;border-radius:var(--r-control);padding:0 8px;background:var(--field-bg);box-shadow:inset 0 0 0 1px var(--hair-rule-strong);color:var(--text);font:inherit;font-size:var(--fs-sm)}
+.wkerin input[type=text]{flex:1 1 220px;min-width:0}
+.wkerin .vor{font-size:var(--fs-xs);color:var(--dim)}
+.wkerinlos{margin-left:auto}
+.wkdfuss{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:center;gap:8px;margin-top:10px}
+@media (max-width:640px){ .wkschein{padding-top:24px} }
+.wkerin input[type=time]{color-scheme:dark}
+:root[data-theme="light"] .wkerin input[type=time]{color-scheme:light}
+@media (prefers-reduced-motion:reduce){.wkkarte,.wkfeld,.wkring .rf,.wkzelle,.wkhaekchen,.wkpfeil,.wkbalken i{transition:none}}
 /* schmal: der Kopf in zwei Zeilen, die Reset-Anzeige links */
 :where(html.w-max-640) .wkreset{align-items:flex-start;margin-left:0;text-align:left}
 :where(html.w-max-640) .wkinhalt{padding-inline:14px}
@@ -6688,6 +7004,7 @@ button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-col
 .rkmed .mtop img{width:18px;height:18px;border-radius:50%;flex:none;box-shadow:0 0 0 1px var(--icon-ring)}
 .rkmed .mtop b{font:400 var(--fs-sm)/1.2 var(--display);color:var(--gold-ink);font-variant-numeric:tabular-nums}
 .rkmed .mtop.offen{font-size:var(--fs-xs);color:var(--dim)}
+.rkmed .mdps.offen{font-size:var(--fs-xs);color:var(--dim)}
 .rkmed .mskill{max-width:100%;font-size:var(--fs-xs);color:var(--ink-soft);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .rkmed .merst{margin-top:6px;font-size:var(--fs-xs);color:var(--dim);white-space:nowrap}
 /* noch nie bekaempft: ein leerer, gedaempfter Umriss mit Namen */
@@ -6696,6 +7013,17 @@ button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-col
 .rkmed.leer .bild{width:56px;height:56px;background:none;box-shadow:none;border:1.5px dashed var(--dimmer);opacity:.6;box-sizing:border-box}
 .rkmed.leer .mname{margin-top:8px;color:var(--dim);font-weight:500}
 .rkmed.leer .munter{color:var(--dimmer)}
+/* Medaillon als Knopf (Bester Pull 5.3): ohne eigenes Aussehen, Raster und
+   Abstaende bleiben die des Listenpunkts. Die ganze Flaeche nimmt den Klick
+   (::before ueber dem Medaillon, aber unter seinem Inhalt: isolation haelt
+   z-index -1 ueber dem Hintergrund des Listenpunkts, und der title von
+   "ab" bleibt mit der Maus erreichbar); dort liegt auch der Fokusring. */
+.rkmed:has(> .rkknopf){position:relative;isolation:isolate}
+.rkknopf{display:flex;flex-direction:column;align-items:center;width:100%;min-width:0;margin:0;padding:0;border:0;border-radius:inherit;
+  background:none;font:inherit;color:inherit;text-align:inherit;cursor:pointer}
+.rkknopf::before{content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit}
+.rkknopf:focus-visible{outline:none}
+.rkknopf:focus-visible::before{outline:2px solid var(--focus);outline-offset:2px}
 @media (prefers-reduced-motion:reduce){.rkinhalt.auf .rkblock .rkmed{animation:none}.rkspur i{transition:none}}
 
 :where(html.w-max-1099) .rkreihe{grid-template-columns:minmax(0,1fr)}
@@ -6716,6 +7044,228 @@ button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-col
 :where(html.w-max-640) .rkmed.leer .mname{margin:0;-webkit-line-clamp:1}
 :where(html.w-max-640) .rkmed.leer .munter{display:none}
 
+/* ----- Gilde (Spezifikation Gilde 5, Entwurf 2 vom 06.10.2026: docs/entwurf/gilde/entwurf.html) -----
+   68-gilde.ts. Die Flaeche ist die der Weeklies (die Klasse weeklies traegt
+   Kopf, Statuszeile, Rollen und Reiter); hier nur, was die Gilde dazu
+   braucht: der naechste Termin rechts im Kopf, der Datenschutz-Satz mit dem
+   Schloss, Suche und Rollenfilter ueber allen drei Reitern, die Mitglieder
+   als Kacheln in Rollenspalten wie die Aufstellung eines Raids (eine Spalte
+   unter 1000 Punkt Inhalt, sonst nebeneinander, --n Spalten) und das Feld
+   zum Bearbeiten mit den runden Waffenknoepfen. Gold nur auf Auswahl und
+   Fokus; kein Rot, kein Gruen. */
+body:not(.compact) .stage > #gilde{max-width:1680px;margin-inline:auto;width:100%}
+.gl-gname{font:400 var(--fs-base)/1.2 var(--serif);color:var(--ink-soft);overflow-wrap:anywhere;min-width:0}
+.gl-naechster{margin:0 0 0 auto;display:flex;flex-direction:column;align-items:flex-end;gap:1px;font-size:var(--fs-xs);line-height:1.35;color:var(--ink-soft);text-align:right}
+.gl-naechster:empty{display:none}
+.gl-naechster b{font-weight:500;color:var(--text)}
+.gl svg.i{width:16px;height:16px;flex:none;fill:none;stroke:currentColor;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
+.gl-hinweis{display:flex;gap:7px;margin:0 0 12px;max-width:70ch;font-size:var(--fs-xs);line-height:1.45;color:var(--dim)}
+.gl-hinweis svg{margin-top:1px}
+.gl-hinweis code{font-family:var(--mono);color:var(--ink-soft);overflow-wrap:anywhere}
+.gl-name{font-family:var(--serif);font-size:var(--fs-lg);line-height:1.15;color:var(--text);overflow-wrap:anywhere}
+.gl .wkreiter[hidden],.gl-filter[hidden]{display:none}
+
+/* Waffenpaar: zwei runde Marken, die zweite ueberlappt; ohne Paar zwei leere Platten */
+.gl .wic{width:32px;height:32px;margin:0;border-radius:50%;vertical-align:0}
+.gl-paar{display:inline-flex;flex:none;align-items:center;min-width:56px}
+.gl-paar .wic+.wic{margin-left:-9px}
+.gl-paar.leer .wic{background-image:none;background-color:var(--well);box-shadow:inset 0 0 0 1px var(--hair-rule-strong)}
+.gl-txt{display:flex;flex-direction:column;gap:2px;min-width:0}
+.gl-klasse{display:inline-flex;align-items:center;gap:5px;font-size:var(--fs-xs);color:var(--ink-soft)}
+.gl-klasse svg{width:13px;height:13px}
+.gl-note{font-size:var(--fs-xs);color:var(--dim);overflow-wrap:anywhere}
+
+/* Rollenspalten */
+.gl-spalten{display:grid;gap:1px;background:var(--hair-rule);box-shadow:0 0 0 1px var(--hair-rule);grid-template-columns:minmax(0,1fr)}
+/* breit nebeneinander; die Breiten setzt 68 (--spalten): Schaden doppelt, weil dort die meisten stehen (Entscheidung 07.10.2026) */
+@container wk (min-width:1000px){.gl-spalten{grid-template-columns:var(--spalten,repeat(3,minmax(0,1fr)))}}
+.gl-spalte{min-width:0;padding:12px 14px 14px;background:var(--comb)}
+.gl-spalte h3{display:flex;align-items:center;gap:7px;margin:0 0 10px;font:400 var(--fs-sm)/1.3 var(--display);letter-spacing:.04em;color:var(--ink-soft)}
+.gl-spalte h3::before{display:none}
+.gl-spalte h3 em{margin-left:auto;font:400 var(--fs-xs)/1 var(--sans);font-style:normal;letter-spacing:0;color:var(--dim);font-variant-numeric:tabular-nums}
+/* kleine Kacheln: zwei je Reihe in einer Spalte, in der doppelt breiten Schaden-Spalte vier; 50 Mitglieder passen auf eine Seite */
+.gl-kacheln{list-style:none;margin:0;padding:0;display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,160px),1fr))}
+.gl-kacheln > li{display:flex;min-width:0}
+.gl-kachel{position:relative;display:flex;flex:1 1 auto;align-items:center;min-width:0;box-sizing:border-box;margin:0;padding:8px 10px;border:0;border-radius:var(--r-surface);
+  background:var(--pitch);box-shadow:inset 0 0 0 1px var(--hair-rule);color:inherit;font:inherit;text-align:left;cursor:pointer}
+.gl-kachel:hover{background:var(--tint-hover-soft)}
+.gl-kachel.sel{box-shadow:inset 0 0 0 1px var(--pick)}
+.gl-kachel:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
+.gl-kachel .gl-name{font-size:var(--fs-base)}
+.gl-kopf{display:flex;align-items:center;gap:10px;min-width:0}
+
+/* Kopf eines Reiters, Fuss, Meldung mit Rueckgaengig */
+.gl-akopf{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 10px}
+.gl-akopf h3{margin:0;flex:1 1 auto;font:400 var(--fs-lg)/1.25 var(--display);color:var(--text)}
+.gl-akopf h3::before{display:none}
+.gl-hilfe{flex-basis:100%;margin:-4px 0 0;font-size:var(--fs-xs);color:var(--dim);text-align:right}
+.gl-fuss{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:10px 0 0;font-size:var(--fs-xs);color:var(--dim)}
+.gl-meldung{display:flex;flex-wrap:wrap;align-items:center;gap:6px 12px;margin:0 0 10px;padding:6px 10px;border-radius:var(--r-control);
+  background:var(--well);font-size:var(--fs-sm);color:var(--text)}
+
+/* Bearbeiten: Name und Notiz links, die Waffenwahl rechts; darunter Klasse und Rolle oder das Rollenfeld */
+.gl-edit{margin:12px 0 0;padding:14px;background:var(--comb);box-shadow:0 0 0 1px var(--hair-rule)}
+.gl-edit h3{margin:0 0 10px;font:400 var(--fs-sm)/1.3 var(--display);letter-spacing:.04em;color:var(--ink-soft);overflow-wrap:anywhere}
+.gl-edit h3::before{display:none}
+.gl-eform{display:grid;gap:10px 14px;grid-template-columns:minmax(0,1fr)}
+@container wk (min-width:760px){.gl-eform{grid-template-columns:minmax(0,260px) minmax(0,1fr)}}
+.gl-waffen{display:grid;gap:10px;align-content:start;min-width:0}
+.gl-wahlreihe{display:flex;flex-direction:column;gap:5px;min-width:0}
+.gl-wahlreihe>span{font-size:var(--fs-xs);color:var(--dim)}
+.gl-wb{display:flex;flex-wrap:wrap;gap:6px}
+.gl-wb button{display:grid;place-items:center;width:44px;height:44px;padding:0;border:0;border-radius:50%;background:var(--well);cursor:pointer}
+.gl-wb button .wic{width:34px;height:34px}
+.gl-wb button:hover:not(:disabled){background:var(--tint-hover-soft)}
+.gl-wb button[aria-pressed="true"]{background:var(--surf-on);box-shadow:inset 0 0 0 2px var(--pick)}
+.gl-wb button:disabled{opacity:.32;cursor:default}
+.gl-wb button:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.gl-ergebnis{display:flex;flex-wrap:wrap;align-items:center;gap:4px 10px;margin:0;padding:8px 10px;border-radius:var(--r-control);background:var(--well);font-size:var(--fs-sm)}
+.gl-ergebnis b{font-weight:500}
+.gl-edit .field input,.gl-edit .field select{box-sizing:border-box;width:100%}
+.gl-edit #gildeEName{font-family:var(--serif)}
+.gl-eaus{display:flex;flex-wrap:wrap;gap:8px;margin:12px 0 0}
+
+/* Aus der Gruppe uebernehmen: je Name ein Haken */
+.gl-namen{list-style:none;margin:0 0 4px;padding:0;display:grid;gap:2px 14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,220px),1fr))}
+.gl-namen label{display:flex;align-items:center;gap:8px;min-height:32px;font-family:var(--serif);font-size:var(--fs-base);color:var(--text);cursor:pointer;overflow-wrap:anywhere}
+.gl-namen input{flex:none;margin:0}
+
+/* Suche und Rollenfilter ueber allen drei Reitern */
+.gl-filter{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 14px;margin:0 0 12px}
+.gl-suche{flex:1 1 220px;max-width:340px}
+.gl-suche input{box-sizing:border-box;width:100%}
+.gl-chips{display:inline-flex;gap:2px;padding:2px;border-radius:var(--r-control);background:var(--well)}
+.gl-chips [role="radio"]{display:inline-flex;align-items:center;gap:6px;height:32px;padding:0 11px;border:0;border-radius:4px;background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-sm);cursor:pointer;white-space:nowrap}
+.gl-chips [role="radio"]:hover{background:var(--tint-hover-soft);color:var(--text)}
+.gl-chips [role="radio"][aria-checked="true"]{background:var(--surf-on);color:var(--lite-ink);box-shadow:inset 0 -2px 0 var(--pick)}
+:root[data-theme="tnl"] .gl-chips [role="radio"][aria-checked="true"]{color:var(--ink-hi)}
+.gl-chips [role="radio"]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.gl-chips svg{width:14px;height:14px}
+.gl-chips em{font-style:normal;font-size:var(--fs-xs);font-variant-numeric:tabular-nums;opacity:.75}
+.gl-treffer{margin:0 0 6px;font-size:var(--fs-xs);color:var(--dim)}
+.gl-leer{margin:0;padding:18px 4px;font-size:var(--fs-sm);color:var(--ink-soft)}
+/* schmal (unter 640 Punkt, wie ueberall in der App ueber html.w-max-640) */
+:where(html.w-max-640) .gl-chips{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));width:100%}
+:where(html.w-max-640) .gl-chips [role="radio"]{justify-content:center;padding:0 4px;min-width:0}
+:where(html.w-max-640) .gl-suche{max-width:none}
+:where(html.w-max-640) .gl .wkinhalt{padding:12px 16px 24px}
+:where(html.w-max-640) .gl-naechster{align-items:flex-start;text-align:left;margin-left:0}
+:where(html.w-max-640) .gl-hilfe{text-align:left}
+:where(html.w-max-640) .gl-wb button{width:46px;height:46px}
+
+/* Termine (Plan Aufgabe 6): links die Reihen mit ihren Terminen, eine schmale Liste (nie gestreckt), rechts die
+   Anwesenheit des gewaehlten Termins in denselben Rollenspalten wie die Mitglieder; unter 1000 Punkt untereinander */
+.gl-termine{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+@container wk (min-width:1000px){.gl-termine{grid-template-columns:300px minmax(0,1fr);align-items:start}}
+.gl-tseite{min-width:0}
+.gl-agenda{min-width:0;padding:12px 12px 14px;background:var(--comb);box-shadow:0 0 0 1px var(--hair-rule)}
+.gl-agenda h3{margin:0 0 6px;font:400 var(--fs-sm)/1.3 var(--display);letter-spacing:.04em;color:var(--ink-soft)}
+.gl-agenda h3::before{display:none}
+.gl-agenda .gl-leer{padding:8px 0}
+.gl-reihe + .gl-reihe{margin-top:14px}
+.gl-reihenkopf{display:flex;flex-wrap:wrap;align-items:center;gap:2px 8px;margin:0 0 4px;font-size:var(--fs-sm);color:var(--text)}
+.gl-reihenkopf b{font-weight:500;overflow-wrap:anywhere;min-width:0}
+.gl-reihenkopf small{color:var(--dim);font-size:var(--fs-xs)}
+.gl-reihenkopf .btn{margin-left:auto}
+.gl-liste{list-style:none;margin:0;padding:0;display:grid;gap:2px}
+.gl-term{display:grid;grid-template-columns:40px minmax(0,1fr) auto;align-items:center;gap:10px;width:100%;min-height:44px;box-sizing:border-box;padding:4px 8px;
+  border:0;border-radius:6px;background:transparent;color:var(--text);font:inherit;font-size:var(--fs-sm);text-align:left;cursor:pointer}
+.gl-term:hover{background:var(--tint-hover-soft)}
+.gl-term[aria-current="true"]{background:var(--surf-on);color:var(--lite-ink);box-shadow:inset 0 -2px 0 var(--pick)}
+:root[data-theme="tnl"] .gl-term[aria-current="true"]{color:var(--ink-hi)}
+.gl-term:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.gl-chip{display:flex;flex-direction:column;align-items:center;justify-content:center;width:40px;height:38px;border-radius:6px;background:var(--well);line-height:1}
+.gl-chip b{font:400 var(--fs-lg)/1 var(--display);font-variant-numeric:tabular-nums}
+.gl-chip small{margin-top:3px;font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.gl-term[aria-current="true"] .gl-chip{background:rgba(0,0,0,.14)}
+.gl-term[aria-current="true"] :is(.gl-chip small,.stand,.gl-tnote){color:inherit}
+.gl-term .wann{display:flex;flex-direction:column;gap:1px;min-width:0}
+.gl-tnote{font-size:var(--fs-xs);color:var(--dim)}
+.gl-term .stand{font-size:var(--fs-xs);color:var(--dim);white-space:nowrap;text-align:right}
+.gl-term.aus .wann{text-decoration:line-through;text-decoration-thickness:1px}
+.gl-wann{flex-basis:100%;margin:-4px 0 0;font-size:var(--fs-xs);color:var(--dim)}
+.gl-summe{display:flex;flex-wrap:wrap;gap:4px 14px;margin:0 0 10px;padding:0;list-style:none;font-size:var(--fs-xs);color:var(--ink-soft)}
+.gl-summe b{font-weight:600;color:var(--text);font-variant-numeric:tabular-nums}
+
+/* Anwesenheit: die Kachel wie bei den Mitgliedern (Paar, Name, Klasse), darunter die drei Marken als Radiogruppe.
+   Gewaehlt ist nie nur Farbe: die Plakette oben rechts traegt das Symbol, "da" rahmt die Kachel in --pick.
+   Schmale Kacheln zeigen nur das Symbol (Wort in aria-label und title). Kein Rot, kein Gruen. */
+.gl-kacheln.anw{grid-template-columns:repeat(auto-fill,minmax(min(100%,190px),1fr))}
+.gl-anw{container:glanw/inline-size;position:relative;display:flex;flex:1 1 auto;flex-direction:column;gap:6px;min-width:0;box-sizing:border-box;padding:7px 8px 8px 10px;
+  border-radius:var(--r-surface);background:var(--pitch);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+.gl-anw .gl-name{font-size:var(--fs-base)}
+.gl-anw .gl-kopf{gap:8px}
+/* die Plakette sitzt unten rechts am Waffenpaar, wie ein Zeichen am Bild: der Name behaelt seine Breite */
+.gl-pp{position:relative;display:inline-flex;flex:none}
+.gl-plakette{position:absolute;right:-5px;bottom:-5px;display:none;width:18px;height:18px;border-radius:50%;place-items:center;
+  background:var(--well-deep);color:var(--ink-soft);box-shadow:inset 0 0 0 1px var(--hair-rule-strong),0 0 0 2px var(--pitch)}
+.gl .gl-plakette svg{width:11px;height:11px;stroke-width:2.2}
+.gl-anw:not([data-m=""]) .gl-plakette{display:grid}
+.gl-anw[data-m="da"]{box-shadow:inset 0 0 0 1px var(--pick)}
+.gl-anw[data-m="da"] .gl-plakette{background:var(--pick);color:var(--acc-ink,#1b1612);box-shadow:0 0 0 2px var(--pitch)}
+.gl-anw:is([data-m="fehlt"],[data-m="entschuldigt"]) .gl-kopf{opacity:.62}
+.gl-marken{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:2px;padding:2px;border-radius:var(--r-control);background:var(--well)}
+.gl-marken [role="radio"]{display:inline-flex;align-items:center;justify-content:center;gap:5px;min-width:0;height:28px;padding:0 4px;border:0;border-radius:4px;
+  background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-xs);cursor:pointer;white-space:nowrap;overflow:hidden}
+.gl-marken [role="radio"]:hover{background:var(--tint-hover-soft);color:var(--text)}
+.gl-marken [role="radio"][aria-checked="true"]{background:var(--surf-on);color:var(--lite-ink);box-shadow:inset 0 0 0 1px var(--pick)}
+:root[data-theme="tnl"] .gl-marken [role="radio"][aria-checked="true"]{color:var(--ink-hi)}
+.gl-marken [role="radio"]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.gl .gl-marken svg{width:14px;height:14px}
+@container glanw (max-width:279px){.gl-marken .wort{display:none}}
+
+/* Reihe anlegen oder aendern, Termin verschieben: im Stil des Felds Bearbeiten */
+.gl-rform{display:grid;gap:10px 14px;grid-template-columns:repeat(auto-fill,minmax(min(100%,200px),1fr));align-items:start}
+.gl-rform .field input,.gl-rform .field select{box-sizing:border-box;width:100%}
+.gl-rform .gl-note{margin:2px 0 0}
+.gl-tage{display:flex;flex-wrap:wrap;gap:2px;padding:2px;border-radius:var(--r-control);background:var(--well);width:max-content;max-width:100%}
+.gl-tage button{min-width:38px;height:32px;padding:0 6px;border:0;border-radius:4px;background:transparent;color:var(--dim);font:inherit;font-size:var(--fs-sm);cursor:pointer}
+.gl-tage button:hover{background:var(--tint-hover-soft);color:var(--text)}
+.gl-tage button[aria-pressed="true"]{background:var(--surf-on);color:var(--lite-ink);box-shadow:inset 0 -2px 0 var(--pick)}
+:root[data-theme="tnl"] .gl-tage button[aria-pressed="true"]{color:var(--ink-hi)}
+.gl-tage button:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+.gl-tagwahl{display:flex;flex-direction:column;gap:5px;grid-column:1/-1}
+.gl-tagwahl>span{font-size:var(--fs-xs);color:var(--dim)}
+.gl-fehler{margin:10px 0 0;font-size:var(--fs-sm);color:var(--text)}
+.gl-fehler:empty{display:none}
+.gl-vform{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 12px}
+.gl-vform .field{min-width:140px}
+
+/* Auswertung (Plan Aufgabe 7, Entwurf 2): eine Karte je Mitglied mit dem Ring der Quote, rechts das Bild zum Kopieren.
+   Entscheidung 07.10.2026: 50 Karten passen bei 2000 x 1480 ohne grosses Rollen - Karten im Raster, mindestens vier je Zeile,
+   darum knapp (Ring 44, Waffen 26). Kein Urteil: der Ring ist fuer alle gleich (--gold-ink auf --ridge wie die Weeklies),
+   keine Farbe, Medaille oder Rangzeichen haengt an der Quote. */
+.gl-wahl{display:flex;flex-wrap:wrap;align-items:flex-end;gap:8px 14px;margin:0 0 12px}
+.gl-wahl .field{min-width:160px}
+.gl-wahl select{box-sizing:border-box;width:100%}
+.gl-ausgabe{display:flex;flex-wrap:wrap;justify-content:flex-end;gap:6px 8px;margin-left:auto}
+.gl-ausgabe p{flex-basis:100%;margin:0;font-size:var(--fs-xs);color:var(--dim);text-align:right}
+.gl-ausw{display:grid;gap:12px;grid-template-columns:minmax(0,1fr)}
+@container wk (min-width:1200px){.gl-ausw{grid-template-columns:minmax(0,1fr) 330px;align-items:start}}
+.gl-aliste{min-width:0}
+.gl-karten{list-style:none;margin:0;padding:0;display:grid;gap:6px;grid-template-columns:repeat(auto-fill,minmax(min(100%,230px),1fr))}
+.gl-karte{min-width:0;padding:8px 10px;border-radius:var(--r-surface);background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+.gl-karte > div{display:grid;grid-template-columns:auto minmax(0,1fr);gap:0 10px;align-items:center}
+.gl-ring{position:relative;display:grid;place-items:center;width:44px;height:44px}
+.gl-ring .wkring{position:absolute;inset:0}
+.gl-ring b{position:relative;display:flex;flex-direction:column;align-items:center;font:400 var(--fs-sm)/1 var(--display);font-variant-numeric:tabular-nums;color:var(--text);white-space:nowrap}
+/* das Prozentzeichen steht unter der Zahl: "100 %" passt sonst nicht in den Ring */
+.gl-ring b small{font:400 11px/1 var(--sans);color:var(--dim)}
+.gl-karte .gl-kopf{gap:8px}
+.gl-karte .wic{width:26px;height:26px}
+.gl-karte .gl-paar{min-width:44px}
+.gl-karte .gl-paar .wic+.wic{margin-left:-8px}
+.gl-karte .gl-name{font-size:var(--fs-base)}
+.gl-karte .gl-txt{gap:0}
+.gl-zahlen{grid-column:1/-1;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:0 8px;margin:4px 0 0;padding:4px 0 0;box-shadow:inset 0 1px 0 var(--hair-rule)}
+.gl-zahlen div{display:flex;flex-direction:column;min-width:0}
+.gl-zahlen dt{font-size:11px;line-height:1.2;letter-spacing:.06em;text-transform:uppercase;color:var(--dim)}
+.gl-zahlen dd{margin:0;font-size:var(--fs-sm);line-height:1.3;font-variant-numeric:tabular-nums;color:var(--text);overflow-wrap:anywhere}
+.gl-bild{min-width:0;padding:12px;background:var(--comb);box-shadow:0 0 0 1px var(--hair-rule)}
+.gl-bild h3{margin:0 0 8px;font:400 var(--fs-sm)/1.3 var(--display);letter-spacing:.04em;color:var(--ink-soft)}
+.gl-bild h3::before{display:none}
+.gl-bild canvas{display:block;width:100%;max-width:560px;height:auto;border-radius:var(--r-surface);box-shadow:0 0 0 1px var(--hair-rule-strong)}
+
 /* ----- Statusleiste (0.23, 0.24) ----- */
 .statusleiste{gap:18px;background:var(--pitch);font-size:var(--fs-xs);box-shadow:inset 0 1px 0 var(--hair-rule)}
 .sbrolle{display:inline-flex;align-items:center;gap:6px;flex:none}
@@ -6727,8 +7277,9 @@ button.wkname:hover:not(:disabled){text-decoration:underline;text-decoration-col
 /* Wenig Hoehe (unter 640 Layoutpunkten, etwa 200 %): The Hive tritt zurueck,
    die Fugen gehen, die Knoepfe duerfen bis 26 Punkt flach werden (13 x 26
    passt auch bei 200 % und 860 Punkt Fensterhoehe, 13 x 28 nicht) - so
-   passen auch die dreizehn Knoepfe des Entwicklermodus (seit den Rekorden,
-   Spezifikation Rekorde 2a), und das Zahnrad bleibt ohne Rollen erreichbar. */
+   passen auch die dreizehn Knoepfe des Entwicklermodus (seit den Rekorden;
+   zwoelf ohne Builds, #207, und wieder dreizehn mit der Gilde,
+   Spezifikation Gilde 5), und das Zahnrad bleibt ohne Rollen erreichbar. */
 :where(html.h-max-640) .bereiche{gap:0}
 :where(html.h-max-640) .bereiche .hive{display:none}
 :where(html.h-max-640) .bereiche .tab{height:clamp(26px, calc((var(--winh,100vh) - var(--chrome) - var(--sb-h,0px) - 16px) / 13), 44px)}
@@ -6873,13 +7424,11 @@ body.felder #cmpOut > .vsatz{padding-right:max(22px, calc(100% - 1100px))}
 #histDetail .histtab td{height:32px;padding:0 12px;box-sizing:border-box;vertical-align:middle;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #histDetail .histtab td:first-child{padding-left:20px}
 #histDetail .histtab :is(th,td):nth-child(1){width:26%}
-#histDetail .histtab :is(th,td):nth-child(4){width:30%;text-align:left}
 #histDetail .histtab .htag{color:var(--text)}
 #histDetail .histtab .htag .bic{width:18px;height:18px;vertical-align:-4px;margin-right:8px}
 #histDetail .histtab .hd{font-family:var(--display);color:var(--ink-hi)}
 #histDetail .histtab th.hd{font-family:inherit;color:var(--gold-ink);font-weight:600}
 #histDetail .histtab tr.best .hd{color:var(--gold-ink)}
-#histDetail .histtab .hbau{color:var(--dim)}
 #histDetail .histtab tbody tr{cursor:pointer;outline:none}
 #histDetail .histtab tbody tr:hover{background:var(--tint-hover-soft)}
 #histDetail .histtab tbody tr[aria-selected="true"]{background:var(--lift-2);box-shadow:inset 2px 0 0 var(--pick)}
@@ -7080,56 +7629,6 @@ body.felder:not(.compact) #p-party.on{padding-bottom:72px;
 :where(html.w-max-640) #p-party .gwege{padding:14px}
 :where(html.w-max-640) .gauf > summary{padding:8px 12px}
 
-/* ---------- Bereich Builds: Links zu Questlog (Aufgabe 12, Nachtrag 29.09.) ----------
-   Oben das Feld zum Einfuegen in einer Zeile (Link breit, Name schmal,
-   Speichern), darunter die Karten in Spalten, so viele nebeneinander, wie
-   passen, jede hoechstens 560 Punkt breit - nichts gestreckt. Die Karte des
-   offenen Kampfs hebt nur ihr Rand in --gold-ink hervor (im hellen Thema
-   dunkler als --gold, damit er gegen die Flaeche traegt), dazu das Schild;
-   kein Leuchten. Gold sonst nur auf dem Median, wie im Verlauf. */
-.qlform{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,240px) auto;align-items:end;gap:6px 10px;max-width:1000px;margin:0 0 14px}
-.qlform[hidden]{display:none}
-.qlform .field input{width:100%;box-sizing:border-box}
-.qlhinweis{grid-column:1 / -1;margin:0;max-width:72ch;color:var(--dim);font-size:var(--fs-xs)}
-.qlstatus{grid-column:1 / -1;margin:0;color:var(--text);font-size:var(--fs-sm)}
-.qlstatus:empty,#qlLauf:empty{display:none}
-#qlLauf{grid-column:1 / -1}
-.qlwahl{display:flex;flex-direction:column;gap:6px;margin:0;padding:10px 12px;border:0;border-radius:var(--r-control);
-  background:var(--well);box-shadow:inset 0 0 0 1px var(--hair-edge-soft);font-size:var(--fs-sm)}
-.qlwahl legend{float:left;width:100%;margin:0 0 2px;padding:0;font-size:var(--fs-sm)}
-.qlwahl .qlzeile2{display:flex;flex-wrap:wrap;gap:8px;margin-top:4px}
-.qlgeloest{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin:0 0 12px;font-size:var(--fs-sm)}
-.qlnoch{margin:0;max-width:72ch;color:var(--dim);font-size:var(--fs-sm)}
-.qlkarten{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,300px),1fr));gap:12px;align-items:stretch}
-.qlkarte{display:flex;flex-direction:column;gap:6px;min-width:0;max-width:560px;padding:12px 16px;border:1px solid var(--hair-edge);
-  border-radius:var(--r-surface);background:var(--lift-1);box-shadow:var(--edge-lit),var(--cast-lifted)}
-:root[data-theme="light"] .qlkarte{background:var(--raise)}
-.qlkarte.offen{border-color:var(--gold-ink)}
-.qlkopf{display:flex;align-items:center;gap:10px;min-width:0}
-.qlpaar{display:inline-flex;align-items:center;gap:4px;flex:none}
-.qlpaar .wic{width:24px;height:24px;margin:0;vertical-align:0}
-.qlkarte h3{min-width:0;margin:0;font:400 var(--fs-md)/1.25 var(--display);color:var(--text);overflow-wrap:anywhere}
-.qlkarte h3:focus:not(:focus-visible){outline:none}
-.qlkarte h3::before{display:none}
-.qlschild{flex:none;margin-left:auto;padding:1px 8px;border-radius:var(--r-control);box-shadow:inset 0 0 0 1px var(--gold-ink);
-  color:var(--gold-ink);font-size:var(--fs-xs);white-space:nowrap}
-.qlkarte p{margin:0}
-.qlzeile{color:var(--dim);font-size:var(--fs-sm)}
-.qlgleich{color:var(--ink-soft);font-size:var(--fs-xs)}
-.qlbosse{display:flex;flex-direction:column;gap:2px;margin:2px 0 0;padding:0;list-style:none;color:var(--dim);font-size:var(--fs-sm)}
-.qlbosse li{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.qlboss{color:var(--text)}
-.qlbosse .num{color:var(--gold-ink);font-weight:600}
-.qlleer{color:var(--dim);font-size:var(--fs-sm)}
-.qlakt{display:flex;flex-wrap:wrap;align-items:center;gap:6px 10px;margin-top:auto;padding-top:6px}
-.qlakt a.btn{color:var(--text);text-decoration:none}
-/* geloeste Builds (Fixrunde 1): leise darunter, aufgeklappt als Karten in der Mulde, ohne Wurf */
-.qlauswahl{margin:12px 0 0}
-.qlkarten.qlaus{margin-top:8px}
-.qlkarte.geloest{background:var(--well);box-shadow:none}
-/* schmal: Link, Name und Speichern untereinander */
-:where(html.w-max-640) .qlform{grid-template-columns:minmax(0,1fr)}
-:where(html.w-max-640) .qlform > .btn{justify-self:start}
 .srvfeld{display:flex;gap:8px;align-items:center}
 .srvfeld .textin{flex:1 1 auto}
 
@@ -7218,6 +7717,25 @@ body.compact #bars .row:not(.sub){--spur:34px;grid-template-columns:minmax(0,1fr
   padding:0 11px 7px;align-items:center;border-radius:0;box-shadow:none;
   /* die Bahn der Spur, ab dem Namen bis an den rechten Rand */
   background:linear-gradient(var(--well-deep),var(--well-deep)) no-repeat var(--spur) calc(100% - 4px) / calc(100% - var(--spur) - 11px) 3px}
+/* Die Restzeile (#160): was unter Zeile 5 liegt, als eine Zeile wie die
+   anderen - Text leise, die Spur in --series-rest am Fuss, rechts der Rest
+   in der Textschrift (er ist keine Faehigkeit). Kein Symbol, kein Gold. */
+.krest{display:none}
+/* mitrest: es gibt mehr als fuenf Hauptzeilen. Dann haelt die Zeile ihren
+   Platz, auch wenn sie gerade nichts zu sagen hat (hidden: unsichtbar),
+   damit ihr Erscheinen die Liste nicht erneut kuerzt. */
+body.compact.mitrest .krest{display:grid;flex:none;grid-template-columns:minmax(0,1fr) auto;align-items:center;column-gap:8px;position:relative;
+  height:27px;margin:2px 0 0;padding:0 11px 7px;border:0;background:none;color:var(--ink-soft);font:inherit;font-size:var(--fs-xs);
+  text-align:left;cursor:pointer}
+/* die Seite setzt [hidden]{display:none !important}: hier muss der Platz trotzdem bleiben */
+body.compact.mitrest .krest[hidden]{display:grid !important;visibility:hidden}
+body.compact .krest .kresttext{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+body.compact .krest .krestwert{font-variant-numeric:tabular-nums}
+body.compact .krest .krestbahn{position:absolute;left:11px;right:11px;bottom:3px;height:3px;border-radius:var(--r-mark);background:var(--well-deep)}
+body.compact .krest .krestspur{display:block;height:100%;border-radius:var(--r-mark);background:var(--series-rest)}
+body.compact .krest:hover{color:var(--text)}
+body.compact .krest:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
+body.compact.durchsicht .krest{color:var(--text)}
 body.compact #bars .row:not(.sub):has(.wpair){--spur:52px}
 body.compact #bars .row:not(.sub) .nm .wpair{min-width:34px;width:34px;gap:2px}
 body.compact #bars .row:not(.sub) .nm .wpair .wic{width:16px;height:16px;margin:0}
@@ -7240,9 +7758,9 @@ body.compact #bars .row:not(.sub) .fill,body.compact #bars .row:not(.sub):hover 
   opacity:1;background:var(--c,var(--gold));box-shadow:none;filter:none;mix-blend-mode:normal}
 
 /* bei Durchsicht (Luecke 11.7): Dauer, Uhrzeit, Einheit, Lesezeile und
-   Ich | Gruppe in der Textfarbe, im hellen Thema die Zahl in --gold-ink */
-body.compact.durchsicht :is(#hMeta,#hMeta .f,#hMeta .wt,.big .ukurz,.compactread,.compactread > span,.top #partySwitch button){color:var(--text)}
-:root[data-theme="light"] body.compact.durchsicht .big .v{color:var(--gold-ink)}
+   Ich | Gruppe in der Textfarbe; die Zahl bleibt im hellen Thema #6d3c00
+   (#156: --gold-ink fiel ueber einer dunklen Szene auf 2,80 zu 1) */
+body.compact.durchsicht :is(#hMeta,#hMeta .f,#hMeta .wt,.big .ukurz,.big .prevline,.compactread,.compactread > span,.top #partySwitch button){color:var(--text)}
 
 /* ---------- Titelleiste bei 560 und 760 einzeilig wie im Entwurf ----------
    Neugestaltung 28.09., Aufgabe 9 (Entscheidung vom 28.09., an
@@ -7259,3 +7777,77 @@ body.compact.durchsicht :is(#hMeta,#hMeta .f,#hMeta .wt,.big .ukurz,.compactread
 :where(html.w-max-752) body.frameless:not(.compact) .top .wbtns{order:99;margin-block:0}
 :where(html.w-max-640) body:not(.compact) .top .kwpf{display:none}
 :where(html.w-max-640) body:not(.compact) .top .livebtn{min-width:0;padding-inline:8px}
+
+/* ---------------------------------------------------------------- Mica
+
+   Rauchglas auf Mica (Spezifikation Rauchglas 4.2, #55). Gilt nur, wenn der
+   Hauptprozess das grosse Fenster wirklich auf Mica gelegt hat (html.mica
+   aus /api/state) und nie im Kompakt. Der Block glas oben bleibt der
+   Rueckfall; hier werden nur Flaechen durchsichtig:
+   - Fenstergrund rgba(24,21,20,.35): dichter als der Entwurf (.2), damit
+     --dimmer auf dem unguenstigsten Desktop haelt. Annahme bis zum
+     Nachmessen (Spezifikation 5.3): dunkles Mica auf weissem
+     Hintergrundbild nicht heller als #4a4a4a. Darauf ergibt sich #393737;
+     gemessen --dim 5,75, --dimmer 4,62, --ink-faint 4,51, Gold 5,46:1
+     (mit .2 waeren es fuer --dimmer 4,10).
+   - Felder: Scheibe rgba(10,9,9,.57) auf dem Fenstergrund, zusammen
+     #1e1d1d. Dichter als der Entwurf (.3; Entscheidung 04.10., A): die kleinste
+     Deckung in Hundertsteln, mit der jede der zwoelf Reihenfarben darauf
+     mindestens 3,10:1 haelt (Rang 2, 5 und 9 3,11, Rang 11 3,12, Rang 7
+     3,13; mit .56 Rang 2 3,09). Schrift darauf: --dim 8,21, --dimmer
+     6,60, --ink-faint 6,44, Gold 7,79, --text 14,94:1.
+   - Die Fugen: die Behaelter verlieren ihren Haarlinien-Grund, die Fuge ist
+     der Fenstergrund zwischen zwei Scheiben.
+   - Was ueber anderem liegt (Kampfwahl, Menues, Tooltips, Dialoge, Toasts,
+     haftende Koepfe, Rundgang, Sprungleiste der Einstellungen), bleibt
+     deckend aus dem Block glas.
+   Seit #189 liegt das Fenster auf Acrylic statt Mica (der Name html.mica
+   blieb). Acrylic zeigt die Fenster dahinter, nicht nur das Hintergrund-
+   bild: gemessen am 06.10. vor einem weissen Fenster, aktiv, stand der
+   Fenstergrund bei 103 - der Grund darunter ist #929292, nicht #4a4a4a.
+   Darum (Entscheidung vom 06.10.):
+   - Der Fenstergrund traegt keine Schrift mehr. Titel-, Bereichs- und
+     Statusleiste liegen auf der Scheibe; durchsichtig bleiben die Fugen und
+     Raender. Auf .35 fiele --dim dort auf 2,78:1.
+   - Die Scheibe .79 statt .57: wieder die kleinste Deckung in Hundertsteln,
+     mit der jede Reihenfarbe ueber #929292 3,10:1 haelt (kleinste 3,12).
+     Vor dem weissen Fenster wird sie #1e1d1d - dieselbe Farbe, die .57 ueber
+     #4a4a4a ergab; alle Kontraste darauf bleiben die von oben. */
+html.mica[data-theme="glas"]{--mica-grund:rgba(24,21,20,.35);--mica-scheibe:rgba(10,9,9,.79)}
+html.mica[data-theme="glas"]:has(> body:not(.compact)){background:transparent}
+html.mica[data-theme="glas"] body:not(.compact){background:var(--mica-grund)}
+html.mica[data-theme="glas"] body:not(.compact) :is(.stage,.einst){background:transparent}
+html.mica[data-theme="glas"] body:not(.compact) :is(.top,.bereiche,.statusleiste){background:var(--mica-scheibe)}
+/* die Scheiben: die Felder, dazu die Koepfe der Bereiche (Name, Zeit und
+   DPS des Kampfes; Weeklies, Rekorde) und die zwei Wege der Gruppe */
+html.mica[data-theme="glas"] body.tafel.glut:not(.compact) :is(#ringFeld,.table,#kurveFeld),
+html.mica[data-theme="glas"] body.felder:not(.compact) :is(#clearedNote,.panel.on > *,#cmpBestWrap,#cmpPick,#cmpOut > *,#histWrap > *,#findings > *,#findings > .drei > *,.bkopf,.gweg),
+html.mica[data-theme="glas"] body:not(.compact) :is(.wkopf,.rkkopf,.wkfeld,.wkleerfeld,.wkgruppe.fertig){background:var(--mica-scheibe)}
+/* die Gilde (68): ihr Inhalt traegt Schrift ausserhalb der Felder (Satz, Filter, Koepfe) und liegt darum ganz auf einer Scheibe */
+html.mica[data-theme="glas"] body:not(.compact) .gl .wkinhalt{background:var(--mica-scheibe)}
+/* darin keine zweite Scheibe (#gilde: die Regel davor zaehlt mit #pNameFeld eine Kennung): die Saetze, die Spalten und das Feld liegen auf ihr, die Fugen als Haarlinie */
+html.mica[data-theme="glas"] body:not(.compact) #gilde :is(.wkgesperrt,.wbox.wkleer,.gl-spalten,.gl-spalte,.gl-edit,.gl-agenda){background:transparent}
+html.mica[data-theme="glas"] body:not(.compact) .gl .gl-spalte{box-shadow:0 0 0 1px var(--hair-rule)}
+/* Schrift, die bisher auf dem Fenstergrund stand (#189): Start links, der
+   Kopf der Einstellungen, das Namensfeld der Gruppe und der Weeklies-Kasten
+   ohne Datei oder gesperrt. Jede eine eigene Scheibe mit Rand, damit der
+   Text nicht an ihrer Kante klebt; der Kasten hat seinen Rand schon. */
+html.mica[data-theme="glas"] body:not(.compact) :is(.startlinks,.einstkopf,#pNameFeld,.wkgesperrt,.wbox.wkleer){background:var(--mica-scheibe);
+  border-radius:var(--r-surface)}
+html.mica[data-theme="glas"] body:not(.compact) :is(.startlinks,.einstkopf,#pNameFeld,.wkgesperrt){padding:14px 16px}
+/* Behaelter, nach den Scheiben (gleiche Spezifitaet, die spaetere Regel
+   gilt): die mit Fugen verlieren ihren Haarlinien-Grund, die Fuge ist der
+   Fenstergrund zwischen zwei Scheiben; wer selbst Felder traegt, bekommt
+   keine Scheibe (sonst laegen zwei uebereinander); die Spalte der Rotation
+   liegt schon in einem Feld, das Urteil in der Liste (.table). */
+html.mica[data-theme="glas"] body.tafel.glut:not(.compact) :is(#app,#urteilFeld),
+html.mica[data-theme="glas"] body.felder:not(.compact) :is(#app,.panel.on,#cmpBody,#cmpOut,#histWrap,#findings,#findings > .drei,#pWege,.rotgut),
+html.mica[data-theme="glas"] body:not(.compact) .wkwaben{background:transparent}
+/* Einstellungen: jeder Abschnitt eine Scheibe, die Fuge zwischen zweien ist
+   der Fenstergrund (statt der Haarlinie). Die Sprungleiste haftet und liegt
+   beim Rollen neben dem Inhalt: deckend auf --comb. */
+html.mica[data-theme="glas"] body:not(.compact) .egruppe{background:var(--mica-scheibe);box-shadow:none;padding-inline:18px}
+html.mica[data-theme="glas"] body:not(.compact) .egruppe + .egruppe{margin-top:1px}
+html.mica[data-theme="glas"] body:not(.compact) .einstgruppen > .egruppe:first-of-type{border-radius:var(--r-surface) var(--r-surface) 0 0}
+html.mica[data-theme="glas"] body:not(.compact) .einstgruppen > .egruppe:last-of-type{border-radius:0 0 var(--r-surface) var(--r-surface)}
+html.mica[data-theme="glas"] body:not(.compact) .einstnav{background:var(--comb);border-radius:var(--r-surface);padding-right:12px}

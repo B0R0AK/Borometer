@@ -4,7 +4,7 @@
 
 import { state } from "./01-state";
 import { uiZoomFactor } from "./37-window-size-and-overlay";
-import type { BauStore, BestStore, PlanStore } from "../types";
+import type { BestStore } from "../types";
 
 /* The first element matching a selector. These are the page's own ids, so the
    element is there - hence the "!"; the few callers that allow for a missing
@@ -97,14 +97,6 @@ export function setup(): void {
      Eintrag aus. */
   state.best = Object.create(null) as BestStore;
   state.cmpRotAll = false;
-  /* Die Baue (47-builds.ts), aus demselben Grund hier: histRecord() fragt
-     danach, und ohne Prototyp wie state.best - die Kennungen kommen aus
-     einer Datei. */
-  state.builds = Object.create(null) as BauStore;
-  /* Die Links zu Questlog (51-plan.ts), aus demselben Grund: die Kennungen kommen aus
-     einer Datei, wie bei den Baeuen. */
-  state.plans = Object.create(null) as PlanStore;
-  state.planNames = Object.create(null) as Record<string, string>;
   state.filterOpen = false;
   // Aus, bis jemand den Haken im ⋯-Menue setzt. Wiederhergestellt wird er
   // aus der Einstellungsdatei, siehe die /api/config-Antwort weiter unten.
@@ -114,7 +106,7 @@ export function setup(): void {
   // preferences, until the saved ones arrive from /api/config a moment later
   state.ghostPref = false;
   state.zoom = 100;           // how big everything is drawn, 10-200
-  state.theme = "dark";       // "dark" | "light" | "tnl" | "auto" (follow the system)
+  state.theme = "dark";       // "dark" | "light" | "tnl" | "glas" | "auto" (follow the system)
   /* Der Zeitverlauf: was gezeigt wird und wie glatt.
      Betraege oder Anteile, gleitender Mittelwert ueber 1, 3 oder 5 Sekunden,
      und welche Reihen gerade aus dem Bild genommen sind. Die Vorgabe 5 s ist
@@ -174,4 +166,5 @@ export function setup(): void {
   state.einst = false;
   state.weeklies = false;
   state.rekorde = false;
+  state.gilde = false;
 }

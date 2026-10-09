@@ -23,19 +23,20 @@ import { standFolgen, syncWindowVars } from "./37-window-size-and-overlay";
 import { readWeaponPair, renderParty, sendReport, syncSaveRunBtns } from "./42-party";
 import { syncTabs } from "./43-more-menu-and-dev-mode";
 import { renderStart, syncCompareBtn } from "./45-startup";
-import { bestRecord } from "./46-best-pull";
-import { bauFuer, bauNameVon, bauVon, gleicherBau } from "./47-builds";
-import { renderBuilds } from "./51-plan";
+import { bestRecord, bossPulls, schluesselVon, verlaufPulls, waereBest } from "./46-best-pull";
+import { bezugVon, paarVon } from "./47-paar";
 import { syncStatusleiste } from "./55-statusleiste";
 import { syncTafel } from "./56-tafel";
 import { leerKnopf, leerTauschen, syncFelder } from "./58-felder";
 import { renderEinst } from "./57-einstellungen";
 import { syncWeeklies } from "./59-weeklies";
 import { syncRekorde } from "./62-rekorde";
-import { classDps, dummyClass } from "../best-pull-core";
-import { MIN_MEDIAN, abendText, einordnungSkala, findBau, mitte } from "../build-core";
-import { TAG_MS, abendAchse, imZeitraum, pullLagen, zeitLagen, zeitSpanne, zusammenfuehren, type Spanne } from "../verlauf-core";
-import type { CombatEvent, Encounter, FightStats, HistFight } from "../types";
+import { syncGilde } from "./68-gilde";
+import { paarCode } from "../build-core";
+import { besterPull, classDps, dummyClass, mindestLaenge, rangfolge } from "../best-pull-core";
+import { MIN_MEDIAN, abendText, einordnungSkala, gleicherBezug, kampfPaar, mitte } from "../build-core";
+import { TAG_MS, abendAchse, imZeitraum, mitDatum, pullLagen, zeitLagen, zeitSpanne, zusammenfuehren, type Spanne } from "../verlauf-core";
+import type { CombatEvent, Encounter, Fight, FightStats, HistFight } from "../types";
 
 /* Festgehalten wird, was diese App gesehen hat - nicht, was im Ordner liegt.
    Der erste Entwurf las beim Oeffnen des Reiters den ganzen Log-Ordner ein.
@@ -49,14 +50,13 @@ import type { CombatEvent, Encounter, FightStats, HistFight } from "../types";
    ersetzt der neue Stand den alten, statt die Kaempfe doppelt zu zaehlen.
    Der Beispielkampf wird nie festgehalten - er ist niemandes Leistung.
 
-   Seit dem Bautagebuch (47-builds.ts) traegt jeder Kampf die Kennung des
-   Baus, mit dem er gekaempft wurde (b), und das Verzeichnis nimmt auch die
-   Uebungspuppe auf: mit ihrer Laengenklasse (c) und der DPS ueber genau
+   Seit dem Bautagebuch trug ein Kampf die Kennung eines Builds (b); seit
+   #207 wird b nur noch weitergereicht, nie gelesen. Das Verzeichnis nimmt
+   auch die Uebungspuppe auf: mit ihrer Laengenklasse (c) und der DPS ueber genau
    diese Laenge, wie "Gegen deinen besten Pull" sie misst. Der Verlauf zeigt
    die Puppe weiterhin nicht - histTargets() und histVerdict() lassen
-   Eintraege mit c aus. Exportiert, weil das Bautagebuch die Kennungen
-   nachtraegt, sobald es seine Datei gelesen hat, und 45-startup.ts den
-   letzten Kampf, wenn Live endet. */
+   Eintraege mit c aus. Exportiert fuer 45-startup.ts: den letzten Kampf,
+   wenn Live endet. */
 /* Live (Spezifikation Live-Leistung 3): nur Kaempfe, die neu oder
    veraendert sind, werden neu gerechnet. loadTail() setzt die Menge fuer
    genau einen Aufruf; jeder andere Aufruf rechnet alle. Was ein Kampf
@@ -73,12 +73,23 @@ export function histRecord(){
   if(state.origin === "sample" || !state.text) return;
   const key = (state.fileNames || []).join(" + ");
   if(!key) return;
+  /* Ein Log nur mit Uhrzeit (state.wall false, Fix verlauf-ohne-datum): der
+     Beginn eines Kampfs ist dann die Zeit seit Mitternacht - im Verlauf hiesse
+     er 01.01.1970, und zwei Kaempfe um 21:00 an zwei Tagen haetten dieselbe
+     Kennung at. Solche Kaempfe kommen nicht ins Verzeichnis (Entscheidung vom
+     05.10.2026). Ein Eintrag, der schon steht, bleibt unberuehrt: hier wird
+     nichts geschrieben und nichts geloescht. Beim Nachlesen bleibt
+     histStillFights leer. */
+  if(!state.wall) return;
+  // ein altes b (Zuordnung aus der Zeit des Builds-Reiters, #207): der alte Eintrag derselben Datei mit derselben Startzeit gibt es weiter, gelesen oder gezeigt wird es nirgends
+  const altB = new Map((state.hist.files[key]?.fights ?? []).filter(x => typeof x.b === "string").map(x => [x.at, x.b!]));
   const fights: HistFight[] = [];
-  state.encounters.forEach((seg, i) => {
+  state.encounters.forEach((seg) => {
     if(histNur && !histNur.has(seg) && histMerk.has(seg)){
       const alt = histMerk.get(seg);
-      if(alt) fights.push(alt);
-      return;
+      /* Das gemerkte Objekt gilt nur, solange sein b dem des Verzeichnisses entspricht (sonst neu rechnen). */
+      if(!alt) return;
+      if((alt.b ?? undefined) === altB.get(alt.at)){ fights.push(alt); return; }
     }
     histMerk.set(seg, null);
     // seg.stats, nicht stats(seg): segment() hat es dort schon abgelegt, und
@@ -95,9 +106,15 @@ export function histRecord(){
       dps: c ? classDps(st.seconds, st.dps, perSecond(seg, 0).total, c) : st.dps,
       dmg: st.total, dur: st.seconds, at: seg.start};
     if(c) f.c = c;
-    // beim Nachlesen kein Build: es legt nichts an (bauFuer schriebe boro-builds.json)
-    const b = histStill ? null : bauFuer(seg, i);
+    /* Die Summe einer Gruppe (mehrere Angreifer, "alle"): sie steht im
+       Verlauf, ist aber nie dein bester Pull (Entscheidung 06.10.). Nur
+       eine Zahl, kein Name. Das Nachlesen waehlt immer einen Angreifer. */
+    if(state.players.length > 1 && state.player === "__all") f.g = 1;
+    const b = altB.get(seg.start);
     if(b) f.b = b;
+    // das Paar als zwei Zahlen, nie Text
+    const w = paarCode(paarVon(seg, histStill) ?? []);
+    if(w) f.w = w;
     /* Treffer, kritisch, schwer, verfehlt (Spezifikation Steckbrief 3.1 und
        4.3): vier ganze Zahlen, keine Namen. Treffer sind alle Schadenszeilen
        des Spielers in diesem Kampf, die Fehlschlaege eingeschlossen - die
@@ -156,7 +173,7 @@ function topDazu(f: HistFight, ev: readonly CombatEvent[]){
    ganzen Stand vorher und legt ihn danach zurueck, Sets und Maps samt
    Inhalt - in einem Zug, ohne await dazwischen: die Seite sieht den
    fremden Stand nie. Was bleibt, ist allein top/topSid im Verzeichnis
-   (state.hist): kein Build (histRecord ruft bauFuer nicht), kein bester
+   (state.hist): kein neuer Build (histRecord legt keinen an), kein bester
    Pull, kein Lernen von Ventius (setVentiusLernen). Die Merker von 04 und 05 (lauf, schnitt) zeigen
    danach auf den gelesenen Text; beide pruefen das selbst und schneiden
    beim naechsten Live-Takt ganz neu.
@@ -241,14 +258,16 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
   return ergebnis;
 }
 
-/* Verlauf, Einordnung, Start und Build-Karten zaehlen nur, was geoeffnet
+/* Verlauf, Einordnung und Start zaehlen nur, was geoeffnet
    wurde (gewuenscht: "ab der naechsten Version gezaehlt"); was die Rekorde nur
    nachgelesen haben (nach), zaehlen allein die Rekorde (rekordKaempfe). */
 export function histCollect(){
   const alle: HistFight[] = [];
   Object.keys(state.hist.files).filter(n => !state.hist.files[n]!.nach).forEach(n =>
-    (state.hist.files[n]!.fights || []).forEach(f =>
-      alle.push(Object.assign({file: n}, f))));
+    (state.hist.files[n]!.fights || []).forEach(f => {
+      // ein Kampf ohne Datum, der vor dem Fix ins Verzeichnis kam: bleibt dort, zaehlt aber nicht (mitDatum)
+      if(mitDatum(f.at)) alle.push(Object.assign({file: n}, f));
+    }));
   alle.sort((a, b) => a.at - b.at);
   state.hist.fights = alle;
 }
@@ -260,7 +279,7 @@ interface VZiel { key: string; name: string; fights: VKampf[]; best?: number; me
 
 /* Die gespeicherten Kaempfe an bekannten Bossen, mit Uhr. Ein Kampf steht
    oft zugleich im Verzeichnis; zusammenfuehren() (verlauf-core.ts) nimmt ihn
-   dann einmal, und zwar aus dem Verzeichnis, weil nur dort sein Build steht. */
+   dann einmal, und zwar aus dem Verzeichnis, weil nur dort sein Waffenpaar (w) steht. */
 function gespeicherteKaempfe(): VKampf[] {
   const raus: VKampf[] = [];
   for(const r of state.runs)
@@ -275,6 +294,9 @@ function gespeicherteKaempfe(): VKampf[] {
   }
   return raus;
 }
+
+/** Die Bosse, die der Verlauf zeigt (histKey) - fuer die Rekorde (62), die in ihn wechseln. */
+export const verlaufZiele = (): Set<string> => new Set(histTargets().map(z => z.key));
 
 function histTargets(): VZiel[] {
   const m = new Map<string, { key: string; name: string; log: VKampf[]; weg: VKampf[] }>();
@@ -291,7 +313,11 @@ function histTargets(): VZiel[] {
   state.hist.fights.forEach(f => { if(!f.c) zu(f, false); });
   gespeicherteKaempfe().forEach(f => zu(f, true));
   return [...m.values()]
-    .map(e => ({key: e.key, name: e.name, fights: zusammenfuehren(e.log, e.weg)}) as VZiel)
+    /* Derselbe Kampf zweimal im Verzeichnis, als Summe der Gruppe (g) und
+       als Kampf eines gewaehlten Angreifers: der ohne g gewinnt, sonst
+       saesse Gold an einer Summe (Entscheidung 06.10.). */
+    .map(e => ({key: e.key, name: e.name,
+                fights: zusammenfuehren(e.log.filter(f => !f.g), e.weg, e.log.filter(f => f.g))}) as VZiel)
     /* Nur Bosse, und erst ab dem zweiten Kampf - einer allein ist kein Verlauf. */
     .filter(e => e.fights.length >= 2 && knownBoss(e.name))
     .map(e => {
@@ -348,10 +374,15 @@ export function renderHistory(){
   const k = imZeitraum(z.fights, spanne);
   histK = k;
   const logKey = (state.fileNames || []).join(" + ");
-  const best = Math.max(...k.map(f => f.dps));
-  /* Der beste: bei Gleichstand der erste, wie verlauf-core ("bester" im
-     Diagramm) - Tabelle und Diagramm heben denselben Kampf hervor. */
-  const besterK = k.findIndex(f => f.dps === best);
+  /* Gold nur am besten Pull (Spezifikation Bester Pull 5.4), ueber die
+     ganze Menge am Boss - liegt er nicht im Zeitraum, steht hier kein Gold.
+     Tabelle und Diagramm heben denselben Kampf hervor. Der Verlauf fuehrt
+     nur Bosse (histTargets), der Schluessel ist also immer "boss:". Gefunden
+     ueber at: die Kaempfe hier tragen seg.start als at (histRecord). Die
+     Menge ist die des Verzeichnisses (verlaufPulls), nicht die des
+     geladenen Logs: der Verlauf zeigt immer alles. */
+  const goldPull = besterPull(verlaufPulls("boss:" + z.key));
+  const besterK = goldPull ? k.findIndex(f => f.at === goldPull.at) : -1;
   // Dieser Kampf: der in der Kampfwahl, falls er hier steht (histRecord schreibt seg.start als at)
   const cur = seg && histKey(segName) === z.key ? k.findIndex(f => f.at === seg.start) : -1;
   /* Die Wahl (Zeile <-> Punkt): festgehalten am Kampf, nicht am Index -
@@ -378,12 +409,13 @@ export function renderHistory(){
      im Zeitraum an einem Abend (hoechstens zwei Tage hintereinander), stehen
      die Pulls nacheinander statt als Streifen am Rand der Datumsachse. */
   const abend = abendAchse(k.map(f => f.at));
-  const bild = histPlot(z, k, cur, wahl, W, H, spanne, logKey, abend);
+  const bild = histPlot(z, k, cur, wahl, besterK, W, H, spanne, logKey, abend);
   if(vpl.dataset.marke !== bild.svg){ vpl.innerHTML = bild.svg; vpl.dataset.marke = bild.svg; }
   const hatLog = k.some(f => f.file === logKey), hatAlt = k.some(f => f.file !== logKey);
   const leg = (hatLog ? '<span><i class="p log"></i>' + esc(t("verlauf.lgLog")) + "</span>" : "") +
     (hatAlt ? '<span><i class="p alt"></i>' + esc(t("verlauf.lgFrueher")) + "</span>" : "") +
-    '<span><i class="p best"></i>' + esc(t("tafel.bester")) + "</span>" +
+    // "bester" nur, wo ein Punkt Gold traegt (der beste Pull im Zeitraum)
+    (besterK >= 0 ? '<span><i class="p best"></i>' + esc(t("tafel.bester")) + "</span>" : "") +
     (bild.median != null ? '<span><i class="l"></i>' + esc(t("verlauf.median") + " " + fmt(bild.median)) + "</span>" : "") +
     (abend ? '<span class="vlgachse">' + esc(t("verlauf.lgAbend")) + "</span>" : "");
   const lg = $("#histLeg");
@@ -399,11 +431,6 @@ export function renderHistory(){
     /* dur(), nicht secs1(): jede andere Flaeche der App schreibt "7m 22s";
        unter einer Minute gibt dur() ohnehin secs1 zurueck. */
     "<td>" + esc(dur(f.dur)) + "</td>" +
-    /* Der Build, den der Kampf traegt (f.b, 47-builds.ts), mit dem Namen,
-       unter dem "Deine Builds" ihn fuehrt; ein Kampf aus der Zeit vor dem
-       Bautagebuch oder ein gespeicherter hat keinen (DECISION 6.7: Build
-       statt Herkunft). */
-    '<td class="hbau">' + esc(f.b && state.builds[f.b] ? bauNameVon(f.b) : "\u2013") + "</td>" +
     '<td class="hd num">' + esc(fmt(f.dps)) + "</td></tr>").reverse().join("");
   /* "Im Vergleich öffnen" (DECISION 6.10): ein leiser Knopf ueber der Liste,
      nur wenn es dort etwas zu waehlen gibt. */
@@ -416,7 +443,7 @@ export function renderHistory(){
       '<label for="histBoss">' + esc(t("verlauf.boss")) + '</label><select id="histBoss" class="auswahl">' + optionen + "</select></span></div>" +
     '<div class="histroll"><table class="histtab"><thead><tr>' +
     "<th>" + esc(t("verlauf.colTag")) + "</th><th>" + esc(t("verlauf.colUhr")) + "</th><th>" + esc(t("verlauf.colDauer")) + "</th>" +
-    "<th>" + esc(t("verlauf.colBuild")) + '</th><th class="hd">' + esc(t("hist.colDps")) + "</th>" +
+    '<th class="hd">' + esc(t("hist.colDps")) + "</th>" +
     "</tr></thead><tbody>" + zeilen + "</tbody></table></div>";
   /* Geschrieben wird nur bei Aenderung (Live-Takt). Stand der Fokus auf
      einer Zeile, steht er danach wieder auf ihr; stand er im Auswahlfeld
@@ -517,8 +544,12 @@ function histWaehle(i: number){
 
 /* Die Einordnung dieses Kampfs (DECISION 2.4: die Skala zieht aus dem Kampf
    in den Verlauf): der Satz von histVerdict() und die Skala mit "sonst"
-   (Median), bester und diesem Kampf (einordnungSkala, build-core.ts). Nur,
-   wenn der Kampf in der Kampfwahl an diesem Boss ist und es einen Median gibt. */
+   (Median), dem hoechsten Wert und diesem Kampf (einordnungSkala,
+   build-core.ts). Nur, wenn der Kampf in der Kampfwahl an diesem Boss ist
+   und es einen Median gibt. Die Marke heisst "hoechster", nicht "bester":
+   v.max ist der hoechste Wert der Menge, auch ein kurzer Pull unter der
+   Schwelle; der beste Pull nach der Regel traegt im Diagramm das Gold.
+   Die Kennung "bester" (Klasse, data-marke) bleibt. */
 const MIDDOT = "\u00b7";
 function einordHtml(key: string): string {
   const seg = state.encounters[state.sel];
@@ -537,7 +568,7 @@ function einordHtml(key: string): string {
        Diagramms - der Satz sagt das (Pruefung 29.09., Befund 3). */
     '<span class="etextzeile" aria-hidden="true">' + esc(v.text + " " + MIDDOT + " " + t("verlauf.einordAlle")) + "</span>" +
     '<span class="eskala" aria-hidden="true"><i class="elinie"></i>' +
-    marke("sonst", s.sonst, v.med, t("verlauf.sonst")) + marke("bester", s.bester, v.max, t("tafel.bester")) + marke("dieser", s.dieser, st.dps, "") +
+    marke("sonst", s.sonst, v.med, t("verlauf.sonst")) + marke("bester", s.bester, v.max, t("verlauf.hoechster")) + marke("dieser", s.dieser, st.dps, "") +
     "</span></div>";
 }
 
@@ -548,15 +579,17 @@ function achsText(v: number){
   const x = v >= 1e6 ? v / 1e6 : v >= 1e3 ? v / 1e3 : v;
   return String(+x.toFixed(2)) + (v >= 1e6 ? "M" : v >= 1e3 ? "k" : "");
 }
-function histPlot(z: VZiel, k: VKampf[], cur: number, wahl: number, W: number, H: number, spanne: Spanne, logKey: string, abend: boolean):
+function histPlot(z: VZiel, k: VKampf[], cur: number, wahl: number, gold: number, W: number, H: number, spanne: Spanne, logKey: string, abend: boolean):
     { svg: string; median: number | null } {
   plotZuletzt = W + "x" + H;
   const rand = {links: 52, rechts: 12, oben: 28, unten: 24};
   const innen = W - rand.links - rand.rechts;
   /* Datumsachse: hoechstens acht Beschriftungen, auf schmalen Flaechen
      weniger (je etwa 90 Punkt). Pull-Achse: eine Uhrzeit je etwa 56 Punkt. */
-  const L = abend ? pullLagen(k, {breite: W, hoehe: H, rand}, Math.max(2, Math.floor(innen / 56)))
-    : zeitLagen(k, {breite: W, hoehe: H, rand}, spanne, Math.min(8, Math.max(2, Math.floor(innen / 90))));
+  /* gold: der Index des besten Pulls in k, -1 ohne (renderHistory); die
+     y-Achse richtet sich weiter nach dem hoechsten Punkt */
+  const L = abend ? pullLagen(k, {breite: W, hoehe: H, rand}, Math.max(2, Math.floor(innen / 56)), gold)
+    : zeitLagen(k, {breite: W, hoehe: H, rand}, spanne, Math.min(8, Math.max(2, Math.floor(innen / 90))), gold);
   const oben = rand.oben, unten = H - rand.unten, links = rand.links, rechts = W - rand.rechts;
   let h = "";
   /* der gewaehlte Tag als Band, sein Datum darueber. Auf der Pull-Achse
@@ -599,6 +632,8 @@ function histPlot(z: VZiel, k: VKampf[], cur: number, wahl: number, W: number, H
          '<circle class="hp' + art + '" data-k="' + i + '" data-at="' + f.at + '" data-dps="' + f.dps + '" data-dur="' + f.dur + '" cx="' + cx + '" cy="' + cy + '" r="' + p.r.toFixed(4) + '"/></g>';
   });
   const dieser = cur >= 0 ? fmt(k[cur]!.dps) : "";
+  /* Der Name nennt den goldenen Punkt; liegt der beste Pull nicht im
+     Zeitraum, laesst er "Bester" weg (die Texte fragen best ab). */
   const best = L.bester >= 0 ? fmt(k[L.bester]!.dps) : "";
   const pull = L.art === "pull";
   const name = L.median != null
@@ -610,10 +645,13 @@ function histPlot(z: VZiel, k: VKampf[], cur: number, wahl: number, W: number, H
 
 /* Die eine Zeile, die im Alltag zaehlt: wo steht der Kampf, den du gerade
    ansiehst, zwischen deinen anderen an diesem Ziel? */
-export function histVerdict(){
+/* seg: ab Werk der gewaehlte Kampf; die Meldung nach dem Kampf (66) fragt
+   nach dem beendeten. p ist die gerundete Abweichung vom Median in Prozent
+   (fuer die Meldung), wo der Satz gegen den Median rechnet. */
+type HistUrteil = {text: string; best: boolean; med?: number | undefined; max?: number; n?: number; p?: number};
+export function histVerdict(seg: Fight | undefined = state.encounters[state.sel]): HistUrteil {
   // med/max/n fuer die Skala im Streifen (56-tafel.ts), sonst fehlen sie
-  const leer: {text: string; best: boolean; med?: number; max?: number; n?: number} = {text: "", best: false};
-  const seg = state.encounters[state.sel];
+  const leer: HistUrteil = {text: "", best: false};
   if(!seg) return leer;
   const st = stats(seg);
   const schluessel = histKey(st.name);
@@ -650,23 +688,46 @@ export function histVerdict(){
       .map(x => x.stats || stats(x));
     quelle = "log";
   }
-  /* Und nur Kaempfe desselben Builds, wo es davon zwei gibt. Sonst stand
-     ueber einem Dolch-Kampf "14 % schlechter als sonst", gemessen an einem
-     Median, den der Bogen-Build gesetzt hatte - richtig gerechnet und doch
-     keine Auskunft ueber diesen Build. Gibt es keine zwei, bleibt es beim
-     Boss oder Log, und der Satz sagt dann nichts von einem Build. */
-  const fp = bauVon(seg);
-  let mitBau = false;
-  if(fp){
-    const bid = findBau(fp, state.builds);
-    const gleich = quelle === "boss"
-      ? (bid ? (andere as HistFight[]).filter(f => f.b === bid) : [])
-      : state.encounters.filter(x => histKey((x.stats || stats(x)).name) === schluessel)
-          .filter(x => { const dort = bauVon(x); return !!dort && gleicherBau(fp, dort); })
-          .map(x => x.stats || stats(x));
-    if(gleich.length >= 2){ andere = gleich; mitBau = true; }
+  /* Dasselbe Waffenpaar (seit #207 ohne Builds): nur Kaempfe mit diesem Paar,
+     wo es davon zwei gibt. Sonst stand ueber einem Dolch-Kampf "14 %
+     schlechter als sonst", gemessen an einem Median, den der Bogen gesetzt
+     hatte - richtig gerechnet und doch keine Auskunft ueber diesen Kampf.
+     Gibt es keine zwei, bleibt es beim Boss oder Log, und der Satz sagt dann
+     nichts vom Paar. */
+  /* Die Menge der Quelle als Pulls (Bester Pull 3): fuer "bester mit
+     diesem Paar" unten. hier: ist es der Kampf, um den es geht - im Verzeichnis
+     ueber at (dort steht seg.start), im Log ueber das Objekt. Ohne die
+     Summen einer Gruppe (g): sie sind nie "dein bester Kampf", auch nicht
+     mit diesem Paar (Entscheidung 06.10.). Median, Skala und n rechnen
+     weiter mit andere, wie sie ist. */
+  type BauPull = {at: number; dps: number; dur: number; hier: boolean};
+  let logSegs = quelle === "log" ? state.encounters.filter(x => histKey((x.stats || stats(x)).name) === schluessel) : [];
+  const alsPulls = (): BauPull[] => quelle === "boss"
+    ? (andere as HistFight[]).filter(f => !f.g).map(f => ({at: f.at, dps: f.dps, dur: Number.isFinite(f.dur) ? f.dur : 0, hier: f.at === seg.start}))
+    : logSegs.map(x => { const s = x.stats || stats(x); return {at: x.start, dps: s.dps, dur: s.seconds, hier: x === seg}; });
+  /* Die Schwelle misst immer die ganze Menge am Boss (Bester Pull 3), nie
+     nur ein Paar. Ein Ziel ohne Schluessel (kein bekannter Boss, nur im
+     Log): die ganze Quelle - gemessen, bevor unten gefiltert wird.
+     Unter zwei Kaempfen bleibt es leer (unten); der Filter nach dem
+     Paar macht die Menge nie groesser, also gleich hier aussteigen. Die
+     Menge am Boss einmal geholt: fuer die Schwelle und fuer Gold (waereBest). */
+  if(andere.length < 2) return leer;
+  const key = schluesselVon(st.name, st.seconds);
+  const idx = state.encounters.indexOf(seg);
+  const menge = key ? bossPulls(key, idx >= 0 ? idx : undefined) : null;
+  const schwelle = mindestLaenge(menge ?? alsPulls());
+  const hier = bezugVon(seg);
+  let mit = "";
+  if(hier){
+    const mitText = t("hist.withPair");
+    if(quelle === "boss"){
+      const gleich = (andere as HistFight[]).filter(f => gleicherBezug(hier, kampfPaar(f)));
+      if(gleich.length >= 2){ andere = gleich; mit = mitText; }
+    } else {
+      const gleich = logSegs.filter(x => gleicherBezug(hier, bezugVon(x)));
+      if(gleich.length >= 2){ logSegs = gleich; andere = gleich.map(x => x.stats || stats(x)); mit = mitText; }
+    }
   }
-  const mit = mitBau ? t("hist.withBuild") : "";
   /* Unter zwei Kaempfen gibt es nichts einzuordnen: "deine beste von einer"
      ist keine Auskunft, sondern eine Tautologie. Das braucht keinen Median,
      nur den besten Wert - und der steht schon mit zwei Kaempfen fest. */
@@ -676,9 +737,26 @@ export function histVerdict(){
      der Satz rechnet - der Median erst ab MIN_MEDIAN, sonst keiner. */
   const med = andere.length >= MIN_MEDIAN ? mitte(andere.map(f => f.dps)) : undefined;
   const zahlen = {med, max: best, n: andere.length};
-  if(st.dps >= best)
+  /* "Bester" nach der Regel (Bester Pull 5.4), nicht nach der hoechsten
+     Zahl: ein kurzer Pull unter der Schwelle ist nie "dein bester". Ohne
+     Paar steht der Satz genau am besten Pull (Gold, waereBest: ueber den
+     Index, nicht ueber at - ohne Datum ist at nur die Zeit seit
+     Mitternacht). Mit Paar steht er am ersten der Rangfolge dieser Menge,
+     mit der Schwelle der ganzen Menge; Gold nur, wenn er zugleich der
+     beste Pull ist. Sonst geht es gegen den Median wie bei jedem Kampf.
+     Die Skala (max) bleibt der hoechste Wert.
+     Ein Ziel ohne Schluessel (nur im Log) hat keinen besten Pull und nie
+     Gold; dort gilt ohne Paar dieselbe Regel ueber die Kaempfe im Log,
+     ab zwei Kaempfen wie bei besterPull. */
+  const istGold = !!menge && waereBest(seg, menge);
+  // mitBau: der Filter nach dem Paar hat gegriffen
+  const mitBau = mit !== "";
+  const vorn = mitBau ? !!rangfolge(alsPulls(), schwelle)[0]?.hier
+    : key ? istGold
+    : andere.length >= 2 && !!rangfolge(alsPulls(), schwelle)[0]?.hier;
+  if(vorn)
     return {text: t(quelle === "log" ? "hist.yourBestLog" : "hist.yourBest",
-                    {n: andere.length, mit}), best: true, ...zahlen};
+                    {n: andere.length, mit}), best: istGold, ...zahlen};
   /* Ab hier vergleicht der Satz gegen den Median, nicht gegen den besten
      Wert - und der braucht MIN_MEDIAN Kaempfe (dieselbe Schwelle wie das
      Bautagebuch, build-core.ts). Bei genau zwei waere mitte() nur der
@@ -696,9 +774,9 @@ export function histVerdict(){
      Funktion, dieselbe Zahl - und nur die gute Nachricht durfte sich
      belegen. */
   const woher = quelle === "log" ? "Log" : "";
-  if(p === 0) return {text: t("hist.sameMed"+woher, {n: andere.length, mit}), best: false, ...zahlen};
+  if(p === 0) return {text: t("hist.sameMed"+woher, {n: andere.length, mit}), best: false, ...zahlen, p};
   return {text: t((p > 0 ? "hist.aboveMed" : "hist.belowMed")+woher,
-                  {p: Math.abs(p), n: andere.length, mit}), best: false, ...zahlen};
+                  {p: Math.abs(p), n: andere.length, mit}), best: false, ...zahlen, p};
 }
 
 export function renderAll(){
@@ -744,13 +822,17 @@ export function renderAll(){
   const weeklies = state.weeklies && !einst && !kompakt;
   /* Die Rekorde (62, Spezifikation Rekorde 2a) sind der fuenfte Ort, wie die Weeklies. */
   const rekorde = state.rekorde && !einst && !weeklies && !kompakt;
-  $("#land").hidden = ((has || solo) && !start) || einst || weeklies || rekorde;
-  $("#app").hidden = (!has && !solo) || start || einst || weeklies || rekorde;
+  /* Die Gilde (68, Spezifikation Gilde 5) ist der sechste Ort, wie die Weeklies. */
+  const gilde = state.gilde && !einst && !weeklies && !rekorde && !kompakt;
+  $("#land").hidden = ((has || solo) && !start) || einst || weeklies || rekorde || gilde;
+  $("#app").hidden = (!has && !solo) || start || einst || weeklies || rekorde || gilde;
   $("#einst").hidden = !einst;
   $("#weeklies").hidden = !weeklies;
   $("#rekorde").hidden = !rekorde;
+  $("#gilde").hidden = !gilde;
   syncWeeklies(weeklies);   // zeichnet die Weeklies und haelt den Minutentakt nur, solange sie offen sind (59)
   syncRekorde(rekorde);     // zeichnet die Rekorde und fragt beim Oeffnen einmal nach neuen Logs (62)
+  syncGilde(gilde);         // zeichnet die Gilde nur, solange sie offen ist (68)
   if(einst) renderEinst();
   if(!$("#land").hidden) renderStart();
   $(".stage").classList.toggle("landing", !$("#land").hidden);
@@ -771,7 +853,7 @@ export function renderAll(){
        Leeren auf Verlauf oder in der Gruppe ohne Kampf stand sonst der
        gewaehlte Knopf gesperrt und gedimmt da. */
     const usable = has || tb.dataset.tab === "party" || tb.dataset.tab === "start" || tb.dataset.tab === "settings" ||
-                   tb.dataset.tab === "weeklies" || tb.dataset.tab === "rekorde" ||
+                   tb.dataset.tab === "weeklies" || tb.dataset.tab === "rekorde" || tb.dataset.tab === "gilde" ||
                    (!!state.parsed && tb.dataset.tab === "setup") ||
                    (tb.dataset.tab === state.tab && !$("#app").hidden);
     tb.disabled = !usable;
@@ -857,8 +939,6 @@ export function renderAll(){
   // the note carries data-i18n, so a language switch reset it to the plain
   // wording even while the sample was loaded
   if(state.tab === "history") renderHistory();
-  // Builds (Luecken 8.1): ein eigener Bereich seit der Neugestaltung 28.09.
-  if(state.tab === "builds") renderBuilds();
   if(document.body.classList.contains("compact")) applyWindowSize();
   sendReport(false);
 }
@@ -892,6 +972,20 @@ let loadOrigin = "file";        // "watch" | "file" | "sample"
 // set from the parts that load something; an import cannot be assigned to
 export function setLoadOrigin(v: string){ loadOrigin = v; }
 export function setLoadingSample(v: boolean){ loadingSample = v; }
+/* #153: Live springt nur mit, wenn man den neuesten Kampf ansah. Wer einen
+   aelteren liest, bleibt bei ihm - gemerkt an der Startzeit, denn der Platz
+   in der Liste verschiebt sich, sobald vorn ein Kampf dazukommt. Fehlt er
+   danach (neu geschnitten), geht es zum neuesten. */
+type AuswahlMerk = { neueste: boolean; start: number | null };
+export function auswahlMerken(): AuswahlMerk {
+  const seg = state.encounters[state.sel];
+  return {neueste: state.sel === 0 || !seg, start: seg ? seg.start : null};
+}
+export function auswahlNachLive(m: AuswahlMerk){
+  if(m.neueste || m.start === null){ state.sel = 0; return; }
+  const i = state.encounters.findIndex(x => x.start === m.start);
+  state.sel = i >= 0 ? i : 0;
+}
 export function loadText(text: string, names: string[], quiet?: boolean, ganz?: boolean){
   // Set here, from a flag sample() raises around its own call, rather than
   // afterwards by sample(): loading renders, and the party panel fills its
@@ -903,8 +997,10 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
      that turns out to be unusable - a wrong one dropped on the window - left
      its origin and its row counts describing the file that is still loaded. */
   const nextOrigin = loadingSample ? "sample" : loadOrigin;
+  const merk = auswahlMerken();
   const prev = state.text || "";
   const sameFile = JSON.stringify(state.fileNames||[]) === JSON.stringify(names||[]);
+  const liveGleich = nextOrigin === "watch" && sameFile;
   const appendOnly = sameFile && prev.length > 0 && text.length > prev.length &&
                      state.parsed && state.mapping && text.startsWith(prev);
   /* Clear sets a cutoff and buildEvents drops everything at or before it, for
@@ -929,13 +1025,18 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
      auch. Ein Live-Takt an derselben Datei laesst Start stehen, sonst waere
      Start waehrend der Aufzeichnung nach zwei Sekunden wieder weg. Gilt erst,
      wenn der Text genommen wird (unten, verlassen()). */
-  const verlassen = () => { if(nextOrigin !== "watch" || !sameFile){ state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; } };
+  const verlassen = () => { if(nextOrigin !== "watch" || !sameFile){ state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false; } };
 
   /* ganz: Live laedt ganz, wenn das Ende nicht anzuhaengen ging (loadTail,
      41-server-mode.ts). Dann immer mit parseGrid - der Weg hier unten zaehlt
      weder stable noch die Zeilenbreiten nach, und eine kleine Datei bliebe
-     so fuer immer unter stable, tailRechnen pruefte gegen alte Breiten. */
-  if(appendOnly && !ganz){
+     so fuer immer unter stable, tailRechnen pruefte gegen alte Breiten.
+     Und nur, wenn die Datei stable ist, wie in tailPasst: sonst stammt die
+     Zuordnung aus den ersten paar Zeilen und bliebe fuer den ganzen Abend
+     stehen (Issue #65: die Faehigkeits-ID als Schaden, 97,8 Mrd.; ab drei
+     Zeilen ohne Versionszeile gar keine Schadensspalte). Bis dahin wird
+     ganz gelesen und neu zugeordnet. */
+  if(appendOnly && !ganz && state.parsed!.stable){
     const tail = text.slice(prev.length);
     const grid = parseGridTail(tail, state.parsed);
     if(grid && grid.rows){
@@ -954,7 +1055,7 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
       });
       state.parsed!.rows = state.parsed!.rows.concat(grid.rows);   // grid came off it
       buildEvents(); refreshPlayers(); segment();
-      state.sel = 0;
+      if(liveGleich) auswahlNachLive(merk); else state.sel = 0;
       histRecord();
       renderAll();
       return;
@@ -995,7 +1096,7 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
   state.parsed = parsed; state._cols = cols; state.mapping = mapping;
   verlassen();
   buildEvents(); refreshPlayers(); segment();
-  state.sel = 0;
+  if(liveGleich) auswahlNachLive(merk); else state.sel = 0;
   histRecord();
   // the message says to map it in Log setup, so go there. It used to say that
   // from the start screen, which was covering the very tab it named.
@@ -1019,9 +1120,10 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
    zufaelligen Schnitten. */
 export function loadTail(tail: string, names: string[]){
   if(!tail) return tailPasst(names);
+  const merk = auswahlMerken();
   const neu = tailRechnen(tail, names);
   if(neu === false) return false;
-  state.sel = 0;
+  auswahlNachLive(merk);
   histNur = neu;
   try { histRecord(); } finally { histNur = null; }
   renderAll();
@@ -1062,7 +1164,7 @@ export function tailRechnen(tail: string, names: string[]): Set<Encounter> | nul
   if(!appendEvents()) buildEvents();
   refreshPlayers();
   const neu = segmentTail();
-  /* Der bisher neueste Kampf zaehlt mit: bauFuer und bestRecord lassen den
+  /* Der bisher neueste Kampf zaehlt mit: bestRecord laesst den
      laufenden aus, und ist er nicht mehr der neueste, gilt er jetzt. Er ist
      der neueste unter denen, die stehen blieben. */
   const bisher = neu ? state.encounters.find(x => !neu.has(x)) : undefined;

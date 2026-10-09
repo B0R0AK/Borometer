@@ -2,7 +2,7 @@
 // Copyright (C) 2026 B0R0AK
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
-// Die reinen Funktionen des Bautagebuchs (src/renderer/build-core.ts), ohne
+// Die reinen Funktionen des Waffenpaars und der Zahlen (src/renderer/build-core.ts), ohne
 // Seite: esbuild buendelt die eine Datei - sie importiert nur Typen -, Node
 // fuehrt sie aus.
 //
@@ -38,49 +38,15 @@ eq(core.pairFromSkills([sk("a", "Crossbow", 97), sk("b", "Longbow", 2), sk("p", 
 eq(core.pairFromSkills([sk("a", "Unassigned", 50), sk("p", "Passive", 50)], 100, 3), null,
    "pairFromSkills: ohne zugeordnete Waffe kein Paar");
 
-// tragende Faehigkeiten: bis 80 %, hoechstens sechs, Passiv nie
-eq(core.coreFromSkills([sk("a", "X", 30), sk("b", "X", 22), sk("c", "X", 16), sk("d", "X", 12), sk("e", "X", 10), sk("f", "X", 10)], 100),
-   ["a", "b", "c", "d"], "coreFromSkills: bis 80 % erreicht sind");
-eq(core.coreFromSkills("abcdefghij".split("").map((k) => sk(k, "X", 10)), 100),
-   ["a", "b", "c", "d", "e", "f"], "coreFromSkills: hoechstens sechs");
-eq(core.coreFromSkills([sk("p", "Passive", 50), sk("a", "X", 30), sk("b", "X", 20)], 100),
-   ["a", "b"], "coreFromSkills: Passiv zaehlt im Nenner, nicht im Kern");
-eq(core.coreFromSkills([sk("a", "X", 45), sk("a", "X", 40), sk("b", "X", 15)], 100),
-   ["a"], "coreFromSkills: zwei Raenge derselben Faehigkeit zaehlen zusammen");
-
-// Fingerabdruck, Handauswahl gewinnt beim Paar
-const skills = [sk("a", "Longbow", 40), sk("b", "Crossbow", 30), sk("c", "Longbow", 20), sk("d", "Crossbow", 10)];
-eq(core.fingerprint(skills, 100, 3, null), { weapons: ["Longbow", "Crossbow"], core: ["a", "b", "c"] },
-   "fingerprint: Paar und Kern");
-eq(core.fingerprint(skills, 100, 3, { main: "Dagger", off: "Staff" }).weapons, ["Dagger", "Staff"],
-   "fingerprint: die Handauswahl gewinnt");
-eq(core.fingerprint([], 0, 3, null), null, "fingerprint: ohne Schaden keiner");
-
-// derselbe Bau
-const fp = (weapons, coreKeys) => ({ weapons, core: coreKeys });
-const A = fp(["Longbow", "Crossbow"], ["a", "b", "c", "d", "e", "f"]);
+/* Erkennung ueber Skills entfaellt (#51, Builds-Reiter 9); ersetzt durch: kampfBuild, kampfPaar,
+   gleicherBezug, zuordnenListe (unten, "Boss-Tabelle, Zuordnen, Bezug"). Entfallen sind damit die Proben
+   zu coreFromSkills (bis 80 %, hoechstens sechs, Passiv nur im Nenner, Raenge zusammen), fingerprint
+   (Paar und Kern, Handauswahl gewinnt, ohne Schaden keiner), sameBau (vier von sechs, anderes Paar,
+   kleiner Kern), bauId (Form, Reihenfolge, anderer Kern) und findBau (meiste gemeinsame, nichts
+   Aehnliches). Was davon bleibt: das Paar aus den Skills (pairFromSkills, oben; die Handauswahl gewinnt in
+   paarVon, 47-builds.ts) und samePair (hier). */
 eq(core.samePair(["Longbow", "Crossbow"], ["Crossbow", "Longbow"]), true, "samePair: Reihenfolge egal");
-eq(core.sameBau(A, fp(["Crossbow", "Longbow"], ["a", "b", "c", "d", "x", "y"])), true, "sameBau: vier von sechs gemeinsam");
-eq(core.sameBau(A, fp(["Longbow", "Crossbow"], ["a", "b", "c", "x", "y", "z"])), false, "sameBau: drei von sechs sind ein anderer Bau");
-eq(core.sameBau(A, fp(["Dagger", "Crossbow"], ["a", "b", "c", "d", "e", "f"])), false, "sameBau: anderes Paar, anderer Bau");
-eq(core.sameBau(fp(["X", ""], ["a", "b"]), fp(["X", ""], ["a", "b", "c"])), true, "sameBau: ein kleiner Kern muss ganz im anderen stehen");
-eq(core.sameBau(fp(["X", ""], ["a", "b"]), fp(["X", ""], ["a", "c"])), false, "sameBau: ... sonst nicht");
-
-// Kennung
-const id = core.bauId(A);
-eq(/^[0-9a-z]{10}$/.test(id), true, "bauId: zehn Buchstaben oder Ziffern");
-eq(core.bauId(fp(["Crossbow", "Longbow"], ["f", "e", "d", "c", "b", "a"])), id, "bauId: unabhaengig von der Reihenfolge");
-eq(core.bauId(fp(["Longbow", "Crossbow"], ["a", "b", "c", "d", "e", "g"])) === id, false, "bauId: ein anderer Kern, eine andere Kennung");
-
-// den bekannten Bau finden
-const store = {
-  aaaaaaaaaa: { name: "", weapons: ["Longbow", "Crossbow"], core: ["a", "b", "c", "d", "x", "y"], first: 2 },
-  bbbbbbbbbb: { name: "", weapons: ["Longbow", "Crossbow"], core: ["a", "b", "c", "d", "e", "y"], first: 3 },
-  cccccccccc: { name: "", weapons: ["Longbow", "Crossbow"], core: ["a", "b", "c", "d", "e", "z"], first: 1 },
-  dddddddddd: { name: "", weapons: ["Dagger", "Crossbow"], core: ["a", "b", "c", "d", "e", "f"], first: 0 },
-};
-eq(core.findBau(A, store), "cccccccccc", "findBau: die meisten gemeinsamen, bei Gleichstand der aeltere");
-eq(core.findBau(fp(["Staff", "Wand and Tome"], ["a"]), store), null, "findBau: nichts Aehnliches");
+eq(core.samePair(["Longbow", "Crossbow"], ["Longbow", ""]), false, "samePair: ein anderes Paar");
 
 // Median wie im Verlauf, Abendgrenze 12:00
 eq([core.mitte([3, 1, 2]), core.mitte([4, 1, 3, 2])], [2, 2.5], "mitte: bei gerader Anzahl der Mittelwert der beiden mittleren");
@@ -93,47 +59,16 @@ eq(core.ABEND_STUNDE, 12, "die Abendgrenze ist eine Konstante: 12 Uhr");
 eq([core.abend(Date.UTC(2026, 8, 23, 11, 59, 59)), core.abend(Date.UTC(2026, 8, 23, 12)), core.abend(Date.UTC(2026, 8, 24, 1, 30)), core.abend(Date.UTC(2026, 8, 24, 11, 59, 59))],
    ["2026-09-22", "2026-09-23", "2026-09-23", "2026-09-23"], "abend: 11:59 gehoert zum Vorabend, 12:00 bis 11:59 zum selben");
 
-// Die Zeilen je Bau und Ziel (bauZeilen) entfielen mit der Karte des Builds (Aufgabe 12, 29.09.); ihre Regeln -
-// Median ab drei Kaempfen, meiste Kaempfe zuerst, die Puppe kein Boss - prueft test-plan-core.mjs an kartenZahlen.
+// Der Builds-Reiter ist entfallen (#207): Build-Form, Name, Link, Rotation-Wahlen je Build, Kennungen, Uebernahme
+// und Boss-Tabelle je Build gibt es im Kern nicht mehr; ihre Proben entfallen mit ihnen.
 
-// Nummern ohne Namen, je Paar
-eq(core.bauNummern(store), { cccccccccc: 1, aaaaaaaaaa: 2, bbbbbbbbbb: 3, dddddddddd: 1 }, "bauNummern: je Paar nach dem ersten Kampf");
-
-// Name und Link
-eq([core.cleanName("  Burst\u0007 "), core.cleanName("x".repeat(41)), core.cleanName("Burst  zwei")], ["Burst", null, "Burst zwei"],
-   "cleanName: Steuerzeichen raus, hoechstens 40");
-eq(["https://questlog.gg/throne-and-liberty/en/character-builder/abc", "http://questlog.gg/x", "javascript:alert(1)",
-    "https://a b", "https://" + "x".repeat(300)].map(core.linkOk), [true, false, false, false, false], "linkOk: nur https");
-eq(core.looksLikeBau({ name: "Burst", weapons: ["Longbow", "Crossbow"], core: ["a"], first: 1 }), true, "looksLikeBau: gut");
-// Fixrunde 1 zu Aufgabe 12: ein Build mit Link wird im Bereich Builds geloest - als Zeitpunkt, nie geloescht
-eq([{ geloest: 5 }, { geloest: "ja" }, { geloest: null }].map((x) => core.looksLikeBau({ name: "", weapons: ["Longbow", "Crossbow"], core: ["a"], first: 1,
-   link: "https://maxroll.gg/tl/x", ...x })), [true, false, false], "looksLikeBau: geloest nur als Zahl");
-eq([{ name: "x".repeat(41), weapons: ["a", "b"], core: ["a"], first: 1 },
-    { name: "", weapons: ["a"], core: ["a"], first: 1 },
-    { name: "", weapons: ["a", "b"], core: [], first: 1 },
-    { name: "", weapons: ["a", "b"], core: ["a"], first: 1, link: "http://x" },
-    { name: "", weapons: ["a", "b"], core: ["a"] }].map(core.looksLikeBau), [false, false, false, false, false],
-   "looksLikeBau: zu langer Name, ein Paar ohne zweite Stelle, leerer Kern, http-Link, ohne first");
-
-// Deine Rotation (Spezifikation 7): rot, Schluessel 1-80 Zeichen, Werte 0/1/2, hoechstens 24
-const bau = (rot) => ({ name: "", weapons: ["a", "b"], core: ["a"], first: 1, rot });
-const vieleRot = (n) => Object.fromEntries(Array.from({ length: n }, (_, i) => ["Skill " + i, i % 3]));
-eq(core.BAU_ROT_MAX, 24, "BAU_ROT_MAX: 24 wie MAX_ROT in src/main/builds.ts");
-eq([{ "Deadly Viper": 1, "Quick Fire": 2, "Storm Current": 0 }, {}, vieleRot(24), { ["k".repeat(80)]: 1 }].map(core.rotOk),
-   [true, true, true, true], "rotOk: gueltig, leer, 24 Eintraege, 80 Zeichen");
-eq([vieleRot(25), { a: 3 }, { a: 1.5 }, { a: -1 }, { a: "1" }, { "": 1 }, { ["k".repeat(81)]: 1 }, [1], null, "x"].map(core.rotOk),
-   [false, false, false, false, false, false, false, false, false, false],
-   "rotOk: 25 Eintraege, 3, 1.5, -1, Text, leerer Schluessel, 81 Zeichen, Liste, null, Text");
-eq([bau({ "Deadly Viper": 1 }), bau(undefined)].map(core.looksLikeBau), [true, true], "looksLikeBau: mit rot und ohne");
-eq([{ toString: 1 }, { constructor: 1 }, { prototype: 1 }, JSON.parse('{"__proto__": 1}'), { "Deadly Viper": 1 }].map(core.rotOk),
-   [false, false, false, false, true], "rotOk: __proto__, constructor, prototype und toString nie (wie putBuild), ein Skill-Name schon");
-eq([bau({ a: 3 }), bau(vieleRot(25)), bau([])].map(core.looksLikeBau), [false, false, false],
-   "looksLikeBau: rot mit Wert 3, mit 25 Eintraegen, als Liste");
-// bauPasst: was putBuild annimmt - die Form und hoechstens BAU_ENTRY_MAX (4096) Zeichen als JSON (Review #44)
-eq(core.BAU_ENTRY_MAX, 4096, "BAU_ENTRY_MAX: 4096 wie MAX_ENTRY in src/main/builds.ts");
-eq([bau(vieleRot(24)), { ...bau({}), mehr: "x".repeat(4100) }, bau({ ["k".repeat(81)]: 1 })].map(core.bauPasst), [true, false, false],
-   "bauPasst: 24 Wahlen passen, ueber 4096 Zeichen nicht, ein Schluessel mit 81 Zeichen nicht");
-
+// --- Builds-Reiter (#51, Spez 5.2/5.3): Waffenliste, Kodierung, gespeicherte Builds
+eq(core.WAFFEN, ["", "Greatsword", "Sword and Shield", "Dagger", "Crossbow", "Longbow", "Staff", "Wand and Tome", "Spear", "Gauntlet", "Orb"],
+   "WAFFEN: feste Liste, Index 0 = keine (nur hinten verlaengern)");
+eq([core.paarCode(["Longbow", "Crossbow"]), core.paarCode(["Dagger", ""]), core.paarCode(["", "Dagger"]), core.paarCode(["Passive", "Dagger"]), core.paarCode(["Bogen", "Dagger"])],
+   [[5, 4], [3, 0], null, null, null], "paarCode: Index je Waffe, erste nie leer, Passiv und Fremdes nie");
+eq([core.paarAus([5, 4]), core.paarAus([3, 0]), core.paarAus([0, 3]), core.paarAus([5, 99]), core.paarAus([1.5, 2]), core.paarAus("5,4"), core.paarAus([5])],
+   [["Longbow", "Crossbow"], ["Dagger", ""], null, null, null, null, null], "paarAus: zurueck, nur ganze Zahlen im Bereich");
 // Einordnung (Instrumententafel 4): Lagen auf der Skala, 0 links, 1 rechts
 {
   const s = core.einordnungSkala(100, 160, 130);
@@ -144,6 +79,19 @@ eq([bau(vieleRot(24)), { ...bau({}), mehr: "x".repeat(4100) }, bau({ ["k".repeat
   eq(t.dieser < t.sonst && t.dieser >= 0, true, "Skala: unter dem Median links davon, nicht aus der Skala");
   const g = core.einordnungSkala(100, 100, 100);
   eq([g.sonst, g.bester, g.dieser].every(x => x >= 0 && x <= 1), true, "Skala: alles gleich bleibt in der Skala");
+}
+
+// --- Bezug (Spez 6, seit #207 nur noch das Waffenpaar): kampfPaar liest nur w, gleicherBezug vergleicht Paare
+{
+  const F = (name, dps, at, x = {}) => ({ name, dps, dmg: dps, dur: 60, at, ...x });
+  eq([core.kampfPaar(F("Fellinex", 1, 1, { w: [5, 4] })), core.kampfPaar(F("Fellinex", 1, 2, { w: [3, 0] })), core.kampfPaar(F("Fellinex", 1, 3)),
+      core.kampfPaar(F("Fellinex", 1, 4, { w: [0, 3] })), core.kampfPaar(F("Fellinex", 1, 5, { w: "5,4" }))],
+     [["Longbow", "Crossbow"], ["Dagger", ""], null, null, null], "kampfPaar: nur w; ein altes b liefert kein Paar mehr");
+  const alt = F("Fellinex", 1, 6, { b: "pve0000000" });
+  eq(core.kampfPaar(alt), null, "kampfPaar: ein alter Eintrag nur mit b (aus boro-builds.json) hat kein Paar und wirft nichts");
+  eq([core.gleicherBezug(["X", "Y"], ["Y", "X"]), core.gleicherBezug(["X", "Y"], ["X", ""]), core.gleicherBezug(null, ["X", "Y"]),
+      core.gleicherBezug(["X", "Y"], null), core.gleicherBezug(null, null)],
+     [true, false, false, false, false], "gleicherBezug: dasselbe Paar in jeder Reihenfolge; Unbekanntes nie");
 }
 
 console.log();

@@ -40,7 +40,7 @@ const ZIEL = ["#btnPickFolder", "#btnWatch", "#kwKnopf", "#btnCompact", '#bereic
 async function oeffne({ app = true, lang = "de", config = {}, configHalt = false, helfer = null, kfenster = false,
   suffix = "", breite = 1280, hoehe = 860, motion = "no-preference", warten = true } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, reducedMotion: motion });
-  const s = { page, fehler: [], posts: [], dir: [], configFrei: () => {} };
+  const s = { page, fehler: [], posts: [], sprache: [], dir: [], configFrei: () => {} };
   const halt = configHalt ? new Promise((r) => { s.configFrei = r; }) : null;
   let ordner = helfer ? helfer.dir : "";
   page.on("pageerror", (e) => s.fehler.push(String(e)));
@@ -51,7 +51,12 @@ async function oeffne({ app = true, lang = "de", config = {}, configHalt = false
     if (path === "/api/state") return json({ dir: ordner, file: "", nativeFrame: app, material: false, stayOnTop: false, kompaktFenster: kfenster });
     // Fixrunde 1, M6: der Hauptprozess meldet den ersten Start (firstStart); eine eigene config ueberschreibt es
     if (path === "/api/config" && req.method() === "GET") { if (halt) await halt; return json({ firstStart: true, ...config }); }
-    if (path === "/api/config") { s.posts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
+    if (path === "/api/config") {
+      const b = JSON.parse(req.postData() || "{}");
+      // Spezifikation Windows-Einbindung 8: die Seite schreibt ihre Sprache selbst ({lang} allein) - nicht der Rundgang, zaehlt hier nicht
+      if (Object.keys(b).join() === "lang") s.sprache.push(b); else s.posts.push(b);
+      return json({ ok: true });
+    }
     if (path === "/api/dir") {
       const b = req.method() === "POST" ? JSON.parse(req.postData() || "{}") : { get: true };
       s.dir.push(b);
@@ -61,7 +66,6 @@ async function oeffne({ app = true, lang = "de", config = {}, configHalt = false
     if (path === "/api/latest") return json({ file: "", from: 0, to: 0, size: 0, head: "", text: "" });
     if (path === "/api/win") return json({ ok: true, max: false, w: 400, h: 28, on_top: true });
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
     if (path === "/api/logs") return json({ ok: true, files: [] });
     if (path.startsWith("/api/")) return json({ ok: true });
@@ -314,7 +318,16 @@ try {
     const p = s.page;
     await offen(p);
     await weiter(p);
+    /* folgt #155 (Entscheidung 06.10.): mit Log-Ordner oeffnet die Pille auch ohne Log die Kampfwahl
+       (fruehere Tage), nicht den Datei-Dialog; Strg+K ebenso. Beides muss bei offener Karte ankommen. */
+    await p.evaluate(() => { window.__offen = 0; document.querySelector("#miOpenCombat").addEventListener("click", () => window.__offen++); });
     await p.click("#kwKnopf");
+    await p.waitForFunction(() => document.querySelector("#kwKnopf").getAttribute("aria-expanded") === "true", null, { timeout: 3000 }).catch(() => {});
+    const pille = await p.evaluate(() => ({ offen: window.__offen, expanded: document.querySelector("#kwKnopf").getAttribute("aria-expanded") }));
+    assert(pille.offen === 0 && pille.expanded === "true", "mit Log-Ordner: der Klick auf die Pille oeffnet bei offener Karte die Kampfwahl", pille);
+    await p.keyboard.press("Escape");
+    await p.waitForFunction(() => document.querySelector("#kwKnopf").getAttribute("aria-expanded") === "false");
+    await p.keyboard.press("Control+K");
     await p.waitForFunction(() => document.querySelector("#kwKnopf").getAttribute("aria-expanded") === "true");
     await p.keyboard.press("Escape");
     await p.waitForFunction(() => document.querySelector("#kwKnopf").getAttribute("aria-expanded") === "false");

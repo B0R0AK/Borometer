@@ -115,7 +115,7 @@ try {
   assert(s.auto.length === 1 && !!viper && viper.text.includes("Listed as a passive – Borometer knows it that way."),
     "Automatisch: Deadly Viper mit dem Grund Passiv, sonst nichts", s.auto);
   assert(viperN > 10 && s.punkte === viperN, "die Punktreihe: ein Punkt je Einsatz von Deadly Viper", { viperN, punkte: s.punkte });
-  assert(s.autoText.includes("Applies to this session – it is kept once Borometer knows the build."),
+  assert(s.autoText.includes("Applies to this session."),
     "ohne Build: die Wahl gilt in der Sitzung", s.autoText);
   /* Issue #52: "Automatisch" ist ein aufklappbarer Kasten. Deadly Viper ist ein ungepruefter Vorschlag:
      der Kasten steht offen, der Kopf sagt "1 new"; eine Zeile je Skill, die Begruendung einzeilig mit title. */
@@ -547,12 +547,13 @@ try {
     await p3.close();
   }
 
-  // 14 · mit dem Helfer: die Wahl geht an den Build (Bau.rot), und zwar ueber POST /api/builds
+  // 14 · mit dem Helfer: die Wahl bleibt in der Sitzung. Der Builds-Reiter ist entfallen (#207): nichts geht an einen Build,
+  // /api/builds und /api/plans werden nie gefragt (posts sammelt jeden Versuch)
   const logA = join(work, "bau-a.txt"), logB = join(work, "bau-b.txt");
   const vortex = Array.from({ length: 10 }, (_, i) => [15000 + i * 1500 + 250, AV]);
   writeFileSync(logA, stilleLog(Date.UTC(2026, 8, 20, 21, 0, 0), vortex));
   writeFileSync(logB, stilleLog(Date.UTC(2026, 8, 20, 21, 10, 0), vortex));
-  const helfer = async (gebe) => {
+  const helfer = async () => {
     const pg = await browser.newPage({ viewport: { width: 1280, height: 900 } });
     const err = [];
     pg.on("pageerror", (e) => err.push(String(e)));
@@ -562,8 +563,7 @@ try {
       const req = route.request();
       const path = new URL(req.url()).pathname;
       const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
-      if (path === "/api/builds" && req.method() === "GET") { const b = gebe(); return b ? json(200, { ok: true, builds: b }) : json(503, { ok: false }); }
-      if (path === "/api/builds" && req.method() === "POST") { posts.push(JSON.parse(req.postData() || "{}")); return json(200, { ok: true }); }
+      if (/^\/api\/(builds|plans)/.test(path)) posts.push(path);
       if (path.startsWith("/api/")) return json(200, {});
       return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
     });
@@ -581,82 +581,53 @@ try {
     .find((x) => x.dataset.k === k && x.dataset.wahl === v)?.click(), [k, v]);
   const warte = async (pg, bis) => { for (const end = Date.now() + 15000; Date.now() < end && !bis(); ) await pg.waitForTimeout(100); };
 
-  const A = await helfer(() => ({}));
+  // eine Wahl bleibt in der Sitzung: Stimmt, ein Kampf mit demselben Paar, Zuruecknehmen, Rueckgaengig; nichts wird geschrieben
+  const A = await helfer();
   await laden(A.pg, logA);
-  await warte(A.pg, () => A.posts.length >= 1);
-  const bau = A.posts[0];
   let sA = await stand(A.pg);
-  assert(!!bau && /^[0-9a-z]{10}$/.test(bau.id) && !bau.build.rot && !sA.autoText.includes("Applies to this session"),
-    "Helfer: der Build ist bekannt (ohne rot), kein Hinweis auf die Sitzung", { bau, auto: sA.autoText });
+  assert(sA.autoText.includes("Applies to this session"), "Helfer: die Wahl gilt in der Sitzung, kein Build", sA.autoText);
   await klick(A.pg, "Deadly Viper", "1");
-  await warte(A.pg, () => A.posts.length >= 2);
-  assert(A.posts.length === 2 && A.posts[1].id === bau.id && JSON.stringify(A.posts[1].build.rot) === '{"Deadly Viper":1}' &&
-    A.posts[1].build.name === bau.build.name && JSON.stringify(A.posts[1].build.core) === JSON.stringify(bau.build.core),
-    "Stimmt: POST an denselben Build, rot {Deadly Viper: 1}, sonst unveraendert", A.posts[1]);
+  await A.pg.waitForTimeout(300);
   sA = await stand(A.pg);
-  assert(sA.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this build", "Stimmt: bestaetigt fuer diesen Build", sA.auto);
+  assert(sA.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this session", "Stimmt: bestaetigt fuer diese Sitzung", sA.auto);
   await laden(A.pg, logB);
   sA = await stand(A.pg);
-  assert(!sA.keys.includes("Deadly Viper") && sA.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this build",
-    "ein neuer Kampf mit demselben Build: weiter draussen und bestaetigt", sA.auto);
+  assert(!sA.keys.includes("Deadly Viper") && sA.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this session",
+    "ein neuer Kampf mit demselben Paar: weiter draussen und bestaetigt", sA.auto);
   await klick(A.pg, "Deadly Viper", "0");
-  await warte(A.pg, () => A.posts.length >= 3);
-  assert(A.posts.length === 3 && JSON.stringify(A.posts[2].build.rot) === '{"Deadly Viper":0}', "Zuruecknehmen: 0, der Schluessel bleibt", A.posts[2]);
+  await A.pg.waitForTimeout(300);
+  sA = await stand(A.pg);
+  assert(sA.auto.find((x) => x.k === "Deadly Viper")?.status === "" , "Zuruecknehmen: wieder nur vorgeschlagen", sA.auto);
   await A.pg.evaluate(() => document.querySelector("#toast .tact")?.click());
-  await warte(A.pg, () => A.posts.length >= 4);
-  assert(A.posts.length === 4 && JSON.stringify(A.posts[3].build.rot) === '{"Deadly Viper":1}', "Rueckgaengig: der Wert davor, geschrieben", A.posts[3]);
+  await A.pg.waitForTimeout(300);
+  sA = await stand(A.pg);
+  assert(sA.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this session", "Rueckgaengig: der Wert davor", sA.auto);
+  await A.pg.waitForTimeout(800);
+  assert(!A.posts.length, "nichts wird an einen Build geschrieben, /api/builds und /api/plans werden nie gefragt", A.posts);
   assert(!A.err.length, "Helfer: keine Fehler in der Seite", A.err);
   await A.pg.close();
 
-  // 24 Wahlen: keine 25., kein POST, der Hinweis sagt es, die Wahl gilt in der Sitzung
-  const voll = Object.fromEntries(Array.from({ length: 24 }, (_, i) => ["Skill " + i, 1]));
-  const V = await helfer(() => ({ [bau.id]: { ...bau.build, rot: voll } }));
-  await laden(V.pg, logA);
-  await klick(V.pg, "Deadly Viper", "1");
-  await V.pg.waitForTimeout(600);
-  const sV = await stand(V.pg);
-  const vtoast = await V.pg.evaluate(() => document.querySelector("#toast").textContent);
-  assert(!V.posts.length && vtoast.startsWith("Not saved – this build already has 24 choices.") &&
-    sV.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this session",
-    "voll: nichts geschrieben, Hinweis, in der Sitzung bestaetigt", { posts: V.posts, vtoast, auto: sV.auto });
-  assert(!V.err.length, "voll: keine Fehler in der Seite", V.err);
-  await V.pg.close();
-
-  // anderer Build desselben Paars: Vorschlag mit seinem Namen
-  const O = await helfer(() => ({ [bau.id]: bau.build,
-    zzzzzzzzzz: { name: "Other", weapons: bau.build.weapons, core: ["x1", "x2", "x3", "x4"], first: 1, rot: { "Arrow Vortex": 1 } } }));
-  await laden(O.pg, logA);
-  const sO = await stand(O.pg);
-  const av = sO.auto.find((x) => x.k === "Arrow Vortex");
-  assert(!!av && av.text.includes("You confirmed it as automatic in your build Other.") && !sO.keys.includes("Arrow Vortex"),
-    "anderer Build desselben Paars: vorgeschlagen, mit seinem Namen", sO.auto);
-  assert(!O.err.length, "anderer Build: keine Fehler in der Seite", O.err);
-  await O.pg.close();
-
-  /* Issue #52: der Kasten "Automatisch" zu oder offen. Nur bestaetigte Skills: zu, der Kopf nennt die Anzahl.
-     Enter auf dem Kopf schaltet um; Neuzeichnen setzt weder den Zustand noch den Fokus zurueck. Ein neuer
-     Vorschlag oeffnet ihn, auch wenn er von Hand zu war; ein schon gesehener nicht. */
+  /* Issue #52: der Kasten "Automatisch" zu oder offen. Ein ungepruefter Vorschlag, der vorher nicht da war, oeffnet
+     ihn; Enter auf dem Kopf schaltet um; Neuzeichnen setzt weder den Zustand noch den Fokus zurueck. Ein schon
+     gesehener Vorschlag oeffnet ihn nicht wieder (gesehen gilt seit #207 je Faehigkeit in der Sitzung, nicht je Build). */
   const logKD = join(work, "kasten-dolch.txt"), logKC = join(work, "kasten-drei.txt");
   writeFileSync(logKD, stilleLog(Date.UTC(2026, 8, 21, 22, 0, 0), [], [FS, VS]));
   writeFileSync(logKC, stilleLog(Date.UTC(2026, 8, 21, 23, 0, 0), [], [QF, FS]));
-  const K = await helfer(() => ({ [bau.id]: { ...bau.build, rot: { "Deadly Viper": 1 } } }));
+  const K = await helfer();
   await laden(K.pg, logA);
   let sK = await stand(K.pg);
-  assert(sK.kasten.da && !sK.kasten.offen && sK.kasten.label === "Automatic, 1 left out" && !sK.kasten.neu && sK.kasten.syms === 1 &&
-    sK.auto.find((x) => x.k === "Deadly Viper")?.status === "confirmed",
-    "nur bestaetigte Skills: der Kasten ist zu, der Kopf nennt die Anzahl", sK.kasten);
-  const kopfHoch = await K.pg.evaluate(() => Math.round(document.querySelector("#drAutoKasten").getBoundingClientRect().height));
-  assert(kopfHoch >= 30 && kopfHoch <= 44, "zugeklappt etwa 38 px hoch", kopfHoch);
-  assert(sK.autoText.includes("Kept for the build"), "der Satz nennt den Build", sK.autoText);
+  assert(sK.kasten.da && sK.kasten.offen && sK.kasten.neu === "1 new" && sK.kasten.label === "Automatic, 1 left out, 1 new",
+    "ein neuer Vorschlag: der Kasten oeffnet von selbst, der Kopf nennt 1 new", sK.kasten);
   await K.pg.focus("#drAutoKasten > summary");
   await K.pg.keyboard.press("Enter");
   await K.pg.waitForTimeout(80);
-  assert((await stand(K.pg)).kasten.offen, "Enter auf dem Kopf: offen");
+  assert(!(await stand(K.pg)).kasten.offen, "Enter auf dem Kopf: zu");
+  const kopfHoch = await K.pg.evaluate(() => Math.round(document.querySelector("#drAutoKasten").getBoundingClientRect().height));
+  assert(kopfHoch >= 30 && kopfHoch <= 44, "zugeklappt etwa 38 px hoch", kopfHoch);
+  assert(sK.autoText.includes("Applies to this session"), "der Satz nennt die Sitzung", sK.autoText);
   await K.pg.keyboard.press(" ");
   await K.pg.waitForTimeout(80);
-  assert(!(await stand(K.pg)).kasten.offen, "Leertaste auf dem Kopf: wieder zu");
-  await K.pg.keyboard.press("Enter");
-  await K.pg.waitForTimeout(80);
+  assert((await stand(K.pg)).kasten.offen, "Leertaste auf dem Kopf: wieder offen");
   // Neuzeichnen (Sprache hin und zurueck baut den Kopf neu): offen bleibt offen, der Fokus bleibt auf dem Kopf
   await K.pg.evaluate(() => { document.querySelector("#btnLang").click(); document.querySelector("#btnLang").click(); });
   await K.pg.waitForTimeout(150);
@@ -665,13 +636,6 @@ try {
   sK = await stand(K.pg);
   assert(sK.kasten.offen && await K.pg.evaluate(() => document.activeElement === document.querySelector("#drAutoKasten > summary")),
     "Neuzeichnen: der Kasten bleibt offen, der Fokus auf dem Kopf", sK.kasten);
-  // von Hand zu, dann ein Kampf mit einem neuen Vorschlag (Dolch-Build, Deadly Viper ungeprueft): offen, 1 new
-  await K.pg.keyboard.press("Enter");
-  await K.pg.waitForTimeout(80);
-  await laden(K.pg, logKD);
-  sK = await stand(K.pg);
-  assert(sK.kasten.offen && sK.kasten.neu === "1 new" && sK.kasten.label === "Automatic, 1 left out, 1 new",
-    "neuer Vorschlag: der Kasten oeffnet von selbst, trotz Handzustand", sK.kasten);
   // Tastatur: vom Kopf mit Tab zu Stimmt; der Fokus geht auf Zuruecknehmen, der Kasten bleibt offen, 1 new ist weg
   await K.pg.focus("#drAutoKasten > summary");
   await K.pg.keyboard.press("Tab");
@@ -694,18 +658,15 @@ try {
   await laden(K.pg, logKD);
   sK = await stand(K.pg);
   assert(!sK.kasten.offen && sK.kasten.neu === "1 new", "von Hand zu, der Vorschlag schon gesehen: der Kasten bleibt zu", sK.kasten);
-  // derselbe Vorschlag in einem anderen Build ist dort neu: der Kasten geht wieder auf
+  // von Hand weggelassen: der title sagt es und dass es in der Sitzung gilt
   await laden(K.pg, logKC);
-  sK = await stand(K.pg);
-  assert(sK.kasten.offen && sK.kasten.neu === "1 new", "derselbe Vorschlag in einem dritten Build: der Kasten oeffnet wieder", sK.kasten);
-  // von Hand weggelassen, mit Build: der title sagt es
   await K.pg.evaluate(() => document.querySelector('#drGed .rotgz[data-k="Quick Fire"]').click());
   await K.pg.waitForTimeout(120);
   await klick(K.pg, "Quick Fire", "1");
   await K.pg.waitForTimeout(300);
   sK = await stand(K.pg);
   const qf = sK.auto.find((x) => x.k === "Quick Fire");
-  assert(!!qf && qf.status === "left out" && qf.fest === "Left out for this build", "Immer weglassen mit Build: ausgeblendet, title Left out for this build", qf);
+  assert(!!qf && qf.status === "left out" && qf.fest === "Left out for this session", "Immer weglassen: ausgeblendet, title Left out for this session", qf);
   await laden(K.pg, logKD);
   // Druecke ich selbst: wirkt wie bisher, auch aus dem Kasten heraus
   await klick(K.pg, "Deadly Viper", "2");
@@ -715,83 +676,27 @@ try {
   assert(!K.err.length, "Kasten: keine Fehler in der Seite", K.err);
   await K.pg.close();
 
-  // die Sitzung geht in den Build ueber, sobald Borometer ihn kennt
-  let lesbar = false;
-  const L = await helfer(() => (lesbar ? {} : null));
-  await laden(L.pg, logA);
-  let sL = await stand(L.pg);
-  assert(sL.autoText.includes("Applies to this session"), "vor dem Lesen: die Wahl gilt in der Sitzung", sL.autoText);
-  await klick(L.pg, "Deadly Viper", "1");
-  lesbar = true;
-  await warte(L.pg, () => L.posts.some((p) => p.build?.rot?.["Deadly Viper"] === 1));
-  const uebernommen = L.posts.find((p) => p.build?.rot?.["Deadly Viper"] === 1);
-  assert(!!uebernommen && uebernommen.id === bau.id, "nach dem Lesen: die Wahl der Sitzung steht im Build", L.posts);
-  assert(!L.err.length, "Sitzung zum Build: keine Fehler in der Seite", L.err);
-  await L.pg.close();
-
-  /* 15 · zwei Builds (Review #44): eine Wahl der Sitzung, getroffen am Kampf von Build A (Bogen), gilt
-     nicht im Kampf von Build B (Dolch) und landet nie in B - nur in A, sobald Borometer A kennt. */
+  /* 15 · zwei Kaempfe ohne Build, verschiedene Paare (Review #44): eine Wahl der Sitzung, getroffen am Kampf
+     mit dem Bogen, gilt nicht im Kampf mit dem Dolch und landet nirgends. */
   const logD = join(work, "bau-dolch.txt");
   writeFileSync(logD, stilleLog(Date.UTC(2026, 8, 21, 21, 0, 0), [], [FS, VS]));
-  let offen2 = false;
-  const Z = await helfer(() => (offen2 ? {} : null));
+  const Z = await helfer();
   await laden(Z.pg, logA);
   await klick(Z.pg, "Deadly Viper", "1");
   await Z.pg.waitForTimeout(200);
   await laden(Z.pg, logD);
   let sZ = await stand(Z.pg);
   assert(sZ.auto.find((x) => x.k === "Deadly Viper")?.knoepfe.length === 2 && !sZ.keys.includes("Deadly Viper"),
-    "Build B, vor dem Lesen: die Wahl aus dem Kampf von A gilt hier nicht (Viper nur vorgeschlagen)", sZ.auto);
-  offen2 = true;
-  const istDolch = (p) => (p.build?.weapons || []).includes("Dagger");
-  await warte(Z.pg, () => Z.posts.some(istDolch));
+    "Kampf mit anderem Paar: die Wahl aus dem Kampf mit dem Bogen gilt hier nicht (Viper nur vorgeschlagen)", sZ.auto);
   await Z.pg.waitForTimeout(800);
-  assert(Z.posts.some(istDolch) && Z.posts.filter(istDolch).every((p) => !p.build.rot),
-    "nach dem Lesen: Build B entsteht, ohne rot", Z.posts.map((p) => ({ id: p.id, w: p.build.weapons, rot: p.build.rot })));
+  assert(!Z.posts.length, "nichts davon geht an /api/builds oder /api/plans", Z.posts);
   await laden(Z.pg, logA);
-  await warte(Z.pg, () => Z.posts.some((p) => !istDolch(p) && p.build?.rot?.["Deadly Viper"] === 1));
-  const inA = Z.posts.find((p) => !istDolch(p) && p.build?.rot?.["Deadly Viper"] === 1);
-  assert(!!inA, "Build A, sobald bekannt: die Wahl der Sitzung steht in A", Z.posts.map((p) => ({ id: p.id, w: p.build.weapons, rot: p.build.rot })));
-  await laden(Z.pg, logD);
-  await Z.pg.waitForTimeout(500);
   sZ = await stand(Z.pg);
-  assert(Z.posts.filter(istDolch).every((p) => !p.build.rot) && sZ.auto.find((x) => x.k === "Deadly Viper")?.knoepfe.length === 2,
-    "zurueck bei B: nichts von A in B, weder geschrieben noch angezeigt", { auto: sZ.auto, posts: Z.posts.filter(istDolch).map((p) => p.build.rot) });
-  assert(!Z.err.length, "zwei Builds: keine Fehler in der Seite", Z.err);
+  assert(sZ.auto.find((x) => x.k === "Deadly Viper")?.fest === "Confirmed for this session",
+    "zurueck beim Bogen: die Wahl der Sitzung gilt weiter", sZ.auto);
+  assert(!Z.err.length, "zwei Paare: keine Fehler in der Seite", Z.err);
   await Z.pg.close();
 
-  // 16 · voll bei A: die Wahl bleibt in der Sitzung bei A und geht nie in einen anderen Build
-  const bauD = Z.posts.find(istDolch);
-  const W = await helfer(() => ({ [bau.id]: { ...bau.build, rot: voll }, [bauD.id]: bauD.build }));
-  await laden(W.pg, logA);
-  await klick(W.pg, "Deadly Viper", "1");
-  await laden(W.pg, logD);
-  await W.pg.waitForTimeout(500);
-  const sW = await stand(W.pg);
-  assert(!W.posts.length && sW.auto.find((x) => x.k === "Deadly Viper")?.knoepfe.length === 2,
-    "voll bei A: in B weder angezeigt noch geschrieben", { posts: W.posts, auto: sW.auto });
-  assert(!W.err.length, "voll: keine Fehler in der Seite (B)", W.err);
-  await W.pg.close();
-
-  // 17 · eine Wahl, die der Helfer ablehnen wuerde (Schluessel ueber 80 Zeichen): kein POST, der mit 400 scheitert
-  const LANG = ["Skill with a name far too long to be a key " + "x".repeat(40), 999999001];
-  const logL = join(work, "bau-lang.txt");
-  writeFileSync(logL, stilleLog(Date.UTC(2026, 8, 22, 21, 0, 0), Array.from({ length: 20 }, (_, i) => [300 + i * 1400, LANG])));
-  const X = await helfer(() => ({}));
-  await laden(X.pg, logL);
-  await warte(X.pg, () => X.posts.length >= 1);
-  const vorX = X.posts.length;
-  await X.pg.evaluate((k) => [...document.querySelectorAll("#drGed .rotgz")].find((b) => b.dataset.k === k)?.click(), LANG[0]);
-  await X.pg.waitForTimeout(150);
-  await klick(X.pg, LANG[0], "1");
-  await X.pg.waitForTimeout(600);
-  const sX = await stand(X.pg);
-  const xt = await X.pg.evaluate(() => document.querySelector("#toast").textContent);
-  assert(LANG[0].length > 80 && X.posts.length === vorX && xt.startsWith("Not saved – this build does not take this choice.") &&
-    sX.auto.some((a) => a.k === LANG[0] && a.fest === "Left out for this session"),
-    "zu langer Schluessel: nichts geschrieben, Hinweis, in der Sitzung weggelassen (Immer weglassen)", { posts: X.posts.length - vorX, xt, auto: sX.auto });
-  assert(!X.err.length, "zu langer Schluessel: keine Fehler in der Seite", X.err);
-  await X.pg.close();
   /* 19 · Abspielen (Stufe 2, Spezifikation 5.5): Bedienung, Kopf in --rot-kopf, "Jetzt" mit
      "danach", Tempo, Uhr, Kopf in der Leiste, Anhalten bei Reiterwechsel und verborgenem Fenster, eine Wahl
      haelt den Kopf bei seinem Einsatz, unter drei Einsaetzen keine Bedienung; reduzierte Bewegung. */
@@ -1070,7 +975,6 @@ try {
       const a = logs.latestAnswer(f, url.searchParams.get("file"), url.searchParams.get("from"));
       return json(a.status, a.body);
     }
-    if (path === "/api/builds" && req.method() === "GET") return json(200, { ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best: {} });
     if (path.startsWith("/api/")) return json(200, { ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });

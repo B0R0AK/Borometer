@@ -9,8 +9,9 @@ import { casts, VENTIUS_FAMILY, VENTIUS_ID, VENTIUS_NAME } from "./15-weapons-an
 import { LIEST_AB_TREFFER, num1, pct, perSecond, weaponFor } from "./16-fight-analysis";
 import { clock, esc } from "./18-interface-basics";
 import { isWatching } from "./45-startup";
-import { bauBezug, bestInfo, bestLauf } from "./46-best-pull";
-import { bauVon, bezugBau, gleicherBau } from "./47-builds";
+import { bauBezug, bestInfo, bestLauf, mitLauf } from "./46-best-pull";
+import { gleicherBezug } from "../build-core";
+import { bezugVon, bezugVonRef } from "./47-paar";
 import { cutCasts, dummyClass } from "../best-pull-core";
 import {
   fensterLesen, fensterSuchen, hauptschaden, nebenziele, start, START_S, type Fenster, type FensterWerte, type FPull, type FSpur,
@@ -121,15 +122,16 @@ function laufPull(run: SavedRun): FPull | null {
 
 /* Der Pool je Build, und die Suche darueber - gemerkt in der Sitzung,
    solange sich weder das Log noch die gespeicherten Pulls noch die
-   Waffenzuordnung aendern (beim Livelog zeichnet die Analyse alle zwei
-   Sekunden). Ohne erkannten Build nur der Kampf selbst. Der laufende Kampf
+   Waffenzuordnung noch die Zuordnung der Builds aendern (beim Livelog zeichnet die Analyse alle zwei
+   Sekunden). Ohne Paar nur der Kampf selbst. Der laufende Kampf
    waehrend Live gehoert nicht hinein. */
 const suchMerk = new Map<string, { fe: Fenster | null; pool: FPull[] }>();
 function bestStempel(){
   return Object.keys(state.best).sort().map(k => { const e = state.best[k]!; return k + ":" + e.best.at + ":" + (e.second?.at ?? ""); }).join(",");
 }
 function gesucht(seg: Fight): { fe: Fenster | null; pool: FPull[] } {
-  const hier = bauVon(seg);
+  const hier = bezugVon(seg);
+  const bekannt = !!hier;
   const live = isWatching();
   /* Waehrend Live waechst nur der laufende Kampf, und der gehoert nicht in
      den Pool: gemerkt wird dann nach der Zahl der Kaempfe und der Laenge des
@@ -137,19 +139,19 @@ function gesucht(seg: Fight): { fe: Fenster | null; pool: FPull[] } {
   const logStand = live ? state.encounters.length + ":" + (state.encounters[1]?.events.length ?? 0) : state.events.length;
   /* Wer und wie geschnitten (schnittKey, 05): im Party-Log mit zwei
      Spielern desselben Builds saehe der zweite sonst den Pool des ersten. */
-  const merk = [schnittKey(), hier ? JSON.stringify(hier) : "seg" + seg.start + "|" + seg.events.length, state.encounters.length,
+  const merk = [schnittKey(), bekannt ? JSON.stringify(hier) : "seg" + seg.start + "|" + seg.events.length, state.encounters.length,
     logStand, live, bestStempel(), Object.keys(state.weaponOf).length, Object.keys(state.weaponById).length].join("|");
   const alt = suchMerk.get(merk);
   if(alt) return alt;
   const pool: FPull[] = [];
-  if(!hier) pool.push(segPull(seg));
+  if(!bekannt) pool.push(segPull(seg));
   else {
     const starts = new Set<number>();
     state.encounters.forEach((x, i) => {
       starts.add(x.start);
       if(live && i === 0) return;
-      const dort = x === seg ? hier : bauVon(x);
-      if(dort && gleicherBau(hier, dort)) pool.push(segPull(x));
+      const dort = x === seg ? hier : bezugVon(x);
+      if(gleicherBezug(hier, dort)) pool.push(segPull(x));
     });
     for(const key of Object.keys(state.best)){
       const e = state.best[key]!;
@@ -157,8 +159,8 @@ function gesucht(seg: Fight): { fe: Fenster | null; pool: FPull[] } {
         const p = e[platz];
         // ein Pull aus dem geladenen Log zaehlt nur einmal, als Kampf mit allen Einsaetzen
         if(!p || (state.wall && starts.has(p.at))) continue;
-        const dort = bezugBau("best|" + key + "|" + platz);
-        if(!dort || !gleicherBau(hier, dort)) continue;
+        const dort = bezugVonRef("best|" + key + "|" + platz);
+        if(!dort || !gleicherBezug(hier, dort)) continue;
         const q = laufPull(p.run);
         if(q) pool.push(q);
       }
@@ -217,19 +219,23 @@ export function fensterStand(seg: Fight | undefined): FensterStand | null {
   const cls = practiceTarget(seg.stats.name) ? dummyClass(seg.stats.seconds) : null;
   const werte = fensterLesen(segPull(seg, cls), fe);
   if(!werte) return null;
-  /* Der Bezug innerhalb des Builds (bauBezug, 46-best-pull.ts): der beste Pull an diesem Boss mit demselben
-     Build, im besten selbst der zweitbeste. */
+  /* Der Bezug innerhalb des Waffenpaars (bauBezug, 46-best-pull.ts): der beste Pull an diesem Boss mit demselben
+     Paar, im besten selbst der zweitbeste. */
   const alle = seg === state.encounters[state.sel] ? bestInfo() : {};
-  const info = alle.refId ? bauBezug(bauVon(seg), alle) : alle;
+  const hier = bezugVon(seg);
+  const info = alle.refId ? bauBezug(hier, alle) : alle;
   let bezug: FensterWerte | null = null, hatBezug = false, noRef = "";
-  if(info.refId && info.curId){
+  // ein Bezug ohne Lauf (ohneLauf) hat keine Werte: wie kein Bezug
+  if(mitLauf(info) && info.curId){
     const s = /^seg(\d+)/.exec(info.refId);
     const refSeg = s ? state.encounters[+s[1]!] : undefined;
     const run = s ? null : bestLauf(info.refId);
     const p = refSeg ? segPull(refSeg, cls) : run ? laufPull(run) : null;
     hatBezug = !!(refSeg || run);
     bezug = p ? fensterLesen(p, fe) : null;
-  } else if(info.grund === "first" && info.label) noRef = t("analysis.window.noRef", {boss: info.label});
+  } else if(info.grund === "first" && info.label){
+    noRef = t("analysis.window.noRefPair", {boss: info.label});
+  }
   return {fe, hName: nameVon(fe.h, pool), fName: nameVon(fe.f, pool), werte, bezug, hatBezug,
           zweit: !!info.isBest, noRef};
 }
@@ -242,7 +248,7 @@ export function fensterAbschnitt(st: FensterStand, zaehlt: boolean): string {
   const bp = t(st.zweit ? "analysis.ref.second" : "analysis.ref.best");
   const zahl = (x: number | null) => x == null ? "\u2014" : fmt(x);
   const rate = (x: number | null) => x == null ? "\u2014" : num1(x);
-  const gef = t(fe.pulls > 1 ? "analysis.window.found" : "analysis.window.one", {
+  const gef = t(fe.pulls > 1 ? "analysis.window.foundPair" : "analysis.window.one", {
     l: fe.l + "\u00a0s", f: st.fName, h: st.hName, g: pct(fe.gewinn), in: fmt(fe.jeIn), out: fmt(fe.jeAus), n: fe.pulls});
   const wort = b ? t("analysis.window.bar", {p: pct(w.aussen), bp, q: pct(b.aussen)})
                  : t("analysis.window.barAlone", {p: pct(w.aussen)});
@@ -271,7 +277,7 @@ export function fensterAbschnitt(st: FensterStand, zaehlt: boolean): string {
    Schaden. Die Ursache steht nicht hier; der Satz verweist auf die
    Zeitleiste im Bereich Rotation, wo die Einsaetze der ersten Sekunden
    stehen (der Trainer, auf den er frueher verwies, entfaellt:
-   Spezifikation 3). Der Bezug innerhalb des Builds (bauBezug). */
+   Spezifikation 3). Der Bezug innerhalb des Waffenpaars (bauBezug). */
 export interface StartStand {
   dps: number;
   bezug: number;
@@ -289,8 +295,8 @@ export function startStand(seg: Fight | undefined): StartStand | null {
   if((seg.unverwundbar || []).some(u => u.bis > u.von && u.von < START_S * 1000)) return null;
   const alle = bestInfo();
   if(!alle.refId) return null;
-  const info = bauBezug(bauVon(seg), alle);
-  if(!info.refId) return null;
+  const info = bauBezug(bezugVon(seg), alle);
+  if(!mitLauf(info)) return null;
   const s = /^seg(\d+)/.exec(info.refId);
   const refSeg = s ? state.encounters[+s[1]!] : undefined;
   const run = s ? null : bestLauf(info.refId);
@@ -304,6 +310,13 @@ function startSatz(st: StartStand): string {
   if(st.art === "staerker") return t(st.zweit ? "analysis.start.strongerSecond" : "analysis.start.stronger");
   return t(st.zweit ? "analysis.start.weakerSecond" : "analysis.start.weaker", {p: pct(st.q)});
 }
+/* Ein Weg in die Rotation (Issue #107): Von/bis auf die Strecke, der Klick
+   laeuft ueber den Hoerer der Analyse (data-weg, 26-analysis-tab.ts). */
+/** Der Knopf in die Rotation fuer die Strecke von-bis (Sekunden), mit der Strecke im Vorlesenamen. */
+export function inRotationKnopf(von: number, bis: number, label: string): string {
+  return '<dd class="w"><button type="button" class="inrot" data-weg="rot" data-von="'+von+'" data-bis="'+bis+'" aria-label="'+
+    esc(t(label, {z: clock(von)+"\u2013"+clock(bis)}))+'">'+esc(t("analysis.inRotation"))+"</button></dd>";
+}
 /** Der Eintrag unter "Weitere Befunde" (Neugestaltung 28.09., DECISION 4.14:
     der Rhythmus verdichtet): Wert, Vergleichswert und ein Satz - nur mit
     Vergleichspull. Begriff und Werte fuer die Liste #weitereListe. */
@@ -311,11 +324,8 @@ export function startZeile(seg: Fight | undefined): string {
   const st = startStand(seg);
   if(!st) return "";
   const bp = t(st.zweit ? "analysis.ref.second" : "analysis.ref.best");
+  // ein deutlich schwaecherer Start fuehrt in die Rotation, auf die ersten 10 s (Issue #107)
   return '<div class="find" data-k="start"><dt class="k">' + esc(t("analysis.start.label")) + '</dt><dd class="v">' + esc(fmt(st.dps)) +
-    '</dd><dd class="n">' + esc(t("analysis.start.ref", {bp, x: fmt(st.bezug)}) + " \u00b7 " + startSatz(st)) + "</dd></div>";
-}
-/** Der Nebensatz unter der Form: nur bei deutlich schwaecherem Start, mit dem Verweis auf die Zeitleiste der Rotation. */
-export function startNebensatz(seg: Fight | undefined): string {
-  const st = startStand(seg);
-  return st && st.art === "schwaecher" ? startSatz(st) + " " + t("analysis.start.rotation") : "";
+    '</dd><dd class="n">' + esc(t("analysis.start.ref", {bp, x: fmt(st.bezug)}) + " \u00b7 " + startSatz(st)) + "</dd>" +
+    (st.art === "schwaecher" ? inRotationKnopf(0, START_S, "analysis.inRotation.start") : "") + "</div>";
 }

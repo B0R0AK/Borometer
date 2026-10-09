@@ -12,14 +12,15 @@ import { looksLikeRun, switchTab } from "./34-menus-drop-and-tabs";
 import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
 import { partyEinsaetze } from "./42-party";
 import { isWatching, syncCompareBtn } from "./45-startup";
-import { bauHinweisSatz, bezugBau, gleicherBau } from "./47-builds";
+import { bauHinweisSatz, bezugVonRef, type Bezug } from "./47-paar";
 import { renderKurve, renderTafelUrteil, tafelGilt } from "./56-tafel";
 import { leerKnopf } from "./58-felder";
 import {
-  BEST_KEY_RX, castOrder, classDps, cutCasts, dummyClass, looksLikeBestEntry, mergeBest, mergeEntries, pickTarget,
-  pullWhen, rotLanes, sameEntry, verteilt, type Candidate,
+  BEST_KEY_RX, besterPull, castOrder, classDps, cutCasts, dummyClass, looksLikeBestEntry, mergeBest, mergeEntries,
+  mindestLaenge, pullWhen, rangfolge, rotLanes, sameEntry, verteilt, type Pull,
 } from "../best-pull-core";
-import type { Fingerprint } from "../build-core";
+import { gleicherBezug } from "../build-core";
+import { mitDatum } from "../verlauf-core";
 import type { Encounter, Fight, SavedRun } from "../types";
 
 /* ---------- Gegen deinen besten Pull ----------
@@ -69,22 +70,97 @@ function segDps(seg: Fight, cls: number | null){
   return cls ? classDps(seg.stats.seconds, seg.stats.dps, perSecond(seg, 0).total, cls) : seg.stats.dps;
 }
 
-/* Wogegen verglichen werden kann: die zwei gespeicherten Pulls und jeder
-   Kampf desselben Schluessels im geladenen Log. Doppelte (gleiches at)
-   raeumt pickTarget() aus. */
-function kandidaten(key: string, cls: number | null): Candidate[] {
-  const raus: Candidate[] = [];
-  state.encounters.forEach((x, i) => {
-    const w = wofuer(x);
+/* Ist dieser Kampf der beste Pull nach der Regel (Spezifikation Bester
+   Pull 3 und 4)? Fuer das Urteil ueber ihn selbst zaehlt er immer mit, auch
+   als neuester unter Live (bossPulls mit "mit"); als Bezug fuer andere
+   bleibt er draussen. Gold in der Einordnung (histVerdict, 32) und die
+   Meldung nach dem Kampf (66) fragen hier, damit Satz und Schalter "nur
+   Bestwert" dasselbe meinen. Ein Kampf, der nicht im geladenen Log steht,
+   ist es nicht. menge: bossPulls(Schluessel, Index) dieses Kampfs, wenn der
+   Aufrufer sie schon hat (histVerdict) - sonst wird sie hier geholt. */
+export function waereBest(seg: Fight, menge?: readonly BossPull[]): boolean {
+  const i = state.encounters.indexOf(seg);
+  if(i < 0) return false;
+  const w = wofuer(seg);
+  if("why" in w) return false;
+  return besterPull(menge ?? bossPulls(w.key, i))?.seg === i;
+}
+
+/* Die Menge fuer den besten Pull (Spezifikation Bester Pull 4): jeder Kampf
+   am Boss im Verlauf, auch aus nur nachgelesenen Dateien (wie die Rekorde),
+   dazu die Kaempfe des geladenen Logs, die dort noch fehlen. Gleiches at
+   zaehlt einmal, der Kampf des Logs gewinnt. Der laufende Live-Kampf zaehlt
+   erst, wenn er zu Ende ist (wie bestRecord). Kein Build, kein Paar.
+   seg ist der Index in state.encounters, wenn der Kampf im geladenen Log steht.
+   Ein Log mit Uhrzeit, aber ohne Datum (state.wall falsch) zaehlt nur fuer
+   sich: seine Zeitpunkte sind Millisekunden seit Mitternacht und passen zu
+   keinem Kampf im Verlauf.
+   Dazu die zwei gespeicherten Pulls (boro-best.json), wenn der Verlauf sie
+   nicht kennt (ein Verlauf, der spaeter begann oder verloren ging): sie sind
+   Kaempfe am Boss wie jeder andere, und sie haben einen Lauf. */
+export type BossPull = Pull & { file: string; seg: number | null };
+/** Der Schluessel eines Kampfes nach Name und Laenge: "boss:<histKey>", "dummy:<Klasse>", sonst null. */
+export function schluesselVon(name: string, seconds: number): string | null {
+  if(practiceTarget(name)){ const c = dummyClass(seconds); return c == null ? null : "dummy:" + c; }
+  return knownBoss(name) ? "boss:" + histKey(name) : null;
+}
+/* mit: der Index eines Kampfes in state.encounters, der auch als laufender
+   Live-Kampf zaehlt - fuer das Urteil ueber genau diesen Kampf (waereBest). */
+export function bossPulls(key: string, mit?: number): BossPull[] {
+  if(state.origin === "sample" || state.noTime) return [];
+  const raus = state.wall ? verzeichnisPulls(key) : new Map<number, BossPull>();
+  const file = (state.fileNames || []).join(" + ");
+  state.encounters.forEach((seg, i) => {
+    // der laufende Live-Kampf: auch sein Stand im Verlauf zaehlt noch nicht
+    if(i === 0 && isWatching() && i !== mit){ raus.delete(seg.start); return; }
+    const w = wofuer(seg);
     if("why" in w || w.key !== key) return;
-    raus.push({id: segId(i, cls), dps: segDps(x, cls), at: state.wall ? x.start : null});
+    raus.set(seg.start, {at: seg.start, dps: segDps(seg, w.cls), dur: seg.stats.seconds, ...(w.cls ? {c: w.cls} : {}), file, seg: i});
   });
-  const e = state.best[key];
-  if(e){
-    raus.push({id: "best|" + key + "|best", dps: e.best.run.dps, at: e.best.at});
-    if(e.second) raus.push({id: "best|" + key + "|second", dps: e.second.run.dps, at: e.second.at});
+  return [...raus.values()];
+}
+/** Der beste Pull am Schluessel nach der Regel (best-pull-core.ts), oder null. */
+export const besterVon = (key: string) => besterPull(bossPulls(key));
+
+/* Verzeichnis (alle Eintraege, auch nach) und die gespeicherten Pulls, deren
+   at das Verzeichnis nicht kennt - der Teil der Menge, der nicht am
+   geladenen Log haengt. Ohne die Summen einer Gruppe (g, histRecord): sie
+   stehen im Verlauf, sind aber nie dein bester Pull (Entscheidung 06.10.). */
+function verzeichnisPulls(key: string): Map<number, BossPull> {
+  const raus = new Map<number, BossPull>();
+  for(const [file, e] of Object.entries(state.hist.files)) for(const f of e.fights || []){
+    const k = f.c ? "dummy:" + f.c : knownBoss(f.name) ? "boss:" + histKey(f.name) : null;
+    // ohne Datum (mitDatum): ein alter Eintrag aus der Zeit vor dem Fix, er stuende am 01.01.1970
+    if(k !== key || !Number.isFinite(f.at) || f.g || !mitDatum(f.at)) continue;
+    raus.set(f.at, {at: f.at, dps: f.dps, dur: Number.isFinite(f.dur) ? f.dur : 0, ...(f.c ? {c: f.c} : {}), file, seg: null});
   }
+  const e = state.best[key];
+  const cls = key.startsWith("dummy:") ? +key.slice(6) : 0;
+  for(const p of [e?.best, e?.second]) if(p && !raus.has(p.at))
+    raus.set(p.at, {at: p.at, dps: p.run.dps, dur: p.run.seconds ?? 0, ...(cls ? {c: cls} : {}), file: p.file, seg: null});
   return raus;
+}
+
+/* Die Menge fuer das Gold im Verlauf (Spezifikation Bester Pull 5.4). Der
+   Verlauf zeigt immer das ganze Verzeichnis, also haengt sein Gold nicht am
+   geladenen Log: nicht am Beispielkampf, nicht an fehlender Uhr oder
+   fehlendem Datum. Die Kaempfe des geladenen Logs, die im Verzeichnis
+   stehen, sind dieselben Eintraege; der laufende Live-Kampf bleibt draussen
+   wie in bossPulls. seg ist hier immer null. */
+export function verlaufPulls(key: string): BossPull[] {
+  const raus = verzeichnisPulls(key);
+  const live = isWatching() && state.wall && !state.noTime ? state.encounters[0] : undefined;
+  if(live) raus.delete(live.start);
+  return [...raus.values()];
+}
+
+/* Die Kennung eines gespeicherten Pulls mit diesem at, oder null: dann hat
+   der Pull keinen Lauf (Spezifikation Bester Pull 5.2, "ohne Lauf"). */
+function gespeichertId(key: string, at: number): string | null {
+  const e = state.best[key];
+  if(e?.best.at === at) return "best|" + key + "|best";
+  if(e?.second?.at === at) return "best|" + key + "|second";
+  return null;
 }
 
 /** Wogegen der Kampf links verglichen werden kann, oder warum nicht. */
@@ -97,7 +173,13 @@ export interface BestInfo {
   refDps?: number;
   refAt?: number | null;
   isBest?: boolean;
+  /* Der Bezug hat keinen Lauf (nur im Verlauf, Spezifikation Bester Pull
+     5.2): der Name seiner Datei. refId hat dann die Form "ohne|<key>|<at>",
+     die kein Vergleich kennt - wer einen Lauf braucht, fragt mitLauf(). */
+  ohneLauf?: string;
 }
+/** Gibt es einen Bezug mit Lauf, gegen den sich vergleichen laesst? */
+export function mitLauf(info: BestInfo): info is BestInfo & { refId: string } { return !!info.refId && !info.ohneLauf; }
 
 /* "passt" grenzt die Kandidaten ein - die Analyse (bauBezug, unten) nimmt
    nur Pulls desselben Baus. Der Kampf links steht nie zur Wahl. */
@@ -109,21 +191,39 @@ export function bestInfo(passt?: (refId: string) => boolean): BestInfo {
   const w = wofuer(seg);
   if("why" in w) return {why: w.why, grund: w.grund};
   const curId = segId(state.sel, w.cls);
-  const ziel = pickTarget({id: curId, dps: segDps(seg, w.cls), at: state.wall ? seg.start : null},
-                          kandidaten(w.key, w.cls).filter(c => !passt || c.id === curId || passt(c.id)));
-  if(ziel.kind === "none") return {why: t("best.whyFirst", {boss: w.label}), grund: "first", label: w.label};
-  return {label: w.label, curId, refId: ziel.ref.id, refDps: ziel.ref.dps, refAt: ziel.ref.at,
-          isBest: ziel.kind === "isBest"};
+  const menge = bossPulls(w.key);
+  /* Der Bezug nach der Regel (best-pull-core.ts): der beste Pull; ist der
+     gewaehlte selbst der beste, der zweite der Rangfolge. Ein gewaehlter
+     unter der Schwelle wird gegen den besten verglichen, ist aber nie
+     selbst der beste. passt grenzt ein (Analyse: Build) - die Schwelle
+     bleibt die der ganzen Menge. Unter zwei Pulls am Boss gibt es keinen
+     besten. Ein Pull ohne Lauf (nur im Verlauf) bleibt Bezug und bekommt
+     die Kennung "ohne|..."; passt sieht ihn nie, die Analyse braucht einen Lauf. */
+  const min = mindestLaenge(menge);
+  const ids = (p: BossPull) => p.seg != null ? segId(p.seg, w.cls) : gespeichertId(w.key, p.at);
+  const reihe = menge.length < 2 ? [] : rangfolge(menge, min).filter(p => {
+    if(p.at === seg.start) return true;
+    const id = ids(p);
+    return !passt || (id != null && passt(id));
+  });
+  const istBest = reihe[0]?.at === seg.start;
+  const ref = istBest ? reihe[1] : reihe[0];
+  if(!ref) return {why: t("best.whyFirst", {boss: w.label}), grund: "first", label: w.label};
+  const refId = ids(ref);
+  /* Ohne Datum (state.wall falsch) ist at die Zeit seit Mitternacht; als
+     Datum gelesen hiesse sie "01.01.". refAt null sagt "in diesem Log". */
+  return {label: w.label, curId, refId: refId ?? "ohne|" + w.key + "|" + ref.at, refDps: ref.dps, refAt: state.wall ? ref.at : null,
+          isBest: istBest, ...(refId ? {} : {ohneLauf: ref.file})};
 }
 
-/* Der Bezug innerhalb eines Builds: der beste Pull mit demselben Waffenpaar
-   und denselben tragenden Faehigkeiten. Ein Bezug, dessen Build sich nicht
-   lesen laesst, bleibt Kandidat - geraten wird nicht. Ohne erkannten Build
-   des Kampfes bleibt es bei "alle". Die Analyse (53-fenster.ts: Fenster und
-   Start) vergleicht so. Stand im Rotationstrainer (48-trainer.ts), der mit
-   der Neugestaltung entfaellt (Spezifikation 3). */
-export function bauBezug(hier: Fingerprint | null, alle: BestInfo): BestInfo {
-  return hier ? bestInfo(id => { const dort = bezugBau(id); return !dort || gleicherBau(hier, dort); }) : alle;
+/* Der Bezug innerhalb eines Waffenpaars: der beste Pull mit demselben Paar.
+   Unbekanntes passt nie: ein Bezug ohne Paar ist kein Kandidat, sobald der
+   Kampf selbst ein Paar hat - geraten wird nicht. Ist das Paar des Kampfs
+   selbst unbekannt, bleibt es bei "alle". Die Analyse (53-fenster.ts:
+   Fenster und Start) vergleicht so. */
+export function bauBezug(hier: Bezug, alle: BestInfo): BestInfo {
+  if(!hier) return alle;
+  return bestInfo(id => { const dort = bezugVonRef(id); return !!dort && gleicherBezug(hier, dort); });
 }
 
 const refWhen = (at: number | null | undefined) => at != null ? pullWhen(at, state.lang) : t("best.thisLog");
@@ -226,6 +326,11 @@ export function bestRecord(nur?: ReadonlySet<Encounter> | null){
   if(state.origin === "sample" || state.noTime || !state.wall || state.players.length > 1) return;
   const file = (state.fileNames || []).join(" + ");
   let anders = false;
+  /* Die Schwelle je Schluessel (Spezifikation Bester Pull 5.2): gespeichert
+     werden die ersten beiden der Rangfolge ueber die ganze Menge, nicht die
+     zwei hoechsten DPS. Je Schluessel einmal gerechnet - bossPulls geht
+     ueber den ganzen Verlauf. An der Puppe ist die Klasse die Schwelle. */
+  const schwelle = new Map<string, number>();
   state.encounters.forEach((seg, i) => {
     if(nur && !nur.has(seg)) return;
     if(i === 0 && isWatching()) return;
@@ -235,9 +340,16 @@ export function bestRecord(nur?: ReadonlySet<Encounter> | null){
     if(!(dps > 0)) return;
     const e = state.best[w.key];
     const selbst = !!e && (e.best.at === seg.start || e.second?.at === seg.start);
-    // beide Plaetze besetzt und schwaecher als beide: nichts zu bauen
-    if(e && e.second && !selbst && dps <= e.second.run.dps) return;
-    const neu = mergeBest(e, {run: bestRun(seg, w.cls), at: seg.start, file, ver: BORO_VERSION});
+    let min = schwelle.get(w.key);
+    if(min == null){ min = w.cls ? 0 : mindestLaenge(bossPulls(w.key)); schwelle.set(w.key, min); }
+    /* beide Plaetze besetzt, beide ab der Schwelle, und dieser nicht vor
+       dem zweiten (weniger DPS, oder gleich viel und spaeter): nichts zu
+       bauen. Die Schwelle waechst mit der Menge; ein Platz darunter wird
+       darum jedes Mal neu entschieden (mergeBest). */
+    const zweit = e?.second;
+    if(e && zweit && !selbst && (e.best.run.seconds ?? 0) >= min && (zweit.run.seconds ?? 0) >= min &&
+       (dps < zweit.run.dps || (dps === zweit.run.dps && seg.start >= zweit.at))) return;
+    const neu = mergeBest(e, {run: bestRun(seg, w.cls), at: seg.start, file, ver: BORO_VERSION}, min);
     if(e && sameEntry(e, neu)) return;
     state.best[w.key] = neu;
     offen.add(w.key);
@@ -280,7 +392,8 @@ function bestLaden(){
       if(!BEST_KEY_RX.test(key)) continue;
       if(!looksLikeBestEntry(roh, looksLikeRun)) continue;
       const hier = state.best[key];
-      const neu = hier ? mergeEntries(roh, hier) : roh;
+      // dieselbe Schwelle wie bestRecord, ueber die ganze Menge am Schluessel
+      const neu = hier ? mergeEntries(roh, hier, key.startsWith("dummy:") ? 0 : mindestLaenge(bossPulls(key))) : roh;
       state.best[key] = neu;
       if(hier && !sameEntry(neu, roh)) offen.add(key);
     }
@@ -320,8 +433,11 @@ export function syncBestBtn(){
   const b = document.querySelector<HTMLButtonElement>("#btnBestPull");
   if(!b) return;
   const info = bestInfo();
-  b.hidden = !info.refId;
-  if(!info.refId) return;
+  /* Ohne Lauf (ohneLauf) gibt es nichts zu vergleichen. Statt dieses
+     Knopfs stehen im Urteil der Satz und "Log oeffnen" (ohneLaufHtml in
+     56-tafel.ts, Spezifikation Bester Pull 5.2). */
+  b.hidden = !mitLauf(info);
+  if(!mitLauf(info)) return;
   b.setAttribute("aria-label", t(info.isBest ? "tafel.imVergleichNameZweit" : "tafel.imVergleichName"));
   b.title = t(info.isBest ? "best.btnTitleSecond" : "best.btnTitle",
               {boss: info.label, dps: fmt(info.refDps), when: refWhen(info.refAt)});
@@ -337,7 +453,7 @@ export function syncBestBtn(){
    versprochen hat. */
 function openBestCompare(){
   const info = bestInfo();
-  if(!info.curId || !info.refId) return;
+  if(!info.curId || !mitLauf(info)) return;
   state.cmpRuns = new Set([info.refId, info.curId]);
   state.cmpPaar = "best";   // der Umschalter im Vergleich (28-compare.ts) steht auf "Bester Pull"
   state.clipRuns = false;
@@ -366,7 +482,7 @@ function zurAntwort(){
 
 /** Ist der Vergleich genau "bester Pull (Referenz) gegen den Kampf links"? */
 export function gegenBestAktiv(info: BestInfo): boolean {
-  return !!info.refId && !!info.curId && state.cmpRuns.size === 2 &&
+  return mitLauf(info) && !!info.curId && state.cmpRuns.size === 2 &&
     [...state.cmpRuns][0] === info.refId && state.cmpRuns.has(info.curId);
 }
 
@@ -419,14 +535,13 @@ export function antwortSchluss(satz: string, drunter: boolean, deltas: { n: stri
                   {skill: x.n, d: (drunter ? "\u2212" : "+") + fmt(Math.abs(x.d), 1e3)});
 }
 
-/* Der Haken fuer Merkmal 2: stammt der Vergleichspull aus einem anderen
-   Bau als der Kampf links, sagt dieser Satz das (47-builds.ts,
-   bauHinweisSatz). Kennt das Bautagebuch einen der beiden nicht, bleibt er
+/* Der Haken fuer Merkmal 2: stammt der Vergleichspull von einem anderen
+   Waffenpaar als der Kampf links, sagt dieser Satz das (47-paar.ts,
+   bauHinweisSatz). Kennt die App eines der beiden nicht, bleibt er
    leer - geraten wird nicht. Ein gespeicherter Pull traegt die Faehigkeiten
-   mit ihrer Waffe im Lauf, auch Bestwerte von vor dem Bautagebuch lassen
-   sich also einordnen. */
+   mit ihrer Waffe im Lauf, auch alte Bestwerte lassen sich also einordnen. */
 function bauHinweis(info: BestInfo): string {
-  return info.refId ? bauHinweisSatz(info.refId, !!info.isBest) : "";
+  return mitLauf(info) ? bauHinweisSatz(info.refId, !!info.isBest) : "";
 }
 
 /** Die Zeile ueber der Auswahl im Vergleich: Satz und Knopf, oder der Satz, warum nicht. */
@@ -439,7 +554,7 @@ export function bestZeile(): string {
   if(info.grund === "sample") return '<p class="cmpstate cmpbest" id="cmpBest" tabindex="-1"><span>' + esc(info.why || "") + "</span> " +
     leerKnopf("open") + "</p>";
   if(info.why) return '<p class="cmpstate cmpbest" id="cmpBest" tabindex="-1">' + esc(info.why) + "</p>";
-  if(!info.refId || !info.curId) return "";
+  if(!mitLauf(info) || !info.curId) return "";
   const vars = {boss: info.label, dps: fmt(info.refDps), when: refWhen(info.refAt)};
   /* Aktiv nur in der Reihenfolge des Knopfs, denn der erste Haken ist die
      Referenz. Dann sagt der Antwortsatz im Ergebnis, womit verglichen wird;

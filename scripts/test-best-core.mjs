@@ -47,24 +47,29 @@ eq(e, { best: pull(2, 20), second: pull(3, 15) }, "mergeBest: der dritte faellt 
 e = core.mergeBest(e, pull(3, 25));
 eq(e, { best: pull(3, 25), second: pull(2, 20) }, "mergeBest: derselbe Kampf (gleiches at) ersetzt sich");
 eq(core.mergeBest(e, pull(4, 5)), e, "mergeBest: schwaecher als beide aendert nichts");
+// mit Schwelle (Spezifikation Bester Pull 5.2): ein kurzer verdraengt keinen langen
+const pullS = (at, dps, seconds) => ({ run: { dps, seconds }, at, file: "f", ver: "v" });
+{
+  let m = core.mergeBest(undefined, pullS(1, 100, 90), 60);
+  m = core.mergeBest(m, pullS(2, 80, 75), 60);
+  eq(core.mergeBest(m, pullS(3, 999, 14), 60), m, "mergeBest: ein kurzer Pull mit hoher DPS verdraengt keinen langen");
+  const kurz = core.mergeBest(core.mergeBest(undefined, pullS(4, 999, 14), 60), pullS(5, 50, 10), 60);
+  eq(core.mergeBest(kurz, pullS(6, 70, 80), 60), { best: pullS(6, 70, 80), second: pullS(4, 999, 14) },
+     "mergeBest: ein langer verdraengt kurze, auch mit weniger DPS");
+  eq(core.mergeBest(m, pullS(7, 90, 60), 60), { best: pullS(1, 100, 90), second: pullS(7, 90, 60) },
+     "mergeBest: genau auf der Schwelle zaehlt");
+  /* Gleiche DPS: der fruehere zuerst, wie in rangfolge. Sonst verdraengte
+     ein spaeterer Pull mit gleicher DPS den frueheren aus dem Speicher,
+     obwohl die Regel den frueheren als besten waehlt. */
+  eq(core.mergeBest({ best: pullS(1, 100, 90) }, pullS(2, 100, 90), 60), { best: pullS(1, 100, 90), second: pullS(2, 100, 90) },
+     "mergeBest: gleiche DPS - der fruehere bleibt bester");
+  eq(core.mergeBest({ best: pullS(5, 100, 90), second: pullS(6, 100, 90) }, pullS(1, 100, 90), 60),
+     { best: pullS(1, 100, 90), second: pullS(5, 100, 90) }, "mergeBest: gleiche DPS - ein frueherer verdraengt den spaetesten");
+}
 eq(core.mergeEntries({ best: pull(1, 10) }, { best: pull(1, 12), second: pull(5, 11) }),
    { best: pull(1, 12), second: pull(5, 11) }, "mergeEntries: bei gleichem at gewinnt der neuere Stand");
 eq(core.sameEntry({ best: pull(1, 10) }, { best: pull(1, 10) }), true, "sameEntry: gleich");
 eq(core.sameEntry({ best: pull(1, 10) }, { best: pull(1, 11) }), false, "sameEntry: verschieden");
-
-// Wahl des Bezugs
-const c = (id, dps, at) => ({ id, dps, at });
-eq(core.pickTarget(c("seg0", 50, 100), [c("seg0", 50, 100)]), { kind: "none" },
-   "pickTarget: nur er selbst - kein Bezug");
-eq(core.pickTarget(c("seg0", 50, 100),
-     [c("seg0", 50, 100), c("seg3", 60, 90), c("best|boss:V|best", 60, 90), c("best|boss:V|second", 55, 80)]),
-   { kind: "best", ref: c("seg3", 60, 90) }, "pickTarget: derselbe Kampf im Log und im Speicher zaehlt als Kampf aus dem Log");
-eq(core.pickTarget(c("seg0", 70, 100), [c("seg3", 60, 90), c("best|boss:V|second", 55, 80)]),
-   { kind: "isBest", ref: c("seg3", 60, 90) }, "pickTarget: ist er der beste, gilt der naechstbeste");
-eq(core.pickTarget(c("seg0", 70, 100), [c("best|boss:V|best", 70, 100), c("best|boss:V|second", 55, 80)]),
-   { kind: "isBest", ref: c("best|boss:V|second", 55, 80) }, "pickTarget: der gespeicherte beste ist er selbst");
-eq(core.pickTarget(c("seg0@60", 40, null), [c("seg2@60", 0, null)]), { kind: "none" },
-   "pickTarget: ohne Schaden kein Bezug");
 
 // Einsaetze: [Beginn ms, Ende ms, Schaden, Treffer, Krits] je Faehigkeit
 const A = [{ n: "Quick Fire", s: "964762401", c: [[0, 100, 5, 1, 0], [3000, 3100, 5, 1, 0], [61000, 61100, 5, 1, 0]] },
@@ -181,6 +186,29 @@ eq([core.verteilt(dl(-300, -100, -100)), core.verteilt(dl(-100, -100, -100, -100
     { name: "B", sid: "2", damage: 16000, hits: 100, dps: 280 } ] };
   const w = core.urteilZahlen(ref, breit, key);
   eq(w.verteilt, core.verteilt(core.vergleichZahlen(ref, breit, key).deltas), "Urteil: verteilt nach derselben Regel wie der Satz");
+}
+
+// ---------- die Regel fuer den besten Pull (#151, Spezifikation Bester Pull 3)
+const P = (at, dps, dur, c) => (c ? { at, dps, dur, c } : { at, dps, dur });
+{
+  // #151: 22 Fehlstarts mit 14,4 s und 31.8k, ein Pull mit 4m 44s und 8.582
+  const wipes = Array.from({ length: 22 }, (_, i) => P(i, 31800, 14.4));
+  const lang = P(100, 8582, 284);
+  eq(core.mindestLaenge([...wipes, lang]), 60, "Schwelle: 60 s, wenn der laengste Pull 120 s oder mehr hat");
+  eq(core.besterPull([...wipes, lang]), lang, "#151: nach 22 Fehlstarts traegt der lange Pull das Gold");
+  eq(core.besterPull([lang]), null, "ein einziger Pull ist kein bester (#151, Punkt 2)");
+  eq(core.besterPull([]), null, "ohne Pulls kein bester");
+  eq(core.mindestLaenge([]), 0, "Schwelle ohne Pulls: 0");
+  eq(core.mindestLaenge([P(1, 1, 40), P(2, 1, 30)]), 20, "Schwelle: halber laengster, wenn der kuerzer als 60 s ist");
+  eq(core.besterPull([P(1, 900, 20), P(2, 1000, 19.9), P(3, 800, 40)]), P(1, 900, 20), "genau auf der Schwelle zaehlt, knapp darunter nicht");
+  eq(core.besterPull([P(5, 500, 90), P(3, 500, 70), P(9, 400, 300)]), P(3, 500, 70), "gleiche DPS: der fruehere");
+  eq(core.rangfolge([P(1, 500, 90), P(2, 700, 61), P(3, 9000, 10), P(4, 600, 120)]).map((p) => p.at), [2, 4, 1],
+     "Rangfolge: nur ab der Schwelle, nach DPS");
+  eq(core.rangfolge([P(1, 500, 90), P(2, 9000, 30)], 20).map((p) => p.at), [2, 1], "Rangfolge: eine Schwelle von aussen gilt");
+  eq(core.rangfolge([P(1, 0, 90), P(2, 300, 90)]).map((p) => p.at), [2], "Rangfolge: ohne DPS kein Kandidat");
+  // Uebungspuppe: die Klasse ist die Schwelle, dur zaehlt nicht
+  eq(core.besterPull([P(1, 700, 62, 60), P(2, 900, 59, 60), P(3, 650, 400, 60)]), P(2, 900, 59, 60),
+     "Puppe: keine Mindestlaenge ueber die Klasse hinaus");
 }
 
 console.log();

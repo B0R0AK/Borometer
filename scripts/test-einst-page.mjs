@@ -46,6 +46,7 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
   let ordner = helfer ? helfer.dir : "";   // wie server.ts: POST /api/dir wechselt ihn
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
+  await page.addInitScript(anfragenZaehlen);
   await page.route("http://boro.test/**", async (route) => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname;
     const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }).catch(() => {});
@@ -73,16 +74,132 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
       return json({ ok: true, max: false, w: 400, h: 28, on_top: b.do === "pin" ? !!b.on : true });
     }
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
     if (path.startsWith("/api/")) return json({ ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
   });
   await page.goto("http://boro.test/index.html" + (app ? "?win=1" : ""));
   // Seite fertig: body[data-bereit] statt #landStatus (Neugestaltung 28.09., Befund 2)
-  await page.waitForFunction((h) => document.body.dataset.bereit === (h ? "ordner" : "ohne"), !!helfer);
-  await page.waitForTimeout(400);
+  await warte(page, (h) => document.body.dataset.bereit === (h ? "ordner" : "ohne"), !!helfer, 30000, "die Seite ist bereit (body[data-bereit])");
+  // und die Einstellungen (/api/config) sind gelesen und angewandt
+  await stille(page, "Start");
   return s;
+}
+/* Warten auf einen Zustand statt fester Pausen (Issue #167): laeuft die
+   Frist ab, steht eine FAIL-Zeile mit dem, worauf gewartet wurde (ohne
+   worauf: die Bedingung selbst), und es geht weiter - die Pruefungen danach
+   sagen, was fehlt. */
+async function warte(page, fn, arg, ms = 5000, worauf = String(fn).replace(/\s+/g, " ")) {
+  try { await page.waitForFunction(fn, arg, { timeout: ms }); return true; }
+  catch (e) { assert(false, "Zeitablauf (" + ms + " ms) beim Warten auf: " + worauf, String(e).split("\n")[0]); return false; }
+}
+/* In der Seite (addInitScript): __offen zaehlt die Anfragen an den Helfer,
+   die noch nicht fertig sind - unterwegs, oder beantwortet, aber der Text der
+   Antwort ist noch nicht gelesen. Fertig ist eine erst eine Aufgabe nach dem
+   Lesen: dann hat auch der Code, der auf die Antwort wartet, seinen Teil
+   getan. /api/events zaehlt nicht, die Frage haelt der Helfer bewusst an. */
+function anfragenZaehlen() {
+  window.__offen = 0;
+  const f = window.fetch;
+  const ende = (r) => { if (!r.__fertig) { r.__fertig = true; window.__offen--; } };
+  window.fetch = function (url) {
+    if (String(url).startsWith("/api/events")) return f.apply(window, arguments);
+    window.__offen++;
+    return f.apply(window, arguments).then(
+      (r) => { r.__zaehlt = true; setTimeout(() => { if (!r.__liest) ende(r); }, 0); return r; },
+      (e) => { setTimeout(() => { window.__offen--; }, 0); throw e; });
+  };
+  for (const k of ["json", "text"]) {
+    const o = Response.prototype[k];
+    Response.prototype[k] = function () {
+      const p = o.call(this);
+      if (this.__zaehlt && !this.__fertig) {
+        this.__liest = true;
+        const fertig = () => setTimeout(() => ende(this), 0);
+        p.then(fertig, fertig);
+      }
+      return p;
+    };
+  }
+}
+/* Ruhe: jede Anfrage der Seite ist beantwortet und verarbeitet - was sie
+   an den Helfer schicken wollte, liegt jetzt in s.posts, s.dir, s.runs. */
+const stille = (page, wann) => warte(page, () => (window.__offen ?? 0) === 0, undefined, 5000,
+  "Ruhe, alle Anfragen der Seite beantwortet (" + wann + ")");
+/* Die Seite steht nach einer Handlung: zwei Bilder sind gezeichnet (was die
+   Seite im naechsten Bild misst, ist gemessen), kein CSS-Uebergang laeuft
+   (Keyframe-Animationen wie der atmende Live-Punkt zaehlen nicht), keine
+   Anfrage ist offen. Die Handler selbst laufen im Klick; was danach kommt,
+   kommt ueber diese drei Wege. */
+async function steht(page, wann) {
+  const gezeichnet = await Promise.race([
+    page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))),
+    new Promise((r) => setTimeout(() => r(false), 5000)),   // Frist, keine Pause: ohne Bild nach 5 s eine FAIL-Zeile
+  ]);
+  if (!gezeichnet) assert(false, "Zeitablauf (5000 ms) beim Warten auf zwei gezeichnete Bilder (" + wann + ")");
+  return warte(page, () => (window.__offen ?? 0) === 0 && document.getAnimations().every((a) => !(a instanceof CSSTransition) || a.playState !== "running"), undefined, 5000,
+    "die Seite steht: keine Anfrage offen, kein Uebergang (" + wann + ")");
+}
+// eine Flaeche (#einst, #app, #land) ist zu sehen, und die Seite steht
+async function zeigt(page, sel, was) {
+  await warte(page, (q) => { const e = document.querySelector(q); return !!e && e.getClientRects().length > 0; }, sel, 5000, sel + " sichtbar: " + was);
+  await steht(page, was);
+}
+// Kompakt an oder aus (body.compact)
+async function kompaktIst(page, an) {
+  await warte(page, (x) => document.body.classList.contains("compact") === x, an, 5000, "Kompakt " + (an ? "an" : "aus"));
+  await steht(page, "Kompakt " + (an ? "an" : "aus"));
+}
+/* Gesprungen zur Gruppe der Einstellungen: der Navigationsknopf traegt
+   aria-current, der Fokus steht auf ihrer Ueberschrift. */
+async function gruppeIst(page, g) {
+  await warte(page, (x) => document.querySelector("#einstNav button[aria-current]")?.dataset.gruppe === x &&
+    document.activeElement?.id === "egh-" + x, g, 5000, "Gruppe " + g + ": aria-current und Fokus auf der Ueberschrift");
+  await steht(page, "Gruppe " + g);
+}
+// den Fokus hat der Bereich tab der Leiste
+async function fokusTab(page, tab) {
+  await warte(page, (x) => document.activeElement?.dataset?.tab === x, tab, 5000, "Fokus auf dem Bereich " + tab);
+  await steht(page, "Fokus auf " + tab);
+}
+// den Fokus hat die Themenkachel th
+async function fokusThema(page, th) {
+  await warte(page, (x) => document.activeElement?.dataset?.theme === x, th, 5000, "Fokus auf der Kachel " + th);
+  await steht(page, "Fokus auf " + th);
+}
+// das Thema th gilt (html data-theme)
+async function themaIst(page, th) {
+  await warte(page, (x) => document.documentElement.dataset.theme === x, th, 5000, "Thema " + th);
+  await steht(page, "Thema " + th);
+}
+// die Groesse gilt (html style.zoom; "" ist 100 %)
+async function zoomIst(page, z) {
+  await warte(page, (x) => document.documentElement.style.zoom === x, z, 5000, "zoom " + JSON.stringify(z));
+  await steht(page, "zoom " + z);
+}
+// die Sprache gilt (html lang)
+async function spracheIst(page, l) {
+  await warte(page, (x) => document.documentElement.lang === x, l, 5000, "Sprache " + l);
+  await steht(page, "Sprache " + l);
+}
+// ein Dialog (Hintergrund mit Klasse on) ist offen oder zu
+async function dialogAuf(page, sel, was) {
+  await warte(page, (q) => document.querySelector(q)?.classList.contains("on"), sel, 5000, was + " offen (" + sel + ".on)");
+  await steht(page, was);
+}
+async function dialogZu(page, sel, was) {
+  await warte(page, (q) => !document.querySelector(q)?.classList.contains("on"), sel, 5000, was + " zu (" + sel + " ohne on)");
+  await steht(page, was);
+}
+// die Meldung (#toast) zeigt einen Text, der text enthaelt
+async function meldungDa(page, text, was) {
+  await warte(page, (t) => (document.querySelector("#toast")?.textContent || "").includes(t), text, 5000, was + " (#toast enthaelt „" + text + "“)");
+  await steht(page, was);
+}
+// das Fenster hat die neue Breite, und die Seite steht
+async function breiteIst(page, w) {
+  await warte(page, (x) => innerWidth === x, w, 5000, "Fensterbreite " + w);
+  await steht(page, "Breite " + w);
 }
 /* Ein Log zum Trennen, nur Zielnamen und Zahlen: zwei Pulls am Kaefer mit
    12 s Pause, ein kurzer Kampf (2 s) an der Fledermaus, zwei Pulls am Wolf
@@ -104,8 +221,7 @@ const TRENN_LOG = (() => {
 })();
 async function beispiel(p) {
   await p.evaluate(() => document.querySelector("#btnSample2").click());
-  await p.waitForFunction(() => !document.querySelector("#app").hidden);
-  await p.waitForTimeout(200);
+  await zeigt(p, "#app", "der Beispielkampf");
 }
 /* Wo man steht: welche der drei Flaechen sichtbar ist, welcher Bereich
    gewaehlt, die Gruppen der Einstellungen. */
@@ -142,19 +258,23 @@ try {
     assert(l.gesperrt === false && l.symbol && l.name && l.name[0] === "Einstellungen" && l.name[1] === "Einstellungen",
       "das Zahnrad ist ohne Log nutzbar, gezeichnet (22 Punkt), Name und Blase „Einstellungen“", l);
     await p.click('#bereiche [data-tab="settings"]');
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const o = await ort(p);
     assert(o.einst && !o.land && !o.app && JSON.stringify(o.aktuell) === '["settings"]',
       "Klick: #einst sichtbar, Startseite und Kampf verborgen, aria-current auf dem Zahnrad", o);
     const g = await p.evaluate(() => {
       const e = document.querySelector("#einst");
       return { titel: e.querySelector("h2#einstTitel")?.textContent.trim(), kopf: e.querySelector(".einstkopf p")?.textContent.trim(),
-        gruppen: [...e.querySelectorAll("section.egruppe")].map((sec) => {
+        /* folgt Spezifikation Windows-Einbindung 9: der neunte Abschnitt "Windows" steht nur im eigenen Fenster unter
+           Windows (GET /api/config bringt windows) - hier ohne windows verborgen; gezaehlt werden die sichtbaren, und
+           verborgen sein duerfen genau er und sein Eintrag in der Sprungleiste */
+        verborgen: [...e.querySelectorAll("section.egruppe[hidden], #einstNav button[hidden]")].map((x) => x.id),
+        gruppen: [...e.querySelectorAll("section.egruppe:not([hidden])")].map((sec) => {
           const h = sec.querySelector("h3");
           return { id: sec.id, h: h?.textContent.trim(), hid: h?.id, lab: sec.getAttribute("aria-labelledby"), ti: h?.getAttribute("tabindex"),
             inhalt: sec.children.length > 1 };
         }),
-        nav: [...e.querySelectorAll("#einstNav button")].map((b) => [b.dataset.gruppe, b.textContent.trim()]),
+        nav: [...e.querySelectorAll("#einstNav button:not([hidden])")].map((b) => [b.dataset.gruppe, b.textContent.trim()]),
         navName: e.querySelector("#einstNav")?.getAttribute("aria-label") || "",
         benach: /Benachrichtigung/i.test(e.textContent),
         ueber: e.querySelector("#eg-info")?.textContent.replace(/\s+/g, " ").trim() || "" };
@@ -163,6 +283,8 @@ try {
       "Kopf: „Einstellungen“, darunter „Gilt sofort“ und wo es gespeichert wird (ohne Pfad)", g);
     assert(JSON.stringify(g.gruppen.map((x) => x.h)) === JSON.stringify(["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Gruppe und Server", "Entwickler", "Info"]),
       "acht Abschnitte in dieser Reihenfolge: Darstellung, Sprache, Größe, Overlay, Log-Ordner, Gruppe und Server, Entwickler, Info", g.gruppen.map((x) => x.h));
+    assert(JSON.stringify(g.verborgen) === JSON.stringify(["einstNavWin", "eg-win"]),
+      "ohne windows aus /api/config: nur der Abschnitt Windows und sein Eintrag verborgen (Windows-Einbindung 9)", g.verborgen);
     const K = ["darst", "sprache", "groesse", "overlay", "logs", "gruppe", "dev", "info"];
     assert(g.gruppen.every((x, i) => x.id === "eg-" + K[i] && x.hid === "egh-" + K[i] && x.lab === x.hid && x.ti === "-1" && x.inhalt),
       "jeder Abschnitt ist eine section mit h3 (aria-labelledby, tabindex -1) und Inhalt darunter", g.gruppen);
@@ -187,49 +309,49 @@ try {
     assert(o.app && !o.zahnrad && tb && tb.sicht && tb.name === "Settings" && tb.tip === "Settings" && tb.typ === "button",
       "mit Kampf: kein Zahnrad in der Titelleiste, das der Symbolleiste heisst „Settings“", { o, tb });
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     o = await ort(p);
     assert(o.einst && !o.app && !o.land && !o.tafel && JSON.stringify(o.aktuell) === '["settings"]',
       "Klick auf das Zahnrad: die Einstellungen, ohne Kampf-Tafel, das Zahnrad der Leiste gewaehlt", o);
     await p.click('#bereiche [data-tab="timeline"]');
-    await p.waitForTimeout(150);
+    await zeigt(p, "#app", "der Kampf nach dem Bereich Kampf");
     o = await ort(p);
     assert(!o.einst && o.app && o.tafel && JSON.stringify(o.aktuell) === '["timeline"]',
       "Klick auf Kampf: die Einstellungen sind verlassen, die Tafel steht wieder", o);
     // Einstellungen, dann ein Kampf aus der Kampfwahl
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(100);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     await p.click("#kwKnopf");
-    await p.waitForFunction(() => !document.querySelector("#kampfwahl").hidden);
+    await warte(p, () => !document.querySelector("#kampfwahl").hidden, undefined, 30000, "die Kampfwahl offen");
     const n = await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].filter((f) => !f.closest("[hidden]")).length);
     await p.evaluate(() => { const f = [...document.querySelectorAll("#fightList .fight")].filter((x) => !x.closest("[hidden]")); f[f.length - 1].click(); });
-    await p.waitForTimeout(150);
+    await zeigt(p, "#app", "der Kampf aus der Kampfwahl");
     o = await ort(p);
     assert(n > 0 && !o.einst && o.app && JSON.stringify(o.aktuell) === '["timeline"]',
       "Einstellungen, dann ein Kampf aus der Kampfwahl: die Einstellungen sind verlassen", { n, o });
     // Laden einer Datei verlaesst die Einstellungen (wie Start)
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(100);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     await p.evaluate(() => document.querySelector("#btnSample2").click());
-    await p.waitForTimeout(400);
+    await zeigt(p, "#app", "der Kampf nach dem Laden des Beispiels");
     o = await ort(p);
     assert(!o.einst && o.app, "Einstellungen, dann eine Datei laden: die Einstellungen sind verlassen", o);
 
     // Kompakt: das ⋯ bleibt, kein Zahnrad, keine Einstellungen; zurueck steht wieder der Ort
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(100);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, true);
     o = await ort(p);
     assert(o.mehr && !o.zahnrad && !o.einst, "Kompakt: ⋯ sichtbar, weder Zahnrad noch Einstellungen", o);
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, false);
     o = await ort(p);
     assert(o.einst && !o.app && JSON.stringify(o.aktuell) === '["settings"]', "zurueck in der vollen Ansicht: wieder die Einstellungen", o);
 
     // Gruppennavigation: springt zur Gruppe, Fokus auf ihre Ueberschrift
     await p.click('#einstNav button[data-gruppe="logs"]');
-    await p.waitForTimeout(400);
+    await gruppeIst(p, "logs");
     const nv = await p.evaluate(() => {
       const h = document.querySelector("#egh-logs"), r = h.getBoundingClientRect(), kopf = document.querySelector(".top").getBoundingClientRect();
       return { fokus: document.activeElement?.id, oben: r.top, unten: r.bottom, kopf: kopf.bottom, hoch: innerHeight,
@@ -241,20 +363,20 @@ try {
 
     // Bereichsleiste per Tastatur: Pfeile erreichen das Zahnrad, Enter oeffnet
     await p.click('#bereiche [data-tab="timeline"]');
-    await p.waitForTimeout(100);
+    await zeigt(p, "#app", "der Kampf nach dem Bereich Kampf");
     await p.focus('#bereiche [data-tab="timeline"]');
     await p.keyboard.press("ArrowUp");      // vom ersten Bereich rundherum ans Ende: das Zahnrad
-    await p.waitForTimeout(150);
+    await fokusTab(p, "settings");
     o = await ort(p);
     assert(o.fokus === "settings" && o.einst, "↑ vom ersten Bereich: das Zahnrad hat den Fokus, die Einstellungen stehen", o);
     await p.keyboard.press("ArrowUp");
-    await p.waitForTimeout(100);
+    await fokusTab(p, "start");
     o = await ort(p);
     assert(o.fokus === "start" && o.land && !o.einst, "↑ weiter: Start", o);
     await p.keyboard.press("ArrowDown");
-    await p.waitForTimeout(100);
+    await fokusTab(p, "settings");
     await p.keyboard.press("Enter");
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach Enter auf dem Zahnrad");
     o = await ort(p);
     assert(o.fokus === "settings" && o.einst && JSON.stringify(o.aktuell) === '["settings"]', "↓ und Enter: das Zahnrad oeffnet die Einstellungen", o);
     const tab = await p.evaluate(() => [...document.querySelectorAll("#bereiche .tab")].filter((b) => b.tabIndex === 0).map((b) => b.dataset.tab));
@@ -274,7 +396,7 @@ try {
     const p = s.page;
     await beispiel(p);
     await p.click('#bereiche [data-tab="settings"]');
-    await p.waitForTimeout(200);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const m = await p.evaluate(() => {
       const n = document.querySelector("#einstNav").getBoundingClientRect(), g = document.querySelector(".einstgruppen").getBoundingClientRect();
       const tops = [...document.querySelectorAll("#einstNav button")].map((b) => Math.round(b.getBoundingClientRect().top));
@@ -293,7 +415,7 @@ try {
     const s = await oeffne();
     const p = s.page;
     await p.click('#bereiche [data-tab="settings"]');
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const o = await ort(p);
     assert(o.einst && !o.land && !o.app, "Browser ohne Log: die Einstellungen sind erreichbar", o);
     assert(!s.fehler.length, "Browser: keine Fehler", s.fehler);
@@ -307,7 +429,7 @@ try {
     const p = s.page;
     await beispiel(p);
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const posts = (k) => s.posts.filter((b) => k in b).map((b) => b[k]);
     /* Ein Regler wie unter der Hand: Wert setzen, input waehrend des
        Ziehens, change beim Loslassen (Playwright fuellt keine range). */
@@ -331,34 +453,49 @@ try {
       };
     });
     let z = await lies();
-    assert(z.rg && JSON.stringify(z.themen.map((x) => x[0])) === '["dark","light","tnl","auto"]',
-      "Thema: eine radiogroup mit Namen und den vier Themen (dunkel, hell, TnL, automatisch)", z.themen);
+    assert(z.rg && JSON.stringify(z.themen.map((x) => x[0])) === '["dark","light","tnl","glas","auto"]',
+      "Thema: eine radiogroup mit Namen und den fuenf Kacheln (dunkel, hell, TnL, Rauchglas, automatisch)", z.themen);
     assert(z.themen.filter((x) => x[1] === "true").length === 1 && z.themen.find((x) => x[1] === "true")[0] === "dark" &&
       z.themen.filter((x) => x[2] === 0).length === 1, "Thema: das gewaehlte (dunkel) traegt aria-checked, ein Tabstopp", z.themen);
     await p.click('#eg-darst [role=radio][data-theme="light"]');
-    await p.waitForTimeout(200);
+    await themaIst(p, "light");
     z = await lies();
     assert(z.thema === "light" && posts("theme").at(-1) === "light", "Thema „Hell“: data-theme light, POST /api/config {theme:\"light\"}", { thema: z.thema, posts: s.posts });
     assert(z.themen.find((x) => x[1] === "true")?.[0] === "light" && JSON.stringify(z.menueThema) === '["light"]',
       "Thema „Hell“: aria-checked in den Einstellungen und aria-pressed im ⋯-Menue (ein Stand)", z);
+    await p.click('#eg-darst [role=radio][data-theme="glas"]');
+    await themaIst(p, "glas");
+    z = await p.evaluate(() => ({ thema: document.documentElement.dataset.theme,
+      menue: [...document.querySelectorAll("#themeRow button")].map((b) => b.dataset.theme) }));
+    assert(z.thema === "glas" && posts("theme").at(-1) === "glas", "Thema „Rauchglas“: data-theme glas, POST /api/config {theme:\"glas\"}", { thema: z.thema, posts: s.posts });
+    assert(JSON.stringify(z.menue) === '["dark","light","tnl","glas","auto"]', "Kompakt-Menue: dieselben Themen", z.menue);
+    await p.focus('#eg-darst [role=radio][data-theme="glas"]');
+    await p.keyboard.press("ArrowRight");
+    await fokusThema(p, "auto");
+    z = await p.evaluate(() => document.activeElement.dataset.theme);
+    assert(z === "auto", "Pfeil rechts von Rauchglas: Auto", z);
+    await p.keyboard.press("ArrowLeft"); await p.keyboard.press("ArrowLeft");
+    await fokusThema(p, "tnl");
+    z = await p.evaluate(() => document.activeElement.dataset.theme);
+    assert(z === "tnl", "Pfeil links ueber Rauchglas zu TnL", z);
     await p.focus('#eg-darst [role=radio][data-theme="light"]');
     await p.keyboard.press("ArrowRight");
-    await p.waitForTimeout(200);
+    await themaIst(p, "tnl");
     z = await lies();
     const fk = await p.evaluate(() => document.activeElement?.dataset?.theme);
     assert(z.thema === "tnl" && fk === "tnl" && posts("theme").at(-1) === "tnl", "Thema per Pfeiltaste: → waehlt TnL und nimmt den Fokus mit", { thema: z.thema, fk });
     await p.click('#eg-darst [role=radio][data-theme="dark"]');
-    await p.waitForTimeout(150);
+    await themaIst(p, "dark");
 
     // Groesse: die Grenzen von setUiZoom (10 bis 200)
     assert(z.zoom.min === "10" && z.zoom.max === "200" && z.zoom.name, "Größe: Regler von 10 bis 200 (die Grenzen von setUiZoom), mit Namen", z.zoom);
     await regler("#eZoom", 120);
-    await p.waitForTimeout(250);
+    await zoomIst(p, "1.2");
     z = await lies();
     assert(z.zoom.css === "1.2" && posts("uiZoom").at(-1) === 120 && z.zoom.out === "120\u00a0%",
       "Größe 120: zoom 1.2, POST {uiZoom:120}, Ausgabe „120 %“ mit geschuetztem Leerzeichen", { zoom: z.zoom, posts: posts("uiZoom") });
     await p.evaluate(() => document.querySelector("#zoomVal").click());   // ⋯-Menue: zurueck auf 100
-    await p.waitForTimeout(250);
+    await zoomIst(p, "");
     z = await lies();
     assert(z.zoom.v === "100" && z.zoom.out === "100\u00a0%" && z.zoom.css === "" && posts("uiZoom").at(-1) === 100,
       "Größe im ⋯-Menue auf 100: der Regler der Einstellungen zeigt 100 (ein Stand)", z.zoom);
@@ -366,13 +503,13 @@ try {
     const vorher = posts("uiZoom").length;
     await p.focus("#eZoom");
     await p.keyboard.press("ArrowRight");
-    await p.waitForTimeout(250);
+    await zoomIst(p, "1.01");
     z = await lies();
     assert(z.zoom.v === "101" && z.zoom.css === "1.01" && z.zoom.out === "101\u00a0%" &&
       posts("uiZoom").length === vorher + 1 && posts("uiZoom").at(-1) === 101,
       "Größe per → : zoom 1.01, Ausgabe „101 %“, genau ein POST {uiZoom:101}", { zoom: z.zoom, neu: posts("uiZoom").slice(vorher) });
     await p.evaluate(() => document.querySelector("#zoomVal").click());
-    await p.waitForTimeout(250);
+    await zoomIst(p, "");
     /* Weggezogen und an den Ausgangswert zurueck: input, aber kein change.
        Nach dem Loslassen folgt der Regler wieder einer Groesse von anderswo. */
     await p.evaluate(() => {
@@ -381,42 +518,42 @@ try {
       r.value = "100"; r.dispatchEvent(new Event("input", { bubbles: true }));
       r.dispatchEvent(new PointerEvent("pointerup", { bubbles: true }));
     });
-    await p.waitForTimeout(50);
+    await steht(p, "Regler losgelassen");
     await p.evaluate(() => document.querySelector("#zoomIn").click());   // ⋯-Menue: eine Stufe groesser (110)
-    await p.waitForTimeout(250);
+    await zoomIst(p, "1.1");
     z = await lies();
     assert(z.zoom.v === "110" && z.zoom.out === "110\u00a0%" && z.zoom.css === "1.1",
       "Regler weggezogen und zurueck, dann ⋯-Menue +: Regler und Ausgabe zeigen 110", z.zoom);
     await p.evaluate(() => document.querySelector("#zoomVal").click());
-    await p.waitForTimeout(250);
+    await zoomIst(p, "");
 
     // Sprache
     assert(JSON.stringify(z.sprache) === '[["de","true"],["en","false"]]', "Sprache: Segment Deutsch | English, Deutsch gedrueckt", z.sprache);
     await p.click('#eg-sprache button[data-lang="en"]');
-    await p.waitForTimeout(250);
+    await spracheIst(p, "en");
     z = await lies();
     const ls = await p.evaluate(() => localStorage.getItem("boroLang"));
     assert(ls === "en" && z.h1 === "Settings" && JSON.stringify(z.sprache) === '[["de","false"],["en","true"]]',
       "Sprache „English“: localStorage boroLang en, die Seite englisch, aria-pressed auf English", { ls, z: z.sprache, h1: z.h1 });
     await p.click('#eg-sprache button[data-lang="de"]');
-    await p.waitForTimeout(250);
+    await spracheIst(p, "de");
 
     // Durchsicht: dieselbe Form wie applySeeThrough (compactAlpha = 1 - see/100)
     assert(z.see.min === "0" && z.see.max === "55", "Durchsicht: Regler 0 bis 55", z.see);
     await regler("#eSee", 30);
-    await p.waitForTimeout(200);
+    await warte(p, () => document.querySelector("#seeSlide").value === "30", undefined, 5000, "#seeSlide folgt der Durchsicht 30"); await steht(p, "Durchsicht 30");
     z = await lies();
     assert(posts("compactAlpha").at(-1) === 0.7 && z.see.out === "30\u00a0%" && z.see.menue === "30",
       "Durchsicht 30: POST {compactAlpha:0.7}, Ausgabe „30 %“, #seeSlide steht auf 30", { see: z.see, posts: posts("compactAlpha") });
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, true);
     const kompakt = await p.evaluate(() => document.querySelector("#seeSlide").value);
     assert(kompakt === "30", "im Kompakt steht #seeSlide auf 30", kompakt);
     await regler("#seeSlide", 12);
     await p.evaluate(() => document.querySelector('#themeRow button[data-theme="tnl"]').click());
-    await p.waitForTimeout(200);
+    await themaIst(p, "tnl");
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, false);
     z = await lies();
     assert(z.see.v === "12" && z.see.out === "12\u00a0%", "Durchsicht im Kompakt-⋯ auf 12: die Einstellungen zeigen 12", z.see);
     assert(z.thema === "tnl" && z.themen.find((x) => x[1] === "true")?.[0] === "tnl", "Thema im Kompakt-⋯ auf TnL: die Einstellungen zeigen es", z.themen);
@@ -441,7 +578,7 @@ try {
     const s = await oeffne({ lang: "de" });
     const p = s.page;
     await p.click('#bereiche [data-tab="settings"]');
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const f = await p.evaluate(() => {
       const g = document.querySelector("#eg-overlay");
       const sicht = (e) => !!e && e.getClientRects().length > 0;
@@ -450,7 +587,7 @@ try {
         darst: [...document.querySelectorAll("#eg-darst [role=radio],#eg-groesse input")].filter(sicht).length };
     });
     assert(/betrifft das Fenster der App/.test(f.satz) && f.bedien === 0, "Browser: „betrifft das Fenster der App“, keine Regler oder Schalter im Overlay", f);
-    assert(f.darst === 5, "Browser: Darstellung und Größe bleiben bedienbar (vier Themen, Größe)", f);
+    assert(f.darst === 6, "Browser: Darstellung und Größe bleiben bedienbar (fuenf Themen, Größe)", f);
     assert(!s.fehler.length, "Overlay (Browser): keine Fehler", s.fehler);
     await p.close();
   }
@@ -461,10 +598,10 @@ try {
     const s = await oeffne({ app: true, lang: "de", helfer: { dir: "C:\\TL\\CombatLogs", file: "TLCombatLog-20260920.txt", text: "" } });
     const p = s.page;
     await p.setInputFiles("#fileInput", { name: "TLCombatLog-20260920.txt", mimeType: "text/plain", buffer: Buffer.from(TRENN_LOG) });
-    await p.waitForFunction(() => !document.querySelector("#app").hidden);
-    await p.waitForTimeout(300);
+    await warte(p, () => !document.querySelector("#app").hidden, undefined, 30000, "der Kampf aus dem geoeffneten Log");
+    await steht(p, "Log geladen");
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const posts = (k) => s.posts.filter((b) => k in b).map((b) => b[k]);
     const lies = () => p.evaluate(() => {
       const q = (x) => document.querySelector(x);
@@ -491,7 +628,7 @@ try {
     await p.waitForSelector("#modalInput", { state: "visible" });
     await p.fill("#modalInput", "D:\\Spiele\\Logs");
     await p.click("#modalOk");
-    await p.waitForTimeout(400);
+    await dialogZu(p, "#modalBg", "Ordner-Dialog nach OK");
     z = await lies();
     assert(JSON.stringify(s.dir.filter((b) => b.path)) === JSON.stringify([{ path: "D:\\Spiele\\Logs" }]) && z.pfad === "D:\\Spiele\\Logs",
       "Ordner „Ändern“: POST /api/dir {path}, der neue Pfad steht in der Zeile", { dir: s.dir, pfad: z.pfad });
@@ -501,25 +638,25 @@ try {
       "Trennen: Abstand 8, Mindestdauer 3, Schalter „Bossphasen verbinden“ an (role=switch, mit Namen)", z);
     const anfang = z.anzahl;
     await p.click("#ePhasen");
-    await p.waitForTimeout(200);
+    await steht(p, "Phasen umgeschaltet");
     z = await lies();
     assert(posts("mergePhases").at(-1) === false && z.phasen === "false" && z.inPhases === false && z.anzahl !== anfang && /4/.test(z.anzahl),
       "Phasen aus: POST {mergePhases:false}, die Liste schneidet neu (4 Kaempfe), der Haken im Filterfeld ist aus", { z, anfang, posts: posts("mergePhases") });
     await p.fill("#eGap", "15");
     await p.press("#eGap", "Enter");
-    await p.waitForTimeout(200);
+    await steht(p, "Abstand 15");
     z = await lies();
     assert(posts("splitAfter").at(-1) === 15 && !posts("gap").length && z.inGap === "15" && /3/.test(z.anzahl),
       "Abstand 15: POST {splitAfter:15} (derselbe Schluessel wie das Filterfeld), 3 Kaempfe, #inGap zeigt 15", { z, posts: s.posts });
     await p.fill("#eMin", "0");
     await p.press("#eMin", "Enter");
-    await p.waitForTimeout(200);
+    await steht(p, "Mindestdauer 0");
     z = await lies();
     assert(posts("minDur").at(-1) === 0 && z.inMin === "0" && /4/.test(z.anzahl),
       "Mindestdauer 0: POST {minDur:0}, der kurze Kampf erscheint (4), #inMin zeigt 0", { z, posts: posts("minDur") });
     await p.fill("#eGap", "500");
     await p.press("#eGap", "Enter");
-    await p.waitForTimeout(200);
+    await steht(p, "Abstand 500");
     z = await lies();
     assert(z.gap === "120" && posts("splitAfter").at(-1) === 120 && z.inGap === "120", "Abstand 500 wird wie im Filterfeld auf 120 geklemmt", { z, posts: posts("splitAfter") });
     // umgekehrt: das Filterfeld aendert, die Einstellungen zeigen es
@@ -527,7 +664,7 @@ try {
       if (typeof b === "boolean") e.checked = b; else e.value = b;
       e.dispatchEvent(new Event("change", { bubbles: true })); }, [q, v]);
     await feld("#inGap", "8"); await feld("#inMin", "3"); await feld("#inPhases", true);
-    await p.waitForTimeout(200);
+    await steht(p, "Filterfeld 8 / 3 / Phasen an");
     z = await lies();
     assert(z.gap === "8" && z.min === "3" && z.phasen === "true" && z.anzahl === anfang &&
       posts("splitAfter").at(-1) === 8 && posts("minDur").at(-1) === 3 && posts("mergePhases").at(-1) === true,
@@ -535,14 +672,14 @@ try {
 
     // Kampfdatei: dieselben Wege wie #btnSaveRuns / #btnLoadRuns
     await p.click("#eLaden");
-    await p.waitForTimeout(300);
+    await dialogAuf(p, "#modalBg", "Dialog Kampfdatei laden");
     const laden = await p.evaluate(() => document.querySelector("#modalTitle").textContent);
     assert(s.runs.includes("GET /api/runs/list") && laden === "Kampfdatei laden",
       "Kampfdatei laden: fragt den Helfer nach /api/runs/list, der Dialog „Kampfdatei laden“", { runs: s.runs, laden });
     await p.keyboard.press("Escape");
-    await p.waitForTimeout(200);
+    await dialogZu(p, "#modalBg", "Dialog Kampfdatei laden nach Esc");
     await p.click("#eSpeichern");
-    await p.waitForTimeout(300);
+    await meldungDa(p, "Noch keine gespeicherten", "Hinweis ohne gespeicherten Kampf");
     const leer = await p.evaluate(() => document.querySelector("#toast").textContent);
     assert(/Noch keine gespeicherten/.test(leer), "Kampfdatei speichern ohne gespeicherten Kampf: derselbe Hinweis wie im Filterfeld", leer);
 
@@ -550,16 +687,16 @@ try {
     assert(z.dev === "false" && z.devRolle === "switch" && z.devName && z.waffe && !z.beispiel,
       "Entwicklermodus: Schalter aus (role=switch, mit Namen), „Nach Waffe“ und Beispielgruppe verborgen", z);
     await p.click("#eDev");
-    await p.waitForTimeout(200);
+    await steht(p, "Entwicklermodus an");
     z = await lies();
     assert(posts("devMode").at(-1) === true && z.dev === "true" && z.csv && !z.waffe && z.beispiel,
       "Entwicklermodus an: POST {devMode:true}, #segWeapon da, „CSV exportieren“ da, Zeile Beispielgruppe sichtbar", { z, posts: posts("devMode") });
     await p.click("#eBeispiel");
-    await p.waitForTimeout(300);
+    await meldungDa(p, "Beispielgruppe mit", "Meldung der Beispielgruppe");
     const bg = await p.evaluate(() => document.querySelector("#toast").textContent);
     assert(/Beispielgruppe mit \d Mitgliedern/.test(bg), "Beispielgruppe: dieselbe Handlung wie im ⋯-Menue", bg);
     await p.click("#eDev");   // der Haken #miDev im ⋯-Menue ist weg (Aufgabe 5), derselbe Weg ueber den Schalter
-    await p.waitForTimeout(200);
+    await steht(p, "Entwicklermodus aus");
     z = await lies();
     assert(posts("devMode").at(-1) === false && z.dev === "false" && z.waffe && !z.beispiel && !z.csv,
       "Entwicklermodus wieder aus: der Schalter zeigt „Aus“, Beispielgruppe und CSV verborgen", z);
@@ -577,7 +714,7 @@ try {
     const sicht = (q) => p.evaluate((x) => { const e = document.querySelector(x); return !!e && e.getClientRects().length > 0; }, q);
     await p.click('#bereiche [data-tab="settings"]');
     await p.click('#einstNav button[data-gruppe="info"]');
-    await p.waitForTimeout(150);
+    await gruppeIst(p, "info");
     const si = await p.evaluate(() => {
       const g = document.querySelector("#eg-info"), dl = g.querySelector("dl");
       return { dt: dl ? [...dl.querySelectorAll(":scope > div > dt")].map((d) => d.textContent.trim()) : [],
@@ -594,13 +731,13 @@ try {
       "Sicherheit: eine Liste mit fuenf Eintraegen - liest, schreibt, lokaler Server, Netz, Spiel", si);
     assert(si.dd[2]?.includes("127.0.0.1") && si.code.includes("127.0.0.1") && si.dlBedien === 0 && JSON.stringify(si.bedien) === '["eUpdatePruefen","eRundgang"]',
       "Sicherheit: 127.0.0.1 woertlich (als Code), keine Schalter und Knoepfe in der Liste; in Info nur der Schalter des Update-Hinweises und „Rundgang zeigen“", si);
-    assert(/Gruppe/.test(si.dd[3] || "") && /Questlog/.test(si.dd[3] || "") && /Update-Hinweis/.test(si.dd[3] || ""),
-      "Sicherheit „Netz“: Gruppe, Questlog auf Klick und der Update-Hinweis als dritter Weg", si.dd[3]);
+    assert(/Gruppe/.test(si.dd[3] || "") && !/Questlog/.test(si.dd[3] || "") && /Update-Hinweis/.test(si.dd[3] || ""),
+      "Sicherheit „Netz“: Gruppe und der Update-Hinweis; Questlog steht nicht mehr da (Abruf entfallen, #207)", si.dd[3]);
     assert(/Kampflog-Ordner/.test(si.dd[0] || "") && /nur lesend/.test(si.dd[0] || "") && /eigenen Dateien/.test(si.dd[0] || ""),
       "Sicherheit „Liest“: den Kampflog-Ordner, nur lesend, und die eigenen Dateien", si.dd[0]);
     // Ueber: Name und Version, drei Handlungen
     await p.click('#einstNav button[data-gruppe="dev"]');
-    await p.waitForTimeout(150);
+    await gruppeIst(p, "dev");
     const ue = await p.evaluate(() => ({ ver: document.querySelector("#einstVer")?.textContent,
       knoepfe: [...document.querySelectorAll("#eg-dev button:not([role=switch])")].filter((b) => b.getClientRects().length > 0)
         .map((b) => [b.id, b.textContent.trim(), b.getAttribute("aria-label") || b.textContent.trim()]) }));
@@ -623,25 +760,25 @@ try {
     assert(/^Fehlerbericht/.test(fehlerSatz) && /Statusleiste/.test(fehlerSatz) && /„Fehler melden“/.test(fehlerSatz) && /ohne das Kampflog/.test(fehlerSatz),
       "Entwickler: die Zeile Fehlerbericht sagt, wo er jetzt steht und was er enthaelt", fehlerSatz);
     // Aenderungsprotokoll: der vorhandene Dialog, Esc zurueck an den Knopf
-    await p.click("#eClog").catch(() => {});
-    await p.waitForTimeout(150);
+    await p.click("#eClog").catch((e) => assert(false, "Zeitablauf beim Klick auf #eClog", String(e).split("\n")[0]));
+    await dialogAuf(p, "#clogBg", "Aenderungsprotokoll");
     const cl = await p.evaluate(() => ({ an: document.querySelector("#clogBg").classList.contains("on"), fokus: document.activeElement?.id,
       text: (document.querySelector("#clog")?.textContent || "").length }));
     assert(cl.an && cl.fokus === "clogClose" && cl.text > 100, "Aenderungsprotokoll oeffnet #clog, der Fokus auf „Schliessen“", cl);
     await p.keyboard.press("Escape");
-    await p.waitForTimeout(100);
+    await dialogZu(p, "#clogBg", "Aenderungsprotokoll nach Esc");
     assert(await p.evaluate(() => !document.querySelector("#clogBg").classList.contains("on") && document.activeElement?.id === "eClog"),
       "Esc schliesst das Protokoll, der Fokus geht an den Knopf zurueck");
     // Fehlerbericht: derselbe Weg wie #btnDebug - POST /api/bug/save, die Meldung (seit 01.10. ueber "Fehler melden" in der Statusleiste)
-    await p.click("#sbFehler").catch(() => {});
-    await p.waitForFunction(() => /Fehlerbericht gespeichert/.test(document.querySelector("#toast")?.textContent || ""), null, { timeout: 4000 }).catch(() => {});
+    await p.click("#sbFehler").catch((e) => assert(false, "Zeitablauf beim Klick auf #sbFehler", String(e).split("\n")[0]));
+    await warte(p, () => /Fehlerbericht gespeichert/.test(document.querySelector("#toast")?.textContent || ""), undefined, 4000);
     const bug = { n: s.bug.length, name: s.bug[0]?.name || "", daten: !!s.bug[0]?.data && typeof s.bug[0].data === "object",
       toast: await p.evaluate(() => document.querySelector("#toast")?.textContent || "") };
     assert(bug.n === 1 && /^boro-bug-\d{8}-\d{4}$/.test(bug.name) && bug.daten && /Fehlerbericht gespeichert als boro-bug-/.test(bug.toast),
       "Fehler melden (Statusleiste): POST /api/bug/save wie #btnDebug, die Meldung nennt Datei und Ordner", bug);
     // Beispielkampf: laedt das Beispiel und verlaesst die Einstellungen
-    await p.click("#eBeispielkampf").catch(() => {});
-    await p.waitForFunction(() => !document.querySelector("#app").hidden, null, { timeout: 4000 }).catch(() => {});
+    await p.click("#eBeispielkampf").catch((e) => assert(false, "Zeitablauf beim Klick auf #eBeispielkampf", String(e).split("\n")[0]));
+    await warte(p, () => !document.querySelector("#app").hidden, undefined, 4000);
     let o = await ort(p);
     const nk = await p.evaluate(() => document.querySelectorAll("#fightList .fight").length);
     assert(o.app && !o.einst && nk === 2, "Beispielkampf: das Beispiel ist geladen (zwei Kaempfe), die Einstellungen sind verlassen", { o, nk });
@@ -657,12 +794,12 @@ try {
        das Wort bleibt im Knopf fuer den Namen, sichtbar ist es nicht mehr. */
     assert(bk && bk.imKopf && bk.svg === "true" && bk.wort === "Als Bild" && bk.wortBreit <= 1 && bk.title === "Als Bild teilen"
       && bk.name === "Als Bild teilen" && bk.typ === "button", "#btnBild im Kopf: Symbol, das Wort „Als Bild“ nur fuer den Namen, Name und title „Als Bild teilen“", bk);
-    await p.click("#btnBild").catch(() => {});
-    await p.waitForTimeout(200);
+    await p.click("#btnBild").catch((e) => assert(false, "Zeitablauf beim Klick auf #btnBild", String(e).split("\n")[0]));
+    await dialogAuf(p, "#shareBg", "Bild-Dialog");
     const bd = await p.evaluate(() => ({ an: document.querySelector("#shareBg").classList.contains("on"), fokus: document.activeElement?.id }));
     assert(bd.an && bd.fokus === "shareCopy", "#btnBild oeffnet den Bild-Dialog wie #miShare", bd);
     await p.keyboard.press("Escape");
-    await p.waitForTimeout(100);
+    await dialogZu(p, "#shareBg", "Bild-Dialog nach Esc");
     assert(await p.evaluate(() => !document.querySelector("#shareBg").classList.contains("on") && document.activeElement?.id === "btnBild"),
       "Esc schliesst das Bild, der Fokus geht an #btnBild zurueck");
 
@@ -677,11 +814,11 @@ try {
     assert(!o.mehr && !o.zahnrad && rechts === "btnPin", "volle Ansicht: weder ⋯ noch Zahnrad in der Titelleiste, rechts aussen Anheften", { o, rechts });
     // Kompakt: das ⋯ wie heute, vollstaendig; kein Bild-Knopf
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, true);
     o = await ort(p);
     assert(o.mehr && !o.zahnrad && !(await sicht("#btnBild")), "Kompakt: das ⋯ ist da, weder Zahnrad noch Bild-Knopf", o);
     await p.click("#btnMore");
-    await p.waitForTimeout(150);
+    await warte(p, () => !document.querySelector("#morePanel").hidden, undefined, 5000, "das ⋯-Menue offen"); await steht(p, "⋯-Menue offen");
     const menue = await p.evaluate(() => [...document.querySelectorAll("#morePanel > *")].filter((e) => e.getClientRects().length > 0)
       .map((e) => e.id || e.className));
     assert(JSON.stringify(menue) === KOMPAKT_MENUE, "Kompakt: das ⋯-Menue zeigt dieselben Eintraege wie vor Stufe 3", menue);
@@ -689,11 +826,11 @@ try {
     assert(!tot.length, "die Eintraege, die nur die volle Ansicht zeigte, gibt es nicht mehr (die Einstellungen und #btnBild tragen sie)", tot);
     await p.keyboard.press("Escape");
     await p.evaluate(() => document.querySelector("#btnCompact").click());
-    await p.waitForTimeout(400);
+    await kompaktIst(p, false);
 
     // 560 Punkt: das Wort nur im title
     await p.setViewportSize({ width: 560, height: 760 });
-    await p.waitForTimeout(300);
+    await breiteIst(p, 560);
     const sm = await p.evaluate(() => { const b = document.querySelector("#btnBild"), w = b?.querySelector(".blabel");
       return b && w ? { wortBreit: w.getBoundingClientRect().width, title: b.title, sicht: b.getClientRects().length > 0,
         quer: document.documentElement.scrollWidth > innerWidth } : null; });
@@ -702,21 +839,21 @@ try {
 
     // Zahlenfeld mit Fokus: ein Nachfuehren von anderswo (Strg+Plus) ueberschreibt die Eingabe nicht
     await p.setViewportSize({ width: 1280, height: 860 });
-    await p.waitForTimeout(200);
+    await breiteIst(p, 1280);
     await p.click(ZAHNRAD);
     await p.click('#einstNav button[data-gruppe="logs"]');
-    await p.waitForTimeout(400);
+    await gruppeIst(p, "logs");
     await p.click("#eGap", { clickCount: 3 });
     await p.keyboard.type("15");
     const z0 = s.posts.filter((b) => "uiZoom" in b).length;
     await p.keyboard.press("Control+Equal");
-    await p.waitForTimeout(150);
+    await steht(p, "Strg+Plus");
     const fo = await p.evaluate(() => ({ wert: document.querySelector("#eGap").value, fokus: document.activeElement?.id }));
     assert(s.posts.filter((b) => "uiZoom" in b).length > z0 && fo.wert === "15" && fo.fokus === "eGap",
       "Zahlenfeld mit Fokus: Strg+Plus fuehrt nach, die Eingabe bleibt stehen", fo);
     await p.keyboard.press("Control+0");
     await p.keyboard.press("Enter");
-    await p.waitForTimeout(150);
+    await steht(p, "Strg+0 und Enter");
     assert(await p.evaluate(() => document.querySelector("#eGap").value) === "15" && s.posts.some((b) => b.splitAfter === 15),
       "Enter: der Wert gilt und steht im Feld");
     /* Zurueckgetippt: waehrend des Tippens aendert das Filterfeld den
@@ -725,12 +862,12 @@ try {
     await p.click("#eGap", { clickCount: 3 });
     await p.keyboard.type("2");
     await p.evaluate(() => { const e = document.querySelector("#inGap"); e.value = "9"; e.dispatchEvent(new Event("change", { bubbles: true })); });
-    await p.waitForTimeout(100);
+    await steht(p, "Filterfeld 9");
     const mitten = await p.evaluate(() => document.querySelector("#eGap").value);
     await p.keyboard.press("Backspace");
     await p.keyboard.type("15");
     await p.keyboard.press("Tab");
-    await p.waitForTimeout(150);
+    await steht(p, "Feld verlassen");
     const nachher = await p.evaluate(() => document.querySelector("#eGap").value);
     assert(mitten === "2" && nachher === "9", "auf den alten Wert zurueckgetippt und verlassen: das Feld zeigt wieder den Stand (9)", { mitten, nachher });
     assert(!s.fehler.length, "Sicherheit und Ueber: keine Fehler", s.fehler);
@@ -772,7 +909,7 @@ try {
         await beispiel(p);
         await p.click('#bereiche [data-tab="settings"]');
         await p.click(`#eThema [role=radio][data-theme="${thema}"]`);
-        await p.waitForTimeout(200);
+        await themaIst(p, thema);
         const st = await p.evaluate(() => ({ thema: document.documentElement.dataset.theme, h: document.querySelector("#einstTitel").textContent.trim() }));
         assert(st.thema === thema && st.h === (lang === "de" ? "Einstellungen" : "Settings"), `${thema}/${lang}: Thema gesetzt, Kopf in der Sprache`, st);
         assert(!(await quer(p)), `${thema}/${lang}: kein waagerechtes Rollen bei 1280 Punkt`);
@@ -783,7 +920,7 @@ try {
         assert(saetze.length >= 28 && !schwach.length, `${thema}/${lang}: Satzzeilen (.ezt span), Kopf, Sicherheit, Navigation, An/Aus, Kacheln, Anzeige, Hinweise und Info mindestens 4,5:1 (${saetze.length} geprueft)`, schwach);
         // Stand ohne Fehler auch schmal
         await p.setViewportSize({ width: 560, height: 800 });
-        await p.waitForTimeout(250);
+        await breiteIst(p, 560);
         assert(!(await quer(p)), `${thema}/${lang}: kein waagerechtes Rollen bei 560 Punkt`);
         assert(!s.fehler.length, `${thema}/${lang}: keine Fehler auf der Seite`, s.fehler);
         await p.close();
@@ -794,15 +931,18 @@ try {
     const p = s.page;
     await beispiel(p);
     await p.click(ZAHNRAD);
-    await p.waitForTimeout(150);
+    await zeigt(p, "#einst", "die Einstellungen nach dem Zahnrad");
     const posts = (k) => s.posts.filter((b) => k in b).map((b) => b[k]);
 
     // Vorleser: eine Ueberschrift h1 (die Wortmarke), die Einstellungen h2, jede Gruppe eine Region mit Namen (h3)
     const uk = await p.evaluate(() => ({ h1: [...document.querySelectorAll("h1")].map((h) => h.className || h.id),
       titel: document.querySelector("#einstTitel")?.tagName,
-      gruppen: [...document.querySelectorAll("#einst section.egruppe")].map((g) => document.getElementById(g.getAttribute("aria-labelledby"))?.tagName) }));
-    assert(uk.h1.length === 1 && uk.titel === "H2" && uk.gruppen.length === 8 && uk.gruppen.every((x) => x === "H3"),
-      "Ueberschriften: ein h1 im Dokument, „Einstellungen“ als h2, die acht Abschnitte als h3", uk);
+      /* folgt Spezifikation Windows-Einbindung 9: der Abschnitt "Windows" ist ohne windows aus /api/config verborgen -
+         gezaehlt werden die sichtbaren; verborgen ist genau er */
+      verborgen: [...document.querySelectorAll("#einst section.egruppe[hidden]")].map((g) => g.id),
+      gruppen: [...document.querySelectorAll("#einst section.egruppe:not([hidden])")].map((g) => document.getElementById(g.getAttribute("aria-labelledby"))?.tagName) }));
+    assert(uk.h1.length === 1 && uk.titel === "H2" && uk.gruppen.length === 8 && uk.gruppen.every((x) => x === "H3") && uk.verborgen.join() === "eg-win",
+      "Ueberschriften: ein h1 im Dokument, „Einstellungen“ als h2, die acht Abschnitte als h3 (Windows verborgen)", uk);
     for (const name of ["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Gruppe und Server", "Entwickler", "Info"]) {
       const n = await p.getByRole("region", { name, exact: true }).count();
       assert(n === 1, `Vorleser: die Gruppe „${name}“ ist eine Region mit diesem Namen`, n);
@@ -810,7 +950,7 @@ try {
 
     // Tastatur: Tab von der Ueberschrift der ersten Gruppe erreicht jedes Bedienelement, in der Reihenfolge der Zeilen
     await p.click('#einstNav button[data-gruppe="darst"]');
-    await p.waitForTimeout(300);
+    await gruppeIst(p, "darst");
     const erwartet = await p.evaluate(() => [...document.querySelectorAll(".einstgruppen button, .einstgruppen input, .einstgruppen [tabindex]")]
       .filter((e) => e.tabIndex >= 0 && !e.disabled && e.getClientRects().length > 0)
       .map((e) => e.id || e.dataset.theme || e.dataset.lang));
@@ -834,34 +974,34 @@ try {
     // Leertaste auf den Schaltern
     await p.focus("#ePhasen");
     await p.keyboard.press("Space");
-    await p.waitForTimeout(150);
+    await steht(p, "Leertaste auf Phasen");
     let sw = await p.evaluate(() => document.querySelector("#ePhasen").getAttribute("aria-checked"));
     assert(sw === "false" && posts("mergePhases").at(-1) === false, "Leertaste auf „Bossphasen verbinden“: aus, POST {mergePhases:false}", { sw, posts: posts("mergePhases") });
     await p.keyboard.press("Space");
-    await p.waitForTimeout(150);
+    await steht(p, "Leertaste auf Phasen");
     sw = await p.evaluate(() => document.querySelector("#ePhasen").getAttribute("aria-checked"));
     assert(sw === "true" && posts("mergePhases").at(-1) === true, "noch einmal Leertaste: wieder an", sw);
     await p.focus("#eDev");
     await p.keyboard.press("Space");
-    await p.waitForTimeout(150);
+    await steht(p, "Leertaste auf Entwicklermodus");
     sw = await p.evaluate(() => ({ dev: document.querySelector("#eDev").getAttribute("aria-checked"), beispiel: document.querySelector("#eBeispiel").getClientRects().length > 0 }));
     assert(sw.dev === "true" && sw.beispiel && posts("devMode").at(-1) === true, "Leertaste auf „Entwicklermodus“: an, die Beispielgruppe erscheint", sw);
     await p.keyboard.press("Space");
-    await p.waitForTimeout(150);
+    await steht(p, "Leertaste auf Entwicklermodus");
 
     // Pfeiltasten auf den Reglern
     await p.focus("#eSee");
     await p.keyboard.press("ArrowRight");
     await p.keyboard.press("ArrowRight");
-    await p.waitForTimeout(150);
+    await steht(p, "Durchsicht → →");
     const see = await p.evaluate(() => ({ v: document.querySelector("#eSee").value, out: document.querySelector("#eSee + output").textContent }));
     assert(see.v === "2" && see.out === "2\u00a0%" && posts("compactAlpha").at(-1) === 0.98, "Durchsicht per → →: 2 %, POST {compactAlpha:0.98}", { see, posts: posts("compactAlpha") });
     await p.keyboard.press("ArrowLeft");
-    await p.waitForTimeout(150);
+    await steht(p, "Durchsicht ←");
     assert(await p.evaluate(() => document.querySelector("#eSee").value) === "1" && posts("compactAlpha").at(-1) === 0.99, "Durchsicht per ←: 1 %");
     await p.focus("#eZoom");
     await p.keyboard.press("ArrowLeft");
-    await p.waitForTimeout(200);
+    await zoomIst(p, "0.99");
     const zl = await p.evaluate(() => ({ v: document.querySelector("#eZoom").value, css: document.documentElement.style.zoom }));
     assert(zl.v === "99" && zl.css === "0.99" && posts("uiZoom").at(-1) === 99, "Größe per ←: 99 %, POST {uiZoom:99}", zl);
 
@@ -869,7 +1009,7 @@ try {
     for (const z of [50, 150, 200]) {
       await p.evaluate((w) => { const r = document.querySelector("#eZoom"); r.value = String(w);
         r.dispatchEvent(new Event("input", { bubbles: true })); r.dispatchEvent(new Event("change", { bubbles: true })); }, z);
-      await p.waitForTimeout(300);
+      await zoomIst(p, String(z / 100));
       const zs = await p.evaluate(() => {
         const sicht = (q) => { const e = document.querySelector(q); return !!e && e.getClientRects().length > 0; };
         return { css: document.documentElement.style.zoom, quer: document.documentElement.scrollWidth > innerWidth + 0.5,
@@ -889,7 +1029,7 @@ try {
     const PRAEFIX = "https://github.com/B0R0AK/Borometer/releases/tag/";
     const bis = async (fn, was) => {
       for (let i = 0; i < 60; i++) { if (fn()) return true; await new Promise((r) => setTimeout(r, 50)); }
-      console.log("        (wartete vergeblich auf " + was + ")");
+      assert(false, "Zeitablauf (3000 ms) beim Warten auf: " + was);
       return false;
     };
     const stand = (p) => p.evaluate(() => {
@@ -904,7 +1044,7 @@ try {
     const zuInfo = async (p) => {
       await p.click(ZAHNRAD);
       await p.click('#einstNav button[data-gruppe="info"]');
-      await p.waitForFunction(() => document.querySelector("#einstNav button[aria-current]")?.dataset.gruppe === "info");
+      await warte(p, () => document.querySelector("#einstNav button[aria-current]")?.dataset.gruppe === "info", undefined, 30000, "Gruppe Info gewaehlt");
     };
 
     // a) Standard: ohne Schluessel aus; an und aus schreibt updatePruefen als Wahrheitswert; Tastatur und Vorleser
@@ -940,7 +1080,7 @@ try {
       const s = await oeffne({ app: true, lang: "de", config: { updatePruefen: wert } });
       const p = s.page;
       await zuInfo(p);
-      await p.waitForFunction((x) => document.querySelector("#eUpdatePruefen").getAttribute("aria-checked") === x, an, { timeout: 3000 }).catch(() => {});
+      await warte(p, (x) => document.querySelector("#eUpdatePruefen").getAttribute("aria-checked") === x, an, 3000);
       const b = await stand(p);
       assert(b.an === an && !s.posts.some((x) => "updatePruefen" in x), `Update-Hinweis: gespeichert ${JSON.stringify(wert)} zeigt ${an === "true" ? "an" : "aus"}, ohne zu schreiben`, b);
       await p.close();
@@ -950,7 +1090,7 @@ try {
       const url = PRAEFIX + "v1.9";
       const s = await oeffne({ app: true, lang: "de", update: { version: "1.9", url } });
       const p = s.page;
-      await p.waitForFunction(() => !document.querySelector("#sbUpdate").hidden, null, { timeout: 3000 }).catch(() => {});
+      await warte(p, () => !document.querySelector("#sbUpdate").hidden, undefined, 3000);
       await zuInfo(p);
       const c = await stand(p);
       assert(c.sb && c.sbText === "Version 1.9 ist da" && c.sbHref === url && c.sbZiel === "_blank" && /noopener/.test(c.sbRel || ""),
@@ -968,7 +1108,7 @@ try {
       assert(links === 1 && fokus === 0, "Update-Hinweis: der Link der Statusleiste ist fuer Vorleser und Tastatur ein Link mit Namen", { links, fokus });
       // Sprache wechseln
       await p.click('#eSprache button[data-lang="en"]');
-      await p.waitForFunction(() => document.querySelector("#sbUpdate").textContent === "Version 1.9 is out", null, { timeout: 3000 }).catch(() => {});
+      await warte(p, () => document.querySelector("#sbUpdate").textContent === "Version 1.9 is out", undefined, 3000);
       const e = await stand(p);
       assert(e.sbText === "Version 1.9 is out" && e.infoText === "Version 1.9 is out \u2013 open the release page \u203a" && e.sbHref === url && e.infoHref === url
         && e.wort === "Off" && /GitHub/.test(e.infoTitel),
@@ -982,7 +1122,7 @@ try {
       const url = PRAEFIX + "v1.9";
       const s = await oeffne({ app: true, lang: "de", config: { updatePruefen: true }, update: (n) => (n >= 3 ? { version: "1.9", url } : null) });
       const p = s.page;
-      await p.waitForFunction(() => !document.querySelector("#sbUpdate").hidden, null, { timeout: 12000 }).catch(() => {});
+      await warte(p, () => !document.querySelector("#sbUpdate").hidden, undefined, 12000);
       const v = await stand(p);
       assert(v.sb && v.sbText === "Version 1.9 ist da" && v.sbHref === url && v.infoHref === url && s.staende >= 3,
         "Update-Hinweis: kommt die Antwort erst beim dritten /api/state, steht der Hinweis trotzdem im selben Lauf da", { v, staende: s.staende });
@@ -1016,7 +1156,7 @@ try {
       await zuInfo(p);
       for (const thema of ["dark", "light", "tnl"]) {
         await p.click(`#eThema [role=radio][data-theme="${thema}"]`);
-        await p.waitForFunction((t) => document.documentElement.dataset.theme === t, thema);
+        await warte(p, (t) => document.documentElement.dataset.theme === t, thema, 30000, "Thema " + thema);
         const f = await p.evaluate(() => {
           const rgba = (c) => { const m = c.match(/[\d.]+/g) || ["0", "0", "0", "0"]; return [+m[0], +m[1], +m[2], m[3] === undefined ? 1 : +m[3]]; };
           const misch = (oben, unten) => [0, 1, 2].map((i) => oben[i] * oben[3] + unten[i] * (1 - oben[3])).concat(1);
@@ -1037,7 +1177,7 @@ try {
         const s = await oeffne({ app: true, lang, breite, hoehe, update: { version: "1.10.2", url: PRAEFIX + "v1.10.2" } });
         const p = s.page;
         await beispiel(p);
-        await p.waitForFunction(() => !document.querySelector("#sbUpdate").hidden, null, { timeout: 3000 }).catch(() => {});
+        await warte(p, () => !document.querySelector("#sbUpdate").hidden, undefined, 3000);
         const m = await p.evaluate(() => {
           const f = document.querySelector("#statusleiste").getBoundingClientRect();
           const drin = (q) => { const e = document.querySelector(q), r = e.getBoundingClientRect();
@@ -1065,15 +1205,15 @@ try {
     page.on("pageerror", (e) => fehler.push(String(e)));
     await page.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("boroLang", "de"); } catch { /* blockiert */ } });
     await page.goto(pathToFileURL(join(root, "dist", "renderer", "index.html")).href);
-    await page.waitForTimeout(400);
+    await warte(page, () => typeof document.querySelector("#btnSample2")?.onclick === "function", undefined, 30000, "die Seite ist eingerichtet (file://, #btnSample2 hat seinen Handler)");
     await beispiel(page);
     // einen Kampf speichern, damit die Kampfdatei etwas enthaelt
     await page.click("#btnSaveRun");
     await page.waitForSelector("#modalInput", { state: "visible" });
     await page.click("#modalOk");
-    await page.waitForTimeout(200);
+    await dialogZu(page, "#modalBg", "Speichern-Dialog nach OK");
     await page.click(ZAHNRAD);
-    await page.waitForTimeout(150);
+    await zeigt(page, "#einst", "die Einstellungen nach dem Zahnrad");
     const f = await page.evaluate(() => {
       const q = (x) => document.querySelector(x);
       const sicht = (e) => !!e && e.getClientRects().length > 0;

@@ -51,7 +51,13 @@ const DUNGEONS: Dungeon[] = [
   {stars:2, en:"Twisted Laboratory",     de:"Verqueres Labor",           boss:["Kaiser Crimson","Kayser"]},
   {stars:2, en:"Doomrot Grove",          de:"Hain der Verderbnisfäule",    boss:["Norn Bercant"]},
   {stars:2, en:"Chapel of Madness",      de:"Kapelle des Wahnsinns",       boss:["Grayeye","Grauauge"]},
-  {stars:2, en:"Halls of Tragedy",       de:"Hallen der Tragik",           boss:["Limuny Bercant"]},
+  /* Limuny Bercant hat wie King Khanzaizin (unten) keine Pause im Kampf -
+     Auskunft vom 04.10. zu Issue #103: die Pausen waren Wipes. Log vom
+     03.10., 15 Runs: neun Kills ohne eine Pause ueber 8 s, eine
+     Zwischenphase gibt es nicht; die Wipes lagen 23 bis 59 s vor dem
+     naechsten Versuch, ohne einen Treffer dazwischen. */
+  {stars:2, en:"Halls of Tragedy",       de:"Hallen der Tragik",           boss:["Limuny Bercant"],
+   wipeGap:20},
   /* King Khanzaizin hat keine Pause im Kampf - Auskunft vom 01.10. zu den
      zusammengeklebten Pulls vom 18.09.: "waren wipes". Gemessen an den 19
      Pulls jenes Abends: 8 davon bestanden aus 2 bis 4 Teilen, die PHASE_GAP
@@ -60,8 +66,8 @@ const DUNGEONS: Dungeon[] = [
      bis 132 s) und nach keinem festen Schaden (8,9 M bis 30,5 M); die
      letzten zwei Pulls des Abends hatten gar keine Pause. Ab 20 s Stille -
      unter dem kuerzesten Wipe, ueber "Trennen nach" (8 s) - beginnt darum
-     ein neuer Kampf. Nur dieser Boss: die anderen behalten die Minute
-     (wipeGap, bossPause, segment()). */
+     ein neuer Kampf. Nur Bosse mit wipeGap: die anderen behalten die
+     Minute (wipeGap, bossPause, segment()). */
   {stars:2, en:"Rancorwood",             de:"Bitterforst",                 boss:["King Khanzaizin","König Khanzaizin"],
    wipeGap:20},
   {stars:2, en:"Torture Chamber of Screams", de:"Folterkammer der Schreie", boss:["Kaligras"]},
@@ -93,6 +99,17 @@ const DUNGEONS: Dungeon[] = [
    // these say which name belongs to which of them
    bosses:[["Silent Gatekeeper Vahelon", "Stiller Torwächter Vahelon"],
            ["Quente, Executor of the Seal", "Quente, Vollstrecker des Siegels"]]},
+  /* Halle der Illusionen (Issue #183): ein eigener Dungeon ohne Sterne,
+     dessen Bosse woechentlich wechseln - bis 07.10. Verence und Marta, ab
+     08.10. Haylock und Gaudian, in beiden Clients gleich geschrieben. Zwei
+     Bosse eines Runs, keine zwei Schreibweisen eines Bosses: darum je einer
+     eine Gruppe in `bosses`. Death Summoner davor ist Trash (Auskunft vom
+     05.10.). Pausen hat hoechstens Marta, etwa 5 s, unter "Trennen nach";
+     ab 20 s Stille ist es ein Wipe wie bei King Khanzaizin. */
+  {separat:true, en:"Halls of Illusion", de:"Halle der Illusionen",
+   boss:["Verence","Marta","Haylock","Gaudian"],
+   bosses:[["Verence"], ["Marta"], ["Haylock"], ["Gaudian"]],
+   wipeGap:20},
   /* The twelve-player raid, which is three parts under one name. The part is
      what a block actually is, so the part names the heading and the raid sits
      under it - the same shape as a dungeon that is only itself.
@@ -196,21 +213,24 @@ const OPEN_BOSSES = [
      sind Vegarus (Kern), Vegarion (Nebenkern) und Vegaorb (Elitekern) -
      die Namen und die Bilder stammen aus der Datenbank von questlog.gg,
      die englische und die deutsche Seite nennen sie gleich.
-     Kein Log hier enthaelt ihn: die Schreibweise im deutschen Client ist
-     damit uebernommen, nicht gemessen.
+     Die deutsche Schreibweise der drei Kerne ist uebernommen, nicht
+     gemessen; die der Klaue und der Krieger ist am 06.10.2026 gemessen.
      Gemessen dazu (eigenes Log vom 29.09., englischer Client, die Kaempfe
      22:07 bis 22:20 gegen Vegamor, bestaetigt): "Vegamor's
      Claw" (299 Zeilen, 22:07:51 bis 22:08:34) ist ein weiterer Teil, und
      "Vagamont" (111 Zeilen, 22:19:11 bis 22:19:22, im Log mit
      Steuerzeichen, die das Einlesen abstreift) ist Vegamor selbst unter
      seinem inneren Namen - so heissen auch seine Bilder (12-boss-images.ts).
-     Darum steht Vagamont in `forms`: der Kampf heisst Vegamor. Wie die Klaue
-     und Vagamont im deutschen Client heissen, zeigt kein Log hier.
+     Darum steht Vagamont in `forms`: der Kampf heisst Vegamor. Im deutschen
+     Client heisst die Klaue "Vegamors Klaue" (Log vom 06.10.2026, 393 Zeilen);
+     Vagamont heisst dort gleich.
      Questlog bestaetigt es: das NPC FD_L13_AB_M_SpiritTree_Vagamont_001
      heisst dort genau "^<s=Dialogue_Speech_Text>Vagamont^</s>", ein
      Geisterbaum.
      `adds`: Gegner, die zum Ereignis gehoeren, ohne der Boss zu sein.
-     "Ego-less Great Tree Warrior" (395 Zeilen) und "Mift" (30) stehen im
+     "Ego-less Great Tree Warrior" (395 Zeilen; im deutschen Client
+     "Selbstloser Großer-Baum-Krieger", 1462 Zeilen am 06.10.2026) und "Mift"
+     (30; in beiden Clients gleich) stehen im
      Log vom 29.09. nur zwischen 22:07:03 und 22:16:26, immer in den Pausen
      zwischen den Teilen, und in keinem der anderen 99 Logs hier. Sie halten
      das Ereignis zusammen: ohne sie laege zwischen der Klaue (bis 22:08:34)
@@ -219,9 +239,9 @@ const OPEN_BOSSES = [
      Hinweis vom 01.10. Sie bleiben Nebengegner: kein Bossbild, kein Verlauf,
      aber der Ort ihres Kampfes ist Vegamor (blockPass). */
   {kind:"koloss", de:"Vegamor",          en:"Vegamor",
-   names:["Vegamor","Vegarus","Vegarion","Vegaorb","Vegamor's Claw","Vagamont"],
+   names:["Vegamor","Vegarus","Vegarion","Vegaorb","Vegamor's Claw","Vegamors Klaue","Vagamont"],
    forms:["Vagamont"],
-   adds:["Ego-less Great Tree Warrior","Mift"]}
+   adds:["Ego-less Great Tree Warrior","Selbstloser Großer-Baum-Krieger","Mift"]}
 ];
 /* Die Tabellen nur zum Lesen, fuer das Album der Rekorde (rekorde-core.ts,
    albumTafel): dort steht jeder Boss als Platz, auch ohne Kampf. */
@@ -255,12 +275,17 @@ const openForm = (name: string) => {
    Ein Kampfname kann zwei Bosse tragen: fightName() verbindet sie mit einem
    Mittelpunkt, wenn beide zum selben Dungeon gehoeren ("Zairos \u00b7 Vulkan").
    Deshalb wird jeder Teil einzeln gefragt - sonst faellt ein echter
-   Bosskampf als Unbekannter durch. */
+   Bosskampf als Unbekannter durch.
+
+   Eine Form ("Calanthia of Destruction") ist der Boss unter anderem Namen
+   und zaehlt. Eine Phase wie Fellini nicht: sie ist ein eigener Gegner, den
+   man auch vor dem Boss trifft (Issue #104). Im Pull des Bosses heisst der
+   Kampf ohnehin nach dem Boss (fightName). */
 export function knownBoss(name: string){
   return String(name || "").split("\u00b7").some(teil => {
     const n = teil.trim(), bare = bareBoss(n);
     return BOSS_DUNGEON.has(bare) || BOSS_DUNGEON.has(n) || !!openBoss(n) ||
-           !!phaseBoss(n);
+           !!formBoss(n);
   });
 }
 /* Derselbe Boss unter zwei Client-Sprachen ist EIN Boss. Als der Verlauf noch
@@ -275,9 +300,10 @@ export function knownBoss(name: string){
  */
 export function histKey(name: string){
   return String(name || "").split("·").map(teil => {
-    /* Eine Phase steht im Verlauf unter ihrem Boss. Sonst waere ein Pull,
-       der auf der Phase endet, ein eigenes Ziel mit eigenem Median. */
-    const roh = teil.trim(), n = phaseBoss(roh) || roh, bare = bareBoss(n);
+    /* Eine Form steht im Verlauf unter ihrem Boss. Sonst waere ein Pull,
+       der auf der Form endet, ein eigenes Ziel mit eigenem Median. Eine
+       Phase wie Fellini nicht: allein ist sie kein Pull des Bosses. */
+    const roh = teil.trim(), n = formBoss(roh) || roh, bare = bareBoss(n);
     const g = bossGroup(n) || bossGroup(bare);
     if(g) return g[0];
     const o = openBoss(n);
@@ -361,6 +387,15 @@ const FORMS = (() => {
   for(const d of DUNGEONS) if(d.forms) for(const boss in d.forms) m.set(boss, d.forms[boss]!);
   return m;
 })();
+/* Die Rueckrichtung zu FORMS, wie phaseBoss zu PHASE_TARGETS: welcher Boss
+   steckt hinter dieser Form? Anders als bei einer Phase gilt das immer,
+   denn eine Form ist kein eigener Gegner. */
+const FORM_OF = (() => {
+  const m = new Map<string, string>();
+  for(const [boss, formen] of FORMS) for(const f of formen) m.set(f, boss);
+  return m;
+})();
+export const formBoss = (name: string) => FORM_OF.get(bareBoss(name)) || FORM_OF.get(name) || null;
 export function hauptzielVon(seg: Fight): (ziel: string) => boolean {
   const st = seg.stats || stats(seg);
   const namen = new Set<string>();
@@ -386,8 +421,8 @@ export const BOSS_DUNGEON = (() => {
   return m;
 })();
 /* Wie lange dieser Gegner fort sein darf und es doch derselbe Kampf ist, in
-   Sekunden: wipeGap seines Dungeons, wo es eines gibt (King Khanzaizin),
-   sonst PHASE_GAP. */
+   Sekunden: wipeGap seines Dungeons, wo es eines gibt (King Khanzaizin,
+   Limuny Bercant, Halle der Illusionen), sonst PHASE_GAP. */
 export const bossPause = (name: string): number => {
   const d: Dungeon | undefined = BOSS_DUNGEON.get(name) || BOSS_DUNGEON.get(bareBoss(name));
   return d && d.wipeGap != null ? d.wipeGap : PHASE_GAP;
@@ -454,10 +489,18 @@ export function blockPass(segs: Fight[], all: Encounter[]){
      boss has nothing to do with that boss. Twice the block cut is the bound,
      measured - over all 87 logs the two raid approaches sit at 67,9 s and
      76,3 s and everything else that could be mistaken for one at 239,6 s or
-     more, with nothing in between. */
+     more, with nothing in between.
+
+     Das Hauptziel kann eine Form oder Phase sein statt des Bosses - im
+     Log vom 02.10. bekam "Calanthia of Destruction" mehr Schaden als
+     Calanthia, der Kampf hatte keinen Ort, und Korridor und Altar standen
+     in einem Block (Issue #111). Ihr Ort ist der ihres Bosses, nach
+     derselben Regel wie der Name (fightName): eine Form immer, eine
+     Phase nur, wenn der Boss den Kampf geoeffnet hat. */
   const own = list.map(s => {
-    const t = mainTarget(s);
-    return BOSS_DUNGEON.get(t) || openBoss(t) || null;
+    const t = mainTarget(s), phase = phaseBoss(t);
+    const boss = formBoss(t) || (phase && phase === s.encBoss ? phase : null) || t;
+    return BOSS_DUNGEON.get(boss) || openBoss(t) || null;
   });
   /* Der Ort: der eigene Boss, sonst der Boss, zu dessen Ereignis der
      Gegner gehoert (`adds`), sonst der naechste Boss (unten). Ein
@@ -625,13 +668,18 @@ export const mainTarget = (seg: Encounter) => {
 
    Over all 87 logs on this machine exactly two fights are named by two
    bosses, both of them Zairos and Vulkan. */
-function fightName(list: TargetStats[]){
+function fightName(list: TargetStats[], encBoss?: string | null){
   if(!list.length) return "Unnamed fight";
   /* Vorn steht das Ziel mit dem meisten Schaden - und das kann die Phase
      sein statt der Boss. An einem Calanthia-Pull gemessen: 18,06M auf
      "Calanthia of Destruction" gegen 6,87M auf Calanthia, und der ganze
-     Kampf hiess danach. Eine Phase traegt den Namen ihres Bosses. */
-  const lead = phaseBoss(list[0]!.name) || openForm(list[0]!.name) || list[0]!.name;
+     Kampf hiess danach. Eine Form traegt immer den Namen ihres Bosses,
+     eine Phase nur, wenn der Boss den Kampf geoeffnet hat (encBoss,
+     segment()): Fellini auf dem Weg zu Fellinex ist Trash und hiess
+     sonst Fellinex (Issue #104). */
+  const erst = list[0]!.name, phase = phaseBoss(erst);
+  const lead = formBoss(erst) || (phase && phase === encBoss ? phase : null) ||
+               openForm(erst) || erst;
   const home = BOSS_DUNGEON.get(lead);
   const leadGroup = bossGroup(lead);
   if(!home || !leadGroup) return lead;
@@ -735,7 +783,7 @@ export function stats(seg: Encounter){
     shieldHits: state.noHitType ? null : shieldHits,
     skills:ranked, targets:targetList,
     dead, worstGap:worst,
-    name: fightName(targetList)
+    name: fightName(targetList, seg.encBoss)
   };
 }
 

@@ -176,9 +176,7 @@ try {
       }
       if (path === "/api/config") return json(200, { logIndex: index, ...(thema ? { theme: thema } : {}) });
       if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json(200, { ok: true, registered: true, counts: {} }); }
-      if (path === "/api/builds" && req.method() === "GET") return json(200, { ok: true, builds: {} });
       if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best: {} });
-      if (path === "/api/plans" && req.method() === "GET") return json(200, { ok: true, plans: {} });
       if (path === "/api/weeklies" && req.method() === "GET") return json(200, { ok: true, data: { v: 1, profile: [] } });
       if (path.startsWith("/api/")) return json(200, { ok: true });
       return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
@@ -213,7 +211,12 @@ try {
       fokus: document.activeElement?.id || "", fokusImFeld: !!document.activeElement?.closest("#kampfwahl"),
     };
   });
-  const kwAuf = async (p) => { if (await p.evaluate(() => document.querySelector("#kampfwahl").hidden)) await p.click("#kwKnopf");
+  /* folgt #155: ohne Log und ohne Log-Ordner oeffnet ein Klick auf die Pille den Log-Dialog ("No log · Open
+     log"); die Kampfwahl dann mit Strg+K, wie in Teil 2. Sonst oeffnet weiter der Klick. */
+  const kwAuf = async (p) => {
+    const z = await p.evaluate(() => ({ zu: document.querySelector("#kampfwahl").hidden,
+      ohneLog: /^(No log loaded|Kein Log geladen)/.test(document.querySelector("#kwKnopf").getAttribute("aria-label") || "") }));
+    if (z.zu) { if (z.ohneLog) await p.keyboard.press("Control+k"); else await p.click("#kwKnopf"); }
     await warte(p, () => !document.querySelector("#kampfwahl").hidden); };
   const logAnfragen = (s) => s.anfragen.filter((a) => a.path === "/api/log");
   const namen = (s, ab = 0) => [...new Set(logAnfragen(s).slice(ab).map((a) => a.name))];

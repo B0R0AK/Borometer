@@ -27,11 +27,14 @@ const out = join(root, "dist", "renderer");
 const parts = readdirSync(join(src, "app")).filter((f) => f.endsWith(".ts")).sort();
 // Numbers left free on purpose, and only these: 49 (evening) went with the
 // redesign of 28.09. (Spezifikation 3); 52 (the Steckbrief) went with Aufgabe 12
-// of it (29.09.); 48 (rotation trainer) went too and is
+// of it (29.09.); 51 (the plan/builds area) went with the Builds tab
+// (#207, 06.10.); 67 (the build field at a fight) went with it and is taken
+// again by 67-weeklies-erinnerung.ts (#209), 68 is the guild (68-gilde.ts,
+// audit 13b.15 names the file); 48 (rotation trainer) went too and is
 // taken again by 48-einsaetze.ts. Renaming the parts after them would have
 // moved every reference to them. A free number may be taken again by a new
 // part; any other gap stops the build.
-const FREE = new Set(["49", "52"]);
+const FREE = new Set(["49", "51", "52"]);
 let nr = 0;
 parts.forEach((f) => {
   nr++;

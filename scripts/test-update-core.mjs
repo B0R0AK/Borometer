@@ -141,7 +141,7 @@ try {
   eq(await u.checkUpdate("1.8.0"), null, "realNet: eine Weiterleitung ergibt null, gefolgt wird nicht");
   // Zeitgrenze: beide Faelle gleichzeitig, 5 s
   verhalten = "haengt";
-  const t0 = Date.now();
+  const t0 = performance.now();
   const haengt = u.checkUpdate("1.8.0");
   verhalten = "tropft";
   const tropft = u.checkUpdate("1.8.0");
@@ -149,10 +149,11 @@ try {
   const wach = setInterval(() => {}, 250);
   const [h, tr] = await Promise.all([haengt, tropft]);
   clearInterval(wach);
-  const dauer = Date.now() - t0;
+  const dauer = performance.now() - t0;
+  // monotone Uhr: die Wanduhr springt in WSL2 (timesyncd) alle ~32 s um ~1,2 s zurueck; docs/ci-runner.md
   eq(h, null, "Zeitgrenze: eine Antwort, die nicht kommt, ergibt null");
   eq(tr, null, "Zeitgrenze: ein Koerper, der stockt, ergibt null");
-  eq(dauer >= 4900 && dauer < 7000, true, "Zeitgrenze: nach etwa 5 s (" + dauer + " ms)");
+  eq(dauer >= 4900 && dauer < 7000, true, "Zeitgrenze: nach etwa 5 s (" + Math.round(dauer) + " ms)");
   eq(anfragen.length, 4, "jede Pruefung fragt genau einmal, nichts wird wiederholt");
 } finally {
   globalThis.fetch = echt;
@@ -175,12 +176,18 @@ try {
     "./server": "export async function startServer() { return 8731; } export function logDir() { return \"\"; }"
       + " export function setUpdate(u) { globalThis.__boroStart.gesetzt.push(u); }",
     "./window": "export function createWindow() { globalThis.__boroStart.fenster++; return { once() {}, on() {}, focus() {} }; }"
-      + " export function currentWindow() { return null; } export function iconFile() { return \"\"; }",
+      + " export function currentWindow() { return null; } export function iconFile() { return \"\"; } export function beendenErlauben() {}",
     "./hotkey": "export const HOTKEY = \"Control+Shift+D\"; export function registerHotkey() { return true; } export function unregisterHotkey() {}",
     "./taskbar": "export function setupTaskbar() {}",
+    // Windows-Einbindung (#56): Infobereich, Sprungliste und Startauftrag, gestellt wie das Fenster
+    "./tray": "export function setupTray() {}",
+    "./jumplist": "export function jumpListBauen() {}",
+    "./start": "export function auftragSetzen() {}",
+    // Weeklies neu: die Erinnerungen laufen im Hauptprozess, hier gestellt wie der Infobereich
+    "./erinnerung": "export function erinnerungStarten() {}",
   };
   const gestellt = { name: "gestellt", setup(b) {
-    b.onResolve({ filter: /^(electron|\.\/(server|window|hotkey|taskbar))$/ }, (a) => ({ path: a.path, namespace: "gestellt" }));
+    b.onResolve({ filter: /^(electron|\.\/(server|window|hotkey|taskbar|tray|jumplist|start|erinnerung))$/ }, (a) => ({ path: a.path, namespace: "gestellt" }));
     b.onLoad({ filter: /.*/, namespace: "gestellt" }, (a) => ({ loader: "js", contents: STUBS[a.path] }));
   } };
   const start = await esbuild.build({ entryPoints: [join(root, "src", "main", "main.ts")], bundle: true, format: "esm",

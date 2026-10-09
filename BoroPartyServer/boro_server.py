@@ -51,6 +51,23 @@ SWEEP_EVERY = 300
 # un-stick them, not how you keep them out — a party that needs somebody kept
 # out changes its code, which takes one button.
 KICK_PAUSE = 20
+# The largest request body accepted. Measured on 04.10.2026 over every fight in
+# four weeks of real logs: the biggest push was 40.0 kB, a 414-second fight whose
+# curve (16 kB) and casts (20 kB) are most of it; the densest fight came to about
+# 150 bytes per second of fighting. 256 kB is six times the largest one and
+# covers a fight of nearly half an hour at that density. Anything bigger is
+# answered 413 before a byte of it is read: this server listens publicly, and
+# reading whatever a sender announces would let anyone fill its memory.
+MAX_BODY = 256 * 1024
+# Seconds a connection may sit without sending anything before it is dropped.
+# One thread serves one connection, so without this a sender that announces a
+# body and never sends it holds a thread for good. Clients push every three
+# seconds and give up on an answer after six, so ten never cuts off a real one.
+REQUEST_TIMEOUT = 10
+# How many names one room holds. A party is six and a raid a few parties; forty
+# leaves room for a large alliance while keeping a room, and every board handed
+# back on each push, bounded. A name already in the room always gets back in.
+MAX_MEMBERS = 40
 
 ROOMS = {}                   # code -> {"created": ts, "owner": name,
                              #          "members": {name: {"payload":…, "ts":…}},
@@ -70,6 +87,19 @@ def make_code(owner=""):
                                "members": {}, "kicked": {}}
                 return code
     raise RuntimeError("could not allocate a free party code")
+
+
+def has_seat(room, name, now):
+    """Whether `name` may hold a row in `room`. Call with LOCK held."""
+    members = room["members"]
+    if name in members or len(members) < MAX_MEMBERS:
+        return True
+    # a full room first lets go of whoever has stopped reporting: they are
+    # already off the board, and holding their seat would lock out the people
+    # who are actually there
+    for n in [n for n, e in members.items() if now - e["ts"] >= REPORT_TTL]:
+        del members[n]
+    return len(members) < MAX_MEMBERS
 
 
 def build_board(code):
@@ -176,16 +206,24 @@ def sweeper():
 class Handler(http.server.BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
     server_version = "BoroPartyServer/1"
+    # socket timeout for every read and write on the connection (see
+    # REQUEST_TIMEOUT); an idle keep-alive connection is closed by it too
+    timeout = REQUEST_TIMEOUT
 
     def log_message(self, *args):
         pass  # keep the service log to real errors only
 
-    def _json(self, obj, code=200):
+    def _json(self, obj, code=200, close=False):
         body = json.dumps(obj).encode("utf-8")
         self.send_response(code)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        if close:
+            # whatever is left of the request body was never read, so this
+            # connection cannot carry another request; send_header also sets
+            # close_connection
+            self.send_header("Connection", "close")
         self.end_headers()
         self.wfile.write(body)
 
@@ -212,8 +250,10 @@ class Handler(http.server.BaseHTTPRequestHandler):
             if name:
                 with LOCK:
                     room = ROOMS.get(code)
-                    if room is not None and name not in room["members"]:
-                        room["members"][name] = {"payload": None, "ts": time.time()}
+                    now = time.time()
+                    if (room is not None and name not in room["members"]
+                            and has_seat(room, name, now)):
+                        room["members"][name] = {"payload": None, "ts": now}
             self._json({"ok": True})
             return
 
@@ -249,11 +289,33 @@ class Handler(http.server.BaseHTTPRequestHandler):
     # --------------------------------------------------------------- POST
     def do_POST(self):
         parts = urllib.parse.urlparse(self.path)
+        # The length is checked before anything is read. Plain ASCII digits
+        # only: int() would also take "-1" (read to the end of the stream),
+        # "+5", " 5" or other scripts' digits.
+        raw = self.headers.get("Content-Length")
+        if raw is None:
+            self._json({"ok": False, "error": "length required"}, 411, close=True)
+            return
+        raw = raw.strip()
+        if not raw or not raw.isascii() or not raw.isdigit():
+            self._json({"ok": False, "error": "bad request"}, 400, close=True)
+            return
+        length = int(raw)
+        if length > MAX_BODY:
+            self._json({"ok": False, "error": "too large"}, 413, close=True)
+            return
         try:
-            length = int(self.headers.get("Content-Length", 0))
-            sent = json.loads(self.rfile.read(length).decode("utf-8") or "{}")
+            data = self.rfile.read(length)
+        except TimeoutError:
+            # the sender stalled mid-body; nothing to answer, just let go
+            self.close_connection = True
+            return
+        try:
+            sent = json.loads(data.decode("utf-8") or "{}")
+            if not isinstance(sent, dict):
+                raise ValueError("not an object")
         except Exception:
-            self._json({"ok": False, "error": "bad request"}, 400)
+            self._json({"ok": False, "error": "bad request"}, 400, close=len(data) < length)
             return
 
         if parts.path == "/party/create":
@@ -282,6 +344,9 @@ class Handler(http.server.BaseHTTPRequestHandler):
                     # answered rather than ignored, so the client can say what
                     # happened instead of quietly showing an empty board
                     self._json({"ok": False, "error": "removed", "kicked": True}, 403)
+                    return
+                if not has_seat(room, name, now):
+                    self._json({"ok": False, "error": "room full"}, 409)
                     return
                 # weapons ride beside the payload, not inside it: a member
                 # who has not finished a pull yet has no payload at all,

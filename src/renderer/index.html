@@ -33,7 +33,9 @@
 <!-- Vor allem anderen, sichtbar sobald er den Fokus hat: bis zur
      Hauptregion liegen der Fensterkopf und die ganze linke Schiene, und
      das waren sechzig Stationen mit der Tabulatortaste. -->
-<a class="skiplink" href="#stage" data-i18n="a11y.skip">Skip to the fight</a>
+<!-- Der Text folgt dem Bereich (syncBereiche, Issue #109): "Zum Kampf
+     springen" nur im Bereich Kampf, sonst "Zum Bereich Analyse springen". -->
+<a class="skiplink" href="#stage">Skip to the fight</a>
 
 <!-- Die Symbolleiste steht im Dokument vor der Titelleiste (Neugestaltung
      28.09., Luecke 12.4): die Tabulatortaste geht wie im Entwurf zuerst in
@@ -47,7 +49,7 @@
        rechts (.btip, aria-hidden) bei Zeigen und Fokus. Die Knoepfe behalten
        die Klasse tab und data-tab, switchTab() (34) ist der eine Wechsel;
        der gewaehlte traegt aria-current="page". Waffen und Log-Einrichtung
-       nach Builds, nur im Entwicklermodus (syncTabs, 43). Unten Weeklies
+       nach Gruppe, nur im Entwicklermodus (syncTabs, 43). Unten Weeklies
        (leer, 9.1), Start und Einstellungen. Ohne Log sind die Bereiche, die
        einen Kampf brauchen, schon hier gesperrt (renderAll setzt es danach). -->
   <nav class="bereiche" id="bereiche" data-i18n-aria-label="tabs.navLabel" aria-label="Areas">
@@ -58,11 +60,14 @@
     <button class="tab" type="button" data-tab="compare" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 5.3V20M8 20h8"/><path d="M4.5 8.2L19.5 5.8"/><path d="M5 8.1l-2.2 5.2M5 8.1l2.2 5.2M19 5.9l-2.2 5.1M19 5.9l2.2 5.1"/><path d="M2.4 13.3h5.2a2.6 2.6 0 0 1-5.2 0z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/><path d="M16.4 11h5.2a2.6 2.6 0 0 1-5.2 0z"/><circle cx="12" cy="4" r="1.3" fill="var(--acc, #E8A33D)" stroke="none"/></svg><span class="vh" data-i18n="tabs.compare">Compare</span><span class="btip" aria-hidden="true" data-i18n="tabs.compare">Compare</span></button>
     <button class="tab" type="button" data-tab="history" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M4.5 12A8 8 0 1 1 6.84 17.66"/><path d="M2.4 9.9l2.1 2.1 2.1-2.1"/><path d="M12.5 7.6V12l3 2" stroke="var(--acc, #E8A33D)" stroke-width="1.8"/><circle cx="12.5" cy="12" r="1" fill="currentColor" stroke="none"/></svg><span class="vh" data-i18n="tabs.history">History</span><span class="btip" aria-hidden="true" data-i18n="tabs.history">History</span></button>
     <button class="tab" type="button" data-tab="party" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="7.6" r="2.7" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/><path d="M6.4 19.8a5.6 5.6 0 0 1 11.2 0"/><circle cx="4.9" cy="10.6" r="2"/><path d="M1.8 18.6a3.8 3.8 0 0 1 4.9-3.7"/><circle cx="19.1" cy="10.6" r="2"/><path d="M22.2 18.6a3.8 3.8 0 0 0-4.9-3.7"/></svg><span class="vh" data-i18n="tabs.party">Party</span><span class="btip" aria-hidden="true" data-i18n="tabs.party">Party</span></button>
-    <button class="tab" type="button" data-tab="builds" tabindex="-1" disabled><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M3.4 10h13.2c1.9 0 3.6-.6 4.4-1.6-.2 2.6-2.2 4.3-5 4.3v1.8l1.8 2.7H7.2L9 14.5v-1.7c-3 0-5.2-1.1-5.6-2.8z"/><path d="M7.2 17.2L6.2 20h12.6l-1-2.8"/><g transform="translate(-.6 -2)"><path d="M3 3.2l6.4 3.8"/><rect x="9.3" y="4.4" width="2.6" height="5.2" rx=".6" transform="rotate(31 10.6 7)"/></g><path d="M15.4 5.6l1.3-1.7M16.6 7.8l2-.5M14.7 3.4l.2-1.7" stroke="var(--acc, #E8A33D)" stroke-width="1.5"/></svg><span class="vh" data-i18n="tabs.builds">Builds</span><span class="btip" aria-hidden="true" data-i18n="tabs.builds">Builds</span></button>
     <button class="tab" type="button" data-tab="weapons" tabindex="-1" hidden><svg viewBox="0 0 20 20" class="alt" aria-hidden="true"><path d="M4 16L14.5 5.5"/><path d="M12 3.5h4.5V8"/><path d="M3 12.5l4.5 4.5"/></svg><span class="vh" data-i18n="tabs.weapons">Weapons</span><span class="btip" aria-hidden="true" data-i18n="tabs.weapons">Weapons</span></button>
     <button class="tab" type="button" data-tab="setup" tabindex="-1" hidden><svg viewBox="0 0 20 20" class="alt" aria-hidden="true"><path d="M3.5 5.5h13M3.5 10h13M3.5 14.5h13"/><circle cx="7.5" cy="5.5" r="1.5" fill="currentColor"/><circle cx="13" cy="10" r="1.5" fill="currentColor"/><circle cx="8.5" cy="14.5" r="1.5" fill="currentColor"/></svg><span class="vh" data-i18n="tabs.setup">Log setup</span><span class="btip" aria-hidden="true" data-i18n="tabs.setup">Log setup</span></button>
     <span class="bfrei" aria-hidden="true"></span>
     <button class="tab" type="button" data-tab="weeklies" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><rect x="3.3" y="5" width="17.4" height="15.2" rx="2"/><path d="M8 2.8v4.1M16 2.8v4.1M3.3 9.6h17.4"/><g fill="currentColor" stroke="none"><circle cx="7.2" cy="13" r=".95"/><circle cx="10.4" cy="13" r=".95"/><circle cx="13.6" cy="13" r=".95"/><circle cx="7.2" cy="16.6" r=".95"/><circle cx="10.4" cy="16.6" r=".95"/></g><circle cx="17.4" cy="17" r="3.6" fill="var(--acc, #E8A33D)" stroke="none"/><path d="M15.8 17l1.1 1.1 2.1-2.3" stroke="var(--acc-ink, #1B1612)" stroke-width="1.5"/></svg><span class="vh" data-i18n="tabs.weeklies">Weeklies</span><span class="btip" aria-hidden="true" data-i18n="tabs.weeklies">Weeklies</span></button>
+    <!-- Gilde (Spezifikation Gilde 5; Entscheidung 07.10.2026): ein Wappen - Schild mit Querbalken und Sparren, 22 Punkt,
+         Strich 1,6; der Funke im oberen Feld ist der Akzent (--acc), in Ruhe Rauch, beim Zeigen und gewaehlt Gold.
+         Die drei Koepfe davor glichen der Gruppe zu sehr. -->
+    <button class="tab" type="button" data-tab="gilde" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6l7.6 2.7v5.6c0 4.8-3.2 8.6-7.6 10.4-4.4-1.8-7.6-5.6-7.6-10.4V5.3z"/><path d="M4.4 11.4h15.2"/><path d="M8.6 14.4l3.4 2.6 3.4-2.6"/><path d="M12 4.9l.65 1.45 1.45.65-1.45.65-.65 1.45-.65-1.45-1.45-.65 1.45-.65z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg><span class="vh" data-i18n="tabs.gilde">Guild</span><span class="btip" aria-hidden="true" data-i18n="tabs.gilde">Guild</span></button>
     <!-- Rekorde (Spezifikation Rekorde 2a): ein Pokal wie im Entwurf, 22 Punkt, Strich 1,6; der Funke in der
          Schale ist der Akzent (--acc), in Ruhe Rauch, beim Zeigen und gewaehlt Gold. -->
     <button class="tab" type="button" data-tab="rekorde" tabindex="-1"><svg viewBox="0 0 24 24" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round"><path d="M7 3.6h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.4H4.3c0 2.9 1.2 4.6 3.4 5.2M17 5.4h2.7c0 2.9-1.2 4.6-3.4 5.2"/><path d="M12 13.6v3.2"/><path d="M8.6 20.4h6.8l-.9-3.6H9.5z"/><path d="M12 5.5l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg><span class="vh" data-i18n="tabs.rekorde">Records</span><span class="btip" aria-hidden="true" data-i18n="tabs.rekorde">Records</span></button>
@@ -92,14 +97,16 @@
   </h1>
   <!-- Die Kampfwahl (Instrumententafel 3.2): der Knopf in der Mitte der
        Titelleiste nennt den Kampf, den man ansieht - Bossbild, Boss, Lauf,
-       Uhrzeit, DPS; ohne Kampf "Kampf waehlen - Strg+K". syncKwKnopf()
-       (23-kampfwahl.ts) schreibt Inhalt und Namen. Im Kompakt nicht da. -->
+       Uhrzeit, DPS; ohne Log "Kein Log - Log oeffnen", dann oeffnet der
+       Klick den Log-Dialog (#155), die Kampfwahl nur Strg+K.
+       syncKwKnopf() (23-kampfwahl.ts) schreibt Inhalt und Namen. Im
+       Kompakt nicht da. -->
   <!-- Neugestaltung 28.09. (Luecken 0.4, 0.5): die Pille, so breit wie ihr
        Inhalt, dazu voriger und naechster Kampf, ohne das Feld zu oeffnen
        (auch Strg+Pfeil links/rechts, 23-kampfwahl.ts); am Ende gesperrt. -->
   <div class="kwahl">
   <button class="kwpf" id="kwVor" type="button" data-i18n-aria-label="kw.vor" aria-label="Previous fight" data-i18n-title="kw.vorTitle" title="Previous fight (Ctrl+Left)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
-  <button class="kwknopf" id="kwKnopf" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="kampfwahl"><span class="kwwas" id="kwWas">Choose a fight &#183; Ctrl+K</span><span class="kwpfeil" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
+  <button class="kwknopf" id="kwKnopf" type="button" aria-haspopup="dialog" aria-expanded="false" aria-controls="kampfwahl"><span class="kwwas" id="kwWas">No log &#183; Open log</span><span class="kwpfeil" aria-hidden="true"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></span></button>
   <button class="kwpf" id="kwNach" type="button" data-i18n-aria-label="kw.nach" aria-label="Next fight" data-i18n-title="kw.nachTitle" title="Next fight (Ctrl+Right)" disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
   </div>
   <!-- Die Live-Aufzeichnung ist EIN Umschalter. Vorher standen hier eine
@@ -118,6 +125,11 @@
        beschreibt den Knopf (aria-describedby). Sichtbar steht derselbe
        Satz im title des Knopfes, gesetzt von syncLiveBtn() (45-startup.ts). -->
   <div class="vh" id="live" role="status" aria-live="polite"><span id="liveText">Live logging off</span></div>
+  <!-- #153: ein neuer Kampf im Live, waehrend man einen aelteren liest -
+       die Auswahl bleibt, dieser Satz sagt ihn an (23-kampfwahl.ts). Ein
+       div wie #live, kein p: das leere p trug eine Leerzeile in den
+       Seitentext (innerText, Paritaet). -->
+  <div class="vh" id="kwNeu" role="status" aria-live="polite"></div>
   <button class="btn livebtn" id="btnWatch" type="button" aria-pressed="false" aria-describedby="liveText"><span class="ldot" aria-hidden="true"></span><span class="lword" data-i18n="top.live">Live</span><span class="lstate" id="liveState" aria-hidden="true">off</span></button>
   <!-- title mit demselben Schluessel: der Satz kuerzt jetzt, wenn es eng
        wird, und was gekuerzt ist, muss beim Zeigen vollstaendig sein. -->
@@ -184,13 +196,14 @@
       <button class="mi" id="btnLang" title="Switch to German">Language: DE</button>
       <button class="mi" id="btnSample" data-i18n="top.sample">Sample</button>
       <div class="misep"></div>
-      <!-- Three positions, two outcomes. "Auto" is not a third look: it
-           means take the one the system is set to. -->
+      <!-- Four looks and Auto. "Auto" is not a fifth look: it means take
+           the one the system is set to (light or dark). -->
       <div class="mizoom miseg" id="themeRow">
         <span data-i18n="top.theme">Colours</span>
         <button type="button" data-theme="dark" data-i18n="top.themeDark">Dark</button>
         <button type="button" data-theme="light" data-i18n="top.themeLight">Light</button>
         <button type="button" data-theme="tnl" data-i18n="top.themeTnl">TnL</button>
+        <button type="button" data-theme="glas" data-i18n="top.themeGlas">Smoked glass</button>
         <button type="button" data-theme="auto" data-i18n="top.themeAuto">Auto</button>
       </div>
       <div class="mizoom" id="zoomRow">
@@ -269,7 +282,7 @@
        solange ein frueherer Tag offen ist. -->
   <div class="kwkopf">
     <button class="kwpf" id="kwTagVor" type="button" data-i18n-aria-label="kw.tagVor" aria-label="Previous day" data-i18n-title="kw.tagVor" title="Previous day" hidden disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
-    <p class="kwtag"><b id="kwTag"></b><span class="kwzahl"><span id="fightCount">No fights yet</span><span class="kwpause" id="kwPause" hidden></span></span></p>
+    <p class="kwtag"><b id="kwTag"></b><span class="kwzahl"><span id="fightCount" data-i18n="rail.noneLoaded">No fights yet</span><span class="kwpause" id="kwPause" hidden></span></span></p>
     <button class="kwpf" id="kwTagNach" type="button" data-i18n-aria-label="kw.tagNach" aria-label="Next day" data-i18n-title="kw.tagNach" title="Next day" hidden disabled><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
     <span class="kwluft" aria-hidden="true"></span>
     <button class="kwheute" id="kwHeute" type="button" data-i18n="kw.heute" hidden>Today</button>
@@ -292,7 +305,7 @@
       <div class="empty-note" id="runNote">None yet. Save fight puts the fight you are looking at here, ready to compare.</div>
       <button class="btn sm cmpbtn" id="btnCompareNow" hidden><span data-i18n="rail.compareNow">Compare</span> <span class="cmpn" id="cmpCount"></span></button>
     </section>
-    <div class="fightlist" id="fightList" role="listbox" data-i18n-aria-label="rail.railLabel" aria-label="Fights"></div>
+    <div class="fightlist" id="fightList" role="tree" data-i18n-aria-label="rail.railLabel" aria-label="Fights"></div>
     <p class="empty-note" id="kwKeinTreffer" hidden></p>
     <!-- Beim Start ohne Log laeuft renderFights() noch nicht: der Satz der
          Liste ist dann zu und "Kein Kampf - Log oeffnen" steht da. -->
@@ -305,7 +318,7 @@
   <!-- DECISION 0.12: links die Tastenhinweise mit gezeichneten Tasten, rechts
        die Knoepfe; Loesen mit Rueckgaengig bleibt an der Zeile. -->
   <div class="kwfuss">
-    <p class="kwtasten" data-i18n-title="kw.tasten" title="Arrow keys choose, Enter opens, Ctrl with the left or right arrow goes to the previous or next fight"><span class="kt"><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></kbd> <span data-i18n="kw.tWaehlen">choose</span></span><span class="kt"><kbd>Enter</kbd> <span data-i18n="kw.tOeffnen">open</span></span><span class="kt"><kbd data-i18n="kw.kbdStrg">Ctrl</kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></kbd> <span data-i18n="kw.tBlaettern">previous/next fight</span></span></p>
+    <p class="kwtasten" id="kwTasten" data-i18n-title="kw.tasten" title="Arrow keys choose, Enter opens, Ctrl with the left or right arrow goes to the previous or next fight"><span class="kt"><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg></kbd> <span data-i18n="kw.tWaehlen">choose</span></span><span class="kt"><kbd>Enter</kbd> <span data-i18n="kw.tOeffnen">open</span></span><span class="kt"><kbd data-i18n="kw.kbdStrg">Ctrl</kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></kbd><kbd><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></kbd> <span data-i18n="kw.tBlaettern">previous/next fight</span></span></p>
     <span class="kwknoepfe">
     <button class="fclear" id="kwLaeufe" type="button" aria-expanded="false" aria-controls="kwRuns" data-i18n-title="rail.savedRuns" title="Saved fights">Saved</button>
     <!-- aria-haspopup, nicht aria-expanded: dahinter liegt der Filterdialog
@@ -394,6 +407,7 @@
           <button type="button" data-gruppe="logs"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 7.5a2 2 0 0 1 2-2h4l2 2h7a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2h-13a2 2 0 0 1-2-2z"/></svg><span data-i18n="einst.g.logs">Log folder</span></button>
           <button type="button" data-gruppe="gruppe"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17M12 3.5c2.5 2.6 3.5 5.4 3.5 8.5S14.5 17.9 12 20.5M12 3.5C9.5 6.1 8.5 8.9 8.5 12s1 5.9 3.5 8.5"/></svg><span data-i18n="einst.g.gruppe">Party and server</span></button>
           <button type="button" data-gruppe="dev"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M8.5 7L3.5 12l5 5M15.5 7l5 5-5 5M13.5 4.5l-3 15"/></svg><span data-i18n="einst.g.dev">Developer</span></button>
+          <button type="button" data-gruppe="win" id="einstNavWin" hidden><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="4.5" width="17" height="15" rx="2"/><path d="M3.5 9h17"/></svg><span data-i18n="einst.win">Windows</span></button>
           <button type="button" data-gruppe="info"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 11v5.5M12 7.8v.2"/></svg><span data-i18n="einst.g.info">Info</span></button>
         </nav>
         <div class="einstgruppen">
@@ -401,7 +415,7 @@
             <h2 id="einstTitel" data-i18n="einst.titel">Settings</h2>
             <p id="einstKopfSatz">Takes effect at once</p>
           </header>
-          <!-- Darstellung: die Themen als vier Kacheln mit Vorschau (eine
+          <!-- Darstellung: die Themen als fuenf Kacheln mit Vorschau (eine
                radiogroup, ein Tabstopp, Pfeiltasten); jede ruft setzeThema wie
                das Kompakt-Menue. "Bewegung verringern" nur als Anzeige, was
                Windows sagt (DECISION 10.4, kein Schluessel). -->
@@ -412,8 +426,10 @@
               <button type="button" class="thk" role="radio" data-theme="dark" aria-checked="true"><span class="thv thv-dark" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeDark">Dark</span></span></button>
               <button type="button" class="thk" role="radio" data-theme="light" aria-checked="false" tabindex="-1"><span class="thv thv-light" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeLight">Light</span></span></button>
               <button type="button" class="thk" role="radio" data-theme="tnl" aria-checked="false" tabindex="-1"><span class="thv thv-tnl" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeTnl">TnL</span></span></button>
+              <button type="button" class="thk" role="radio" data-theme="glas" aria-checked="false" tabindex="-1"><span class="thv thv-glas" aria-hidden="true"><i></i><i></i><span class="z">466.8k</span><span class="b2"></span><span class="b1"></span></span><span class="tn2"><span data-i18n="top.themeGlas">Smoked glass</span></span></button>
               <button type="button" class="thk" role="radio" data-theme="auto" aria-checked="false" tabindex="-1"><span class="thv thv-auto" aria-hidden="true"></span><span class="tn2"><span data-i18n="einst.themaAuto">Auto</span> <small data-i18n="einst.wieWindows">like Windows</small></span></button>
             </div>
+            <p class="ehinweis" id="eGlasSatz"><span data-i18n="einst.glasSatz">Smoked glass lets the Windows background show through, blurred (Windows 11). Elsewhere it stands on solid smoke grey.</span> <span id="eGlasOhne" hidden></span></p>
             <div class="ezeile">
               <div class="ezt"><b data-i18n="einst.bewegung">Reduce motion</b><span data-i18n="einst.bewegungSatz">Follows Windows (animation effects). With them off, the big number stands at once and nothing glides.</span></div>
               <div class="ezc"><span class="ewert" id="eBewegung"></span></div>
@@ -550,6 +566,31 @@
               <div class="ezc"><button type="button" class="btn sm" id="eClog" data-i18n="top.changelog">Changelog</button></div>
             </div>
           </section>
+          <!-- Windows (Spezifikation Windows-Einbindung 9, 3.4): nur im eigenen
+               Fenster unter Windows (GET /api/config bringt windows.da), sonst
+               bleiben Abschnitt und Eintrag der Sprungleiste verborgen.
+               "Nur bei neuem Bestwert" steht eingerueckt unter "Nach jedem
+               Kampf melden" und ist nur bedienbar, wenn der an ist
+               (aria-disabled). "Mit Windows starten" nur, wo Windows es kann. -->
+          <section class="egruppe" id="eg-win" aria-labelledby="egh-win" hidden>
+            <h3 id="egh-win" tabindex="-1" data-i18n="einst.win">Windows</h3>
+            <div class="ezeile">
+              <div class="ezt"><b id="eWinMeldenName" data-i18n="einst.winMelden">Notify after every fight</b><span id="eWinMeldenSatz" data-i18n="einst.winMeldenSatz">Windows shows the result when a fight is over and Borometer is not in front.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eWinMelden" role="switch" aria-checked="false" aria-labelledby="eWinMeldenName" aria-describedby="eWinMeldenSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="ezeile eein">
+              <div class="ezt"><b id="eWinNurBestName" data-i18n="einst.winNurBest">Only for a new best</b><span id="eWinNurBestSatz" data-i18n="einst.winNurBestSatz">Stays quiet unless the fight beats your best pull.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eWinNurBest" role="switch" aria-checked="false" aria-disabled="true" aria-labelledby="eWinNurBestName" aria-describedby="eWinNurBestSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="ezeile">
+              <div class="ezt"><b id="eWinTrayName" data-i18n="einst.winTray">Close to the notification area</b><span id="eWinTraySatz" data-i18n="einst.winTraySatz">Closing hides the window; live logging goes on. Quit from the icon&#8217;s menu.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eWinTray" role="switch" aria-checked="false" aria-labelledby="eWinTrayName" aria-describedby="eWinTraySatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+            <div class="ezeile" id="eWinAutoZeile" hidden>
+              <div class="ezt"><b id="eWinAutoName" data-i18n="einst.winAuto">Start with Windows</b><span id="eWinAutoSatz" data-i18n="einst.winAutoSatz">Opens minimized when you sign in.</span></div>
+              <div class="ezc"><button type="button" class="esw" id="eWinAuto" role="switch" aria-checked="false" aria-labelledby="eWinAutoName" aria-describedby="eWinAutoSatz"><span class="esw-t" aria-hidden="true"></span><span class="esw-w" aria-hidden="true">Off</span></button></div>
+            </div>
+          </section>
           <!-- Info: Version, Fanprojekt und Rechte; darunter "Nur gelesen -
                nichts im Spiel" mit der Sicherheit (DECISION 10.12): was
                Borometer liest, schreibt, wo sein Server hoert, wann es ins
@@ -602,10 +643,32 @@
     <section class="weeklies" id="weeklies" hidden aria-labelledby="weekliesTitel">
       <div class="wkopf">
         <h2 id="weekliesTitel" data-i18n="tabs.weeklies">Weeklies</h2>
-        <p class="wkreset"><span id="wkWoche"></span> <span id="wkTag"></span></p>
+        <button type="button" class="btn sm wkglocke" id="wkGlocke" aria-haspopup="dialog" hidden></button>
+        <p class="wkreset"><span id="wkTag"></span></p>
       </div>
       <p class="wkstatus" id="wkStatus" role="status"></p>
       <div class="wkrollt"><div class="wkinhalt" id="wkBody"></div></div>
+    </section>
+
+    <!-- Gilde (Spezifikation Gilde 5, Entwurf 2 vom 06.10.2026): ein Ort wie die
+         Weeklies (state.gilde), dieselbe Flaeche (Klasse weeklies). Oben der Kopf
+         mit dem Namen der Gilde und dem naechsten Termin, darunter der Satz zum
+         Speichern (Live-Region), dann der Inhalt, der in sich rollt: der
+         Datenschutz-Satz, die drei Reiter, Suche und Rollenfilter und die Flaeche
+         des gewaehlten Reiters. Ihn zeichnet 68-gilde.ts, gerechnet in gilde-core.ts. -->
+    <section class="weeklies gl" id="gilde" hidden aria-labelledby="gildeTitel">
+      <div class="wkopf" id="gildeKopf">
+        <h2 id="gildeTitel" tabindex="-1" data-i18n="tabs.gilde">Guild</h2>
+        <span class="gl-gname" id="gildeName"></span>
+        <p class="gl-naechster" id="gildeNaechster"></p>
+      </div>
+      <p class="wkstatus" id="gildeStatus" role="status"></p>
+      <div class="wkrollt"><div class="wkinhalt" id="gildeInhalt">
+        <p class="gl-hinweis" id="gildeDatenschutz"><svg class="i" viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2"/><path d="M8 11V8a4 4 0 0 1 8 0v3"/></svg><span data-i18n-html="gilde.datenschutz">The names stay on this PC only, in <code>boro-gilde.json</code>. Borometer sends them nowhere.</span></p>
+        <div class="wkleiste"><div class="wkreiter" id="gildeTabs" hidden></div></div>
+        <div class="gl-filter" id="gildeFilter" hidden></div>
+        <div id="gildeFlaeche"></div>
+      </div></div>
     </section>
 
     <!-- Rekorde (Spezifikation Rekorde 2a, Sammelalbum, 02.10.2026): ein
@@ -666,9 +729,10 @@
            Verlassen zurueck, Kompakt findet sie an ihrem Platz. In der Mitte
            die grosse Zahl; der Ring selbst ist ein Canvas. -->
       <section class="ringfeld" id="ringFeld" data-i18n-aria-label="ring.feld" aria-label="Fight as a ring">
-        <div class="ringlinks" id="ringLinks"><button class="btn sm" id="ringZurueck" type="button" hidden data-i18n="ring.zurGruppe">&lsaquo; Group</button><div class="headmeta ringsatz" id="ringSatz"></div><p class="kurvemech" id="kurveMech" hidden></p><button class="btn sm" id="ringNachspielen" type="button"><svg class="bsym" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg><span data-i18n="ring.nachspielen">Replay the fight</span></button></div>
+        <div class="ringlinks" id="ringLinks"><button class="btn sm" id="ringZurueck" type="button" hidden data-i18n="ring.zurGruppe">&lsaquo; Group</button><div class="headmeta ringsatz" id="ringSatz"></div><p class="kurvemech" id="kurveMech" hidden></p><button class="btn sm" id="ringNachspielen" type="button"><svg class="bsym" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg><span data-i18n="ring.nachspielen">Replay the fight</span></button><span class="ringhinweis" id="ringHinweis" role="status"></span></div>
         <div class="ringrechts" id="ringRechts"><div class="headmeta ringmeta" id="ringMeta"></div></div>
-        <div class="ringbuehne" id="ringBuehne"><canvas id="ring" role="img" data-i18n-aria-label="ring.canvas" aria-label="Ring of the fight"></canvas><div class="ringmitte" id="ringMitte"><div class="ringmitglied" id="ringMitglied" hidden><span class="v num" id="ringMitgliedZahl"></span><span class="u" id="ringMitgliedEinheit"></span></div><p class="ringdu" id="ringDu" hidden></p><p class="ringfokus" id="ringFokus" aria-hidden="true"></p></div></div>
+        <div class="ringbuehne" id="ringBuehne"><canvas id="ring" role="img" data-i18n-aria-label="ring.canvas" aria-label="Ring of the fight"></canvas><div class="ringmitte" id="ringMitte"><div class="ringmitglied" id="ringMitglied" hidden><span class="v num" id="ringMitgliedZahl"></span><span class="u" id="ringMitgliedEinheit"></span></div><p class="ringdu" id="ringDu" hidden></p><p class="ringfokus" id="ringFokus" aria-hidden="true"></p><p class="ringhinweis" id="ringMitteHinweis" hidden></p></div></div>
+        <div class="ringlegende" id="ringLegende" hidden><span class="rltitel" id="ringLegendeTitel" data-i18n="ring.randLegende">Outer rim</span><ul aria-labelledby="ringLegendeTitel"><li><i aria-hidden="true" class="art-normal"></i><span data-i18n="ring.art.normal">Normal</span></li><li><i aria-hidden="true" class="art-crit"></i><span data-i18n="ring.art.crit">Critical</span></li><li><i aria-hidden="true" class="art-heavy"></i><span data-i18n="ring.art.heavy">Heavy</span></li><li><i aria-hidden="true" class="art-critheavy"></i><span data-i18n="ring.art.critheavy">Critical heavy</span></li><li id="ringLegendeSchild" hidden><i aria-hidden="true" class="art-shield"></i><span data-i18n="ring.art.shield">Shield</span></li></ul></div>
         <!-- Kampf nachspielen (Spezifikation Glutring 6, 65-nachspielen.ts): das
              Rennen der Faehigkeiten im Ringfeld. Der Ring weicht (body.rennt),
              Liste und Band bleiben stehen; Esc oder "Zurueck zum Ring" schliessen. -->
@@ -681,6 +745,7 @@
           </div>
           <p class="rmech" id="rennMech" role="status"><i aria-hidden="true"></i><span id="rennMechText"></span></p>
           <div class="rbahnen" id="rennBahnen" role="list" data-i18n-aria-label="rennen.bahnen" aria-label="Skills by damage so far"></div>
+          <p class="rluecke" id="rennLuecke" hidden></p>
           <div class="rsteuer">
             <button class="rplay" id="rennPlay" type="button" aria-label="Play"><svg class="rsym rspiel" viewBox="0 0 24 24" aria-hidden="true"><path d="M7 4l13 8-13 8z"/></svg><svg class="rsym rhalt" viewBox="0 0 24 24" aria-hidden="true"><path d="M6 5h4v14H6zM14 5h4v14h-4z"/></svg></button>
             <div class="rspul"><canvas id="rennKurve" aria-hidden="true"></canvas><input type="range" id="rennPos" min="0" max="1" step="0.1" value="0" data-i18n-aria-label="rennen.zeit" aria-label="Time in the fight"></div>
@@ -715,6 +780,11 @@
              eine Flaeche, fuer die es diese App gibt. -->
         <div class="bars" id="bars" role="treegrid"
              aria-label="Damage table" data-i18n-aria-label="bars.tableLabel"></div>
+        <button id="kRest" class="krest" type="button" hidden><span class="kresttext" id="kRestText"></span><span class="krestwert"></span><span class="krestbahn" aria-hidden="true"><span class="krestspur"></span></span></button>
+        <!-- Das Menue "Ordnen" der Liste neben dem Glutring (Spezifikation
+             Feinschliff 4, 64-glutring.ts). Es liegt neben #bars, nicht im
+             Kopf: die Kopftastatur (24) sieht es so nicht. -->
+        <div class="ordnenmenue" id="ringOrdnenMenue" role="menu" hidden data-i18n-aria-label="ring.ordnenMenue" aria-label="Sort the list"></div>
         <!-- Das Urteil: Ueberschrift wie beim Kurvenfeld, der Inhalt in
              #urteilInhalt (renderTafelUrteil schreibt nur ihn), der Knopf zur
              Analyse steht fest - ein Live-Takt nimmt ihm den Fokus nicht. Seit dem Glutring
@@ -731,11 +801,6 @@
                  im Kopf. Nur da, wenn es an diesem Boss einen Bezug gibt
                  (46-best-pull.ts, syncBestBtn). -->
             <button class="uanalyse" id="btnBestPull" type="button" hidden aria-label="In the comparison: against your best pull" title="In the comparison">In the comparison &rsaquo;</button>
-            <!-- "Build in Questlog" (Aufgabe 12, 29.09.): ein leiser Link, wenn
-                 eine Karte im Bereich Builds die Waffen dieses Kampfs hat
-                 (51-plan.ts, syncKampfQuestlog); das Fenster gibt ihn an den
-                 Browser des Systems weiter. -->
-            <a class="uanalyse" id="kampfQuestlog" hidden target="_blank" rel="noopener noreferrer">Build in Questlog &rsaquo;</a>
           </div>
         </section>
       </div>
@@ -748,9 +813,8 @@
       <header class="bkopf" id="bereichKopf">
         <h2 id="bkName"></h2>
         <span class="bkkampf" id="bkKampf" hidden><img id="bkBoss" alt="" aria-hidden="true" hidden><b id="bkBossName"></b><span class="vh" id="bkTr1"></span><span class="bkzeit" id="bkZeit"></span><span class="vh" id="bkTr2"></span><span class="num" id="bkDps"></span></span>
-        <!-- Gruppe und Builds (Luecken 7.1, 8.1) nennen statt des Kampfs ihren
-             Stand: "Noch keine Gruppe", "Gruppe laeuft &#183; K7QX", "4 Builds &#183;
-             Links zu Questlog"; syncFelder() (58-felder.ts). -->
+        <!-- Die Gruppe (Luecken 7.1) nennt statt des Kampfs ihren Stand:
+             "Noch keine Gruppe", "Gruppe laeuft &#183; K7QX"; syncFelder() (58-felder.ts). -->
         <span class="bkctx" id="bkCtx" hidden></span>
         <!-- Der Beispielkampf wird hier einmal genannt (Kritik 28.09.), nicht
              in jedem leeren Feld darunter; syncFelder() (58-felder.ts). -->
@@ -987,7 +1051,8 @@
         <!-- Das eine Urteil: welcher Befund am meisten gekostet hat, in
              Schaden gerechnet (urteilHtml). Den Inhalt schreibt
              renderAnalysis ganz neu; der Name des Feldes steht darum hier am
-             Element, nicht in einer Ueberschrift darin. -->
+             Element und als unsichtbares h3 darin (Issue #109: unter dem h2
+             des Bereichs stehen alle Felder als h3 auf einer Ebene). -->
         <div class="urteil" id="analysisCall" role="region" aria-label="Verdict" data-i18n-aria-label="tafel.urteil" hidden></div>
         <section class="neben" id="weitere" aria-labelledby="weitereTitel" hidden>
           <h3 id="weitereTitel" data-i18n="analysis.weitere">Further findings</h3>
@@ -1004,7 +1069,7 @@
              darunter (#lueckeDef), danach die Zeile zur erkannten Mechanik
              des Bosses (#mechanikZeile, 61-mechanik.ts), schraffiert im Bild. -->
         <section class="verdict form" id="verdict" aria-labelledby="formTitel" hidden>
-          <div class="fkx"><h2 id="formTitel" data-i18n="analysis.form">Shape of the fight</h2>
+          <div class="fkx"><h3 id="formTitel" data-i18n="analysis.form">Shape of the fight</h3>
             <span class="vlegend">
               <span data-i18n="analysis.legendBalken">damage per second</span>
               <span class="vleg" id="vlegGap" hidden><i class="lpause"></i><span data-i18n="analysis.legendGap">gap</span></span>
@@ -1013,14 +1078,14 @@
               <span class="vleg" id="vlegMech" hidden><i class="lmech"></i><span data-i18n="mechanik.legend">mechanic</span></span>
             </span></div>
           <p class="fein" id="lueckeDef"></p>
-          <p class="fein" id="mechanikZeile" hidden></p>
+          <p class="fein" id="mechanikZeile" role="note" hidden></p>
           <div class="vform" id="verdictForm"><div class="saeulen" id="saeulen" role="img"></div></div>
           <div class="fachse" id="formAchse" aria-hidden="true"></div>
           <p class="fein" id="verdictText"></p>
         </section>
         <div id="findings"></div>
         <section class="afuss" id="afuss" aria-labelledby="afussTitel">
-          <h2 id="afussTitel" data-i18n="analysis.fuss">What the log does not know</h2>
+          <h3 id="afussTitel" data-i18n="analysis.fuss">What the log does not know</h3>
           <ul>
             <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span><span data-i18n="analysis.fuss.1">whether the boss could not be hit during a gap, or you had to move</span><span id="fussMech" hidden></span></span></li>
             <li><svg viewBox="0 0 16 16" aria-hidden="true" focusable="false"><circle cx="8" cy="8" r="6.2" fill="none" stroke="currentColor" stroke-width="1.3"/><path d="M8 7.2v4" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"/><circle cx="8" cy="4.9" r=".9" fill="currentColor"/></svg><span data-i18n="analysis.fuss.2">which buffs were on you and when they ran out</span></li>
@@ -1111,7 +1176,7 @@
             <div><button class="btn hot" type="button" id="pHost" data-i18n="party.hostBtn" aria-describedby="pHostLock pHostNote pHint">Start party</button></div>
             <!-- Warum der Knopf gesperrt ist, direkt darunter (syncPartyName) -->
             <p class="gleise waylock" id="pHostLock" hidden></p>
-            <p class="gleise" data-i18n="party.hinaus">Only the board's numbers go out: target, damage, DPS, weapons. Never a log file.</p>
+            <p class="gleise" data-i18n="party.hinaus">What goes out: your character name with weapons, role and game language, and your newest fight: target, time and length, damage and hits per skill, damage per second and when you used what. Never a log file.</p>
           </section>
           <section class="gweg" id="pBeitritt" aria-labelledby="pBeitrittT">
             <h3 id="pBeitrittT" data-i18n="party.wayJoinTitle">Join a party</h3>
@@ -1197,14 +1262,6 @@
         </section>
         <section class="hkampf" id="histDetail" aria-labelledby="histListeT"></section>
       </div>
-    </div>
-
-    <!-- Builds (Neugestaltung 28.09., Luecken 8): ein eigener Bereich. Seit
-         Aufgabe 12 (29.09.) ein Speicher fuer Links zu Questlog: oben das
-         Feld zum Einfuegen, darunter je Link eine Karte; gefuellt von
-         renderBuilds() (51-plan.ts). -->
-    <div class="panel" id="p-builds">
-      <div id="bauBody"></div>
     </div>
 
     <div class="panel" id="p-compare">

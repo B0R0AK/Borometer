@@ -110,6 +110,8 @@ const p = await bundle(`
   export { setup as setup32, tailRechnen, refreshPlayers } from "./src/renderer/app/32-history";
   export { parseGrid, profile, autoMap, buildEvents } from "./src/renderer/app/04-log-parsing";
   export { segment } from "./src/renderer/app/05-fights";
+  export { knownBoss, histKey } from "./src/renderer/app/06-blocks-and-places";
+  export { bossIcon } from "./src/renderer/app/12-boss-images";
   export { SAMPLE_LOG } from "./src/renderer/app/40-sample-fight";`);
 p.setup15(); p.setup18(); p.setup19(); p.setup32();
 const { state } = p;
@@ -373,6 +375,129 @@ function zweiTeile(boss, pause) {
   eq(kaempfe("King Khanzaizin", 10), [["King Khanzaizin", 2, 89]], "King Khanzaizin, 10 s Pause: ein Kampf aus zwei Teilen");
   eq(kaempfe("König Khanzaizin", 30).length, 2, "König Khanzaizin (deutscher Client), 30 s Pause: zwei Kaempfe");
   eq(kaempfe("Vulcanus", 30), [["Vulcanus", 2, 109]], "Gegenprobe Vulcanus, 30 s Pause: ein Kampf aus zwei Teilen wie bisher");
+}
+
+// --- 5e. Ein Puppenabend wie im Issue #65
+/* Fehlerbericht vom 28.09.: Live las die Datei zuerst mit neun Zeilen und
+   nahm die Faehigkeits-ID als Schaden - 97,8 Mrd. statt 161.773. Ein Abend
+   wie dort, nur aus Zeiten, IDs und Zahlen: zehn Spalten, "Claw" unter fuenf
+   IDs, der Schaden eng zwischen 864 und 1209. Die Zuordnung muss bei 10 wie
+   bei 700 Zeilen stimmen, mit und ohne Versionszeile. Das Wachsen ueber
+   loadText prueft scripts/test-live-page.mjs (Abschnitt 15) an der Seite. */
+const PUPPEN_IDS = [940710828, 940842037, 940907488, 940973120, 941169852];
+const puppenAbend = (n) => Array.from({ length: n }, (_, k) =>
+  `${stempel(Date.UTC(2026, 8, 28, 23, 13, 22) + k * 56)},DamageDone,Claw,${PUPPEN_IDS[(k * 3) % 5]},${864 + (k * 37) % 346},` +
+  `${k % 4 ? 0 : 1},${k % 9 ? 0 : 1},kNormalHit,Spieler A,Practice Dummy`);
+for (const kopf of ["CombatLogVersion,4\n", ""]) {
+  const zuordnung = (n) => { const g = p.parseGrid(kopf + puppenAbend(n).join("\n") + "\n"); const m = p.autoMap(g, p.profile(g)); return [m.damage, m.skillId]; };
+  eq([zuordnung(10), zuordnung(700)], [[4, 3], [4, 3]],
+    `Puppenabend ${kopf ? "mit" : "ohne"} Versionszeile: bei 10 und bei 700 Zeilen Schaden aus Spalte 5, die ID als ID`);
+}
+
+// --- 5f. Limuny Bercant: Wipes als eigene Kaempfe (Issue #103, Auskunft vom 04.10.: die Pausen waren Wipes)
+/* Wie King Khanzaizin: in den Hallen der Tragik verschwindet die Bossin nie,
+   eine Pause ab 20 s ist ein Wipe. Die kuerzeste Pause zwischen zwei
+   Versuchen im Log vom 03.10. waren 23 s. */
+{
+  const kaempfe = (boss, pause) => { frisch(8, true); ganz(zweiTeile(boss, pause));
+    return state.encounters.map((s) => [s.stats.name, s.parts, Math.round((s.end - s.start) / 1000)]); };
+  eq(kaempfe("Limuny Bercant", 23), [["Limuny Bercant", 1, 40], ["Limuny Bercant", 1, 40]], "Limuny Bercant, 23 s Pause: zwei Kaempfe");
+  eq(kaempfe("Limuny Bercant", 10), [["Limuny Bercant", 2, 89]], "Limuny Bercant, 10 s Pause: ein Kampf aus zwei Teilen");
+}
+
+/* Ein Ablauf aus Abschnitten: [Ziel, Beginn in s, Dauer in s, Schaden je
+   Treffer], ein Treffer alle 0,5 s. Nur Zeiten, Zahlen und Gegnernamen. */
+function ablauf(teile) {
+  const z = ["CombatLogVersion,4"], t0 = Date.UTC(2026, 9, 3, 15, 0, 0);
+  for (const [ziel, ab, dauer, dmg] of teile)
+    for (let k = 0; k * 0.5 <= dauer; k++)
+      z.push(`${stempel(t0 + ab * 1000 + k * 500)},DamageDone,Quick Fire,964762401,${dmg + (k % 7) * 11},${k % 3 ? 0 : 1},0,kNormalHit,Spieler A,${ziel}`);
+  return z.join("\n") + "\n";
+}
+
+// --- 5g. Fellini vor dem Boss ist Trash (Issue #104)
+/* Auf dem Weg zu Fellinex trifft man Fellini schon einmal, 3 s lang, mit
+   Trash davor und danach. Das ist kein Fellinex-Pull: kein Bossname, kein
+   Boss im Verlauf, kein Bossbild. Gegenprobe: im Pull, den Fellinex
+   oeffnet, heisst der Kampf Fellinex, auch wenn Fellini mehr Schaden nimmt. */
+{
+  frisch(8, true);
+  ganz(ablauf([["Tumgir's Magic Soldier", 0, 9, 900], ["Fellini", 20, 3.3, 1300],
+               ["Tumgir's Slaughterer Chardum", 40, 22, 5000],
+               ["Fellinex", 150, 46, 9000], ["Fellinex", 222, 69, 9000]]));
+  const namen = [...state.encounters].reverse().map((s) => s.stats.name);   // die Liste steht neueste zuerst
+  eq(namen, ["Tumgir's Magic Soldier", "Fellini", "Tumgir's Slaughterer Chardum", "Fellinex"],
+    "Fellini vor dem Boss: ein eigener Kampf unter seinem eigenen Namen");
+  eq([p.knownBoss("Fellini"), p.histKey("Fellini"), p.bossIcon("Fellini")], [false, "Fellini", null],
+    "Fellini allein: kein Boss, eigener Schluessel, kein Bossbild");
+  frisch(8, true);
+  ganz(ablauf([["Fellinex", 0, 20, 4000], ["Fellini", 30, 40, 9000], ["Fellinex", 80, 30, 4000]]));
+  eq(state.encounters.map((s) => [s.stats.name, s.parts]), [["Fellinex", 3]],
+    "Gegenprobe: Fellinex oeffnet, Fellini nimmt mehr Schaden - der Kampf heisst Fellinex");
+  eq([p.knownBoss("Calanthia of Destruction"), p.histKey("Calanthia of Destruction"), p.histKey("Calanthia der Zerstörung")],
+    [true, "Calanthia", "Calanthia"], "Gegenprobe: Calanthias zweite Phase bleibt Calanthia");
+}
+
+// --- 5h. Altar von Calanthia: Korridor und Altar getrennt, auch wenn Phase 2 mehr Schaden hat (Issue #111)
+{
+  frisch(8, true);
+  ganz(ablauf([["Radeth", 0, 48, 9000], ["High Drakhoul Sorcerer", 81, 30, 3000],
+               ["Calanthia", 141, 60, 6000], ["Calanthia of Destruction", 223, 50, 9000]]));
+  eq([...state.encounters].reverse().map((s) => [s.stats.name, s.parts]),
+    [["Radeth", 1], ["High Drakhoul Sorcerer", 1], ["Calanthia", 2]], "die Kaempfe: Radeth, Trash, Calanthia aus zwei Teilen");
+  eq(state.blocks.map((b) => b.dungeon?.en ?? null), ["The Corridor of Anguish", "The Altar of Rebirth"],
+    "Phase 2 mit mehr Schaden: Korridor und Altar in zwei Bloecken");
+}
+
+// --- 5i. Halle der Illusionen (Issue #183)
+/* Zwei Runs wie im Log vom 05.10. (16:51 bis 16:56), auf Zeiten und
+   Zahlen reduziert: Verence, Death Summoner mit einem Zombiehund, Marta;
+   70 s spaeter dasselbe noch einmal. Die Bosse wechseln woechentlich, ab
+   08.10. Haylock und Gaudian; alle vier heissen in beiden Clients gleich.
+   Death Summoner ist Trash (Auskunft vom 05.10.). Marta pausiert hoechstens
+   etwa 5 s, eine Pause ab 20 s ist darum ein Wipe wie bei Limuny Bercant. */
+{
+  frisch(8, true);
+  const run = (ab) => [["Verence", ab, 17, 16000], ["Death Summoner", ab + 42, 8, 9000],
+    ["Decaying Zombie Mutt", ab + 51, 2, 9000], ["Marta", ab + 71, 21, 12000]];
+  ganz(ablauf([...run(0), ...run(162)]));
+  eq([...state.encounters].reverse().map((s) => s.stats.name),
+    ["Verence", "Death Summoner", "Marta", "Verence", "Death Summoner", "Marta"], "zwei Runs: je Verence, Trash, Marta als eigene Kaempfe");
+  eq(state.blocks.map((b) => [b.dungeon?.en ?? null, b.dungeon?.de ?? null, b.dungeon?.stars ?? null]),
+    [["Halls of Illusion", "Halle der Illusionen", null], ["Halls of Illusion", "Halle der Illusionen", null]],
+    "zwei Bloecke, beide heissen Halle der Illusionen, ohne Sterne");
+  eq(["Verence", "Marta", "Haylock", "Gaudian"].map((n) => [p.knownBoss(n), p.histKey(n), !!p.bossIcon(n)]),
+    [[true, "Verence", true], [true, "Marta", true], [true, "Haylock", true], [true, "Gaudian", true]],
+    "Verence, Marta, Haylock, Gaudian: Boss, eigener Schluessel, Bossbild");
+  eq([p.knownBoss("Death Summoner"), p.histKey("Death Summoner"), p.bossIcon("Death Summoner")], [false, "Death Summoner", null],
+    "Death Summoner ist Trash: kein Boss, kein Bossbild");
+  const kaempfe = (boss, pause) => { frisch(8, true); ganz(zweiTeile(boss, pause));
+    return state.encounters.map((s) => [s.stats.name, s.parts, Math.round((s.end - s.start) / 1000)]); };
+  eq(kaempfe("Marta", 23), [["Marta", 1, 40], ["Marta", 1, 40]], "Marta, 23 s Pause: zwei Kaempfe (Wipe)");
+  eq(kaempfe("Marta", 10), [["Marta", 2, 89]], "Marta, 10 s Pause: ein Kampf aus zwei Teilen");
+  eq(kaempfe("Gaudian", 23).length, 2, "Gaudian, 23 s Pause: zwei Kaempfe");
+}
+
+// --- 5j. Vegamor im deutschen Client (Issue #206)
+/* Der deutsche Client schreibt die Klaue "Vegamors Klaue" und die Nebengegner
+   "Selbstloser Großer-Baum-Krieger"; gemessen am 06.10.2026. Ein Ablauf wie
+   dort, nur aus Zeiten, Zahlen und Gegnernamen: Vagamont, die drei Kerne, die
+   Klaue, Mift, dazwischen die Krieger. Ohne die zwei deutschen Namen laege
+   zwischen Vegarion und Vegaorb eine Stille von 240 s (KOLOSS_GAP: 180 s). */
+{
+  const abschnitte = (klaue, krieger) => [["Vagamont", 0, 40, 24000], ["Vegarion", 50, 60, 3000],
+    [klaue, 120, 30, 6000], [krieger, 155, 120, 4000], ["Mift", 300, 10, 5000],
+    ["Vegaorb", 300, 40, 9000], ["Vegarus", 350, 30, 4000]];
+  const lauf = (klaue, krieger) => { frisch(8, true);
+    ganz(ablauf(abschnitte(klaue, krieger).filter(([n]) => n !== null)));
+    return [state.blocks.length, [...new Set(state.encounters.map((s) => s.stats.name))].sort()]; };
+  const de = lauf("Vegamors Klaue", "Selbstloser Großer-Baum-Krieger");
+  eq(de[0], 1, "Vegamor im deutschen Client: ein Ereignis, nicht mehrere");
+  eq(de[1].includes("Vegamor"), true, "Vegamor im deutschen Client: der Kampf heisst Vegamor");
+  eq(lauf("Vegamor's Claw", "Ego-less Great Tree Warrior")[0], 1, "Vegamor im englischen Client: weiter ein Ereignis");
+  eq(lauf(null, null)[0] > 1, true, "Gegenprobe: fehlen Klaue und Krieger im Log, zerfaellt der Ablauf");
+  eq([p.knownBoss("Vegamors Klaue"), !!p.bossIcon("Vegamors Klaue"), p.bossIcon("Vegamors Klaue") === p.bossIcon("Vegamor's Claw")],
+    [true, true, true], "Vegamors Klaue: Boss, Bossbild wie die englische Klaue");
 }
 
 // --- 6. Steuerzeichen des Spiels in Namen (Fehler vom 29.09.)

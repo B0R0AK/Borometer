@@ -21,7 +21,7 @@ function eq(got, want, name) {
   else { failed++; console.log("  FAIL  " + name + "\n        got  " + a + "\n        want " + b); }
 }
 const built = await esbuild.build({
-  stdin: { contents: 'export * from "./src/main/lage"; export { borderFor, themeSourceFor, materialFor } from "./src/main/chrome"; export { isFirstStart } from "./src/main/firststart";',
+  stdin: { contents: 'export * from "./src/main/lage"; export { borderFor, themeSourceFor, materialFor, overlayFor } from "./src/main/chrome"; export { isFirstStart } from "./src/main/firststart";',
     resolveDir: root, loader: "ts" },
   bundle: true, format: "esm", platform: "node", write: false, logLevel: "silent" });
 const k = await import("data:text/javascript;base64," + Buffer.from(built.outputFiles[0].text).toString("base64"));
@@ -162,16 +162,28 @@ function gestellteUhr() {
 }
 
 // --- 7. Tabellen in chrome.ts
-eq([k.borderFor("dark"), k.borderFor("light"), k.borderFor("tnl")], ["#242525", "#abb9b8", "#3a2744"], "Randfarbe je Thema");
-eq(["dark", "light", "tnl"].every((t) => /^#[0-9a-f]{6}$/.test(k.borderFor(t))), true, "jede Randfarbe deckend (#rrggbb, ohne Alpha)");
+eq([k.borderFor("dark"), k.borderFor("light"), k.borderFor("tnl"), k.borderFor("glas")], ["#242525", "#abb9b8", "#3a2744", "#3c3b3a"], "Randfarbe je Thema");
+eq(["dark", "light", "tnl", "glas"].every((t) => /^#[0-9a-f]{6}$/.test(k.borderFor(t))), true, "jede Randfarbe deckend (#rrggbb, ohne Alpha)");
 eq(["constructor", "toString", "auto", "", undefined, 42].map((t) => k.borderFor(t)), Array(6).fill("#242525"),
   "unbekanntes Thema: dark");
-eq([k.themeSourceFor("light", "light"), k.themeSourceFor("dark", "dark"), k.themeSourceFor("tnl", "tnl")],
-  ["light", "dark", "dark"], "themeSource: hell light, dunkel und tnl dark");
+eq(k.overlayFor("glas").symbolColor, "#bdb4a7", "Systemknoepfe in Rauchglas: --dim des Themas");
+eq(k.overlayFor("glas").color, "#00000000", "Systemknoepfe in Rauchglas: durchsichtiger Grund wie ueberall");
+eq([k.themeSourceFor("light", "light"), k.themeSourceFor("dark", "dark"), k.themeSourceFor("tnl", "tnl"), k.themeSourceFor("glas", "glas")],
+  ["light", "dark", "dark", "dark"], "themeSource: hell light, dunkel, tnl und Rauchglas dark (dunkles Mica)");
 eq([k.themeSourceFor("light", "auto"), k.themeSourceFor("dark", "auto")], ["system", "system"], "Einstellung auto: system");
 eq([k.themeSourceFor("constructor", undefined), k.themeSourceFor(undefined, null)], ["dark", "dark"], "unbekannt: dark");
-eq([k.materialFor(true, false), k.materialFor(true, true), k.materialFor(false, false), k.materialFor(false, true)],
+eq([k.materialFor(true, false, "dark"), k.materialFor(true, true, "dark"), k.materialFor(false, false, "dark"), k.materialFor(false, true, "dark")],
   ["acrylic", "none", "none", "none"], "Acrylic nur in Kompakt und nur ohne reduzierte Transparenz");
+eq([k.materialFor(false, false, "glas"), k.materialFor(false, true, "glas"), k.materialFor(true, false, "glas"), k.materialFor(true, true, "glas")],
+  ["acrylic", "none", "acrylic", "none"], "Rauchglas: Acrylic im grossen Fenster wie im Kompakt, ohne Transparenz nichts (#189)");
+eq(["dark", "light", "tnl", "auto", "constructor", "toString", "", undefined, null, 42, "Glas", "glas ", "mica", "acrylic"].map((t) => k.materialFor(false, false, t)),
+  Array(14).fill("none"), "grosses Fenster ohne Rauchglas (auch feindliche Namen): kein Material");
+/* #189: Mica zeigt nur das verwischte Hintergrundbild, nie die Fenster
+   dahinter, und ein inaktives Fenster bekommt statt Mica die feste Farbe -
+   auf einem einfarbigen Desktop und neben dem Spiel also immer nur Grau. Kein
+   Thema und kein Zustand fuehrt mehr auf Mica. */
+eq([true, false].flatMap((c) => [true, false].flatMap((r) => ["dark", "light", "tnl", "glas", "mica"].map((t) => k.materialFor(c, r, t))))
+  .filter((m) => m !== "acrylic" && m !== "none"), [], "materialFor kennt nur acrylic und none, nie mica (#189)");
 
 // Der erste Start (Spezifikation Rundgang 2, Pruefung M6): src/main/firststart.ts.
 // Die Schluessel, die ein Mensch setzt, wie server.ts sie nennt (gekuerzt um

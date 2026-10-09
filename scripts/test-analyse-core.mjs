@@ -114,6 +114,19 @@ function gesetzt(nIn, nAus, dIn, dAus, extra = {}) {
   eq([duenn.kIn, duenn.kAus], [fe.jeIn, fe.jeAus], "unter 15 Treffern aussen: Kosten mit den Staerken des Builds");
   const umgekehrt = core.fensterLesen(gesetzt(20, 20, 40000, 70000), fe);
   eq(umgekehrt.kosten, 0, "innen schwaecher als aussen: Kosten 0, nie negativ");
+
+  /* Issue #108: gegen den Bezugspull, nicht gegen 0 % aussen. Der beste Pull
+     hatte 41 % aussen, dieser Kampf 30 % - er war besser, also kein Urteil. */
+  const ges = 34 * 81200 + 26 * 45500;
+  eq(core.fensterKosten(w, null), w.kosten, "fensterKosten: ohne Bezug wie bisher, gegen alles im Fenster");
+  eq([core.fensterKosten(w, 0.41), core.fensterUrteil(w, ges, 0.02, 0.41)], [0, false],
+    "#108: Bezug 41 % aussen, Kampf 30 % - keine Kosten, kein Urteil");
+  eq(core.fensterUrteil(w, ges, 0.02, w.aussen), false, "#108: gleich viel aussen wie der Bezug - kein Urteil");
+  eq(nah(core.fensterKosten(w, 0.10), w.kosten * (w.aussen - 0.10) / w.aussen, 1e-6), true,
+    "#108: Bezug 10 % - Kosten nur fuer den Teil ueber dem Bezug");
+  eq(core.fensterUrteil(w, ges, 0.02, 0.10), true, "#108: Bezug 10 %, Kampf 30 % - das Urteil spricht");
+  eq(core.fensterUrteil(w, ges, 0.02, 0.29), false, "#108: Bezug 29 % - der Rest liegt unter 2 % des Kampfes");
+  eq(core.fensterUrteil(elf, 34 * 81200 + 7 * 45500, 0.02, 0), false, "#108: unter 20 % aussen auch gegen einen Bezug mit 0 % kein Urteil");
 }
 
 // --- Gleichstand zweier Laengen: auf 1 % gilt die laengere
@@ -226,12 +239,14 @@ const tr = (lang) => (key, vars) => {
 };
 {
   const KEYS = ["head.side", "head.sideMany", "analysis.side", "analysis.sideMany", "analysis.sideNoTime",
-    "analysis.sideManyNoTime", "analysis.sideCounts", "analysis.sec.window", "analysis.window.found",
+    "analysis.sideManyNoTime", "analysis.sideCounts", "analysis.sec.window", "analysis.window.foundPair",
     "analysis.window.one", "analysis.window.value", "analysis.window.bar", "analysis.window.barAlone",
     "analysis.window.in", "analysis.window.out", "analysis.window.rate", "analysis.window.ref", "analysis.window.crit",
-    "analysis.window.noRef", "analysis.window.tiles", "analysis.call.window.value", "analysis.call.window.note",
+    "analysis.window.noRefPair", "analysis.window.tiles", "analysis.call.window.value", "analysis.call.window.note", "analysis.call.window.noteRef",
     "analysis.start.label", "analysis.start.ref", "analysis.start.usual", "analysis.start.weaker",
-    "analysis.start.weakerSecond", "analysis.start.stronger", "analysis.start.strongerSecond", "analysis.start.rotation",
+    "analysis.start.weakerSecond", "analysis.start.stronger", "analysis.start.strongerSecond",
+    "analysis.zumBeleg", "analysis.inRotation", "analysis.inRotation.luecke", "analysis.inRotation.schwach",
+    "analysis.inRotation.start", "analysis.folgeRotation", "analysis.ganzerKampf",
     "analysis.ref.best", "analysis.ref.second"];
   eq(KEYS.filter((k) => core.I18N.de[k] === undefined || core.I18N.en[k] === undefined), [],
     "Texte: jeder Schluessel in DE und EN");
@@ -239,15 +254,25 @@ const tr = (lang) => (key, vars) => {
   eq(de("head.side", { p: "7\u00a0%", ziel: "Fellini", t: "0:19" }), "davon 7\u00a0% auf Fellini, ab 0:19", "DE head.side");
   eq(en("head.sideMany", { p: "12%", n: 3, ziel: "Fellini", q: "7%", t: "0:19" }),
     "12% of it on 3 other targets, most on Fellini (7%), from 0:19", "EN head.sideMany");
-  eq(de("analysis.window.found", { l: "6\u00a0s", f: "Detonierendes Mal", h: "Auge von Ventius", g: "43\u00a0%",
+  // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar, der Satz endet auf "mit diesen Waffen."
+  eq(de("analysis.window.foundPair", { l: "6 s", f: "Detonierendes Mal", h: "Auge von Ventius", g: "43 %",
     in: "103.0k", out: "72.0k", n: 14 }),
-    "Borometer hat das Fenster selbst gefunden: in den 6\u00a0s nach Detonierendes Mal trifft Auge von Ventius im Schnitt " +
-    "43\u00a0% st\u00e4rker (103.0k statt 72.0k) \u2013 gemessen \u00fcber 14 Pulls mit diesem Build.", "DE analysis.window.found");
+    "Borometer hat das Fenster selbst gefunden: in den 6 s nach Detonierendes Mal trifft Auge von Ventius im Schnitt " +
+    "43 % stärker (103.0k statt 72.0k) – gemessen über 14 Pulls mit diesen Waffen.", "DE analysis.window.foundPair");
+  eq(de("analysis.window.noRefPair", { boss: "Fellinex" }),
+    "Einen Vergleichswert gibt es ab dem zweiten Pull an Fellinex mit diesen Waffen.", "DE analysis.window.noRefPair");
   eq(de("analysis.window.bar", { p: "30\u00a0%", bp: de("analysis.ref.best"), q: "11\u00a0%" }),
     "30\u00a0% au\u00dferhalb \u00b7 bester Pull 11\u00a0%", "DE analysis.window.bar");
   eq(de("analysis.call.window.note", { dmg: "1.57M", pct: "19\u00a0%", p: "30\u00a0%", out: "45.5k", in: "81.2k" }),
-    "Etwa 1.57M Schaden, 19\u00a0% des Kampfes: 30\u00a0% davon lag au\u00dferhalb, und dort traf es mit 45.5k statt 81.2k.",
-    "DE analysis.call.window.note");
+    "Etwa 1.57M Schaden, 19\u00a0% des Kampfes, gerechnet, als l\u00e4ge alles im Fenster: 30\u00a0% davon lag au\u00dferhalb, und dort traf es mit 45.5k statt 81.2k.",
+    "DE analysis.call.window.note: ohne Bezug sagt der Satz, wogegen er rechnet (#108)");
+  eq([de("analysis.call.window.noteRef", { dmg: "680k", pct: "8\u00a0%", p: "30\u00a0%", q: "17\u00a0%", out: "45.5k", in: "81.2k" }),
+      de("analysis.call.window.noteRef", { dmg: "680k", pct: "8\u00a0%", p: "30\u00a0%", q: "17\u00a0%", out: "45.5k", in: "81.2k", zweit: true }),
+      en("analysis.call.window.noteRef", { dmg: "680k", pct: "8%", p: "30%", q: "17%", out: "45.5k", in: "81.2k" })],
+    ["Etwa 680k Schaden, 8\u00a0% des Kampfes, gerechnet gegen deinen besten Pull: 30\u00a0% davon lag au\u00dferhalb, dort nur 17\u00a0%. Au\u00dferhalb traf es mit 45.5k statt 81.2k.",
+     "Etwa 680k Schaden, 8\u00a0% des Kampfes, gerechnet gegen deinen zweitbesten Pull: 30\u00a0% davon lag au\u00dferhalb, dort nur 17\u00a0%. Au\u00dferhalb traf es mit 45.5k statt 81.2k.",
+     "About 680k damage, 8% of the fight, counted against your best pull: 30% of it landed outside, there only 17%. Outside it hit for 45.5k instead of 81.2k."],
+    "analysis.call.window.noteRef: mit Bezug nennt der Satz ihn und seinen Anteil (#108)");
   eq([de("analysis.start.weaker", { p: "18\u00a0%" }), de("analysis.start.weakerSecond", { p: "18\u00a0%" })],
     ["Dein Start war deutlich schw\u00e4cher: 18\u00a0% deines besten Pulls.",
      "Dein Start war deutlich schw\u00e4cher: 18\u00a0% deines zweitbesten Pulls."], "DE Start: bester und zweitbester");
@@ -284,6 +309,33 @@ const tr = (lang) => (key, vars) => {
   eq(core.luecken([0, 0, 0, 10, 0, 0, 0, 0, 30, 20, 0, 0, 0, 0, 0]).median, 20, "luecken: Median der Sekunden mit Treffern");
   eq(core.jeMinute(30, 60, 10), { mit: 30, ohne: 36 }, "jeMinute: mit und ohne die Luecken");
   eq(core.jeMinute(30, 60, 60), { mit: 30, ohne: null }, "jeMinute: ohne Zeit ausserhalb der Luecken keine Rate");
+}
+
+/* Issue #105: die schwaechste Stelle zaehlt erst unter dem halben Median
+   (Entscheidung vom 04.10.2026) - im Eintrag wie im Urteil. Die Faelle aus der
+   Kritik: 84.8k bei einem Median von 84.8k, 51.7k bei 45.0k. */
+{
+  eq(core.SCHWACH_ANTEIL, 0.5, "schwacheStelle: Grenze 50 %");
+  eq([core.schwacheStelle(84800, 84800), core.schwacheStelle(51700, 45000)], [false, false],
+    "schwacheStelle: auf oder ueber dem Median keine schwache Stelle");
+  eq([core.schwacheStelle(30000, 45000), core.schwacheStelle(22500, 45000), core.schwacheStelle(22000, 45000)], [false, false, true],
+    "schwacheStelle: erst unter dem halben Median");
+  eq([core.schwacheStelle(0, 0), core.schwacheStelle(10, 0)], [false, false], "schwacheStelle: ohne Median nie");
+}
+
+/* Issue #106: der Haelftenvergleich erst ab dem 1,15-fachen - "dem
+   1,0-fachen der ersten" ist keine Aussage. */
+{
+  const gleich = Array.from({ length: 60 }, () => 1000);
+  eq(core.HAELFTE_AB, 1.15, "haelften: Grenze 1,15");
+  eq(core.haelften(gleich), null, "haelften: 1,0-fach - kein Satz");
+  eq(core.haelften([...Array(30).fill(1000), ...Array(30).fill(1140)]), null, "haelften: 1,14-fach - kein Satz");
+  eq(core.haelften([...Array(30).fill(1000), ...Array(30).fill(1200)]), { erste: 1000, zweite: 1200, x: 1.2, staerker: "zweite" },
+    "haelften: 1,2-fach - die zweite ist staerker");
+  eq(core.haelften([...Array(30).fill(1500), ...Array(30).fill(1000)]), { erste: 1500, zweite: 1000, x: 1.5, staerker: "erste" },
+    "haelften: die erste ist staerker");
+  eq(core.haelften([...Array(31).fill(1000), ...Array(30).fill(2000)]).erste, 1000, "haelften: ungerade Zahl - die erste Haelfte ist die kleinere");
+  eq([core.haelften([]), core.haelften([0, 0, 0, 5000]), core.haelften([5000])], [null, null, null], "haelften: eine leere Haelfte - kein Satz");
 }
 
 /* aus test-trainer-core.mjs, Neugestaltung 28.09.: der Trainer entfaellt

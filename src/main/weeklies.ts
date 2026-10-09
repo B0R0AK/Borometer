@@ -53,11 +53,23 @@ const NAME_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,24}$/u;
 /** the name of an own or a renamed point */
 const TEXT_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,60}$/u;
 const TAKTE = ["woche", "tag"];
-const FILE_KEYS = ["v", "profile"];
-const PROFILE_KEYS = ["id", "name", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche"];
+const FILE_KEYS = ["v", "profile", "erinnerungen"];
+const PROFILE_KEYS = ["id", "name", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];
 const OWN_KEYS = ["schluessel", "name", "menge", "takt", "geloest"];
 const COUNTER_KEYS = ["stand", "seit"];
 const LAST_WEEK_KEYS = ["reset", "zaehler"];
+/** reminders: at most 12 not detached, 40 in all (the detached ones stay in the file) */
+const MAX_REMINDERS_ACTIVE = 12;
+const MAX_REMINDERS = 40;
+/** collapse choices per character: one per area of the page */
+const MAX_ZU = 20;
+/** a reminder's id, made by the page: "e" and nine lower-case letters or digits */
+const REMINDER_ID_RX = /^e[0-9a-z]{9}$/;
+const TIME_RX = /^([01]\d|2[0-3]):[0-5]\d$/;
+/** the text of a reminder, at most 120 characters, no control, format or line separator characters */
+const REMINDER_TEXT_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,120}$/u;
+const REMINDER_KEYS = ["id", "an", "tage", "zeit", "text", "nurOffen", "geloest"];
+const ZU_KEYS = ["zu", "bei"];
 
 export type Takt = "woche" | "tag";
 export interface Counter { stand: number; seit: number }
@@ -68,8 +80,11 @@ export interface Profile {
   aus: string[]; namen: Record<string, string>;
   eigene: OwnPoint[];
   vorwoche?: { reset: number; zaehler: Record<string, Counter> };
+  zu?: Record<string, ZuWahl>;
 }
-export interface WeekliesFile { v: 1; profile: Profile[] }
+export interface ZuWahl { zu: boolean; bei: boolean }
+export interface Reminder { id: string; an: boolean; tage: number[]; zeit: string; text: string; nurOffen: boolean; geloest?: boolean }
+export interface WeekliesFile { v: 1; profile: Profile[]; erinnerungen?: Reminder[] }
 
 const isRec = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const only = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).every((k) => keys.includes(k));
@@ -90,6 +105,40 @@ function countersOf(x: unknown): Record<string, Counter> | null {
     out[k] = { stand: z.stand, seit: z.seit };
   }
   return out;
+}
+
+/** The collapse choices {key: {zu, bei}}, rebuilt; null when anything is off. */
+function zuOf(x: unknown): Record<string, ZuWahl> | null {
+  if (!isRec(x) || Object.keys(x).length > MAX_ZU) return null;
+  const out: Record<string, ZuWahl> = {};
+  for (const [k, v] of Object.entries(x)) {
+    if (!keyOk(k) || !isRec(v) || !only(v, ZU_KEYS) || typeof v.zu !== "boolean" || typeof v.bei !== "boolean") return null;
+    out[k] = { zu: v.zu, bei: v.bei };
+  }
+  return out;
+}
+
+/** One reminder, rebuilt from the fields the schema names; null when anything is off. */
+function reminderOf(x: unknown): Reminder | null {
+  if (!isRec(x) || !only(x, REMINDER_KEYS)) return null;
+  if (typeof x.id !== "string" || !REMINDER_ID_RX.test(x.id) || typeof x.an !== "boolean" || typeof x.nurOffen !== "boolean" || !flagOk(x.geloest)) return null;
+  if (typeof x.zeit !== "string" || !TIME_RX.test(x.zeit) || !textOk(x.text, REMINDER_TEXT_RX)) return null;
+  const tage = x.tage;
+  if (!Array.isArray(tage) || tage.length < 1 || tage.length > 7 || !tage.every((d) => Number.isInteger(d) && d >= 0 && d <= 6) || new Set(tage).size !== tage.length) return null;
+  return { id: x.id, an: x.an, tage: [...(tage as number[])], zeit: x.zeit, text: x.text, nurOffen: x.nurOffen,
+    ...(x.geloest === undefined ? {} : { geloest: x.geloest as boolean }) };
+}
+
+/** The reminders, each rebuilt: at most 40, at most 12 not detached, no id twice; null when anything is off. */
+function remindersOf(x: unknown): Reminder[] | null {
+  if (!Array.isArray(x) || x.length > MAX_REMINDERS) return null;
+  const out: Reminder[] = [];
+  for (const e of x) {
+    const r = reminderOf(e);
+    if (!r || out.some((q) => q.id === r.id)) return null;
+    out.push(r);
+  }
+  return out.filter((r) => !r.geloest).length > MAX_REMINDERS_ACTIVE ? null : out;
 }
 
 /** One character, rebuilt from the fields the schema names; null when anything is off. */
@@ -118,6 +167,11 @@ function profileOf(x: unknown): Profile | null {
   }
   const p: Profile = { id: x.id, name: x.name, ...(x.geloest === undefined ? {} : { geloest: x.geloest as boolean }),
     zaehler, aus: [...aus], namen, eigene };
+  if (x.zu !== undefined) {
+    const zu = zuOf(x.zu);
+    if (!zu) return null;
+    p.zu = zu;
+  }
   if (x.vorwoche !== undefined) {
     const w = x.vorwoche;
     if (!isRec(w) || !only(w, LAST_WEEK_KEYS) || !timeOk(w.reset)) return null;
@@ -146,6 +200,10 @@ export function checkWeeklies(next: unknown, stored: WeekliesFile): WeekliesFile
     profile.push(p);
   }
   if (profile.filter((p) => !p.geloest).length > MAX_ACTIVE) return null;
+  const erinnerungen = next.erinnerungen === undefined ? undefined : remindersOf(next.erinnerungen);
+  if (erinnerungen === null) return null;
+  // a stored reminder may be detached, never left out (never deleted for good)
+  if (!(stored.erinnerungen ?? []).every((old) => (erinnerungen ?? []).some((r) => r.id === old.id))) return null;
   for (const old of stored.profile) {
     const p = profile.find((q) => q.id === old.id);
     if (!p) return null;
@@ -159,7 +217,7 @@ export function checkWeeklies(next: unknown, stored: WeekliesFile): WeekliesFile
       if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null;
     }
   }
-  return { v: 1, profile };
+  return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }) };
 }
 
 /*

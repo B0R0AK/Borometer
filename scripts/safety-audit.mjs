@@ -332,9 +332,8 @@ function auditMain() {
     "config.ts": ["target", 'CONFIG_PATH + ".tmp"'],
     "server.ts": ["target"],
     "best.ts": ["BEST_PATH", 'BEST_PATH + ".tmp"'],
-    "builds.ts": ["BUILDS_PATH", 'BUILDS_PATH + ".tmp"'],
-    "plans.ts": ["PLANS_PATH", 'PLANS_PATH + ".tmp"'],
     "weeklies.ts": ["WEEKLIES_PATH", 'WEEKLIES_PATH + ".tmp"'],
+    "gilde.ts": ["GILDE_PATH", 'GILDE_PATH + ".tmp"'],
   };
   const bad = [];
   for (const [file, src] of Object.entries(code)) {
@@ -374,9 +373,8 @@ function auditMain() {
   // one descriptor there is comes from the openSync on the log below
   const allowedReads = {
     "best.ts": ['fs.readFileSync(BEST_PATH, "utf8")'],
-    "builds.ts": ['fs.readFileSync(BUILDS_PATH, "utf8")'],
-    "plans.ts": ['fs.readFileSync(PLANS_PATH, "utf8")'],
     "weeklies.ts": ['fs.readFileSync(WEEKLIES_PATH, "utf8")'],
+    "gilde.ts": ['fs.readFileSync(GILDE_PATH, "utf8")'],
     "config.ts": ["fs.existsSync(target)", "fs.statSync(legacy)", 'fs.readFileSync(legacy, "utf8")',
       'fs.readFileSync(CONFIG_PATH, "utf8")'],
     // readdirSync(folder) and lstatSync(full) are listLogs(), the one listing
@@ -469,7 +467,7 @@ function auditMain() {
   // except CONFIG_PATH shown as text; no path is climbed up from with dirname
   // or ".."; process.env only by name, and only these names.
   const settingsStray = [];
-  const STORE_FILES = ["best.ts", "builds.ts", "plans.ts", "weeklies.ts", "config.ts"];
+  const STORE_FILES = ["best.ts", "weeklies.ts", "gilde.ts", "config.ts"];
   for (const f of files) {
     if (f === "paths.ts") continue;
     const sp = counts(f, /\bsettingsPath\b/g);
@@ -477,7 +475,7 @@ function auditMain() {
     const sd = counts(f, /\bSETTINGS_DIR\b/g);
     if (sd !== (f === "main.ts" ? 2 : 0)) settingsStray.push(`${f}: SETTINGS_DIR ${sd}x`);
     if (/\bgetPath\b/.test(bare[f])) settingsStray.push(`${f}: getPath`);
-    for (const [name, owner] of [["BEST_PATH", "best.ts"], ["BUILDS_PATH", "builds.ts"], ["PLANS_PATH", "plans.ts"], ["WEEKLIES_PATH", "weeklies.ts"]]) {
+    for (const [name, owner] of [["BEST_PATH", "best.ts"], ["WEEKLIES_PATH", "weeklies.ts"], ["GILDE_PATH", "gilde.ts"]]) {
       if (f !== owner && new RegExp(`\\b${name}\\b`).test(bare[f])) settingsStray.push(`${f}: ${name}`);
     }
   }
@@ -510,7 +508,7 @@ function auditMain() {
 
   // a store's file name is written out once, in its declaration - and no
   // file in main holds a piece of one ("boro-week" + "lies.json")
-  const STORE_NAMES = { "best.ts": 1, "builds.ts": 1, "plans.ts": 1, "weeklies.ts": 1, "config.ts": 2, "paths.ts": 1 };
+  const STORE_NAMES = { "best.ts": 1, "weeklies.ts": 1, "gilde.ts": 1, "config.ts": 2, "paths.ts": 1 };
   const nameStray = files
     .map((f) => [f, [...code[f].matchAll(/boro-/gi)].length])
     .filter(([f, k]) => k !== (STORE_NAMES[f] ?? 0))
@@ -747,6 +745,7 @@ function auditMain() {
   check(/^\s*const found = newestLog\(STATE\.dir\);/.test(latestCase)
       && latestCalls.join() === "latestAnswer,readLog"
       && latestCase.includes('const { status, body } = latestAnswer(found, q.get("file"), q.get("from"));')
+      && latestCase.includes('if (status === 200 && "to" in body) leseFortschritt(currentWindow(), body.to, body.size);')
       && latestCase.includes("text(res, readLog(found));")
       && !/\bfs\b|openSync|readFileSync|createReadStream|\bpath\./.test(latestCase)
       && foundTotal === foundAllowed && answerFoundTotal === answerFoundAllowed
@@ -775,7 +774,7 @@ function auditMain() {
     + "if (!piece) return { status: 409, body: { ok: false, error: \"the log is shorter than that\" } }; return { status: 200, body: piece };";
   const LOGS_CASE = "const files = listLogs(STATE.dir).map((f) => ({ name: f.name, size: f.size, mtime: f.mtime })); "
     + "return reply(res, { ok: true, files });";
-  const LOG_CASE = "try { const { status, body } = logAnswer(STATE.dir, q.get(\"name\"), q.get(\"from\")); return reply(res, body, status); } "
+  const LOG_CASE = "try { const { status, body } = logAnswer(STATE.dir, q.get(\"name\"), q.get(\"from\")); if (status === 200 && \"to\" in body) leseFortschritt(currentWindow(), body.to, body.size); return reply(res, body, status); } "
     + "catch { return text(res, \"\", 500); }";
   const tageStray = [];
   const listBodyLogs = bodyOf(logs, "export function listLogs(folder: string): FoundLog[] {");
@@ -801,13 +800,29 @@ function auditMain() {
   if (caseBody("/api/logs") !== LOGS_CASE) tageStray.push(`case /api/logs is now: ${caseBody("/api/logs")}`);
   if (caseBody("/api/log") !== LOG_CASE) tageStray.push(`case /api/log is now: ${caseBody("/api/log")}`);
   if (/"\/api\/logs?"/.test(tagePost)) tageStray.push("the POST path names /api/log or /api/logs");
-  if (counts("server.ts", /\blistLogs\b/g) !== 2 || counts("server.ts", /\blogAnswer\b/g) !== 2) tageStray.push("server.ts calls listLogs or logAnswer elsewhere");
+  if (counts("server.ts", /\blistLogs\b/g) !== 3 || counts("server.ts", /\blogAnswer\b/g) !== 2) tageStray.push("server.ts calls listLogs or logAnswer elsewhere");
   for (const c of callsOf("server.ts", /\b(newestLog|listLogs|logAnswer)\s*\(/g)) {
     if (!/^STATE\.dir(,|$)/.test(c.args ?? "")) tageStray.push(`server.ts: ${c.name}(${c.args})`);
   }
   check(!tageStray.length,
     "/api/logs and /api/log only list and read the logs of the watched folder: the name is compared with a fresh listing, never opened; GET only",
     `found: ${tageStray.join(" | ")}`);
+
+  // "recently read" (spec Windows-Einbindung 5): the one POST that keeps a log's name. Pinned word for
+  // word: only name is read, it must equal the name of an entry of a fresh listing, and what is kept is
+  // that entry's name under zuletztGelesen - once. It exists only in the POST handler.
+  const GELESEN_CASE = "const name = String(sent.name ?? \"\"); const entry = listLogs(STATE.dir).find((f) => f.name === name); "
+    + "if (!entry) return reply(res, { ok: false }, 404); "
+    + "updateConfig({ zuletztGelesen: zuletztNeu(loadConfig().zuletztGelesen, entry.name) }); jumpListBauen(); return reply(res, { ok: true });";
+  const gelesenIn = (handler) => (handler.match(/\n    case "\/api\/gelesen": \{([\s\S]*?)\n    \}\n/) || [null, null])[1];
+  const gelesenPost = gelesenIn(tagePost);
+  const gelesenStray = [];
+  if (gelesenPost === null || gelesenPost === undefined || norm(gelesenPost) !== GELESEN_CASE) gelesenStray.push(`case /api/gelesen is now: ${gelesenPost == null ? null : norm(gelesenPost)}`);
+  if ([...srvCode.matchAll(/\/api\/gelesen/g)].length !== 1) gelesenStray.push(`/api/gelesen named ${[...srvCode.matchAll(/\/api\/gelesen/g)].length}x in server.ts`);
+  if (counts("server.ts", /\bzuletztGelesen\b/g) !== 2) gelesenStray.push(`zuletztGelesen ${counts("server.ts", /\bzuletztGelesen\b/g)}x in server.ts`);
+  check(!gelesenStray.length,
+    "/api/gelesen keeps only the name of a listed log under zuletztGelesen, and only in the POST path",
+    `found: ${gelesenStray.join(" | ")}`);
 
   // --- 2d. Ein Log wird nur als Eintrag der Auflistung gelesen (Pruefung N3,
   //         W1; die Luecke bestand fuer 2b schon vorher): 2b und 2c halten
@@ -956,7 +971,8 @@ function auditMain() {
   if (getBody !== null && postBody !== null) {
     const stateful = ["updateConfig(", "STATE.dir =", "fetchJson(", "/api/dir", "/api/party/check", "/api/party/curve",
       "writeFileSync(", "shell.", "putBest(", "saveBest(", "putBuild(", "saveBuilds(",
-      "putWeeklies(", "saveWeeklies(", "createWeeklies(", "checkUpdate(", "setUpdate("].filter((w) => getBody.includes(w));
+      "putWeeklies(", "saveWeeklies(", "createWeeklies(", "putGilde(", "saveGilde(", "createGilde(",
+      "checkUpdate(", "setUpdate("].filter((w) => getBody.includes(w));
     check(!stateful.length, "no GET route changes state or reaches out (dir, settings, party server)", `found: ${stateful}`);
     check(['case "/api/dir":', 'case "/api/party/check":', 'case "/api/party/curve":'].every((c) => postBody.includes(c)),
       "/api/dir, party/check and party/curve are handled in the POST path");
@@ -1162,16 +1178,15 @@ function auditMain() {
     const stray = onlyNamedFields(chrome, ["theme", "height"]);
     check(!stray.length, "chrome reads only the theme name and header height from the request", `found: ${stray}`);
   }
-  // compact's Acrylic: the material of our own window, two literal values
+  // compact's Acrylic and full view's Mica: the material of our own window,
+  // set only through materialSetzen() with a yes/no and a theme name
   const material = block("material");
   if (material !== null) {
     const calls = [...material.matchAll(/\.(\w+)\(/g)].map((m) => m[1]);
-    check(calls.every((c) => ["setBackgroundMaterial", "setTitleBarOverlay"].includes(c)),
-      "material only sets the window's own material and frame buttons", `calls: ${calls}`);
-    // exactly one call, so a second one with a page value cannot slip in beside the literal one
-    check(calls.filter((c) => c === "setBackgroundMaterial").length === 1
-        && /setBackgroundMaterial\(acrylic \? "acrylic" : "none"\)/.test(material),
-      "material takes one of two literal values, never one from the page");
+    check(calls.every((c) => ["setTitleBarOverlay"].includes(c)),
+      "material only sets the frame's buttons itself; the material goes through materialSetzen()", `calls: ${calls}`);
+    check(/\n\s*const compact = sent\.kind === "acrylic";\n/.test(material) && /\n\s*materialSetzen\(win, compact, sent\.theme\);\n/.test(material),
+      "material takes compact as a comparison with one literal and the material from materialSetzen(), never a value from the page");
     // the buttons are either hidden (a literal) or the theme's from chrome.ts
     const args = overlayArgs(material);
     check(args.length >= 1 && args.every((a) => a === PAGE_OVERLAY || a === HIDDEN_OVERLAY),
@@ -1206,9 +1221,24 @@ function auditMain() {
     "the remembered header height is only stored from the request and passed through overlayFor()",
     `found: ${headerUses.filter((u) => !headerOk(u)).join(" | ")}`);
 
+  // the jump list (spec Windows-Einbindung 5): one file, this exe, fixed arguments
+  const jumpers = Object.keys(code).filter((f) => f !== "jumplist.ts" && /\bsetJumpList\b/.test(code[f]));
+  check(!jumpers.length && /\bapp\.setJumpList\(/.test(code["jumplist.ts"] ?? ""), "setJumpList only in jumplist.ts", `found in: ${jumpers}`);
+  const JUMP_IFACE = "export interface JumpEintrag { title: string; args: string; description: string }";
+  const wc = code["windows-core.ts"] ?? "";
+  const jumpArgs = [...wc.replace(JUMP_IFACE, "").matchAll(/\bargs: ([^,}]+)/g)].map((m) => m[1].trim());
+  check(wc.includes(JUMP_IFACE) && JSON.stringify(jumpArgs) === JSON.stringify(['"--kompakt"', '"--live"', '"--logordner"', "logArg(n)"])
+      && /^  return "\\"--log=" \+ name \+ "\\"";$/m.test(wc),
+    "jump-list arguments come only from the fixed list", `found: ${jumpArgs.join(" | ")}`);
+  const jl = code["jumplist.ts"] ?? "";
+  check([...jl.matchAll(/\bprogram:/g)].length === 1 && /\bprogram: process\.execPath,/.test(jl)
+      && [...jl.matchAll(/\bargs:/g)].length === 1 && /\bargs: i\.args,/.test(jl)
+      && [...jl.matchAll(/\biconPath:/g)].length === 1 && /\biconPath: process\.execPath,/.test(jl),
+    "a jump-list entry starts only this exe", "");
+
   // the taskbar: one file, our own window, two buttons
   const taskbarUsers = Object.entries(code)
-    .filter(([f, src]) => f !== "taskbar.ts" && /setOverlayIcon|setThumbarButtons/.test(src)).map(([f]) => f);
+    .filter(([f, src]) => f !== "taskbar.ts" && /setOverlayIcon|setThumbarButtons|setProgressBar/.test(src)).map(([f]) => f);
   check(!taskbarUsers.length, "only taskbar.ts touches the taskbar", `found in: ${taskbarUsers}`);
   const tb = code["taskbar.ts"];
   if (tb !== undefined) {
@@ -1217,6 +1247,10 @@ function auditMain() {
     const buttons = (tb.match(/setThumbarButtons\(\[([\s\S]*?)\]\)/) || ["", ""])[1].match(/\bclick\s*:/g) || [];
     check(buttons.length === 2, "the preview carries exactly two buttons", `found: ${buttons.length}`);
     check(!/exec|spawn|shell\./.test(tb), "a taskbar button runs nothing, it only raises an event");
+    // the progress bar (spec Windows-Einbindung 6): one value from fortschritt(), or -1 from the timer
+    const bars = [...tb.matchAll(/\.setProgressBar\(([^)]*)\)/g)].map((m) => m[1].trim());
+    check(bars.length === 2 && bars[0] === "wert" && bars[1] === "-1" && /const wert = fortschritt\(to, size, balken\.an\);/.test(tb),
+      "the progress bar is set only to fortschritt()'s value", `found: ${bars.join(" | ")}`);
   }
   const live = block("live");
   if (live !== null) {
@@ -1284,10 +1318,10 @@ function auditMain() {
     `setAccentColor(${accent.join(") | (")})`);
   const borderTable = chromeSrc.match(/const BORDER: Record<string, string> = \{([^}]*)\};/);
   const borderRows = borderTable ? borderTable[1].split(",").map((r) => r.trim()).filter(Boolean) : [];
-  check(borderRows.length === 3
-      && borderRows.every((r, i) => new RegExp(`^${["dark", "light", "tnl"][i]}: "#[0-9a-f]{6}"$`).test(r))
+  check(borderRows.length === 4
+      && borderRows.every((r, i) => new RegExp(`^${["dark", "light", "tnl", "glas"][i]}: "#[0-9a-f]{6}"$`).test(r))
       && [...chromeSrc.matchAll(/\bBORDER\b/g)].length === 3,
-    "border colours are fixed and opaque: one #rrggbb each for dark, light and tnl, read only by borderFor()",
+    "border colours are fixed and opaque: one #rrggbb each for dark, light, tnl and glas, read only by borderFor()",
     `found: ${borderRows.join(" | ") || "no BORDER table"}`);
   const borderBody = fnBody(chromeSrc, "export function borderFor\\(theme: unknown\\): string");
   check(borderBody === '\n  const key = typeof theme === "string" && Object.hasOwn(BORDER, theme) ? theme : "dark";\n  return BORDER[key]!;',
@@ -1303,14 +1337,36 @@ function auditMain() {
   const inTheme = fnBody(win, "function borderInTheme\\(win: BrowserWindow, theme: unknown\\): void");
   check(inTheme === '\n  if (process.platform === "win32") win.setAccentColor(borderFor(theme));\n  nativeTheme.themeSource = themeSourceFor(theme, loadConfig().theme);',
     "borderInTheme() sets the border and themeSource and nothing else");
-  // 3.3: das Material nur als eines von zwei Woertern, nativeTheme nur hier
+  // 3.3 / Rauchglas 3.4: das Material an genau einer Stelle, nur aus materialFor()
   const materials = Object.entries(code).flatMap(([f, src]) => argsOf(src, "setBackgroundMaterial").map((a) => `${f}: ${a}`));
-  check(materials.length > 0 && materials.every((m) => m === 'window.ts: "none"' || m === 'window.ts: acrylic ? "acrylic" : "none"'),
-    "setBackgroundMaterial takes only \"none\" or acrylic ? \"acrylic\" : \"none\", and only in window.ts",
+  const SETZEN = "\nfunction materialSetzen(win: BrowserWindow, compact: boolean, theme: unknown): void {\n  if (acrylicSupported()) win.setBackgroundMaterial(materialFor(compact, nativeTheme.prefersReducedTransparency, theme));\n}";
+  check(materials.length === 1 && materials[0] === "window.ts: materialFor(compact, nativeTheme.prefersReducedTransparency, theme)"
+      && win.split(SETZEN).length === 2,
+    "setBackgroundMaterial is called once, in materialSetzen() in window.ts, with materialFor() from chrome.ts",
     `setBackgroundMaterial(${materials.join(") | (")})`);
-  const materialBody = fnBody(chromeSrc, 'export function materialFor\\(compact: boolean, reducedTransparency: boolean\\): "acrylic" \\| "none"');
-  check(materialBody === '\n  return compact && !reducedTransparency ? "acrylic" : "none";',
-    "materialFor() returns only \"acrylic\" or \"none\"");
+  const setzen = argsOf(win, "materialSetzen")
+    .filter((a) => a !== "win: BrowserWindow, compact: boolean, theme: unknown");
+  check(setzen.length > 0 && setzen.every((a) => /^(win|kw), (true|false|compact|state\.compact), (sent\.theme|cfg\.themeResolved|loadConfig\(\)\.themeResolved)$/.test(a)),
+    "materialSetzen() gets a window, a yes/no for compact and a theme name - nothing else from a request",
+    `materialSetzen(${setzen.join(") | (")})`);
+  // #189: full view's glass ground is Acrylic, Mica is gone - materialFor()
+  // knows two materials, and only compact or the theme glas gets Acrylic
+  const materialBody = fnBody(chromeSrc, 'export function materialFor\\(compact: boolean, reducedTransparency: boolean, theme: unknown\\): "acrylic" \\| "none"');
+  check(materialBody === '\n  if (reducedTransparency) return "none";\n  if (compact) return "acrylic";\n  return theme === "glas" ? "acrylic" : "none";',
+    "materialFor() returns only \"acrylic\" or \"none\", and full view's Acrylic only for the theme glas");
+  const micaWords = Object.entries(code).flatMap(([f, src]) => [...src.matchAll(/["'`]mica["'`]/g)].map(() => f));
+  check(micaWords.length === 0,
+    "the material mica is named nowhere in the main process (#189)", `found in: ${micaWords.join(", ")}`);
+  const micaNowBody = fnBody(win, "export function micaNow\\(\\): boolean");
+  check(micaNowBody === '\n  return acrylicSupported() && !state.compact\n    && materialFor(false, nativeTheme.prefersReducedTransparency, loadConfig().themeResolved) === "acrylic";',
+    "micaNow() asks materialFor() and nothing else");
+  const grundBody = fnBody(win, 'export function micaGrund\\(\\): "system" \\| "aus" \\| null');
+  check(grundBody === '\n  if (!acrylicSupported()) return "system";\n  return nativeTheme.prefersReducedTransparency ? "aus" : null;',
+    "micaGrund() returns only \"system\", \"aus\" or null");
+  const stateSrv = code["server.ts"] ?? "";
+  check(/\n\s*mica: currentWindow\(\) !== null && micaNow\(\),\n\s*micaGrund: currentWindow\(\) !== null \? micaGrund\(\) : null,\n/.test(stateSrv)
+      && [...stateSrv.matchAll(/\bmica(Grund)?:/g)].length === 2,
+    "GET /api/state reports mica only as micaNow() and its reason only as micaGrund(), for the app's own window");
   const themeUses = Object.entries(bare).flatMap(([f, src]) =>
     [...src.matchAll(/\bnativeTheme\b(\s*\.\s*(\w+))?/g)].map((m) => ({ f, member: m[2] ?? "" })));
   const themeOk = themeUses.every(({ f, member }) => f === "window.ts" && ["", "prefersReducedTransparency", "on", "themeSource"].includes(member))
@@ -1346,8 +1402,8 @@ function auditMain() {
   // genauer: jeder Schluessel der Liste, der auf "Gesehen" endet, steht in
   // BOOLEAN_KEYS - ein neuer Hinweis kann nicht still beliebige Werte tragen.
   check(configPost.includes('for (const key of CONFIG_KEYS) {\n        if (key in sent && (!BOOLEAN_KEYS.includes(key) || typeof sent[key] === "boolean")) changes[key] = sent[key];\n      }')
-      && /^const BOOLEAN_KEYS = \["randlosGesehen", "rundgangGesehen", "updatePruefen"\];$/m.test(code["server.ts"] ?? ""),
-    "POST /api/config takes a true/false key (randlosGesehen, rundgangGesehen, updatePruefen) only as true or false");
+      && /^const BOOLEAN_KEYS = \["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung"\];$/m.test(code["server.ts"] ?? ""),
+    "POST /api/config takes a true/false key (randlosGesehen, rundgangGesehen, updatePruefen, meldenKampf, meldenNurBest, trayBeimSchliessen, gildeErinnerung) only as true or false");
   const booleanKeys = ((code["server.ts"] ?? "").match(/^const BOOLEAN_KEYS = \[([^\]]*)\];$/m) || [null, ""])[1]
     .split(",").map((k) => k.trim()).filter(Boolean);
   // Pruefung Rundgang G3: auch "Seen" und in jeder Schreibweise (gesehen, SEEN)
@@ -1395,22 +1451,27 @@ function auditMain() {
   check(!wcStray.length,
     "webContents is used only as win.webContents or kw.webContents in window.ts, with the listed members and the listed events",
     `found: ${wcStray.join(" | ")}`);
-  const APP_EVENTS = new Set(["will-quit", "activate", "window-all-closed", "second-instance"]);
+  const APP_EVENTS = new Set(["will-quit", "activate", "window-all-closed", "second-instance", "before-quit"]);
   const appStray = [];
+  const quitListeners = [];
   for (const f of files) {
     for (const m of bare[f].matchAll(/\bapp\s*\.\s*(on|once|addListener|prependListener|prependOnceListener)\s*\(/g)) {
       const event = (code[f].slice(m.index).match(/^app\.(?:on|once)\("([^"\n]*)",/) || [null, null])[1];
       if (!APP_EVENTS.has(event)) appStray.push(`${f}: ${norm(code[f].slice(m.index, m.index + 48))}`);
+      // before-quit: exactly one listener, the one line in main.ts that lets the window close for good
+      if (event === "before-quit") quitListeners.push(f === "main.ts" && code[f].slice(m.index).startsWith('app.on("before-quit", beendenErlauben);') ? "ok" : `${f}: ${norm(code[f].slice(m.index, m.index + 60))}`);
     }
   }
-  check(!appStray.length, "app listens only to its listed events (will-quit, activate, window-all-closed, second-instance)",
+  if (quitListeners.length !== 1 || quitListeners[0] !== "ok") appStray.push(`before-quit listeners: ${quitListeners.join(" | ") || "none"}`);
+  check(!appStray.length, "app listens only to its listed events (will-quit, activate, window-all-closed, second-instance, before-quit)",
     `found: ${appStray.join(" | ")}`);
   const PIN = "const want = !!sent.on; win.setAlwaysOnTop(want); updateConfig({ stayOnTop: want && sent.remember !== false && win === state.win }); "
     + "return ok({ on_top: want }); }";
   const SEE = "let alpha = Number(sent.alpha); if (!isFinite(alpha)) alpha = 1; alpha = Math.max(0.35, Math.min(1, alpha)); if "
     + "(process.platform !== \"win32\" && process.platform !== \"darwin\") { return fail(\"this window cannot fade\"); } "
     + "win.setOpacity(alpha); updateConfig({ compactAlpha: alpha }); return ok({ alpha }); }";
-  const onTop = files.flatMap((f) => [...code[f].matchAll(/alwaysOnTop/gi)].map(() => f));
+  // the tray may only read it (isAlwaysOnTop() for its tick), once
+  const onTop = files.flatMap((f) => [...(f === "tray.ts" ? code[f].replace(/\?\.isAlwaysOnTop\(\)/, "") : code[f]).matchAll(/alwaysOnTop/gi)].map(() => f));
   check(win.split('case "pin":').length === 2 && norm(pin ?? "").replace(/^\{ /, "") === PIN
       && onTop.join() === "window.ts,window.ts" && win.split("win.setAlwaysOnTop(want);").length === 2
       && /\n  const kw = new BrowserWindow\(\{\n(?:    [^\n]*\n)*?    alwaysOnTop: true,\n/.test(win),
@@ -1421,6 +1482,21 @@ function auditMain() {
       && opacity.join() === "window.ts" && win.split("win.setOpacity(alpha);").length === 2,
     "the window's opacity is set only in see-through: one call, win.setOpacity(alpha), in the one see-through case as written",
     `seethrough: ${norm(see ?? "")}; opacity in: ${opacity.join(", ")}`);
+
+  // --- 8c. Kompakt-Fenster (04.10.2026): der Durchklick Wort fuer Wort wie
+  //         Pin und Durchsicht. setIgnoreMouseEvents steht dreimal, alle in
+  //         window.ts: im Fall clickthrough, und je einmal mit false, wenn
+  //         ein Fenster neu laedt (es nimmt die Maus dann wieder an).
+  const THROUGH = "const want = !!sent.on; win.setIgnoreMouseEvents(want, want ? { forward: true } : undefined); "
+    + "if (win === state.win) state.through = want; else kompakt.through = want; return ok({ clickthrough: want }); }";
+  const throughBlock = block("clickthrough");
+  const ignores = files.flatMap((f) => [...code[f].matchAll(/setIgnoreMouseEvents/g)].map(() => f));
+  check(throughBlock !== null && norm(throughBlock).replace(/^\{ /, "") === THROUGH
+      && ignores.join() === "window.ts,window.ts,window.ts"
+      && win.split("\n      win.setIgnoreMouseEvents(false);\n").length === 2
+      && win.split("\n      kw.setIgnoreMouseEvents(false);\n").length === 2,
+    "click-through is set only in its case, as written; elsewhere only reset to false on reload",
+    `clickthrough: ${norm(throughBlock ?? "")}; setIgnoreMouseEvents in: ${ignores.join(", ")}`);
 
   // no handle to any window but our own is ever taken
   check(!/getNativeWindowHandle|FindWindow/.test(all), "no native window handles are taken");
@@ -1456,7 +1532,7 @@ function auditMain() {
     }
     return src.slice(from, i + 1);
   };
-  const SEITE_DEF = "const SEITE = Object.freeze({ nodeIntegration: false, contextIsolation: true, sandbox: true, spellcheck: false });";
+  const SEITE_DEF = "const SEITE = Object.freeze({ nodeIntegration: false, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: false });";
   const winOpts = [optionsOf(win, "const win = new BrowserWindow({"), optionsOf(win, "const kw = new BrowserWindow({")];
   const prefsIn = files.flatMap((f) => [...bare[f].matchAll(/\bwebPreferences\b/g)].map(() => f));
   check(win.split(SEITE_DEF).length === 2 && [...winBare.matchAll(/\bSEITE\b/g)].length === 3
@@ -1473,15 +1549,16 @@ function auditMain() {
   check(JSON.stringify(loads) === JSON.stringify(["window.ts: loadURL(url)", "window.ts: loadURL(`${seite.origin}/?win=1&kompakt=1`)"])
       && /\n  const port = await startServer\(pagePath\(\)\);\n  const url = `http:\/\/127\.0\.0\.1:\$\{port\}\/`;\n/.test(mainTs)
       && /\n  const winUrl = `\$\{url\}\?win=1`;\n/.test(mainTs)
-      && createCalls.length === 2 && createCalls.every((c) => c === "winUrl, icon")
-      && /\nexport function createWindow\(url: string, iconPath: string\): BrowserWindow \{\n/.test(win)
+      && JSON.stringify(createCalls) === JSON.stringify(["winUrl, icon, startArt", "winUrl, icon"])
+      && mainTs.includes('\n  const startArt = ERSTER_START.autostart ? (loadConfig().trayBeimSchliessen === true ? "verborgen" : "minimiert") : "normal";\n')
+      && /\nexport function createWindow\(url: string, iconPath: string, start: "normal" \| "minimiert" \| "verborgen" = "normal"\): BrowserWindow \{\n/.test(win)
       && originSets === 1 && /\n  const origin = new URL\(url\)\.origin;\n  seite\.origin = origin;\n/.test(win)
       && !files.some((f) => f !== "window.ts" && /\bseite\b/.test(bare[f])),
     "both windows load only the app's own page from 127.0.0.1 (full view ?win=1, the compact window ?win=1&kompakt=1)",
     `loads: ${loads.join(" | ")}; createWindow(${createCalls.join(") | (")}); seite.origin set ${originSets}x`);
   const eigene = fnBody(win, "function nurEigeneSeite\\(win: BrowserWindow, origin: string\\): void");
   const handlers = files.flatMap((f) => [...bare[f].matchAll(/\bsetWindowOpenHandler\b/g)].map(() => f));
-  const createBody = fnBody(win, "export function createWindow\\(url: string, iconPath: string\\): BrowserWindow");
+  const createBody = fnBody(win, "export function createWindow\\(url: string, iconPath: string, start: \"normal\" \\| \"minimiert\" \\| \"verborgen\" = \"normal\"\\): BrowserWindow");
   const openBody = fnBody(win, "function openKompakt\\(start: \\{ live: boolean; durch: boolean \\}\\): boolean");
   check(eigene !== null && handlers.length === 1 && handlers[0] === "window.ts"
       && /\n  win\.webContents\.setWindowOpenHandler\(\(\{ url: target \}\) => \{\n    if \(external\(target\)\) void shell\.openExternal\(target\);\n    return \{ action: "deny" \};\n  \}\);/.test(eigene)
@@ -1556,7 +1633,8 @@ function auditMain() {
   // Pruefung N4, M1: the page's origin - every line naming seite, as written
   const SEITE_LINES = ['const seite = { origin: "", icon: "" };', "seite.origin = origin;", "seite.icon = iconPath;",
     "if (!kompaktMoeglich() || !seite.origin) return false;", "icon: seite.icon,", "nurEigeneSeite(kw, seite.origin);",
-    "void kw.loadURL(`${seite.origin}/?win=1&kompakt=1`);"];
+    "void kw.loadURL(`${seite.origin}/?win=1&kompakt=1`);",
+    "const gezeigt = meldeKampf(currentWindow(), seite.icon, sent.titel, sent.satz, sent.best);"];
   const seiteLines = [...win.matchAll(/[^\n]*\bseite\b[^\n]*/g)].map((m) => m[0].trim());
   check(JSON.stringify(seiteLines) === JSON.stringify(SEITE_LINES),
     "the page's origin (seite) is set once from createWindow's url and used only where written",
@@ -1608,7 +1686,7 @@ function auditMain() {
   // "pfad" passed on beside the stand) is a change the audit sees
   const KOMPAKT_STAND = "\n  return { offen: kompaktWindow() !== null, live: kompakt.start.live, durch: kompakt.start.durch,\n"
     + "    grund: vollStand.grund, datei: vollStand.datei, kampf: vollStand.kampf };";
-  const SENT_FIELDS = ["alpha", "art", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "on", "remember", "theme", "w", "win"];
+  const SENT_FIELDS = ["alpha", "an", "art", "best", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "nr", "on", "remember", "satz", "theme", "titel", "w", "win"];
   const sentFields = [...new Set([...winBare.matchAll(/\bsent\s*\.\s*(\w+)/g)].map((m) => m[1]))].sort();
   const standOk = fnBody(win, "export function kompaktStand\\(\\): \\{ offen: boolean; live: boolean; durch: boolean; grund: string; datei: string; kampf: number \\| null \\}") === KOMPAKT_STAND
     && JSON.stringify(sentFields) === JSON.stringify(SENT_FIELDS);
@@ -1627,6 +1705,128 @@ function auditMain() {
       && [...allBare.matchAll(/\bkompaktStand\b/g)].length === 3,
     "full view's stand reaches the strip only as named values: a listed reason, one bare log file name, a fight's start - never opened in main",
     `stand: ${norm(standCase ?? "no case")}; vollStand: ${vollStandLines.join(" | ")}; sent: ${sentFields.join(" ")}`);
+  // the start switches (spec Windows-Einbindung 5.1): argv - the process's
+  // and second-instance's - is handed to startSchalter( and nowhere else
+  // each naming of argv, with the rest of its line; windows-core.ts names it as the parameter and in the loop over it
+  const argvUses = files.flatMap((f) => [...bare[f].matchAll(/\bargv\b[^\n]*/g)].map((m) => `${f}: ${m[0].trim()}`));
+  const ARGV_OK = ["main.ts: argv);", "main.ts: argv) => {", "main.ts: argv));", "windows-core.ts: argv: readonly unknown[]): Start {", "windows-core.ts: argv) {"];
+  check(argvUses.length === ARGV_OK.length && argvUses.every((u) => ARGV_OK.includes(u))
+      && /^const ERSTER_START = startSchalter\(process\.argv\);$/m.test(code["main.ts"] ?? "")
+      && /\n    auftragSetzen\(startSchalter\(argv\)\);\n/.test(code["main.ts"] ?? ""),
+    "argv reaches nothing but startSchalter(", `found: ${argvUses.join(" | ")}`);
+  const sTs = code["start.ts"] ?? "";
+  check(sTs !== "" && !/\bfs\b|shell|loadURL|readLog|listLogs|logAnswer|require\(|import\(/.test(sTs),
+    "start.ts only holds the order: no file, no shell, no log", "");
+  const erledigt = block("starterledigt");
+  check(erledigt !== null && !onlyNamedFields(erledigt, ["nr"]).length,
+    "starterledigt reads only nr from the request", erledigt ?? "missing");
+  // autostart (spec Windows-Einbindung 7): one file, one fixed argument
+  const loginUsers = files.filter((f) => /\bsetLoginItemSettings\b/.test(code[f]));
+  const au = code["autostart.ts"] ?? "";
+  const loginArgs = [...au.matchAll(/\bargs: (\[[^\]]*\])/g)].map((m) => m[1]);
+  check(loginUsers.join() === "autostart.ts" && loginArgs.length === 2 && loginArgs.every((a) => a === '["--autostart"]'),
+    "setLoginItemSettings only in autostart.ts", `in: ${loginUsers}; args: ${loginArgs.join(" | ")}`);
+  // Abschlussreview Important 1: both calls as written, each once - no other path, no other option
+  const AU_SET = '\n  app.setLoginItemSettings({ openAtLogin: an, args: ["--autostart"] });\n';
+  const AU_GET = '\n  return autostartDa() && app.getLoginItemSettings({ args: ["--autostart"] }).openAtLogin;\n';
+  const loginCalls = (re) => files.reduce((n, f) => n + [...bare[f].matchAll(re)].length, 0);
+  check(au.includes(AU_SET) && au.includes(AU_GET)
+      && loginCalls(/\bsetLoginItemSettings\b/g) === 1 && loginCalls(/\bgetLoginItemSettings\b/g) === 1,
+    "the login item is set and read only as written in autostart.ts",
+    `set: ${loginCalls(/\bsetLoginItemSettings\b/g)}, get: ${loginCalls(/\bgetLoginItemSettings\b/g)}`);
+  const auCase = block("autostart");
+  check(auCase !== null && !onlyNamedFields(auCase, ["an"]).length, "autostart reads only an from the request", auCase ?? "missing");
+  // the notification after a fight (spec Windows-Einbindung 3): one file, plain options, no XML
+  const notifiers = files.filter((f) => f !== "notify.ts" && /\bNotification\b/.test(bare[f]));
+  const nt = code["notify.ts"] ?? "";
+  const nOpts = (nt.match(/new Notification\(\{([\s\S]*?)\}\);/) || [null, null])[1];
+  // only the keys of the options themselves: what stands in nested braces, brackets or parentheses is cut first
+  let nTop = nOpts ?? "";
+  for (let prev = ""; prev !== nTop;) { prev = nTop; nTop = nTop.replace(/\{[^{}]*\}|\[[^\[\]]*\]|\([^()]*\)/g, ""); }
+  const nKeys = nOpts === null ? [] : [...nTop.matchAll(/(?:^|,|\{)\s*(\w+)\s*(?=[:,}])/g)].map((m) => m[1]);
+  check(!notifiers.length && [...nt.matchAll(/new Notification\(/g)].length === 1 && !files.some((f) => /toastXml/.test(code[f]))
+      && JSON.stringify(nKeys) === JSON.stringify(["title", "body", "icon", "actions"]),
+    "Notification only in notify.ts", `elsewhere: ${notifiers}; keys: ${nKeys.join(",")}`);
+  // the tray (spec Windows-Einbindung 4): one file, one icon, items that raise an event, show the window or quit
+  const trayUsers = files.filter((f) => f !== "tray.ts" && /\bTray\b|buildFromTemplate|popUpContextMenu/.test(bare[f]));
+  const tr = code["tray.ts"] ?? "";
+  const menuUses = files.flatMap((f) => [...bare[f].matchAll(/\bMenu\s*\.\s*(\w+)/g)].map((m) => `${f}: ${m[1]}`));
+  check(!trayUsers.length && [...tr.matchAll(/new Tray\(/g)].length === 1
+      && menuUses.every((u) => u === "main.ts: setApplicationMenu" || u === "tray.ts: buildFromTemplate"),
+    "Tray and its menu only in tray.ts", `elsewhere: ${trayUsers}; Menu: ${menuUses.join(", ")}`);
+  // every way to hear a click: the two tray.on calls as written, five menu items, nothing else
+  const trayOn = [...tr.matchAll(/\btray\s*\.\s*on\(/g)].length;
+  const clickForms = [...tr.matchAll(/\bclick\b/g)].length;
+  const clicks = [...tr.matchAll(/click: \(\) => ([^\n]*?)\s*\},?$/gm)].map((m) => m[1].trim());
+  check(trayOn === 2 && clickForms === 7 && tr.includes('  tray.on("click", () => vorholen(holeFenster()));\n') && tr.includes('  tray.on("right-click", () => {\n')
+      && clicks.length === 5 && clicks.every((c) => /^(bump\("(compact|live|pin)"\)|vorholen\(holeFenster\(\)\)|app\.quit\(\))$/.test(c)) && !/\bshell\b|\bfs\b|exec|spawn|relaunch|loadURL|openExternal|\bexit\b/.test(tr),
+    "a tray item only raises an event, shows the window or quits", `found: ${clicks.join(" | ")}`);
+  check(nt !== "" && !/\bshell\b|\bfs\b|exec|spawn|relaunch|loadURL|openExternal/.test(nt),
+    "a notification click only brings the window forward or raises compact", "");
+  // Abschlussreview Important 2: the options block and both handlers word for word (a quoted key or a
+  // spread cannot hide in them), and nothing else listens: two .on( in notify.ts, both on n
+  const N_GEBAUT = "\n  const n = new Notification({\n    title: titel,\n    body: satz,\n    icon,\n"
+    + '    actions: art === "kampf" ? [{ type: "button", text: wort(cfg.lang, "ansehen") }, { type: "button", text: wort(cfg.lang, "kompaktFenster") }] : [{ type: "button", text: wort(cfg.lang, "ansehen") }],\n'
+    + "  });\n"
+    + '  n.on("click", () => nach(art, win));\n'
+    + '  n.on("action", (e) => {\n'
+    + '    if (art === "kampf" && e.actionIndex === 1) bump("compact");\n'
+    + "    else nach(art, win);\n"
+    + "  });\n"
+    + "  n.show();\n";
+  const ntBare = bare["notify.ts"] ?? "";
+  const nOn = [...ntBare.matchAll(/\.\s*on\s*\(/g)].length;
+  const nNOn = [...ntBare.matchAll(/\bn\s*\.\s*on\s*\(/g)].length;
+  check(nt.includes(N_GEBAUT) && nOn === 2 && nNOn === 2
+      && !/\.\s*(once|addListener|prependListener|prependOnceListener)\s*\(/.test(ntBare),
+    "a notification is built and heard only as written in notify.ts", `.on( ${nOn}, n.on( ${nNOn}`);
+  // a notification raises only compact or the weeklies, and is built in the one function zeige()
+  const nBumps = [...nt.matchAll(/\bbump\(([^)]*)\)/g)].map((m) => m[1]);
+  check(nBumps.length === 2 && nBumps.every((b) => b === '"compact"' || b === '"weeklies"')
+      && [...nt.matchAll(/\nfunction zeige\(win: BrowserWindow \| null, icon: string, art: Art, titel: string, satz: string\): void \{\n/g)].length === 1
+      && [...ntBare.matchAll(/\bzeige\s*\(/g)].length === 3,
+    "notify.ts raises only compact or weeklies, and zeige() builds every notification and is called only for a fight and a reminder", `bump: ${nBumps.join(", ")}`);
+  const kampfCase = block("kampf");
+  check(kampfCase !== null && !onlyNamedFields(kampfCase, ["titel", "satz", "best"]).length,
+    "kampf reads only titel, satz and best from the request", kampfCase ?? "missing");
+  // the weeklies' reminders (spec Weeklies neu, 9): the schedule's files import only each other, and
+  // reach no network, file system, shell, process or notification; only notify.ts shows anything
+  const ZEIT_DATEIEN = ["zeitplan-core.ts", "zeitplan.ts", "erinnerung-core.ts"];
+  const zeitStray = [];
+  for (const f of ZEIT_DATEIEN) {
+    if (code[f] === undefined) { zeitStray.push(f + ": missing"); continue; }
+    for (const m of code[f].matchAll(/^[ \t]*import\b[^\n]*\bfrom\s*"([^"\n]*)";?[ \t]*$/gm)) if (!m[1].startsWith("./")) zeitStray.push(f + ": " + m[0].trim());
+    for (const m of bare[f].matchAll(/\b(?:http|https|net|dgram|fetch|XMLHttpRequest|WebSocket|fs|shell|electron|Notification|child_process|process|require|globalThis|eval|Function)\b|\bimport\s*\(/g)) zeitStray.push(f + ": " + m[0]);
+  }
+  check(!zeitStray.length, "the schedule's files (zeitplan-core, zeitplan, erinnerung-core) import only ./ modules and name no network, file, shell, process or notification", "found: " + zeitStray.join(" | "));
+  const zp = bare["zeitplan.ts"] ?? "";
+  const optsUsed = [...zp.matchAll(/\bopts\.(\w+)/g)].map((m) => m[1]);
+  check([...zp.matchAll(/\bsetInterval\s*\(/g)].length === 1 && !/\bsetTimeout\b/.test(zp)
+      && optsUsed.every((n) => ["regeln", "beiFaellig", "jetzt", "versatz", "stelle", "loesche"].includes(n))
+      && optsUsed.filter((n) => n === "beiFaellig").length === 1,
+    "the schedule has one timer, in zeitplan.ts, and calls only beiFaellig", "found: " + optsUsed.join(","));
+  const er = code["erinnerung.ts"] ?? "";
+  const erImports = [...er.matchAll(/^[ \t]*import\b[^\n]*\bfrom\s*"([^"\n]*)";?[ \t]*$/gm)].map((m) => m[1]).sort();
+  const erBare = bare["erinnerung.ts"] ?? "";
+  check(JSON.stringify(erImports) === JSON.stringify(["./erinnerung-core", "./events", "./notify", "./zeitplan", "./zeitplan-core"])
+      && [...erBare.matchAll(/\bsetTimeout\s*\(/g)].length === 1 && !/\bsetInterval\b|\bfetch\b|\bfs\b|\bhttp\b|\bshell\b|\belectron\b|\bNotification\b|\bsent\b/.test(erBare),
+    "erinnerung.ts imports only the schedule, events and notify, has one timer (the answer's time) and no network, file or notification of its own", "found: " + erImports.join(", "));
+  const erUsers = files.filter((f) => /from "\.\/erinnerung"/.test(code[f])).sort();
+  check(JSON.stringify(erUsers) === JSON.stringify(["main.ts", "server.ts"])
+      && [...(bare["main.ts"] ?? "").matchAll(/\berinnerungStarten\s*\(/g)].length === 1,
+    "only main.ts starts the reminders and only server.ts answers for them", "found: " + erUsers.join(", "));
+  const erGet = (((getBody ?? "").match(/case "\/api\/erinnerung":\n([\s\S]*?)\n    case "/) || [null, ""])[1]).replace(/\s+/g, " ").replace(/\/\/[^\n]*?(?=return)/, "").trim();
+  const erPost = (((postBody ?? "").match(/case "\/api\/erinnerung": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\/\/[^\n]*\n/g, "").replace(/\s+/g, " ").trim();
+  check(erGet.endsWith("return reply(res, { ok: true, ...erinnerungAbfrage() });")
+      && erPost === "const done = erinnerungAntwort(sent.id, sent.n); return reply(res, { ok: done }, done ? 200 : 400);",
+    "/api/erinnerung answers a GET with erinnerungAbfrage() and takes a POST of an id and a number only, nothing else from the request", "get: " + erGet + " post: " + erPost);
+  const serverSrc = code["server.ts"] ?? "";
+  check(/\n      if \(changes\.lang !== "de" && changes\.lang !== "en"\) delete changes\.lang;\n/.test(serverSrc)
+      // GET /api/config gives it back only as "de", "en" or null (Windows-Einbindung 8, Fixrunde 1 zu Aufgabe 8)
+      && serverSrc.includes('\n        lang: cfg.lang === "de" || cfg.lang === "en" ? cfg.lang : null,\n')
+      && [...serverSrc.matchAll(/\bcfg\.lang\b/g)].length === 3
+      && /^const FIRST_START = isFirstStart\(loadConfig\(\),\n  \[\.\.\.CONFIG_KEYS\.filter\(\(k\) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang"\)/m.test(serverSrc),
+    "lang is stored only as de or en", "");
   // Kompakt-Fix 2 (01.10.2026): the compact window has a maximum - twice the
   // largest strip the page measured, only ever growing - set in one place
   // and only from the compact window's resize; full view gets none. How the
@@ -1867,248 +2067,26 @@ function auditMain() {
       "/api/best's GET case answers only loadBest(), 503 when it could not read, nothing from the log", `found: ${getCode}`);
   }
 
-  // --- 10. the builds (boro-builds.json, spec Fortschritt, feature 2): one
-  //         fixed file in the settings folder, written only through
-  //         putBuild() from a POST, after its checks, never sent anywhere
-  //         and never emptied - no path removes a build. The same rules as
-  //         section 9, written out again rather than shared: that section
-  //         went through two reviews line by line, and sharing it would
-  //         have meant rewriting it. A third store would be the time to.
-  const builds = code["builds.ts"];
-  if (builds !== undefined) {
-    const buildsPathDefs = [...builds.matchAll(/\bconst BUILDS_PATH\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
-    check(buildsPathDefs.length > 0 && buildsPathDefs.every((d) => d === 'settingsPath("boro-builds.json")'),
-      "builds live in one fixed file in the settings folder, never a name built at run time",
-      `found: ${buildsPathDefs.join(" | ")}`);
-    check(!/fetchJson|readLog|STATE\.dir|shell\.|\bfetch\(|require\(|import\(/.test(builds),
-      "builds.ts reads no log and sends nothing anywhere");
-    // a leaf, like best.ts - and it needs no node:path at all
-    const BUILD_IMPORTS = ['import * as fs from "node:fs";', 'import { settingsPath } from "./paths";'];
-    const bImportLines = [...builds.matchAll(/^[ \t]*import\b[^\n]*$/gm)].map((m) => m[0].trim());
-    const bRest = BUILD_IMPORTS.reduce((src, line) => src.split(line).join(""), builds);
-    const bStray = [...bRest.matchAll(/\bimport\b[^\n]*|\bfrom\s*["'`][^\n]*|\brequire\b[^\n]*/g)].map((m) => m[0]);
-    check(bImportLines.every((l) => BUILD_IMPORTS.includes(l)) && !bStray.length,
-      "builds.ts imports only node:fs and ./paths",
-      `found: ${[...bImportLines.filter((l) => !BUILD_IMPORTS.includes(l)), ...bStray].join(" | ")}`);
-    check(!/\bprocess\b|\bglobalThis\b|\bReflect\b|\bFunction\s*\(/.test(bRest),
-      "builds.ts reaches nothing through process, globalThis, Reflect or Function");
-    const bFsMentions = [...bRest.matchAll(/\bfs\b[.\w]*/g)].map((m) => m[0]);
-    const bOtherFs = bFsMentions.filter((m) => !/^fs\.(readFileSync|writeFileSync|renameSync)$/.test(m));
-    const bFsCalls = [...bRest.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync)\(/g)].length;
-    check(bFsMentions.length > 0 && !bOtherFs.length && bFsMentions.length === bFsCalls,
-      "builds.ts uses node:fs only to read, write and rename (no delete, descriptor, copy or stream)",
-      `found: ${bOtherFs.join(" | ") || `${bFsMentions.length} mentions of fs, ${bFsCalls} calls`}`);
-    const B_TMP = 'BUILDS_PATH + ".tmp"';
-    const bFileOps = [...bRest.matchAll(/\bfs\.(readFileSync|writeFileSync)\(\s*([^,)]+)/g)];
-    const bBadOps = bFileOps.filter((m) => m[2].trim() !== "BUILDS_PATH" && m[2].trim() !== B_TMP).map((m) => m[0]);
-    check(bFileOps.length > 0 && !bBadOps.length,
-      "builds.ts reads and writes only BUILDS_PATH and its temp file", `found: ${bBadOps.join(" | ")}`);
-    const bRenames = [...bRest.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)];
-    check(bRenames.length > 0 && bRenames.every((m) => m[1].trim() === B_TMP + ", BUILDS_PATH"),
-      "builds.ts renames only its own temp file onto BUILDS_PATH", `found: ${bRenames.map((m) => m[0]).join(" | ")}`);
-    const bPathLeft = bRest
-      .replace(/export const BUILDS_PATH = settingsPath\("boro-builds\.json"\);/, "")
-      .replace(/\bfs\.(readFileSync|writeFileSync)\(BUILDS_PATH\b/g, "")
-      .replace(/\bfs\.renameSync\(BUILDS_PATH \+ "\.tmp", BUILDS_PATH\)/g, "");
-    const bStrayPath = [...bPathLeft.matchAll(/[^\n]{0,30}\b(BUILDS_PATH|settingsPath)\b[^\n]{0,30}/g)].map((m) => m[0].trim());
-    check(!bStrayPath.length, "BUILDS_PATH is declared once and used only as the path of those calls",
-      `found: ${bStrayPath.join(" | ")}`);
-    const bPut = (builds.match(/export function putBuild\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, null])[1];
-    check(bPut !== null, "putBuild() exists in builds.ts");
-    if (bPut !== null) {
-      check(/export function putBuild\(id: unknown, entry: unknown\): PutResult \{/.test(builds),
-        "putBuild takes exactly the id and the entry");
-      const at = (s) => bPut.indexOf(s);
-      const checks = [at("ID_RX.test(id)"), at("NAME_RX.test(e.name)"), at("LINK_RX.test(e.link)"),
-        at("> MAX_ENTRY"), at(">= MAX_BUILDS")];
-      check(checks.every((i) => i >= 0) && at("saveBuilds(") > Math.max(...checks),
-        "putBuild checks id, name, link, size and count before it writes",
-        `positions: ${checks} / saveBuilds ${at("saveBuilds(")}`);
-      // no way to remove a build: an empty entry is refused, and the file
-      // holds no delete at all (counted without strings and comments)
-      check(bPut.includes('if (!entry || typeof entry !== "object" || Array.isArray(entry)) return "refused";')
-          && !/\bdelete\b/.test(bare["builds.ts"] ?? ""),
-        "putBuild refuses an empty entry and builds.ts never deletes a build");
-    }
-    const bDecl = (name) => [...builds.matchAll(new RegExp(`\\b(?:const|let|var)\\s+${name}\\b\\s*(?::[^=]+)?=\\s*([^;]+);`, "g"))]
-      .map((m) => m[1].trim());
-    const bNum = (v) => (/^[\d_]+$/.test(v) ? Number(v.replace(/_/g, "")) : NaN);
-    const bEntry = bDecl("MAX_ENTRY");
-    const bCount = bDecl("MAX_BUILDS");
-    check(bEntry.length > 0 && bEntry.every((v) => bNum(v) > 0 && bNum(v) <= 4096)
-        && bCount.length > 0 && bCount.every((v) => v === "200"),
-      "one build and the number of them are capped (MAX_BUILDS 200)", `MAX_ENTRY ${bEntry}, MAX_BUILDS ${bCount}`);
-    // the three rules as written, built with String.fromCharCode(92) for the
-    // backslashes, as in section 9
-    const BS = String.fromCharCode(92);
-    const RULES = {
-      ID_RX: ["/^[0-9a-z]{10}$/", "build ids are ten letters or digits, as ruled (ID_RX pinned)"],
-      NAME_RX: ["/^[^" + BS + "u0000-" + BS + "u001f" + BS + "u007f]{0,40}$/",
-        "a build's name is at most 40 characters without control characters (NAME_RX pinned)"],
-      LINK_RX: ["/^https:" + BS + "/" + BS + "/[^" + BS + "s" + BS + "u0000-" + BS + "u001f" + BS + "u007f]{1,292}$/",
-        "a planner link is https and nothing else (LINK_RX pinned)"],
-    };
-    for (const [name, [src, label]] of Object.entries(RULES)) {
-      const vals = bDecl(name);
-      check(vals.length > 0 && vals.every((v) => v === src), label, `found: ${vals.join(" | ")}`);
-    }
-    const buildsBare = bare["builds.ts"] ?? "";
-    const bMentions = (name) => [...buildsBare.matchAll(new RegExp(`\\b${name}\\b`, "g"))].length;
-    const bPins = [["MAX_ENTRY", "> MAX_ENTRY"], ["MAX_BUILDS", ">= MAX_BUILDS"], ["ID_RX", "ID_RX.test(id)"],
-      ["NAME_RX", "NAME_RX.test(e.name)"], ["LINK_RX", "LINK_RX.test(e.link)"]];
-    const bLoose = bPins.filter(([name, use]) => bMentions(name) !== 2 || bDecl(name).length !== 1 || !(bPut ?? "").includes(use))
-      .map(([name]) => `${name}: ${bMentions(name)} mentions, ${bDecl(name).length} declarations`);
-    check(!bLoose.length, "MAX_ENTRY, MAX_BUILDS, ID_RX, NAME_RX and LINK_RX are each bound once and used once, in putBuild",
-      `found: ${bLoose.join(" | ")}`);
-    // the rotation choices on a build (spec Deine Rotation, 7): an object of
-    // at most MAX_ROT keys of 1-80 characters, each value a whole number 0-2,
-    // all checked before the file is written - written out as the rule is
-    // written, so a looser check anywhere in it fails here
-    const rotGates = [
-      '  if (e.rot !== undefined) {\n    if (!e.rot || typeof e.rot !== "object" || Array.isArray(e.rot)) return "refused";',
-      "    const rot = Object.entries(e.rot);\n    if (rot.length > MAX_ROT) return \"refused\";",
-      '    if (!rot.every(([k, v]) => ROT_KEY_RX.test(k) && !Object.hasOwn(Object.prototype, k) && Number.isInteger(v) && v >= 0 && v <= 2)) return "refused";\n  }',
-    ].map((g) => (bPut ?? "").indexOf(g));
-    const bSave = (bPut ?? "").indexOf("saveBuilds(");
-    check(rotGates.every((i) => i >= 0) && rotGates[0] < rotGates[1] && rotGates[1] < rotGates[2] && bSave > rotGates[2],
-      "putBuild checks a rotation (an object, at most MAX_ROT choices, keys by ROT_KEY_RX and not on Object.prototype, whole numbers 0-2) before it writes",
-      `positions: ${rotGates} / saveBuilds ${bSave}`);
-    // the key rule as written (backslashes built as above): 1-80 characters,
-    // never a name Object.prototype already has, bound once, used once
-    const ROT_KEY_SRC = "/^(?!(?:__proto__|prototype)$)[" + BS + "s" + BS + "S]{1,80}$/";
-    check(bDecl("ROT_KEY_RX").length === 1 && bDecl("ROT_KEY_RX")[0] === ROT_KEY_SRC && bMentions("ROT_KEY_RX") === 2
-        && (bPut ?? "").includes("ROT_KEY_RX.test(k)"),
-      "a rotation key is 1-80 characters, never __proto__ or prototype (ROT_KEY_RX pinned) nor a name of Object.prototype, bound once and used once, in putBuild",
-      `found: ${bDecl("ROT_KEY_RX").join(" | ")}, ${bMentions("ROT_KEY_RX")} mentions`);
-    check(bDecl("MAX_ROT").length === 1 && bDecl("MAX_ROT")[0] === "24" && bMentions("MAX_ROT") === 2
-        && (bPut ?? "").includes("rot.length > MAX_ROT"),
-      "MAX_ROT is 24, bound once and used once, in putBuild", `found: ${bDecl("MAX_ROT")}, ${bMentions("MAX_ROT")} mentions`);
-    const BUILDS_STRINGS = new Set(["node:fs", "./paths", "boro-builds.json", ".tmp", "utf8", "ENOENT",
-      "object", "string", "data", "corrupt", "saved", "refused", "unavailable"]);
-    const tbs = toks["builds.ts"];
-    const bOdd = tbs.error ? ["(not tokenised)"] : tbs.strings.filter((x) => !BUILDS_STRINGS.has(x)).map((x) => JSON.stringify(x));
-    check(!bOdd.length && !(tbs.templates > 0), "builds.ts holds only its own fixed strings and no template",
-      `found: ${bOdd.join(" | ")}${tbs.templates ? ` and ${tbs.templates} template(s)` : ""}`);
-  }
-  const buildPutters = Object.entries(code).filter(([f, s]) => f !== "builds.ts" && /\bputBuild\(/.test(s)).map(([f]) => f);
-  const buildImporters = Object.entries(code)
-    .filter(([f, s]) => f !== "builds.ts" && /from\s*["'`]\.\/builds(\.js)?["'`]|require\(\s*["'`]\.\/builds|import\(\s*["'`]\.\/builds/.test(s))
-    .map(([f]) => f);
-  check(buildPutters.every((f) => f === "server.ts") && buildImporters.every((f) => f === "server.ts")
-      && (!buildImporters.length || /^import \{ loadBuilds, putBuild \} from "\.\/builds";$/m.test(code["server.ts"] ?? ""))
-      && [...(code["server.ts"] ?? "").matchAll(/\bputBuild\(/g)].length <= 1,
-    "only the local server calls putBuild, once, under its own name", `callers: ${buildPutters}; importers: ${buildImporters}`);
-  const buildNames = Object.fromEntries(files.filter((f) => f !== "builds.ts")
-    .map((f) => [f, [...bare[f].matchAll(/\bputBuild\b/g)].length]));
-  const buildOk = Object.entries(buildNames).every(([f, k]) => (f === "server.ts" ? k <= 2 : k === 0))
-    && (builds === undefined || ((buildNames["server.ts"] ?? 0) === 2
-      && /^import \{ loadBuilds, putBuild \} from "\.\/builds";$/m.test(serverCode)
-      && [...serverCode.matchAll(/\bputBuild\(sent\.id, sent\.build\);/g)].length === 1
-      && [...serverCode.matchAll(/["'`]\.\/builds(\.js)?["'`]/g)].length === 1));
-  check(buildOk, "putBuild is named only in server.ts's import and its one call, never passed on as a value",
-    `mentions: ${Object.entries(buildNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
-  check(!/loadBuilds|putBuild|BUILDS_PATH/.test(code["party.ts"] ?? ""), "the party code never sees the builds");
-  if (postBody !== null && builds !== undefined) {
-    check(postBody.includes('case "/api/builds":'), "/api/builds writes in the POST path");
-    const bPostCase = (postBody.match(/case "\/api\/builds": \{([\s\S]*?)\n    \}/) || [null, null])[1];
-    const bPutCalls = [...(bPostCase ?? "").matchAll(/putBuild\([^)]*\)/g)].map((m) => m[0]);
-    check(bPostCase !== null && bPutCalls.length === 1 && bPutCalls[0] === "putBuild(sent.id, sent.build)"
-        && !/readLog|STATE\.dir/.test(bPostCase),
-      "/api/builds's POST case calls putBuild(sent.id, sent.build) once and nothing else", `found: ${bPutCalls.join(", ")}`);
-  }
-  if (getBody !== null && builds !== undefined) {
-    check(getBody.includes('case "/api/builds":'), "/api/builds also answers a GET (read-only)");
-    const bGetCase = (getBody.match(/case "\/api\/builds": \{\n([\s\S]*?)\n    \}/) || [null, null])[1];
-    const bGetCode = (bGetCase ?? "").replace(/\s+/g, " ").trim();
-    check(bGetCode === "const builds = loadBuilds(); return builds ? reply(res, { ok: true, builds }) : reply(res, { ok: false }, 503);",
-      "/api/builds's GET case answers only loadBuilds(), 503 when it could not read, nothing from the log", `found: ${bGetCode}`);
-  }
-
-  // --- 11. the plans (boro-plans.json, spec Build-Planer): one fixed file,
-  //         written only through putPlan() from a POST, never sent
-  //         anywhere, never emptied. The rules of section 10 for a third
-  //         store, written out once more (sections 9 and 10 stay as
-  //         reviewed). Checks on calls and names read `bare` (strings
-  //         blanked), checks on fixed text read `code` (comments gone).
-  const plans = code["plans.ts"];
-  const plansBare = bare["plans.ts"] ?? "";
-  check(plans !== undefined && /^export function putPlan\(id: unknown, entry: unknown\): PutResult \{$/m.test(plans),
-    "plans.ts is there to audit, with putPlan(id, entry)");
-  if (plans !== undefined) {
-    const P = "PLANS_PATH", TMP = 'PLANS_PATH + ".tmp"';
-    const defs = [...plans.matchAll(/\bconst PLANS_PATH\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
-    check(defs.length === 1 && defs[0] === 'settingsPath("boro-plans.json")'
-        && [...plansBare.matchAll(/\bsettingsPath\b/g)].length === 2,
-      "plans live in one fixed file in the settings folder (settingsPath imported and used once)", `found: ${defs.join(" | ")}`);
-    // no `questlog` here: LINK_RX names questlog.gg, and bare blanks it anyway
-    check(!/fetchJson|readLog|STATE\.dir|shell\.|\bfetch\s*\(|require\s*\(|import\s*\(|\bprocess\b|\bglobalThis\b|\bReflect\b|\bFunction\b/
-        .test(plansBare), "plans.ts reads no log and sends nothing");
-    const IMPORTS = ['import * as fs from "node:fs";', 'import { settingsPath } from "./paths";'];
-    const lines = [...plans.matchAll(/^[ \t]*import\b[^\n]*$/gm)].map((m) => m[0].trim());
-    const pRest = IMPORTS.reduce((src, line) => src.split(line).join(""), plans);
-    const pStray = [...pRest.matchAll(/\bimport\b[^\n]*|\bfrom\s*["'`][^\n]*/g)].map((m) => m[0]);
-    check(lines.length === 2 && lines.every((l) => IMPORTS.includes(l)) && !pStray.length,
-      "plans.ts imports only node:fs and ./paths", `found: ${[...lines, ...pStray].join(" | ")}`);
-    const fsMentions = [...plansBare.matchAll(/\bfs\b[.\w]*/g)].map((m) => m[0]);
-    const fsCalls = [...plansBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync)\(/g)].length;
-    // the import line names fs once without a method
-    check(fsMentions.filter((m) => m === "fs").length === 1 && fsCalls === fsMentions.length - 1 && fsCalls > 0,
-      "plans.ts uses node:fs only to read, write and rename (no delete, descriptor, copy or stream)",
-      `found: ${fsMentions.join(" | ")}`);
-    const ops = [...plans.matchAll(/\bfs\.(readFileSync|writeFileSync)\(\s*([^,)]+)/g)];
-    check(ops.length > 0 && ops.every((m) => [P, TMP].includes(m[2].trim())),
-      "plans.ts reads and writes only PLANS_PATH and its temp file", `found: ${ops.map((m) => m[0]).join(" | ")}`);
-    const renames = [...plans.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)];
-    check(renames.length === 1 && renames[0][1].trim() === TMP + ", " + P,
-      "plans.ts renames only its own temp file onto PLANS_PATH", `found: ${renames.map((m) => m[0]).join(" | ")}`);
-    check(!/\bdelete\b|unlink|\brm\w*\b|truncate/.test(plansBare), "plans.ts never deletes a plan");
-    const put = (plans.match(/export function putPlan\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
-    const at = (x) => put.indexOf(x);
-    const gates = [at("ID_RX.test(id)"), at("LINK_RX.test(e.link)"), at("> MAX_ENTRY"), at(">= MAX_PLANS"),
-      at('if (e.sheet !== undefined && !sheetOk(e.sheet)) return "refused";')];
-    check(gates.every((i) => i >= 0) && at("savePlans(") > Math.max(...gates)
-        && put.includes('if (!entry || typeof entry !== "object" || Array.isArray(entry)) return "refused";'),
-      "putPlan checks id, link, size and count and the Steckbrief before it writes, and refuses an empty entry",
-      `positions: ${gates} / savePlans ${at("savePlans(")}`);
-    check(/^const MAX_PLANS = 100;$/m.test(plans) && /^const MAX_ENTRY = 49152;$/m.test(plans)
-        && [...plansBare.matchAll(/\bMAX_PLANS\b/g)].length === 2 && [...plansBare.matchAll(/\bMAX_ENTRY\b/g)].length === 2,
-      "plans are capped (MAX_PLANS 100, MAX_ENTRY 48 KB), each bound once and used once");
-    // the Steckbrief (spec Steckbrief 6): only the fields of spec 4.3, every
-    // string an id - the lists and the id rule as written, and sheetOk used
-    // once, in putPlan (the gate above)
-    const SHEET_LINES = [
-      "const SHEET_ID_RX = /^[A-Za-z0-9_.-]{1,80}$/;",
-      'const SHEET_KEYS = ["slots", "sets", "fmt", "mast", "lack"];',
-      String.raw`const SHEET_NAME_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,80}$/u;`,
-      'const SLOT_KEYS = ["item", "name", "lvl", "lvlGuess", "vals", "runes", "syn", "perk", "resTier"];',
-      'const nameOk = (x: unknown) => typeof x === "string" && SHEET_NAME_RX.test(x) && x.trim() === x;',
-      'const ORIGINS = ["grund", "traits", "einzig", "resonanz", "heroic", "potenzial"];',
-      'const RUNE_KEYS = ["type", "stat", "val", "lvl"];',
-      'const RUNE_TYPES = ["attack", "defense", "assist", "chaos"];',
-      'const SET_KEYS = ["id", "worn", "of", "active", "next"];',
-      'const UNITS = ["n", "%", "s", "m"];',
-      'const LACKS = ["runes", "syn", "fmt"];',
-    ];
-    const sheetBody = (plans.match(/\nfunction sheetOk\(s: unknown\): boolean \{([\s\S]*?)\n\}/) || [null, ""])[1];
-    check(SHEET_LINES.every((l) => plans.split("\n").includes(l))
-        && [...plansBare.matchAll(/\bsheetOk\b/g)].length === 2 && sheetBody.trim().endsWith("return true;")
-        && sheetBody.includes("if (!isRec(s) || !only(s, SHEET_KEYS)) return false;")
-        && sheetBody.includes("if (!SHEET_ID_RX.test(slot) || !isRec(e) || !only(e, SLOT_KEYS)) return false;")
-        && [...sheetBody.matchAll(/return true;/g)].length === 1
-        // the one text (spec Steckbrief 11): the item name of a slot, checked
-        // once, inside the slot loop - nowhere else in the Steckbrief
-        && [...plansBare.matchAll(/\bSHEET_NAME_RX\b/g)].length === 2 && [...plansBare.matchAll(/\bnameOk\b/g)].length === 2
-        && sheetBody.includes("\n    if (e.name !== undefined && !nameOk(e.name)) return false;\n"),
-      "a stored Steckbrief takes only the fields of spec 4.3, every string an id (SHEET_ID_RX), only the item name of a slot as text (SHEET_NAME_RX)",
-      `missing: ${SHEET_LINES.filter((l) => !plans.split("\n").includes(l)).join(" | ")}`);
-    // the whole rule as written, backslashes built as in section 10
-    const BS = String.fromCharCode(92);
-    const PLAN_LINK = "/^https:" + BS + "/" + BS + "/questlog" + BS + ".gg" + BS + "/throne-and-liberty" + BS
-      + "/[^" + BS + "s" + BS + "u0000-" + BS + "u001f" + BS + "u007f]{1,260}$/";
-    const links = [...plans.matchAll(/\bconst LINK_RX\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
-    check(links.length === 1 && links[0] === PLAN_LINK && [...plansBare.matchAll(/\bLINK_RX\b/g)].length === 2,
-      "a stored plan's link is a questlog.gg link (LINK_RX pinned)", `found: ${links.join(" | ")}`);
-  }
+  // --- 10-12. the builds, the plans and the Questlog request are gone
+  //         (#207, 06.10.2026). Sections 10 (boro-builds.json), 11
+  //         (boro-plans.json) and 12 (questlog.ts, the one request to
+  //         questlog.gg) held the rules for three files. The files are gone,
+  //         and the rules now say that they stay gone: no store of the
+  //         builds, no route to them, no name of Questlog anywhere in main,
+  //         and the global fetch only in http.ts (the party, section 3) and
+  //         update.ts (the update notice, section 14), once each. The
+  //         player's own files boro-builds.json and boro-plans.json stay on
+  //         the disk untouched: no main file names them (the count of
+  //         "boro-" per file, below, already holds that; the explicit check
+  //         here names the two).
+  const GONE = ["builds.ts", "plans.ts", "questlog.ts"];
+  check(!GONE.some((f) => files.includes(f)), "builds.ts, plans.ts and questlog.ts are gone from src/main",
+    `found: ${GONE.filter((f) => files.includes(f)).join(", ")}`);
+  const namesGone = files.filter((f) => /boro-(builds|plans)|questlog/i.test(code[f]) || /\b(putBuild|loadBuilds|putPlan|loadPlans|fetchPlan|QL_BASE)\b/.test(bare[f]));
+  check(!namesGone.length, "no main file names Questlog, boro-builds.json, boro-plans.json or the old builds, plans and Questlog functions",
+    `found in: ${namesGone}`);
+  const routesGone = files.filter((f) => /\/api\/(builds|plans?)\b/.test(code[f]));
+  check(!routesGone.length, "no main file serves /api/builds, /api/plans or /api/plan/fetch", `found in: ${routesGone}`);
   // every module path in a main file (import/export ... from, a bare import,
   // require() or import() with a plain string - section 0 allows no other)
   // that leads to <name>.ts, however it is spelled: "./plans",
@@ -2117,98 +2095,14 @@ function auditMain() {
     .filter((m) => /^[./]/.test(m[1]))
     .map((m) => posix.basename(posix.normalize(m[1])).replace(/\.(js|ts|mjs|cjs)$/, ""))
     .filter((x) => x === name).length;
-  // only the local server reaches the plans: one import line, putPlan named
-  // there and in its one call, never handed on as a value
-  const planNames = Object.fromEntries(files.filter((f) => f !== "plans.ts")
-    .map((f) => [f, [...bare[f].matchAll(/\b(putPlan|loadPlans|PLANS_PATH)\b/g)].length
-      + modRefs(f, "plans")]));
-  check(Object.entries(planNames).every(([f, k]) => f === "server.ts" || k === 0)
-      && (plans === undefined || (/^import \{ loadPlans, putPlan \} from "\.\/plans";$/m.test(serverCode)
-        && [...(bare["server.ts"] ?? "").matchAll(/\bputPlan\b/g)].length === 2
-        && [...(bare["server.ts"] ?? "").matchAll(/\bloadPlans\b/g)].length === 2
-        && modRefs("server.ts", "plans") === 1)),
-    "only the local server imports plans.ts, and names putPlan and loadPlans only in that import and one call each",
-    `mentions: ${Object.entries(planNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
-  if (postBody !== null && plans !== undefined) {
-    const postCase = (postBody.match(/case "\/api\/plans": \{([\s\S]*?)\n    \}/) || [null, ""])[1];
-    const puts = [...postCase.matchAll(/putPlan\([^)]*\)/g)].map((m) => m[0]);
-    check(puts.length === 1 && puts[0] === "putPlan(sent.id, sent.plan)" && !/readLog|STATE\.dir/.test(postCase),
-      "/api/plans's POST case calls putPlan(sent.id, sent.plan) once and nothing else", `found: ${puts.join(", ")}`);
-  }
-  if (getBody !== null && plans !== undefined) {
-    const getCase = ((getBody.match(/case "\/api\/plans": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
-    check(getCase === "const plans = loadPlans(); return plans ? reply(res, { ok: true, plans }) : reply(res, { ok: false }, 503);",
-      "/api/plans's GET case answers only loadPlans(), 503 when it could not read", `found: ${getCase}`);
-  }
-
-  // --- 12. the one request outside this computer (spec Build-Planer,
-  //         section 3): questlog.ts asks QL_BASE only, by GET, without
-  //         cookies or redirects, and only the POST case /api/plan/fetch
-  //         calls it. No other main file names questlog.gg, and the global
-  //         fetch is called only here, in http.ts (fetchJson, section 3) and
-  //         - since the update notice, approved on 02.10.2026 - in
-  //         update.ts, once each; section 14 holds update.ts to its own
-  //         rules. questlog.ts touches no file, log or setting.
-  const ql = code["questlog.ts"];
-  const qlBare = bare["questlog.ts"] ?? "";
-  check(ql !== undefined && /^export async function fetchPlan\(/m.test(ql), "questlog.ts is there to audit, with fetchPlan()");
-  const QL = "https://questlog.gg/throne-and-liberty/api/trpc/";
-  const namers = files.filter((f) => f !== "questlog.ts" && /questlog\.gg/.test(code[f]));
-  check(!namers.length, "only questlog.ts names questlog.gg", `found in: ${namers}`);
+  // ... and none loads the three files under any spelling of the path
+  const gonePaths = files.filter((f) => GONE.some((g) => modRefs(f, g.replace(/\.ts$/, ""))));
+  check(!gonePaths.length, "no main file imports builds, plans or questlog, however the path is spelled", `found in: ${gonePaths}`);
   const fetchers = files.flatMap((f) => [...bare[f].matchAll(/\bfetch\b/g)].map(() => f));
-  // 14.4: update.ts is the third file, and the only one added (02.10.2026)
-  const FETCHERS = ["http.ts", "questlog.ts", "update.ts"];
+  // 14.4: update.ts is the second file, and the only one added (02.10.2026); questlog.ts left in #207
+  const FETCHERS = ["http.ts", "update.ts"];
   check(FETCHERS.every((g) => fetchers.filter((f) => f === g).length <= 1) && fetchers.every((f) => FETCHERS.includes(f)),
-    "only questlog.ts, http.ts and update.ts call fetch, once each", `found in: ${fetchers}`);
-  if (ql !== undefined) {
-    check(/^export const QL_BASE = "https:\/\/questlog\.gg\/throne-and-liberty\/api\/trpc\/";$/m.test(ql)
-        && [...ql.matchAll(/\bQL_BASE\s*=/g)].length === 1,
-      "QL_BASE is exactly " + QL);
-    const hosts = [...ql.matchAll(/https?:\/\/[^"'`\s)]*/g)].map((m) => m[0]);
-    check(hosts.every((h) => h === QL), "questlog.ts asks nothing but QL_BASE", `found: ${hosts.join(" | ")}`);
-    const fetches = [...ql.matchAll(/\bfetch\(([^,]*),\s*\{([^}]*)\}\)/g)];
-    const opts = (fetches[0]?.[2] ?? "").split(",").map((o) => o.trim()).filter(Boolean).sort().join(", ");
-    check(fetches.length === 1 && fetches[0][1].trim() === "url"
-        && opts === 'credentials: "omit", method: "GET", redirect: "error", signal: AbortSignal.timeout(timeoutMs)',
-      "questlog.ts fetches once, only GET, without credentials or redirects", `found: ${fetches.map((m) => m[0]).join(" | ")}`);
-    // the fetch sits in realNet, which is only ever called as net(url, ...),
-    // and url is built from QL_BASE in one place
-    check([...ql.matchAll(/\bconst url = QL_BASE \+ /g)].length === 1 && [...qlBare.matchAll(/\burl\s*=/g)].length === 1
-        && [...qlBare.matchAll(/\bnet\(/g)].length === 1 && /answer = await net\(url, TIMEOUT_MS\);/.test(ql),
-      "every questlog.ts request starts with QL_BASE");
-    const imports = [...ql.matchAll(/^[ \t]*import\b[^\n]*$/gm)].map((m) => m[0]);
-    const touches = qlBare.match(/\bimport\b|\bfs\b|readLog|fetchJson|\bSTATE\b|\bshell\b|\brequire\b|\bprocess\b|\bglobalThis\b|\bReflect\b|\bFunction\b/g) || [];
-    check(!imports.length && !touches.length,
-      "questlog.ts imports nothing and touches no file, log or setting", `found: ${[...imports, ...touches].join(" | ")}`);
-    // the tRPC procedures questlog.ts may ask (spec Build-Planer 3.2 and
-    // Steckbrief 6): a fixed list, and every call names its procedure as a
-    // literal - none is put together from a variable
-    const PROCS = ["characterBuilder.getCharacter", "skillBuilder.getSkillBuildsBySlug",
-      "weaponSpecialization.getWeaponSpecializationBySlug", "database.getSkillSet", "database.getWeaponSpecialization",
-      "database.getItem", "characterBuilder.getEquipmentRunes", "characterBuilder.getRuneSynergies", "statFormat.getStatFormat"];
-    const procNames = [...ql.matchAll(/["'`]([a-z][A-Za-z]*\.get[A-Z][A-Za-z]*)["'`]/g)].map((m) => m[1]);
-    const procCalls = [...ql.matchAll(/\[\s*["'`]([^"'`]*)["'`]\s*,\s*\{/g)].map((m) => m[1]);
-    const procVars = qlBare.match(/\[\s*[^"'`\s\[\]][^,\]]*,\s*\{\s*(id|slug|language)\b/g) || [];
-    check(procNames.length > 0 && procCalls.length > 0 && [...procNames, ...procCalls].every((p) => PROCS.includes(p)) && !procVars.length,
-      "questlog.ts asks only the listed tRPC procedures, each named as a literal",
-      `found: ${[...new Set([...procNames, ...procCalls])].filter((p) => !PROCS.includes(p)).concat(procVars).join(" | ")}`);
-    check(/^export const MAX_REQUESTS = 12;$/m.test(ql) && /^const TIMEOUT_MS = 10000;$/m.test(ql)
-        && /^const MAX_BYTES = 1024 \* 1024;$/m.test(ql)
-        && [...qlBare.matchAll(/\b(MAX_REQUESTS|TIMEOUT_MS)\s*=/g)].length === 2,
-      "questlog.ts caps requests (12), time (10 s) and size (1 MB)");
-  }
-  // fetchPlan: named in server.ts's one import line and its one call, in the
-  // POST case /api/plan/fetch, and nowhere else outside questlog.ts
-  const qlNames = Object.fromEntries(files.filter((f) => f !== "questlog.ts")
-    .map((f) => [f, [...bare[f].matchAll(/\b(fetchPlan|QL_BASE|MAX_REQUESTS|parseLink)\b/g)].length
-      + modRefs(f, "questlog")]));
-  const fetchCase = ((postBody ?? "").match(/case "\/api\/plan\/fetch": \{([\s\S]*?)\n    \}/) || [null, ""])[1];
-  check(Object.entries(qlNames).every(([f, k]) => (f === "server.ts" ? k === 3 : k === 0))
-      && /^import \{ fetchPlan \} from "\.\/questlog";$/m.test(serverCode)
-      && [...(bare["server.ts"] ?? "").matchAll(/\bfetchPlan\b/g)].length === 2
-      && fetchCase.replace(/\s+/g, " ").trim() === "return reply(res, await fetchPlan(sent.link, sent.lang, sent.pick));",
-    "fetchPlan is called only from the POST case /api/plan/fetch",
-    `mentions: ${Object.entries(qlNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
+    "only http.ts and update.ts call fetch, once each", `found in: ${fetchers}`);
 
   // --- 12b. every way out of this computer, not only fetch (Gutachten
   //          Update-Hinweis, 02.10.2026: http.get, https.request, electron's
@@ -2217,7 +2111,7 @@ function auditMain() {
   //          node:http in http.ts (types only), server.ts and party.ts (the
   //          two listeners, createServer once each); node:dgram in party.ts
   //          (one UDP socket that only picks the LAN address, it sends
-  //          nothing); fetch in http.ts and questlog.ts (section 12).
+  //          nothing); fetch in http.ts and update.ts (section 10-12).
   //          Nothing else: no node:https, node:net, node:tls, node:http2,
   //          node:dns or undici, no electron net or session, no WebSocket,
   //          EventSource, XMLHttpRequest, WebTransport or WebRTC.
@@ -2379,12 +2273,15 @@ function auditMain() {
       + " const profile: Profile[] = []; for (const x of next.profile) { const p = profileOf(x);"
       + " if (!p || profile.some((q) => q.id === p.id)) return null; profile.push(p); }"
       + " if (profile.filter((p) => !p.geloest).length > MAX_ACTIVE) return null;"
+      + " const erinnerungen = next.erinnerungen === undefined ? undefined : remindersOf(next.erinnerungen);"
+      + " if (erinnerungen === null) return null;"
+      + " if (!(stored.erinnerungen ?? []).every((old) => (erinnerungen ?? []).some((r) => r.id === old.id))) return null;"
       + " for (const old of stored.profile) { const p = profile.find((q) => q.id === old.id); if (!p) return null;"
       + " if (!Object.keys(old.zaehler).every((k) => Object.hasOwn(p.zaehler, k))) return null;"
       + " if (!old.eigene.every((e) => p.eigene.some((f) => f.schluessel === e.schluessel))) return null;"
       + " if (old.vorwoche) { const week = p.vorwoche; if (!week || week.reset < old.vorwoche.reset) return null;"
       + " if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null; } }"
-      + " return { v: 1, profile };";
+      + " return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }) };";
     check(chk === CHK && [...wkBare.matchAll(/\bcheckWeeklies\b/g)].length === 3,
       "checkWeeklies refuses a state that leaves out a stored character, own point, counter or last week, and keeps detached ones",
       `found: ${chk}`);
@@ -2409,6 +2306,7 @@ function auditMain() {
     const WEEKLIES_STRINGS = new Set(["node:fs", "./paths", "boro-weeklies.json", ".tmp", "utf8", "ENOENT", "wx",
       "woche", "tag", "v", "profile", "id", "name", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche",
       "schluessel", "menge", "takt", "stand", "seit", "reset",
+      "erinnerungen", "zu", "bei", "an", "tage", "zeit", "text", "nurOffen",
       "object", "string", "boolean", "data", "corrupt", "saved", "refused", "unavailable"]);
     const tw = toks["weeklies.ts"];
     const wOdd = tw.error ? ["(not tokenised)"] : tw.strings.filter((x) => !WEEKLIES_STRINGS.has(x)).map((x) => JSON.stringify(x));
@@ -2424,9 +2322,9 @@ function auditMain() {
   check(Object.entries(wkNames).every(([f, k]) => f === "server.ts" || k === 0)
       && (wk === undefined || (/^import \{ createWeeklies, loadWeeklies, putWeeklies \} from "\.\/weeklies";$/m.test(serverCode)
         && ["putWeeklies", "loadWeeklies", "createWeeklies"]
-          .every((n) => [...serverBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === 2)
-        && wkNames["server.ts"] === 7)),
-    "only the local server imports weeklies.ts, and names createWeeklies, loadWeeklies and putWeeklies only in that import and one call each",
+          .every((n) => [...serverBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === (n === "loadWeeklies" ? 3 : 2))
+        && wkNames["server.ts"] === 8)),
+    "only the local server imports weeklies.ts, and names createWeeklies and putWeeklies only in that import and one call each, loadWeeklies in it and two calls (the GET and the reminders' reader)",
     `mentions: ${Object.entries(wkNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
   const wkFileNamers = files.filter((f) => f !== "weeklies.ts" && /boro-weeklies\.json/.test(code[f]));
   check(!wkFileNamers.length, "only weeklies.ts names boro-weeklies.json", `found in: ${wkFileNamers}`);
@@ -2447,8 +2345,208 @@ function auditMain() {
       "/api/weeklies's POST case calls putWeeklies(sent.data) once and nothing else", `found: ${wPost}`);
     const start = (serverCode.match(/export async function startServer\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
     check([...serverBare.matchAll(/\bcreateWeeklies\(/g)].length === 1
-        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n  return port;$/.test(start),
+        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createGilde\(\);\n  return port;$/.test(start),
       "createWeeklies is called once, from startServer, once the server listens", `found in startServer: ${/createWeeklies/.test(start)}`);
+  }
+
+  // --- 13b. the guild (boro-gilde.json, spec Gilde 7 and 8, 06.10.2026):
+  //          one fixed file in the settings folder that holds player names
+  //          the leader typed in himself (a deliberate exception), so
+  //          it never leaves this computer. Written only through putGilde()
+  //          from a POST after checkGilde() rebuilt the state, or created
+  //          empty once on start ("wx"). Never sent anywhere, never emptied.
+  //          Section 13's rules once more, and a few more: no other file but
+  //          the server and the reminder (gilde-erinnerung.ts) reaches it, and
+  //          the ways out of this computer (update.ts, the party)
+  //          never name it. The page's side is in auditPage (13b.15).
+  //          Rules on gilde-erinnerung.ts (13b.11, 13b.16) hold vacuously
+  //          until that file exists (plan Gilde, task 8); a mention of the
+  //          guild's names anywhere else fails already.
+  const gd = code["gilde.ts"];
+  const gdBare = bare["gilde.ts"] ?? "";
+  // 13b.1
+  check(gd !== undefined && /^export function putGilde\(data: unknown\): PutResult \{$/m.test(gd),
+    "gilde.ts is there to audit, with putGilde(data)");
+  if (gd !== undefined) {
+    const P = "GILDE_PATH", TMP = 'GILDE_PATH + ".tmp"';
+    // 13b.2
+    const defs = [...gd.matchAll(/\bconst GILDE_PATH\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
+    check(defs.length === 1 && defs[0] === 'settingsPath("boro-gilde.json")'
+        && /^export const GILDE_PATH = settingsPath\("boro-gilde\.json"\);$/m.test(gd)
+        && [...gdBare.matchAll(/\bsettingsPath\b/g)].length === 2,
+      "the guild lives in one fixed file in the settings folder (GILDE_PATH defined once, settingsPath imported and used once)",
+      `found: ${defs.join(" | ")}`);
+    // 13b.3
+    check(!/fetchJson|readLog|STATE\.dir|shell\.|\bfetch\b|\bhttps?\b|\bnet\b|\bdns\b|child_process|electron|require\s*\(|import\s*\(|\bprocess\b|\bglobal\b|\bglobalThis\b|\bReflect\b|\bFunction\b/
+        .test(gdBare), "gilde.ts reads no log and sends nothing (no fetch, http, net, child_process or electron)");
+    // 13b.4
+    const IMPORTS = ['import * as fs from "node:fs";', 'import { settingsPath } from "./paths";'];
+    const lines = [...gd.matchAll(/^[ \t]*import\b[^\n]*$/gm)].map((m) => m[0].trim());
+    const gRest = IMPORTS.reduce((src, line) => src.split(line).join(""), gd);
+    const gStray = [...gRest.matchAll(/\bimport\b[^\n]*|\bfrom\s*["'`][^\n]*/g)].map((m) => m[0]);
+    check(lines.length === 2 && lines.every((l) => IMPORTS.includes(l)) && new Set(lines).size === 2 && !gStray.length,
+      "gilde.ts imports only node:fs and ./paths", `found: ${[...lines, ...gStray].join(" | ")}`);
+    // 13b.5: the import line names fs once without a method
+    const fsMentions = [...gdBare.matchAll(/\bfs\b[.\w]*/g)].map((m) => m[0]);
+    const fsCalls = [...gdBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync)\(/g)].length;
+    check(fsMentions.filter((m) => m === "fs").length === 1 && fsCalls === fsMentions.length - 1 && fsCalls === 4,
+      "gilde.ts uses node:fs only to read, write and rename (no delete, descriptor, copy or stream)",
+      `found: ${fsMentions.join(" | ")}`);
+    // 13b.6: one read, two writes, one rename - and GILDE_PATH never shadowed
+    // (a parameter default, a let): its six mentions are the declaration, the
+    // read, the two writes and the two of the rename; the one let is the text
+    // of readGildeFile
+    const ops = [...gd.matchAll(/\bfs\.(readFileSync|writeFileSync)\(\s*([^,)]+)/g)];
+    const renames = [...gd.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)];
+    check(ops.length === 3 && ops.every((m) => [P, TMP].includes(m[2].trim()))
+        && gd.split('fs.readFileSync(GILDE_PATH, "utf8")').length === 2
+        && renames.length === 1 && renames[0][1].trim() === TMP + ", " + P
+        && [...gdBare.matchAll(/\bGILDE_PATH\b/g)].length === 6
+        && [...gdBare.matchAll(/\b(let|var)\b/g)].length === 1 && gd.includes("\n  let text: string;\n"),
+      "gilde.ts reads and writes only GILDE_PATH and its temp file, and renames only its own temp file onto GILDE_PATH",
+      `found: ${[...ops, ...renames].map((m) => m[0]).join(" | ")}; GILDE_PATH ${[...gdBare.matchAll(/\bGILDE_PATH\b/g)].length}x`);
+    // 13b.7: the two writes as written - the whole state into the temp file,
+    // and the empty file on the first start, only when there is none
+    const writes = [...gd.matchAll(/\bfs\.writeFileSync\([^;]*;/g)].map((m) => m[0]);
+    check(writes.length === 2
+        && writes[0] === 'fs.writeFileSync(GILDE_PATH + ".tmp", JSON.stringify(all), "utf8");'
+        && writes[1] === 'fs.writeFileSync(GILDE_PATH, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });'
+        && /\nexport function createGilde\(\): void \{\n  try \{\n    fs\.writeFileSync\(GILDE_PATH, JSON\.stringify\(empty\(\)\), \{ encoding: "utf8", flag: "wx" \}\);\n  \} catch \{/.test(gd)
+        && /^const empty = \(\): GildeFile => \(\{ v: 1, gilde: null \}\);$/m.test(gd),
+      "the guild file is written whole through its temp file, or created once (empty) and never over a file that is there",
+      `found: ${writes.join(" | ")}`);
+    // 13b.8: no word for removing, no array emptied in place, nothing of the
+    // stored state assigned to; saveGilde writes the state it was given as
+    // written; checkGilde refuses a state that leaves out anything stored
+    const save = ((gd.match(/\nfunction saveGilde\(all: GildeFile\): boolean \{([\s\S]*?)\n\}/) || [null, ""])[1])
+      .replace(/\s+/g, " ").trim();
+    check(!/\bdelete\b|unlink|\brm\w*\b|truncate|\bsplice\b|\.pop\s*\(|\.shift\s*\(|\.length\s*=(?!=)|\.fill\s*\(|copyWithin|Object\.assign/.test(gdBare)
+        && !/\b(?:stored|old|read\.data)(?:\s*\.\s*\w+|\s*\[[^\]]*\])+\s*(?:[-+*/%&|^]|\?\?|&&|\|\|)?=(?!=)/.test(gdBare)
+        && !/(?<!\bconst\s+)\b(?:stored|old)\s*(?:[-+*/%&|^]|\?\?|&&|\|\|)?=(?!=)/.test(gdBare)
+        && save === 'try { fs.writeFileSync(GILDE_PATH + ".tmp", JSON.stringify(all), "utf8"); fs.renameSync(GILDE_PATH + ".tmp", GILDE_PATH); return true; } catch { return false; }',
+      "saveGilde never deletes or empties: no delete, no splice, nothing of the stored state assigned", `saveGilde: ${save}`);
+    const chk = ((gd.match(/\nexport function checkGilde\(next: unknown, stored: GildeFile\): GildeFile \| null \{([\s\S]*?)\n\}/) || [null, ""])[1])
+      .replace(/\s+/g, " ").trim();
+    const CHK = "if (!isRec(next) || !only(next, FILE_KEYS) || next.v !== 1) return null;"
+      + " if (next.gilde === null) return stored.gilde ? null : empty();"
+      + " const g = gildeOf(next.gilde); if (!g) return null; const old = stored.gilde;"
+      + " if (old) { if (old.id !== g.id) return null;"
+      + " if (!old.mitglieder.every((m) => g.mitglieder.some((n) => n.id === m.id))) return null;"
+      + " for (const r of old.reihen) { const n = g.reihen.find((q) => q.id === r.id);"
+      + " if (!n || !Object.keys(r.ausnahmen).every((d) => Object.hasOwn(n.ausnahmen, d))) return null; }"
+      + " for (const [k, v] of Object.entries(old.anwesend)) { const n = g.anwesend[k];"
+      + " if (!n || !Object.keys(v).every((mid) => Object.hasOwn(n, mid))) return null; } }"
+      + " return { v: 1, gilde: g };";
+    check(chk === CHK && [...gdBare.matchAll(/\bcheckGilde\b/g)].length === 3,
+      "checkGilde refuses a state that leaves out the stored guild, a member, a series, an exception or a mark, and keeps detached ones",
+      `found: ${chk}`);
+    // putGilde as written: size first, then the stored state, then checkGilde
+    // against it, and only its result is saved
+    const put = ((gd.match(/export function putGilde\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1])
+      .replace(/\s+/g, " ").trim();
+    const PUT = 'const text = JSON.stringify(data); if (typeof text !== "string" || text.length > MAX_TEXT) return "refused";'
+      + ' const read = readGildeFile(); if ("corrupt" in read) return "unavailable";'
+      + ' const clean = checkGilde(data, read.data); if (!clean) return "refused";'
+      + ' return saveGilde(clean) ? "saved" : "unavailable";';
+    check(put === PUT && [...gdBare.matchAll(/\bsaveGilde\b/g)].length === 2,
+      "putGilde checks size and schema before it writes, and writes only what checkGilde returned", `found: ${put}`);
+    // 13b.9: the bounds, each defined once and used where it bounds
+    const BOUNDS = { MAX_TEXT: ["2097152", 2], MAX_MITGLIEDER: ["100", 3], MAX_REIHEN: ["20", 2], MAX_TERMINE: ["4000", 2] };
+    check(Object.entries(BOUNDS).every(([n, [v, k]]) => gd.split("\n").filter((l) => l === `const ${n} = ${v};`).length === 1
+          && [...gdBare.matchAll(new RegExp(`\\b${n}\\s*=(?!=)`, "g"))].length === 1
+          && [...gdBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === k)
+        && gd.includes("x.mitglieder.length > MAX_MITGLIEDER || !Array.isArray(x.reihen) || x.reihen.length > MAX_REIHEN) return null;")
+        && gd.includes("if (!isRec(x.anwesend) || Object.keys(x.anwesend).length > MAX_TERMINE) return null;")
+        && gd.includes("Object.keys(v).length > MAX_MITGLIEDER) return null;"),
+      "the guild is capped (MAX_TEXT 2097152 characters, MAX_MITGLIEDER 100, MAX_REIHEN 20, MAX_TERMINE 4000), each bound once");
+    // 13b.10
+    const GILDE_STRINGS = new Set(["node:fs", "./paths", "boro-gilde.json", ".tmp", "utf8", "ENOENT", "wx",
+      "tank", "heal", "dps", "", "da", "fehlt", "entschuldigt", "offen", "einmal", "woche", "tage",
+      "v", "gilde", "id", "name", "geloest", "mitglieder", "reihen", "anwesend", "rolle", "waffen", "notiz",
+      "Greatsword", "Sword and Shield", "Dagger", "Crossbow", "Longbow", "Staff", "Wand and Tome", "Spear", "Gauntlet", "Orb",
+      "titel", "start", "zone", "wdh", "dauerMin", "erinnerungMin", "ausnahmen", "art", "bis", "aus", "zeit",
+      "m", "r", "g", "object", "string", "boolean", "data", "corrupt", "saved", "refused", "unavailable"]);
+    const tg = toks["gilde.ts"];
+    const gOdd = tg.error ? ["(not tokenised)"] : tg.strings.filter((x) => !GILDE_STRINGS.has(x)).map((x) => JSON.stringify(x));
+    check(!gOdd.length && !(tg.templates > 0), "gilde.ts holds only its own fixed strings and no template",
+      `found: ${gOdd.join(" | ")}${tg.templates ? ` and ${tg.templates} template(s)` : ""}`);
+  }
+  // 13b.11: only the local server reaches the guild: one import line, each
+  // name there and in its one call, never handed on as a value. The one
+  // exception is the reminder (gilde-erinnerung.ts, plan task 8): it may
+  // import loadGilde alone, in one line, and call it once - it only reads.
+  // Until that file exists, the exception is not used.
+  const gdNames = Object.fromEntries(files.filter((f) => f !== "gilde.ts")
+    .map((f) => [f, [...bare[f].matchAll(/\b(putGilde|loadGilde|createGilde|checkGilde|saveGilde|readGildeFile|GILDE_PATH)\b/g)].length
+      + modRefs(f, "gilde")]));
+  const gdServerBare = bare["server.ts"] ?? "";
+  const reminder = code["gilde-erinnerung.ts"];
+  const reminderBare = bare["gilde-erinnerung.ts"] ?? "";
+  check(Object.entries(gdNames).every(([f, k]) => f === "server.ts" || f === "gilde-erinnerung.ts" || k === 0)
+      && (gd === undefined || (/^import \{ createGilde, loadGilde, putGilde \} from "\.\/gilde";$/m.test(serverCode)
+        && ["putGilde", "loadGilde", "createGilde"]
+          .every((n) => [...gdServerBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === 2)
+        && [...gdServerBare.matchAll(/\bcreateGilde\(\);/g)].length === 1
+        && gdNames["server.ts"] === 7))
+      && (reminder === undefined || ([...reminder.matchAll(/^[^\n]*\bfrom\s*["'`][^"'`\n]*\bgilde["'`][^\n]*$/gm)].length === 1
+        && /^import \{ loadGilde \} from "\.\/gilde";$/m.test(reminder)
+        && [...reminderBare.matchAll(/\bloadGilde\b/g)].length === 2
+        && [...reminderBare.matchAll(/\bloadGilde\(\)/g)].length === 1
+        && gdNames["gilde-erinnerung.ts"] === 3)),
+    "only the local server imports gilde.ts, and names createGilde, loadGilde and putGilde only in that import and one call each (the reminder: loadGilde alone, read once)",
+    `mentions: ${Object.entries(gdNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
+  // 13b.12
+  const gdFileNamers = files.filter((f) => f !== "gilde.ts" && /boro-gilde\.json/i.test(code[f]));
+  check(!gdFileNamers.length, "only gilde.ts names boro-gilde.json", `found in: ${gdFileNamers}`);
+  // 13b.13: the route - "/api/gilde" twice (one GET case, one POST case), the
+  // module's path once, the reminder's settings key twice (CONFIG_KEYS and
+  // BOOLEAN_KEYS), and no other string of the server names the guild
+  if (gd !== undefined) {
+    const ts = toks["server.ts"];
+    const gdStrings = ts.error ? ["(not tokenised)"] : ts.strings.filter((x) => /gilde/i.test(x));
+    const many = (x) => gdStrings.filter((y) => y === x).length;
+    check(many("/api/gilde") === 2 && many("./gilde") === 1 && many("gildeErinnerung") === 2 && gdStrings.length === 5
+        && (getBody ?? "").split('case "/api/gilde":').length === 2 && (postBody ?? "").split('case "/api/gilde":').length === 2,
+      "the guild route is /api/gilde, one GET and one POST case, and no other string of the server names the guild",
+      `found: ${gdStrings.join(" | ")}`);
+    const gGet = (((getBody ?? "").match(/case "\/api\/gilde": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    check(gGet === "const gilde = loadGilde(); return gilde ? reply(res, { ok: true, data: gilde }) : reply(res, { ok: false }, 503);",
+      "/api/gilde's GET case answers only loadGilde(), 503 when it could not read", `found: ${gGet}`);
+    const gPost = (((postBody ?? "").match(/case "\/api\/gilde": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    check(gPost === 'const put = putGilde(sent.data); return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);',
+      "/api/gilde's POST case calls putGilde(sent.data) once and nothing else", `found: ${gPost}`);
+    const gStart = (serverCode.match(/export async function startServer\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
+    check([...gdServerBare.matchAll(/\bcreateGilde\(/g)].length === 1
+        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createGilde\(\);\n  return port;$/.test(gStart),
+      "createGilde is called once, from startServer, once the server listens", `found in startServer: ${/createGilde/.test(gStart)}`);
+  }
+  // 13b.14: nothing leaves this computer. No file but gilde.ts, the reminder
+  // and the server names loadGilde or GILDE_PATH, and the ways out - the
+  // update notice, the party and its HTTP helper - never name the guild, in
+  // any case, not even in a string. The fourth way out, questlog.ts, left
+  // with #207; rule 14 keeps it gone, and should it ever come back it is
+  // held to this rule too (decision of 07.10.2026).
+  const gdReaders = files.filter((f) => !["gilde.ts", "gilde-erinnerung.ts", "server.ts"].includes(f)
+    && /\b(?:loadGilde|GILDE_PATH)\b/.test(code[f]));
+  const OUTWARD = ["update.ts", "party.ts", "http.ts"];
+  const gdOutward = [...OUTWARD, "questlog.ts"].filter((f) => /gilde/i.test(code[f] ?? ""));
+  check(!gdReaders.length && !gdOutward.length && OUTWARD.every((f) => code[f] !== undefined),
+    "nothing leaves this computer with the guild: update.ts, party.ts and http.ts never name it, and no file but gilde.ts, the reminder and the server reads it",
+    `found in: ${[...gdReaders, ...gdOutward].join(", ")}`);
+  // 13b.16: the reminder (plan task 8) shows a Notification from electron and
+  // reaches nothing else: it imports no node: module, names no electron way
+  // but Notification (and BrowserWindow, for the window it raises), and no
+  // fetch, http, https, net, dns, child_process or shell. Holds vacuously
+  // until gilde-erinnerung.ts exists.
+  if (reminder !== undefined) {
+    const eNames = [...reminder.matchAll(/^import \{([^}]*)\} from "electron";$/gm)].flatMap((m) => m[1].split(",").map((x) => x.trim()).filter(Boolean));
+    const rStrings = toks["gilde-erinnerung.ts"].strings ?? [];
+    check(eNames.includes("Notification") && eNames.every((n) => n === "Notification" || n === "BrowserWindow")
+        && [...reminder.matchAll(/\bfrom\s*"electron"/g)].length === 1
+        && !rStrings.some((s) => /^node:|^(?:https?|net|dns|child_process|electron\/)/.test(s))
+        && !/\bfetch\b|\bhttps?\b|\bnet\b|\bdns\b|child_process|\bshell\b|require\s*\(|import\s*\(|WebSocket|EventSource|XMLHttpRequest/.test(reminderBare),
+      "the guild reminder uses electron's Notification and nothing that reaches the network (no fetch, http, https, net, dns, child_process or shell)",
+      `electron: ${eNames.join(", ")}`);
   }
 
   // --- 14. the update notice (spec Update-Hinweis, decided on
@@ -2738,20 +2836,24 @@ async function auditPage() {
   check(!notApi.length && JSON.stringify(partyStart) === JSON.stringify(["/api/party/create", "/api/party/host"]),
     "every page fetch starts at /api/ as a literal (the party starts through /api/party/create or /api/party/host)",
     `found: ${[...notApi, ...partyStart].join(" | ")}`);
+  // Gruppenkurven (Spezifikation 2026-10-04, 6): die Kurve eines Mitglieds holt
+  // nur kurveHolen in 42-party.ts - eine Stelle, die die Zahl der Abrufe je
+  // Klick in der Hand hat. Ring und Rennen (64/65) rufen sie dort auf.
+  // auch ein Ziel als Vorlage (fetch(`/api/party/${x}`)) zaehlt als Abruf
+  const kurveAbruf = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/\bfetch\s*\(\s*["'`]\/api\/party\/(?:curve\b|[^"'`]*\$\{)/g)].map(() => f));
+  check(JSON.stringify(kurveAbruf) === JSON.stringify(["42-party.ts"]),
+    "a member's curve is fetched only in 42-party.ts, at one place", `found: ${kurveAbruf.join(" | ") || "none"}`);
   // the page must not try to write files anywhere near the game
   for (const bad of ["createWritable", "removeEntry", "showSaveFilePicker"]) {
     check(!src.includes(bad), `the page never writes to the log folder (${bad})`);
   }
-  // a build's name stays on this computer (spec Fortschritt, feature 2): the
-  // party report, the party logs and the bug report never read the builds,
-  // and the two parts that show them fetch nothing but /api/builds - a
-  // planner link is opened as a link, Borometer never loads it
+  // the builds are gone (#207): see "the Builds tab, the plans and the Questlog request stay gone" below
   const part = (f) => (existsSync(join(pageDir, f)) ? readFileSync(join(pageDir, f), "utf8") : "");
   // a part read below under a name it no longer has would read as empty,
   // and an empty part passes every rule - so the names must still be there
   // (49-abend.ts went with the redesign of 28.09., Spezifikation 3; its
   // rules below keep reading the image part, which stays)
-  const named = ["47-builds.ts", "50-bild.ts"].filter((f) => !existsSync(join(pageDir, f)));
+  const named = ["47-paar.ts", "50-bild.ts"].filter((f) => !existsSync(join(pageDir, f)));
   check(!named.length, "the parts the rules below read are there under their names", `missing: ${named}`);
   // the first-start tour (spec Rundgang 02.10.2026, 7) asks nothing: no fetch,
   // no beacon, no request object, no /api/ address in its part; it writes
@@ -2783,7 +2885,7 @@ async function auditPage() {
   // Rennen (65) fragen nichts und merken sich nichts - kein fetch, kein /api/, kein Speicher im
   // Browser, kein persistPref, kein neues Fenster. Beide Teile muessen da sein: ein fehlender
   // Teil liest sich leer, und ein leerer Teil bestuende jede Regel. Mindestens so breit wie
-  // reach bei 47-builds; gezaehlt wird auch in Kommentaren und Zeichenketten.
+  // reach bei 47-paar; gezaehlt wird auch in Kommentaren und Zeichenketten.
   const glutTeile = ["64-glutring.ts", "65-nachspielen.ts"];
   const glutFehlt = glutTeile.filter((f) => !existsSync(join(pageDir, f)));
   const glutFragt = glutTeile.flatMap((f) => [...part(f).matchAll(/\bfetch\b|sendBeacon|XMLHttpRequest|EventSource|WebSocket|\/api\/|localStorage|sessionStorage|indexedDB|\.cookie\b|\bcaches\b|\bpersistPref\b|window\.open|\bnew\s+Image\b|\blocation\b|<img\b|<iframe\b|\bimport\s*\(|\bnavigator\b|\bWorker\b|\bglobalThis\b/g)]
@@ -2802,15 +2904,21 @@ async function auditPage() {
   check(glutKern.length > 0 && !kernGriffe.length,
     "glutring-core.ts is a pure core: it imports and re-exports nothing and touches no page or network",
     `found: ${kernGriffe.join(" | ")}`);
-  const outward = ["35-party-log-files.ts", "42-party.ts", "44-bug-report.ts"]
-    .filter((f) => /state\.builds|\/api\/builds|47-builds/.test(part(f)));
-  check(!outward.length, "the party report, the party logs and the bug report never see the builds", `found in: ${outward}`);
-  // the builds section is built and bound in its own part (shown in History)
-  const shown = part("47-builds.ts");
-  const fetched = [...shown.matchAll(/\bfetch\(\s*([^,)]*)/g)].map((m) => m[1].trim());
-  const reach = shown.match(/XMLHttpRequest|sendBeacon|new Image\b|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b/g) || [];
-  check(fetched.every((a) => a === '"/api/builds"') && !reach.length,
-    "the builds part fetches nothing but /api/builds and never loads a planner link",
+  // ... und ebenso der Kern des Streifens (Spezifikation Kompakt-Fenster, 04.10.2026)
+  const kompaktKernPfad = join(rendererDir, "kompakt-core.ts");
+  const kompaktKern = existsSync(kompaktKernPfad) ? readFileSync(kompaktKernPfad, "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/[^\n]*/gm, "") : "";
+  const kompaktGriffe = [...kompaktKern.matchAll(/\bimport\b|\bfrom\s*["'`]|\brequire\s*\(|\bfetch\b|\bdocument\b|\bwindow\b|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bglobalThis\b|\bnavigator\b|\bXMLHttpRequest\b|\bsendBeacon\b|\bEventSource\b|\bWebSocket\b|\bImage\b|\blocation\b|\bself\b|\beval\b|\bFunction\b/g)]
+    .map((m) => m[0].trim());
+  check(kompaktKern.length > 0 && !kompaktGriffe.length,
+    "kompakt-core.ts is a pure core: it imports and re-exports nothing and touches no page or network",
+    `found: ${kompaktGriffe.join(" | ")}`);
+  // the weapon pair and the reference of the comparisons (47-paar.ts, #207)
+  // ask nothing: no fetch, no /api/ address, no beacon, no request object, no link
+  const shown = part("47-paar.ts");
+  const fetched = [...shown.matchAll(/\bfetch\b/g)].map((m) => m[0]);
+  const reach = shown.match(/XMLHttpRequest|sendBeacon|new Image\b|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|\/api\//g) || [];
+  check(shown.length > 0 && !fetched.length && !reach.length,
+    "the weapon-pair part asks nothing and loads nothing: no fetch, no /api/, no beacon, no link",
     `fetch: ${fetched.join(" | ")}; also: ${reach.join(" | ")}`);
   // the shared image (spec Fortschritt, feature 4). The evening, which read
   // the saved party logs by GET, went with the redesign of 28.09., and with
@@ -2833,44 +2941,83 @@ async function auditPage() {
     .filter((f) => /49-abend|50-bild|abendStand|bildInhalt/.test(part(f)));
   check(!abendOut.length, "the party report, the party logs and the bug report never see the evening or the image",
     `found in: ${abendOut}`);
-  // the plan (spec Build-Planer): the page part asks only the local helper,
-  // and the plans and their names never leave this computer
-  check(existsSync(join(pageDir, "51-plan.ts")), "the plan part is there under its name");
-  const planPart = part("51-plan.ts");
-  const planFetch = [...planPart.matchAll(/\bfetch\(\s*([^,)]*)/g)].map((m) => m[1].trim());
-  const planReach = planPart.match(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|questlog\.gg\/throne-and-liberty\/api/g) || [];
-  check(planFetch.length > 0 && planFetch.every((a) => a === '"/api/plans"' || a === '"/api/plan/fetch"') && !planReach.length,
-    "the plan part fetches nothing but /api/plans and /api/plan/fetch", `fetch: ${planFetch.join(" | ")}; also: ${planReach.join(" | ")}`);
-  const planOut = ["35-party-log-files.ts", "42-party.ts", "44-bug-report.ts", "50-bild.ts"]
-    .filter((f) => /state\.plans|state\.planNames|\/api\/plans|51-plan|52-steckbrief/.test(part(f)));
-  check(!planOut.length, "the party report, the party logs, the bug report and the image never see the plans",
-    `found in: ${planOut}`);
-  // the builds as links to Questlog (Aufgabe 12 of the redesign,
-  // 29.09.): what the plan part stores is built in one literal - the link,
-  // when, the player's own name and the weapons - and Questlog's build name
-  // goes to the session only (state.planNames), in one line. Nothing of a
-  // fetch is spread into what is stored, and the names, items and gear a
-  // fetch brings are never read (CLAUDE.md, Questlog 3.4).
-  const eintrag = [...planPart.matchAll(/const eintrag: Plan = \{([^}]*)\};/g)].map((m) => m[1]);
-  const eintragKeys = eintrag.length === 1 ? [...eintrag[0].matchAll(/(\w+)\s*:/g)].map((m) => m[1]).sort().join() : "";
-  const qlName = planPart.split("\n").filter((l) => /\bd\.name\b/.test(l)).map((l) => l.trim());
-  const qlMehr = planPart.match(/\.\.\.\s*(?:d|r)\b|\br\.(?:names|gear)\b|\bd\.(?:active|passive|mastery|gear)\b|Object\.assign\(/g) || [];
-  check(eintrag.length === 1 && eintragKeys === "at,link,name,weapons" && /\bname: eigen\b/.test(eintrag[0])
-      && JSON.stringify(qlName) === JSON.stringify(['if(typeof d.name === "string") state.planNames[id] = d.name.slice(0, 60);']) && !qlMehr.length,
-    "the plan part stores only link, time, the player's own name and the weapons; Questlog's build name stays in the session",
-    `literal: ${eintragKeys}; d.name: ${qlName.join(" | ")}; also: ${qlMehr.join(" | ")}`);
-  // Fixrunde 1 zu Aufgabe 12: a name is set only to the player's own or to
-  // "" - never to what an entry or the session held before - and the session
-  // names are written in that one line above and read in one line, for the
-  // card (comments aside)
-  const planCode = planPart.replace(/\/\*[\s\S]*?\*\//g, "").replace(/\/\/[^\n]*/g, "");
-  const nameSetzt = [...planCode.matchAll(/\.name\s*=(?!=)\s*([^;\n]*)/g)].map((m) => m[1].trim()).filter((v) => v !== '""' && v !== "eigen");
-  const sitzung = planCode.split("\n").filter((l) => /planNames/.test(l)).map((l) => l.trim());
-  check(!nameSetzt.length && sitzung.length === 2
-      && sitzung[0] === 'if(typeof d.name === "string") state.planNames[id] = d.name.slice(0, 60);'
-      && /^name: e\.name \|\| state\.planNames\[id\] \|\| /.test(sitzung[1]),
-    "the plan part sets a name only to the player's own or to \"\", and reads the session names only for the card",
-    `set: ${nameSetzt.join(" | ")}; planNames: ${sitzung.join(" | ")}`);
+  // the Builds tab, the plans and the Questlog request are gone (#207). Nothing
+  // of the page may bring them back: the parts 47-builds, 51-plan and
+  // 67-build-feld and the core plan-core are not there; no part and no file
+  // beside app/ names an /api/ route of the builds or plans, the state of
+  // either, the player's two files or the functions that wrote a build
+  // (comments and strings count too). The party report, the party logs, the
+  // bug report and the image never saw the builds, and now there is nothing
+  // for them to see.
+  const GONE_FILES = ["47-builds.ts", "51-plan.ts", "67-build-feld.ts"].filter((f) => existsSync(join(pageDir, f)))
+    .concat(["plan-core.ts"].filter((f) => existsSync(join(rendererDir, f))));
+  const GONE_NAMES = /\/api\/(?:builds|plans?)\b|\b(?:planNames|buildWahl)\b|\bstate\.(?:builds|plans)\b|boro-(?:builds|plans)|\b(?:BauStore|PlanStore|buildAnlegen|buildAendern|buildLoesen|buildWiederherstellen|kampfZuordnen|renderBuilds|syncBuildFeld|syncKampfQuestlog)\b/;
+  const goneNamed = Object.keys(page).sort().filter((f) => GONE_NAMES.test(page[f]));
+  check(!GONE_FILES.length && !goneNamed.length,
+    "the Builds tab, the plans and the Questlog request stay gone: no page part names their routes, state, files or functions",
+    `files: ${GONE_FILES.join(", ")}; named in: ${goneNamed.join(", ")}`);
+  // 13b.15: the guild's names stay on this computer (spec Gilde 8). Its core
+  // (gilde-core.ts) is pure and asks nothing; its part (68-gilde.ts, since
+  // plan task 5 there under its name) fetches nothing but /api/gilde.
+  // Neither names the party or Questlog, and the party report, the party logs
+  // and the bug report never name the guild.
+  check(existsSync(join(rendererDir, "gilde-core.ts")), "the guild's core is there under its name");
+  check(existsSync(join(pageDir, "68-gilde.ts")), "the guild's part is there under its name");
+  // The one import the core may make is the class table (klassen-core.ts, as
+  // pure as it is - read here under the same bans); any other import trips.
+  const klassenCore = outer["../klassen-core.ts"] ?? "";
+  check(existsSync(join(rendererDir, "klassen-core.ts")), "the class table's core is there under its name");
+  const gildeCore = (outer["../gilde-core.ts"] ?? "").replace(/^import \{[^}]*\} from "\.\/klassen-core";$/m, "") + "\n" + klassenCore;
+  // The one thing the guild's part takes from the party's part: the names
+  // this session already knows, for "Aus der Gruppe uebernehmen" (spec Gilde
+  // 4, on a click, each name ticked by hand). Exactly this import line is
+  // read past here - any other line naming the party still trips - and the
+  // function it imports is pinned as written: the session's colour names and
+  // the board standing now, without the sample party; nothing goes the other
+  // way (the party report, logs and bug report never name the guild, below).
+  const GRUPPEN_IMPORT = 'import { gruppenNamen } from "./19-grouping-and-party-fights";';
+  const gildeRoh = part("68-gilde.ts");
+  const gildePart = gildeRoh.split("\n").filter((l) => l !== GRUPPEN_IMPORT).join("\n");
+  // What the guild's part may import: exactly the modules it uses (plan task 5) - state, words, weapon
+  // marks, esc, the names line above, SERVED, its core and the class table. Anything else trips.
+  const GILDE_IMPORTE = ["./01-state", "./08-translation", "./09-weapon-icons", "./18-interface-basics", "./19-grouping-and-party-fights",
+    "./41-server-mode", "../gilde-core", "../klassen-core"];
+  const gildeImporte = [...gildeRoh.matchAll(/\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\brequire\s*\(/gm)]
+    .map((m) => m[1] ?? m[2] ?? "require(");
+  check(gildeImporte.length > 0 && gildeImporte.every((x) => GILDE_IMPORTE.includes(x)),
+    "the guild's part imports only its listed modules (state, words, weapon marks, esc, the session's names, SERVED, its core, the class table)",
+    `imports: ${gildeImporte.join(" | ")}`);
+  // the protected space and the middle dot stand as escapes in code (CLAUDE.md), never as raw characters
+  const rohZeichen = [["68-gilde.ts", gildeRoh], ["gilde-core.ts", outer["../gilde-core.ts"] ?? ""], ["klassen-core.ts", outer["../klassen-core.ts"] ?? ""]]
+    .filter(([, text]) => /[\u00a0\u00b7]/.test(text)).map(([n]) => n);
+  check(!rohZeichen.length, "the guild's part, its core and the class table write the protected space and the middle dot as escapes, never raw",
+    `raw in: ${rohZeichen.join(" | ")}`);
+  const namenFn = /\nexport function gruppenNamen\(\): string\[\] \{\n([\s\S]*?)\n\}\n/.exec(part("19-grouping-and-party-fights.ts"));
+  check(!!namenFn && namenFn[1] === "  mitgliederMerken(((state.party && state.party.board) || []).map(r => r.name));\n" +
+      "  return [...mitgliedNr.keys()].filter(n => !/^Beispiel [A-C]$/.test(n));",
+    "the guild takes from the party's part only the names this session knows (gruppenNamen as written)",
+    `body: ${namenFn ? namenFn[1] : "(missing)"}`);
+  const REACH = /XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|navigator\.share\b/g;
+  const gildeFetch = [...gildePart.matchAll(/\bfetch\b\s*(?:\(\s*([^,)]*))?/g)].map((m) => (m[1] ?? "").trim());
+  const gildeReach = [...(gildePart.match(REACH) || []), ...(gildeCore.match(REACH) || []),
+    ...[...gildeCore.matchAll(/\bfetch\b|\bimport\b|\brequire\b/g)].map((m) => "gilde-core.ts: " + m[0]),
+    ...[gildePart, gildeCore].flatMap((s) => s.match(/party|questlog/gi) || [])];
+  check(gildeFetch.length > 0 && gildeFetch.every((a) => a === '"/api/gilde"') && !gildeReach.length,
+    "the guild's part fetches nothing but /api/gilde, its core nothing at all, and neither names the party or Questlog",
+    `fetch: ${gildeFetch.join(" | ")}; also: ${gildeReach.join(" | ")}`);
+  // The files the guild hands out (the image, the calendar file, plan task 7) leave only as a Blob of its
+  // own: every link the part sets is exactly URL.createObjectURL(...), in one place, and nothing in it loads
+  // a picture or a page by address (no new Image, no src, no href or src by setAttribute).
+  const gildeHref = [...gildePart.matchAll(/\.\s*href\s*=(?!=)\s*([^;\n]*)|\[\s*["'`]href["'`]\s*\]\s*=(?!=)\s*([^;\n]*)/g)]
+    .map((m) => (m[1] ?? m[2] ?? "").trim());
+  check(gildeHref.length === 1 && /^URL\.createObjectURL\([A-Za-z_$][\w$]*\)$/.test(gildeHref[0]),
+    "the guild's part sets a link only to a Blob of its own (URL.createObjectURL), in one place", `href: ${gildeHref.join(" | ")}`);
+  const gildeLaden = gildePart.match(/\bnew\s+Image\b|\.\s*src\s*=(?!=)|\[\s*["'`]src["'`]\s*\]\s*=(?!=)|\.setAttribute\(\s*["'`](?:href|src)["'`]/gi) || [];
+  check(!gildeLaden.length, "the guild's part loads no picture or page by address (no new Image, no src, no href or src by setAttribute)",
+    `found: ${gildeLaden.join(" | ")}`);
+  const gildeOut = ["35-party-log-files.ts", "42-party.ts", "44-bug-report.ts"].filter((f) => /gilde/i.test(part(f)));
+  check(!gildeOut.length, "the party report, the party logs and the bug report never name the guild",
+    `found in: ${gildeOut}`);
   // the Steckbrief part (spec Steckbrief 6) went with Aufgabe 12 of the
   // redesign (29.09.), and with it its core: no page part imports either.
   // Should 52-steckbrief.ts come back, the rule after this one still reads
@@ -2889,11 +3036,18 @@ async function auditPage() {
   const histLit = (histBody.match(/const f: HistFight = \{([\s\S]*?)\};/) || [null, ""])[1];
   const histKeys = [...histLit.matchAll(/\b(\w+)\s*:/g)].map((m) => m[1]).sort().join();
   const histSets = [...histBody.matchAll(/\bf\.(\w+)\s*=(?!=)/g)].map((m) => m[1]).sort().join();
-  check(histKeys === "at,dmg,dps,dur,name" && histSets === "b,c,crit,heavy,hits,miss"
+  // the group mark g (06.10.2026): the sum of a group, opened with
+  // "everyone", is set in exactly one line and only to the number 1 - never
+  // a name, never the chosen attacker
+  check(histKeys === "at,dmg,dps,dur,name" && histSets === "b,c,crit,g,heavy,hits,miss,w"
       && !/Object\.assign\(\s*f\b|\bf\s*\[|\(f as\b|\.\.\.f\b/.test(histBody)
       && histBody.includes("\n    const miss = seg.missed || 0;\n")
-      && histBody.includes("\n    f.hits = st.hits + miss; f.crit = st.crit; f.heavy = st.heavy; f.miss = miss;\n"),
-    "the history index takes per fight only its known fields, hits, crit, heavy and miss as whole numbers",
+      && histBody.includes("\n    f.hits = st.hits + miss; f.crit = st.crit; f.heavy = st.heavy; f.miss = miss;\n")
+      && histBody.includes("\n    const b = altB.get(seg.start);\n    if(b) f.b = b;\n")
+      && histBody.includes("\n    const w = paarCode(paarVon(seg, histStill) ?? []);\n    if(w) f.w = w;\n")
+      && histBody.includes("\n    if(state.players.length > 1 && state.player === \"__all\") f.g = 1;\n")
+      && [...histBody.matchAll(/\bf\.g\b/g)].length === 1,
+    "the history index takes per fight only its known fields, hits, crit, heavy and miss as whole numbers, the pair w as two numbers, b carried over and the group mark g as 1",
     `literal: ${histKeys}; assigned: ${histSets}`);
   // Records (spec Rekorde 3, Fixrunde 1, 02.10.2026): the fight's top hit
   // joins the index only through topDazu - called once in histRecord, after
@@ -2941,12 +3095,49 @@ async function auditPage() {
   // best pulls and the save, and Ventius learns nothing while it runs
   const v15 = part("15-weapons-and-ventius.ts");
   const stillAt = histBody.indexOf("\n  if(histStill){ histStillFights = fights; return; }\n");
-  check(histBody.includes("\n    const b = histStill ? null : bauFuer(seg, i);\n") && [...histBody.matchAll(/\bbauFuer\s*\(/g)].length === 1
-      && stillAt > 0 && stillAt < histBody.indexOf("state.hist.files[key]") && stillAt < histBody.indexOf("bestRecord(") && stillAt < histBody.indexOf("persistPref(")
+  check(!/\bbauFuer\b/.test(histBody)
+      && stillAt > 0 && stillAt < histBody.indexOf("const alt = state.hist.files[key];") && stillAt < histBody.indexOf("bestRecord(") && stillAt < histBody.indexOf("persistPref(")
       && h32.includes("\n        setVentiusLernen(false);\n        segment();\n") && h32.includes("\n    histStill = false; setVentiusLernen(true);\n")
       && /\nexport function learnVentius\(segs: Encounter\[\]\)\{\n  if\(!ventiusLernen\) return;\n/.test(v15),
     "the records' re-read makes no build, no best pull and teaches Ventius nothing; it stores only the index entry",
     `bauFuer: ${[...histBody.matchAll(/[^\n]*\bbauFuer\s*\([^\n]*/g)].map((m) => m[0].trim()).join(" | ")}; early return at ${stillAt}`);
+  // Builds-Reiter (#207): the Builds tab is gone, and a fight gets no build any
+  // more. histRecord only carries a b over from the earlier index entry of
+  // the same file (an old assignment; nothing reads or shows it). No other
+  // `.b =` on a fight in any page part.
+  const bSets = Object.keys(parts).sort().flatMap((f) => [...parts[f].matchAll(/^[^\n]*(?:\.b|\[\s*["'`]b["'`]\s*\])\s*(?:\?\?|\|\||&&)?=(?!=)[^\n]*/gm)].map((m) => `${f}: ${m[0].trim()}`));
+  const B_SETS = ["32-history.ts: if(b) f.b = b;"];
+  check(JSON.stringify(bSets) === JSON.stringify(B_SETS),
+    "a fight gets a b only carried over in histRecord, never assigned anew",
+    `found: ${bSets.filter((l) => !B_SETS.includes(l)).join(" | ")}`);
+  // Builds-Reiter (spec 9 and 12): the recognition by skills is gone and must not
+  // come back quietly. No page part and no file beside app/ names coreFromSkills
+  // or fingerprint (not even in a comment), and none reads `core` of a build:
+  // no `.core` or `?.core`, no `["core"]` or `"core" in`, no `core` between
+  // braces (a destructuring, an object). types.ts may declare the field (Bau.core stays in
+  // boro-builds.json for builds recognised before #51); build-core.ts checks its
+  // form in looksLikeBau - exactly the two lines listed here, nothing else.
+  // "bars.core" is a text key, not a read: a `.core` right before a quote or
+  // part of a longer word does not count. A read continued on the next line
+  // (`state.builds[id]!` and `.core` below it, or `.` and `core` below it) is
+  // folded into one line first (Fixrunde 1, Minor 3). The names of the old
+  // recognition count too: sameBau, findBau, bauNummern, and bauId as a call
+  // (`bauId` alone is a variable name in 54-deine-rotation.ts).
+  const pageFiles = { ...parts, ...outer };
+  const CORE_READ = /[\w$)\]!]\s*\??\.\s*core\b(?![\w$"'`-])|\[\s*["'`]core["'`]\s*\]|["'`]core["'`]\s+in\b|\{[^{}\n]*(?<![\w$.\-"'`])core(?![\w$\-"'`])[^{}\n]*\}/;
+  const recog = Object.keys(pageFiles).sort().flatMap((f) => [...pageFiles[f].matchAll(/^[^\n]*\b(?:coreFromSkills|fingerprint|sameBau|findBau|bauNummern)\b[^\n]*|^[^\n]*\bbauId\s*\([^\n]*/gim)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const gefaltet = (src) => src.replace(/\s*\n\s*(?=\??\.\s*core\b)/g, "").replace(/(\??\.)[ \t]*\n\s*(?=core\b)/g, "$1");
+  const coreLines = (f) => gefaltet(pageFiles[f]).split("\n").filter((l) => CORE_READ.test(l)).map((l) => l.trim());
+  const coreReads = Object.keys(pageFiles).sort().filter((f) => f !== "../build-core.ts" && f !== "../types.ts")
+    .flatMap((f) => coreLines(f).map((l) => `${f}: ${l}`));
+  const typeCore = pageFiles["../types.ts"] === undefined ? ["types.ts missing"] : coreLines("../types.ts");
+  // build-core.ts no longer holds the form of a build (#207): no line of it reads core either
+  const KERN_ZEILEN = [];
+  const bcCore = pageFiles["../build-core.ts"] === undefined ? ["build-core.ts missing"] : coreLines("../build-core.ts");
+  check(!recog.length && !coreReads.length && !typeCore.length && JSON.stringify(bcCore) === JSON.stringify(KERN_ZEILEN),
+    "no page part reads core of a build or names coreFromSkills or fingerprint (the recognition by skills stays gone)",
+    `recognition: ${recog.join(" | ")}; core read: ${coreReads.join(" | ")}; types.ts: ${typeCore.join(" | ")}; build-core.ts: ${bcCore.join(" | ")}`);
   // the records part reads older logs only through the two routes of
   // "Earlier days" (spec Nachtraege N3), GET /api/logs and GET /api/log, and
   // sends nothing itself: what it reads goes into the history through 32
@@ -2981,7 +3172,9 @@ async function auditPage() {
     "41-server-mode.ts: if(state.zweiFenster) setKompaktOffen(!!(s.kompakt && s.kompakt.offen));",
     "41-server-mode.ts: kompaktFensterStart(!!(s.kompakt && s.kompakt.durch));",
     "41-server-mode.ts: if(s.kompakt && s.kompakt.live && serverDir && !isWatching()) beginServedWatch();",
-    "41-server-mode.ts: else void streifenFolgt(s.kompakt);"];
+    "41-server-mode.ts: else void streifenFolgt(s.kompakt);",
+    // Windows-Einbindung 5.1: das Flag "kompakt" eines Auftrags aus der Sprungliste (start in /api/state), kein Dateiname
+    "66-windows.ts: if(a.kompakt && !kompaktIstOffen()) $(\"#btnCompact\").click();"];
   const kompaktReads = Object.keys(parts).sort().flatMap((f) => [...parts[f].matchAll(/^[^\n]*[\w$)\]]\s*\.\s*kompakt\b[^\n]*/gm)]
     .map((m) => `${f}: ${m[0].trim()}`));
   const kompaktOther = Object.keys(parts).flatMap((f) => [...parts[f].matchAll(/\[\s*["'`]kompakt["'`]\s*\]|\{[^{}]*\bkompakt\b[^{}]*\}\s*=[^=>]/g)]

@@ -393,7 +393,9 @@ export function renderStack(): number | null {
     const oben = mt.actualBoundingBoxAscent || 8, unten = mt.actualBoundingBoxDescent || 2;
     const p = {x: Math.round(cx - mt.width / 2 - 4), y: Math.round(y - oben - 2), w: Math.round(mt.width + 8),
                h: Math.round(oben + unten + 4), text: txt};
-    k.fillStyle = cssv("--comb");
+    // Rauchglas auf Mica: die Leinwand liegt in einem Feld mit Scheibe,
+    // ein deckendes Rechteck stuende darin als Kasten
+    k.fillStyle = document.documentElement.classList.contains("mica") ? cssv("--mica-scheibe") || cssv("--comb") : cssv("--comb");
     k.beginPath();
     if(k.roundRect) k.roundRect(p.x, p.y, p.w, p.h, 2); else k.rect(p.x, p.y, p.w, p.h);
     k.fill();
@@ -562,8 +564,9 @@ export function setup(): void {
   document.addEventListener("keydown", e => {
     if(e.altKey || e.ctrlKey || e.metaKey) return;
     const el = e.target as HTMLElement;
-    /* Der Kopf: ein Tabstopp, links und rechts von Spalte zu Spalte, runter
-       in die erste Zeile. Enter und Leertaste sortieren wie bisher. */
+    /* Der Kopf: ein Tabstopp. Im Glutring traegt er den Knopf "Ordnen"
+       (64), der Enter und Leertaste selbst bedient; links und rechts von
+       Zelle zu Zelle, Pfeil runter in die erste Zeile. */
     const kopfZelle = el && el.closest && el.closest<HTMLElement>("#bars .bhead [tabindex]");
     if(kopfZelle){
       const kopf = [...$("#bars").querySelectorAll<HTMLElement>(".bhead [tabindex]")];

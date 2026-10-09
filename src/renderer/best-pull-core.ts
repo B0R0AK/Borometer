@@ -37,49 +37,57 @@ export function cutCasts(list: PartyCasts[], ms: number): PartyCasts[] {
   return list.map(l => ({n: l.n, s: l.s, c: l.c.filter(c => c[0] < ms)})).filter(l => l.c.length > 0);
 }
 
+/* ---------- Die Regel fuer den besten Pull (Spezifikation Bester Pull 3) ----------
+   Eine Regel fuer jede Stelle, die "bester Pull" sagt: Goldpunkt der
+   Kampfwahl, Gegen deinen besten Pull, Rekorde, Verlauf. Erst die
+   Mindestlaenge, dann die meisten DPS (Entscheidung vom 04.10., #151): ein Fehlstart
+   mit starkem Opener ist nie der beste. Die Schwelle ist 60 s, oder die
+   halbe Laenge des laengsten Pulls, wenn die kuerzer ist - so hat auch ein
+   Boss, der nach 40 s liegt, einen besten Pull. Gemessen wird immer ueber
+   die ganze Menge am Boss, nie ueber einen Ausschnitt. An der Puppe ist die
+   Klasse (c) die Schwelle. */
+export interface Pull { at: number; dps: number; dur: number; c?: number }
+export const MINDEST_S = 60;
+export function mindestLaenge(pulls: readonly Pull[]): number {
+  let lang = 0;
+  for(const p of pulls) if(p.dur > lang) lang = p.dur;
+  return Math.min(MINDEST_S, lang / 2);
+}
+/** Die Kandidaten ab der Schwelle, nach DPS; bei gleicher DPS der fruehere zuerst. */
+export function rangfolge<T extends Pull>(pulls: readonly T[], min = mindestLaenge(pulls)): T[] {
+  return pulls.filter(p => p.dps > 0 && (p.c != null || p.dur >= min))
+    .sort((a, b) => b.dps - a.dps || a.at - b.at);
+}
+/* Der beste Pull, oder null. Ein bester von einem ist keine Auskunft
+   (#151, Punkt 2): erst ab zwei Pulls am Boss, kurze mitgezaehlt. */
+export function besterPull<T extends Pull>(pulls: readonly T[]): T | null {
+  return pulls.length < 2 ? null : rangfolge(pulls)[0] ?? null;
+}
+
 /* Zwei Plaetze je Boss. Derselbe Kampf (gleiches at) ersetzt sich selbst -
    ein Log, das erneut geladen wird oder beim Livelog waechst, zaehlt ihn
-   nicht doppelt. Der Rest wird nach DPS sortiert, die zwei besten bleiben. */
-export function mergeBest(entry: BestEntry | undefined, cand: BestPull): BestEntry {
+   nicht doppelt. Zuerst die Pulls ab der Schwelle min (Sekunden, von der
+   Seite ueber die ganze Menge gemessen), darin nach DPS: ein kurzer
+   Fehlstart verdraengt nie einen langen Pull. Ein kurzer bleibt, bis ein
+   langer seinen Platz braucht - geloescht wird nichts, was nicht ersetzt ist.
+   Bei gleicher DPS der fruehere, wie in rangfolge. */
+export function mergeBest(entry: BestEntry | undefined, cand: BestPull, min = 0): BestEntry {
   const pulls: BestPull[] = [cand];
   for(const p of [entry?.best, entry?.second]) if(p && p.at !== cand.at) pulls.push(p);
-  pulls.sort((x, y) => y.run.dps - x.run.dps);
+  const lang = (p: BestPull) => (p.run.seconds ?? 0) >= min ? 1 : 0;
+  pulls.sort((x, y) => lang(y) - lang(x) || y.run.dps - x.run.dps || x.at - y.at);
   return pulls[1] ? {best: pulls[0]!, second: pulls[1]} : {best: pulls[0]!};
 }
 
 /** Zwei Staende desselben Schlüssels; bei gleichem at gewinnt `newer`. */
-export function mergeEntries(older: BestEntry | undefined, newer: BestEntry): BestEntry {
-  let out = mergeBest(older, newer.best);
-  if(newer.second) out = mergeBest(out, newer.second);
+export function mergeEntries(older: BestEntry | undefined, newer: BestEntry, min = 0): BestEntry {
+  let out = mergeBest(older, newer.best, min);
+  if(newer.second) out = mergeBest(out, newer.second, min);
   return out;
 }
 
 export function sameEntry(a: BestEntry, b: BestEntry): boolean {
   return JSON.stringify(a) === JSON.stringify(b);
-}
-
-/** Ein Kampf, gegen den verglichen werden kann: "segN", "segN@60" oder "best|<key>|best|second". */
-export interface Candidate {
-  id: string;
-  dps: number;
-  /** Beginn auf der Uhr des Logs; null ohne Uhr */
-  at: number | null;
-}
-export type Target = { kind: "none" } | { kind: "best" | "isBest"; ref: Candidate };
-
-/* Der Bezug ist immer der staerkste der ANDEREN. Ist der gewaehlte Kampf
-   selbst staerker, ist er der beste, und der Bezug ist der zweitbeste - dann
-   "isBest". Derselbe Kampf im geladenen Log und im Speicher (gleiches at)
-   zaehlt einmal, als Kampf aus dem Log: der hat alles, auch seine Treffer. */
-export function pickTarget(cur: Candidate, cands: Candidate[]): Target {
-  const imLog = new Set(cands.filter(c => c.id.startsWith("seg") && c.at != null).map(c => c.at));
-  const andere = cands.filter(c =>
-    c.id !== cur.id && c.dps > 0 &&
-    !(c.at != null && c.at === cur.at) &&
-    !(!c.id.startsWith("seg") && c.at != null && imLog.has(c.at)));
-  if(!andere.length) return {kind: "none"};
-  const ref = andere.reduce((x, y) => (y.dps > x.dps ? y : x));
-  return {kind: cur.dps >= ref.dps ? "isBest" : "best", ref};
 }
 
 /** Eine Faehigkeit in der Rotation nebeneinander: Beginn ihrer Einsaetze in ms, oben (a) und unten (b). */

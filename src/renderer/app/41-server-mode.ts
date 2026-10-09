@@ -8,7 +8,7 @@ import { t, tt } from "./08-translation";
 import { ventiusTargetKey } from "./15-weapons-and-ventius";
 import { $ } from "./18-interface-basics";
 import { renderHead } from "./20-meter-head";
-import { streifenFolgt, tagAnsichtVerlassen } from "./23-kampfwahl";
+import { istLivePausiert, streifenFolgt, syncKwKnopf, tagAnsichtVerlassen } from "./23-kampfwahl";
 import { persistPref, renderWeapons } from "./27-weapons-tab";
 import { renderCompare } from "./28-compare";
 import { renderRuns } from "./30-fight-list";
@@ -16,16 +16,18 @@ import { histCollect, histRecord, loadTail, loadText, refreshPlayers, renderAll,
 import { looksLikeRun } from "./34-menus-drop-and-tabs";
 import { askText } from "./36-dialog";
 import {
-  applySeeThrough, clampSee, kompaktFensterStart, kopfHoehe, materialGemeldet, placeWindowChrome, randlosHinweis, setKompaktOffen,
+  applySeeThrough, clampSee, kompaktFensterStart, kopfHoehe, materialGemeldet, micaMerken, placeWindowChrome, randlosHinweis, setKompaktOffen,
   setUiZoom, syncRahmenKnoepfe, syncWindowVars, winPost
 } from "./37-window-size-and-overlay";
 import { applyTheme } from "./39-themes";
-import { pollParty, renderParty, serverStatusNachfuehren } from "./42-party";
+import { fightKey, pollParty, renderParty, serverStatusNachfuehren } from "./42-party";
 import { applyDevMode } from "./43-more-menu-and-dev-mode";
 import { isWatching, liveSay, renderStart, setWatching, syncLiveBtn } from "./45-startup";
 import { setzeUpdate, updateNachfragen } from "./55-statusleiste";
 import { einstNachfuehren, updateSchalterStand } from "./57-einstellungen";
 import { rundgangVonSelbst } from "./63-rundgang";
+import { kampfZustand, wachstum, type KampfMarke } from "../kompakt-core";
+import { gelesenMelden, kampfWache, spracheGelesen, startAuftragHolen } from "./66-windows";
 import type { SavedRun } from "../types";
 
 /* ============================================================
@@ -57,6 +59,8 @@ let stand: { file: string; to: number; len: number; head: string } | null = null
 /* Ein Takt nach dem anderen: zwei gleichzeitige haetten dasselbe Ende
    zweimal angehaengt. */
 let fragtGerade = false;
+/* Die Datei, die dieser Lauf ab Byte 0 liest; "" nach Beenden. */
+let vonVorn = "";
 
 /* Das Ende ab einem Byte, als JSON vom Helfer - oder null, wenn er es so
    nicht gibt (409: eine andere oder kuerzere Datei, 400, ein 500 als Text,
@@ -82,6 +86,36 @@ async function pollServer(){
   fragtGerade = true;
   try { await takt(); } finally { fragtGerade = false; }
 }
+/* Im Kampf oder danach (Spezifikation Kompakt-Fenster 3): der neueste Kampf
+   nach dem letzten Abruf und wann er zuletzt wuchs - an der Uhr der Seite,
+   nicht der des Logs. Ein neuer Lauf faengt ohne beides an. */
+let marke: KampfMarke = null;
+let gewachsen: number | null = null;
+/* Der erste Takt eines Laufs und jeder erste Takt mit einer anderen Datei
+   merkt sich nur die Marke: was dasteht, laeuft nicht deshalb. Danach ist
+   auch der erste Kampf eines leeren Logs Wachstum. */
+let ersterTakt = true;
+let markeDatei = "";
+function markeJetzt(): KampfMarke {
+  const neu = state.encounters[0];   // die Liste ist nach Beginn absteigend sortiert (05-fights.ts)
+  return neu ? {key: fightKey(neu), ende: neu.end} : null;
+}
+function wachstumNachziehen(datei: string){
+  const jetzt = markeJetzt();
+  if(datei !== markeDatei){ markeDatei = datei; marke = null; gewachsen = null; ersterTakt = true; }
+  gewachsen = wachstum(marke, jetzt, gewachsen, Date.now(), !ersterTakt);
+  marke = jetzt;
+  ersterTakt = false;
+}
+/** Laeuft der gewaehlte Kampf gerade (Live, der neueste, gewachsen vor weniger als der Kampftrennung)? */
+export function kampfLaeuft(): boolean {
+  return kampfZustand({live: isWatching() && !istLivePausiert(), neuester: state.sel === 0,
+    seitWachstumMs: gewachsen == null ? Infinity : Date.now() - gewachsen, trennS: state.gap}) === "kampf";
+}
+/** Wie lange er noch als laufend gilt, in ms (fuer den Wecker im Kopf). */
+export function kampfRestMs(): number {
+  return gewachsen == null ? 0 : Math.max(0, state.gap * 1000 - (Date.now() - gewachsen));
+}
 async function takt(){
   const lauf = watchLauf;
   try{
@@ -93,7 +127,7 @@ async function takt(){
     // kept so a bug report can name the settings file: which one is in use
     // stopped being obvious the moment it left the folder beside the exe
     state.srv = s;
-    if(serverDir !== (s.dir || "")){ serverDir = s.dir || ""; einstNachfuehren(); renderStart(); }
+    if(serverDir !== (s.dir || "")){ serverDir = s.dir || ""; einstNachfuehren(); renderStart(); syncKwKnopf(); }
     if(!s.dir){
       /* Kein Ordner mehr: es gibt nichts zu beobachten, also wirklich aus.
          serverDir ist jetzt leer, der naechste Klick fragt nach einem. */
@@ -128,6 +162,7 @@ async function takt(){
       if(!d) throw new Error("no answer from the helper");
       stand = null;
       if(d.text) loadText(d.text, [s.file], true, true);
+      vonVorn = s.file;
       /* Zurueck aus der Pause mit derselben Datei: Zeitschnitt und geloeste
          Kaempfe wie vorher (pauseMerk). Eine andere Datei faengt frisch an. */
       const merk = pauseMerk;
@@ -145,8 +180,17 @@ async function takt(){
     /* Die Signatur gilt erst, wenn alles bis zur Groesse gelesen ist; eine
        halbe letzte Zeile oder die 8-MB-Grenze lassen den naechsten Takt
        wieder fragen. */
+    wachstumNachziehen(s.file);
+    // renderAll hat vor dem Nachziehen gezeichnet: hat sich der Zustand geaendert, den Kopf neu
+    if(kampfLaeuft() !== document.body.classList.contains("kampf-laeuft")) renderHead();
     lastSig = d.to === d.size && d.size === s.size ? sig : "";
+    /* Ganz von vorn bis zum Ende gelesen - auch ueber mehrere Stuecke, wenn
+       das Log groesser ist als eine Antwort: fuer "Zuletzt gelesen" in der
+       Sprungliste (66, meldet denselben Namen nur einmal hintereinander). */
+    if(vonVorn === s.file && d.to === d.size) gelesenMelden(s.file);
     liveSay(s.file);
+    // ist der neueste Kampf fuer die Meldung beendet? (66)
+    kampfWache();
   }catch(err){
     if(lauf !== watchLauf) return;
     /* Der Helfer antwortet nicht. Die Abfrage laeuft weiter und faengt sich
@@ -159,6 +203,7 @@ async function takt(){
 }
 let watchTimer: ReturnType<typeof setInterval> | null = null;
 function beginServedWatch(){
+  marke = null; gewachsen = null; ersterTakt = true; markeDatei = "";
   // ein frueherer Tag in der Kampfwahl ist damit verlassen (Nachtraege N3)
   tagAnsichtVerlassen();
   watchLauf++;
@@ -170,12 +215,15 @@ function beginServedWatch(){
    sagt nur, was im Ordner liegt, wenn man ihn fragt. lastSig geht mit,
    damit ein neuer Start den neuesten Kampf wieder laedt, wie beim ersten. */
 function stopServedWatch(pause = false){
+  marke = null; gewachsen = null; ersterTakt = true; markeDatei = "";
   watchLauf++;
   clearInterval(watchTimer ?? undefined);
-  watchTimer = null; lastSig = ""; stand = null;
+  watchTimer = null; lastSig = ""; stand = null; vonVorn = "";
   if(!pause) pauseMerk = null;
   setWatching(false, undefined, pause);
   liveSay(() => t("top.notWatching"));
+  // "Kampf laeuft" gilt nur bei laufendem Live: den Kopf gleich neu, nicht erst mit dem Wecker
+  renderHead();
 }
 /* Fruehere Tage (Nachtraege N3): ein frueherer Tag pausiert das Mitlesen -
    wie Beenden, nur sagt der Satz "pausiert". true, wenn Live lief; dann
@@ -214,7 +262,7 @@ export async function chooseServerDir(){
     .then(d => {
       if(d.ok){ serverDir = d.dir; lastSig = ""; stand = null; einstNachfuehren();
         // Start zeigt jetzt "Zuletzt geoeffnet" statt der Einrichtung (DECISION 1.12)
-        document.body.dataset.bereit = "ordner"; renderStart();
+        document.body.dataset.bereit = "ordner"; renderStart(); syncKwKnopf();
         toast(tt("live.nowWatching",{dir:d.dir})); beginServedWatch(); }
       else toastFail(tt("toast.noSuchFolder"));
     })
@@ -371,6 +419,15 @@ export function setup(): void {
       state.ersterStart = c.firstStart === true
         && !(c.logIndex && typeof c.logIndex === "object" && Object.keys(c.logIndex).length);
       rundgangVonSelbst();
+      // die gespeicherte Sprache des Hauptprozesses; weicht die Seite ab, schreibt sie ihre (66)
+      spracheGelesen(c.lang);
+      /* Windows (Windows-Einbindung 9, 3.4): den Abschnitt gibt es nur, wenn
+         der Hauptprozess windows meldet (eigenes Fenster unter Windows); jeder
+         Schalter gilt nur als an, wenn er ausdruecklich true ist. Gezeigt wird
+         er mit dem naechsten einstNachfuehren (updateSchalterStand gleich hier). */
+      state.win = c.windows && typeof c.windows === "object" ? {da: c.windows.da === true, autostartDa: c.windows.autostartDa === true,
+        autostart: c.windows.autostart === true, melden: c.meldenKampf === true, nurBest: c.meldenNurBest === true,
+        tray: c.trayBeimSchliessen === true} : null;
       // der Update-Hinweis: aus, solange nicht ausdruecklich an (Spezifikation Update-Hinweis 2.4)
       updateSchalterStand(c.updatePruefen === true);
       // eingeschaltet: die Antwort von GitHub kann nach dem ersten /api/state kommen (55)
@@ -388,6 +445,7 @@ export function setup(): void {
     fetch("/api/state").then(r => r.json()).then(s => {
       serverDir = s.dir || "";
       einstNachfuehren();
+      syncKwKnopf();   // mit Log-Ordner hat die Pille auch ohne Log etwas zu waehlen (#155)
       // was der Hauptprozess beim Start bei GitHub fand, geprueft (55)
       setzeUpdate(s.update);
       /* Nur das eigene Fenster bekommt den nativen Rahmen. nativeFrame meldet
@@ -398,6 +456,7 @@ export function setup(): void {
       if(s.nativeFrame && OWN_WINDOW){
         eigenerRahmen();
         document.documentElement.classList.toggle("acrylic", !!s.material);
+        micaMerken(s);   // Rauchglas: liegt das grosse Fenster auf Mica (37)
         // erst jetzt die Durchsicht des Kompaktfensters (Kompakt-Fix 4, 37)
         if(KOMPAKT_FENSTER) materialGemeldet();
         /* Schon kompakt, bevor /api/state da war (Taskleistenknopf oder
@@ -439,6 +498,10 @@ export function setup(): void {
       /* Start: kennt der Helfer keinen Log-Ordner, sagt die Einrichtung das
          jetzt (DECISION 1.12); sonst steht "Zuletzt geoeffnet" da. */
       renderStart();
+      /* Ein Auftrag aus der Sprungliste (66): erst jetzt, wo Log-Ordner und
+         Kompakt als eigenes Fenster bekannt sind - "live" und "kompakt"
+         klicken dieselben Knoepfe wie der Spieler. */
+      void startAuftragHolen();
     }).catch(() => { if(!document.body.dataset.bereit) document.body.dataset.bereit = "ohne"; renderStart(); });
     fetch("/api/party/server").then(r => r.json()).then(s => { state.partyServer = s.server || ""; if(state.tab === "party") renderParty(); serverStatusNachfuehren(); }).catch(() => {});
     pollParty();

@@ -95,9 +95,8 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
     if (path === "/api/config") { s.posts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
     if (path === "/api/win") return json({ ok: true, max: false, w: 400, h: 28, on_top: true });
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
-    // die Builds, wie die Seite sie in boro-builds.json schreibt (Aufgabe 12: ihre Namen stehen nur noch im Verlauf)
-    if (path === "/api/builds" && req.method() === "POST") { const b = JSON.parse(req.postData() || "{}"); s.baue[b.id] = b.build; return json({ ok: true }); }
+    // der Builds-Reiter ist entfallen (#207): jede Frage nach /api/builds oder /api/plans wird gezaehlt (soll nie kommen)
+    if (/^\/api\/(builds|plans)/.test(path)) s.baue[req.method() + " " + path] = (s.baue[req.method() + " " + path] || 0) + 1;
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
     if (path.startsWith("/api/")) return json({ ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
@@ -179,7 +178,7 @@ const laden = async (p, n = 5) => {
   await p.evaluate(() => document.querySelector("#btnWatch").click());
   await p.waitForFunction((m) => document.querySelectorAll("#fightList .fight").length >= m, n, { timeout: 8000 });
   await p.evaluate(() => {
-    const v = [...document.querySelectorAll("#fightList .fight")].filter((f) => /Vulcanus/.test(f.textContent));
+    const v = [...document.querySelectorAll("#fightList .fight")].filter((f) => /^Vulcanus, /.test(f.getAttribute("aria-label") || ""));   // folgt #152/#155: Pull-Zeilen heissen "Pull N", der Vorleser-Name traegt den Boss
     v[1].click();
   });
   await p.waitForFunction(() => !document.querySelector("#app").hidden);
@@ -334,7 +333,18 @@ try {
       dps: document.querySelector("#hDps").textContent.trim() }));
     assert(nachher.felder && nachher.boss === kopfKampf.boss && nachher.dps.includes(kopfKampf.dps),
       "Live: nach einem neuen Kampf nennt die Kopfzeile den gewaehlten Kampf", { nachher, kopfKampf });
-    assert(nachher.dps !== vorher.dps || nachher.zeit !== vorher.zeit, "Live: der neue Kampf aendert die Kopfzeile", { vorher, nachher });
+    // folgt #153: Live bleibt beim gelesenen Kampf - die Kopfzeile bleibt, wie sie war
+    assert(nachher.boss === vorher.boss && nachher.zeit === vorher.zeit && nachher.dps === vorher.dps,
+      "Live: ein neuer Kampf aendert die Kopfzeile des gelesenen Kampfs nicht", { vorher, nachher });
+    // den neuesten waehlen: die Kopfzeile folgt dem gewaehlten Kampf
+    await p.evaluate(() => document.querySelector('#fightList .fight[data-i="0"]').click());
+    await p.waitForTimeout(500);
+    const neuest = await blick(p);
+    const kopfNeuest = await p.evaluate(() => ({ boss: document.querySelector("#hName").textContent.trim(),
+      dps: document.querySelector("#hDps").textContent.trim() }));
+    assert(neuest.felder && neuest.boss === kopfNeuest.boss && neuest.dps.includes(kopfNeuest.dps) &&
+      (neuest.dps !== vorher.dps || neuest.zeit !== vorher.zeit),
+      "Live: den neuen Kampf gewaehlt, die Kopfzeile nennt ihn und weicht von vorher ab", { vorher, neuest, kopfNeuest });
     assert(!s.fehler.length, "Live: keine Fehler", s.fehler);
     await p.close();
   }
@@ -684,12 +694,12 @@ try {
     }
   }
 
-  // --- 8. (Aufgabe 4) Verlauf: Liste und Detail als Felder, Punktediagramm, Spalte Build
+  // --- 8. (Aufgabe 4) Verlauf: Liste und Detail als Felder, Punktediagramm (die Spalte Build entfiel mit #207)
   /* Folgt Entwurf (Neugestaltung 28.09., Luecken 6): statt Bossliste und Detail
      nebeneinander stehen das Diagramm (#histPlotFeld) und die Liste "Kaempfe"
      (#histDetail) als zwei Felder untereinander; x ist das Datum (6.2), der
      Median steht in der Legende, der beste ist gold, die Wahl traegt den Ring;
-     die Spalte Build steht an vierter Stelle (6.7), der Boss ist ein
+     die Spalte Build (6.7) entfiel mit dem Builds-Reiter (#207), der Boss ist ein
      Auswahlfeld (6.5). Die Proben pruefen dasselbe mindestens so streng. */
   {
     /* Was der Verlauf zeigt: die beiden Felder, das SVG, die Kreise mit ihren
@@ -729,8 +739,23 @@ try {
       };
     });
     const radius = (d) => 3 + Math.min(4, Math.sqrt(d / 30) * 1.6);
+    /* Alte Zuordnung (#207): das Verzeichnis, wie die Seite es beim ersten Lesen schreibt, dazu b an jedem
+       Vulcanus-Kampf aus der Zeit des Builds-Reiters. Die Seite liest b nicht mehr, zeigt es nicht und wirft keinen Fehler. */
+    let VER_INDEX = {};
+    {
+      const s = await oeffne({ app: true, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
+      await laden(s.page);
+      for (const ende = Date.now() + 8000; Date.now() < ende && !s.posts.some((x) => x.logIndex); ) await s.page.waitForTimeout(100);
+      const idx = s.posts.filter((x) => x.logIndex).at(-1)?.logIndex ?? {};
+      VER_INDEX = Object.fromEntries(Object.entries(idx).map(([k, e]) => [k, { ...e,
+        fights: e.fights.map((f) => (f.name === "Vulcanus" ? { ...f, b: "pve0000000" } : f)) }]));
+      const n = Object.values(VER_INDEX).flatMap((e) => e.fights).filter((f) => f.b).length;
+      assert(n === 4 && !s.fehler.length, "Verlauf: Vorbereitung, das Verzeichnis traegt vier Vulcanus-Kaempfe (b von Hand gesetzt)", { n, fehler: s.fehler });
+      await s.page.close();
+    }
     for (const [lang, breite] of [["en", 1280], ["de", 560]]) {
-      const s = await oeffne({ app: true, lang, breite, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
+      const s = await oeffne({ app: true, lang, breite, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) },
+        config: { logIndex: VER_INDEX } });
       const p = s.page;
       await laden(p);
       /* Neugestaltung 28.09. (DECISION 2.4, Entwurf Bereich Kampf): die Skala
@@ -767,9 +792,9 @@ try {
       assert(!!medZahl && Math.abs(zurueck(medZahl) - mitteDps) <= 50, `${wo}: dieselbe Zahl wie die Linie in der Legende (gerundet)`, { med: v.medText, mitteDps });
       assert(v.medText.startsWith("Median "), `${wo}: die Linie heisst Median`, v.medText);
       assert(v.name.includes("Median " + medZahl) && !/usual|sonst/.test(v.name), `${wo}: der Name nennt den Median, nicht "sonst"`, { name: v.name, med: v.medText });
-      // nur ein Build am Boss: dann rechnet "sonst" im Kampf ueber dieselben Kaempfe - zusaetzliche Probe, keine Gleichsetzung
+      // nur ein Waffenpaar am Boss: dann rechnet "sonst" im Kampf ueber dieselben Kaempfe - zusaetzliche Probe, keine Gleichsetzung
       assert(!!v.med && Math.abs(v.med.wert - ein.sonst) < 1e-6,
-        `${wo}: ein Build am Boss - "sonst" im Kampf hat hier denselben Wert`, { med: v.med, sonst: ein.sonst });
+        `${wo}: ein Waffenpaar am Boss - "sonst" im Kampf hat hier denselben Wert`, { med: v.med, sonst: ein.sonst });
       // folgt Entwurf 6: "bester" steht in der Legende, der hoechste Kreis ist gold
       assert(v.bestText === (lang === "de" ? "bester" : "best") && v.spitze === hoechster.k && hoechster.fill === v.tok.gold,
         `${wo}: "bester" ist der hoechste Kreis, in Gold, und steht in der Legende`, { best: v.bestText, spitze: v.spitze, hoechster });
@@ -778,19 +803,10 @@ try {
         `${wo}: dieser Kampf (der gewaehlte des Logs) ist ohne eigene Wahl der gewaehlte (Ring), nicht gold`, { dies, dieser: ein.dieser, ring: v.ring });
       assert(v.kreise.filter((c) => c.k !== v.spitze).every((c) => c.fill !== v.tok.gold && c.stroke !== v.tok.gold),
         `${wo}: sonst kein Gold an den Kreisen`, v.kreise);
-      // die Tabelle mit der Spalte Build
-      assert(v.kopf.length === 5 && v.kopf[3] === "Build", `${wo}: die Tabelle hat die Spalte Build (folgt Entwurf 6.7: an vierter Stelle)`, v.kopf);
-      /* folgt Aufgabe 12 (29.09.): der Bereich Builds zeigt Links zu Questlog, keine erkannten Builds mehr - die Namen
-         kommen darum aus dem, was die Seite in boro-builds.json schreibt: ohne eigenen Namen "Paar Nummer" wie
-         bauNameVon (47-builds.ts), die Waffen in der Sprache der Seite, die Nummer je Paar nach dem ersten Kampf */
-      for (const ende = Date.now() + 8000; Date.now() < ende && !Object.keys(s.baue).length; ) await p.waitForTimeout(100);
-      const DE = { Longbow: "Langbogen", Crossbow: "Armbrust", Dagger: "Dolch", Staff: "Stab" };
-      const paar = (w) => w.filter(Boolean).map((x) => (lang === "de" ? DE[x] || x : x)).join("/");
-      const ids = Object.keys(s.baue), nummer = (id) => ids.filter((o) => paar(s.baue[o].weapons) === paar(s.baue[id].weapons) &&
-        (s.baue[o].first < s.baue[id].first || (s.baue[o].first === s.baue[id].first && o <= id))).length;
-      const baue = ids.map((id) => s.baue[id].name || paar(s.baue[id].weapons) + " " + nummer(id));
-      assert(v.zeilen.length === 4 && baue.length >= 1 && v.zeilen.every((z) => baue.includes(z.zellen[3])),
-        `${wo}: je Zeile der Name des gespeicherten Builds`, { zeilen: v.zeilen.map((z) => z.zellen), baue });
+      // die Tabelle ohne die Spalte Build (#207): Tag, Uhrzeit, Dauer, DPS; ein altes b zeigt nichts, gefragt wird nichts
+      assert(v.kopf.length === 4 && !v.kopf.includes("Build"), `${wo}: die Tabelle hat vier Spalten, keine Spalte Build`, v.kopf);
+      assert(v.zeilen.length === 4 && v.zeilen.every((z) => z.zellen.length === 4) && !Object.keys(s.baue).length,
+        `${wo}: je Zeile vier Zellen; /api/builds und /api/plans werden nie gefragt`, { zeilen: v.zeilen.map((z) => z.zellen), baue: s.baue });
       assert(v.zeilen.filter((z) => z.cur).length === 1 && v.kreise.find((c) => c.cur)?.k === v.zeilen.find((z) => z.cur)?.k,
         `${wo}: dieselbe Zeile ist dieser Kampf`, v.zeilen);
       // Auswahl: genau eine Zeile, ihr Kreis mit Ring
@@ -880,25 +896,45 @@ try {
       assert(!s.fehler.length, "Fokus Bossliste: keine Fehler", s.fehler);
       await p.close();
     }
-    // ein Kampf aus der Zeit vor dem Bautagebuch (ohne b): in der Spalte Build ein Strich
+    // zwei Kaempfe ohne b neben denen mit altem b: alle sechs in Tabelle und Diagramm
     {
       /* zwei alte Kaempfe mit derselben, hoechsten DPS: "bester" in Diagramm
          und Tabelle ist derselbe, der erste (wie verlauf-core) */
       const alt = { "alt.txt": { size: 1, fights: [
         { name: "Vulcanus", dps: 99999, dmg: 5999940, dur: 60, at: Date.UTC(2026, 8, 1, 20, 0, 0) },
         { name: "Vulcanus", dps: 99999, dmg: 5999940, dur: 60, at: Date.UTC(2026, 8, 2, 20, 0, 0) }] } };
-      const s = await oeffne({ app: true, config: { logIndex: alt }, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
+      const s = await oeffne({ app: true, config: { logIndex: { ...alt, ...VER_INDEX } },
+        helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
       const p = s.page;
       await laden(p);
       await bereich(p, "history");
       await p.waitForTimeout(300);
       const v = await verlauf(p);
-      const leer = v.zeilen.filter((z) => z.zellen[3] === "\u2013");
-      assert(v.zeilen.length === 6 && leer.length === 2 && leer.every((z) => z.k === "0" || z.k === "1"), "ohne Build: ein Strich in der Spalte Build", v.zeilen.map((z) => z.zellen));
-      assert(v.kreise.length === 6 && !!v.med, "ohne Build: die Kaempfe stehen im Diagramm", v.kreise.length);
+      assert(v.zeilen.length === 6 && v.zeilen.every((z) => z.zellen.length === 4), "mit und ohne altes b: sechs Zeilen zu je vier Zellen", v.zeilen.map((z) => z.zellen));
+      assert(v.kreise.length === 6 && !!v.med, "mit und ohne altes b: die Kaempfe stehen im Diagramm", v.kreise.length);
       const beste = v.zeilen.filter((z) => z.best).map((z) => z.k);
       assert(beste.length === 1 && beste[0] === "0" && v.spitze === "0", "Gleichstand: bester in Tabelle und Diagramm derselbe, der erste", { beste, spitze: v.spitze });
-      assert(!s.fehler.length, "ohne Build: keine Fehler", s.fehler);
+      assert(!s.fehler.length, "mit und ohne altes b: keine Fehler", s.fehler);
+      await p.close();
+    }
+    /* Alte Eintraege aus der Zeit des Builds-Reiters (#207, ersetzt "Builds-Reiter 8", den Namen eines Builds in der
+       Spalte): jede Form von b - Kennungen von Builds ohne Namen, geloeste, frueher erkannte, Kennungen des Prototyps -
+       wird gelesen ohne Fehler und ohne Anzeige. Die Tabelle bleibt bei vier Spalten, ohne Querrollen. Englisch bei
+       1280, Deutsch bei 560. */
+    for (const [lang, breite] of [["en", 1280], ["de", 560]]) {
+      const tag = (d) => Date.UTC(2026, 8, d, 20, 0, 0);
+      const k = (d, b) => ({ name: "Vulcanus", dps: 50000 + d, dmg: (50000 + d) * 60, dur: 60, at: tag(d), b });
+      const alt = { "alt.txt": { size: 1, fights: [k(1, "ohne000000"), k(2, "zwei000000"), k(3, "__proto__"), k(4, "constructor")] } };
+      const s = await oeffne({ app: true, lang, breite, config: { logIndex: { ...alt, ...VER_INDEX } },
+        helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
+      const p = s.page;
+      await laden(p);
+      await bereich(p, "history");
+      await p.waitForTimeout(300);
+      const v = await verlauf(p);
+      assert(v.zeilen.length === 8 && v.kopf.length === 4 && v.zeilen.every((z) => z.zellen.length === 4) && !Object.keys(s.baue).length,
+        `${breite} Verlauf, altes b in jeder Form: acht Zeilen zu je vier Zellen, nichts gefragt`, { zeilen: v.zeilen.map((z) => z.zellen), baue: s.baue });
+      assert(!v.quer && !s.fehler.length, `${breite} Verlauf, altes b: kein Querrollen, keine Fehler`, s.fehler);
       await p.close();
     }
   }

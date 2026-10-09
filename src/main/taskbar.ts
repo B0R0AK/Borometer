@@ -8,12 +8,15 @@
  * switches like the page's own. A click is passed to the page as an event
  * (events.ts), and the page does exactly what its own button does: Compact
  * opens or closes the compact window where there is one (spec Nachtraege
- * N4), which has no taskbar button of its own. The only file that touches the taskbar.
+ * N4), which has no taskbar button of its own.
+ * The tray menu (#56) opens it the same way: bump("compact"), nothing else.
+ * The only file that touches the taskbar.
  */
 
 import { BrowserWindow, nativeImage } from "electron";
 import * as path from "node:path";
 import { bump } from "./events";
+import { fortschritt } from "./windows-core";
 
 /*
  * createFromPath picks up name@2x.png beside name.png by itself and adds it
@@ -50,4 +53,29 @@ export function setLiveBadge(win: BrowserWindow, on: boolean): void {
   if (process.platform !== "win32" || !dot) return;
   liveOn = on;
   win.setOverlayIcon(on ? dot : null, on ? "Live-Aufzeichnung läuft / Live logging on" : "");
+}
+
+/** whether live logging runs, as the dot shows it (the tray's tick) */
+export function liveAn(): boolean {
+  return liveOn;
+}
+
+/*
+ * Reading a long log (spec Windows-Einbindung 6): server.ts hands over
+ * where each piece ended. The bar shows only while more than one piece is
+ * needed, and goes away with the last one - or 5 s after a piece, when the
+ * page stopped asking.
+ */
+const balken = { an: false, timer: null as ReturnType<typeof setTimeout> | null };
+export function leseFortschritt(win: BrowserWindow | null, to: number, size: number): void {
+  if (process.platform !== "win32" || !win) return;
+  const wert = fortschritt(to, size, balken.an);
+  if (wert === null) return;
+  win.setProgressBar(wert);
+  balken.an = wert >= 0;
+  if (balken.timer) clearTimeout(balken.timer);
+  balken.timer = balken.an ? setTimeout(() => {
+    balken.an = false;
+    if (!win.isDestroyed()) win.setProgressBar(-1);
+  }, 5000) : null;
 }

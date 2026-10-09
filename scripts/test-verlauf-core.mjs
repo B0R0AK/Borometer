@@ -259,6 +259,9 @@ const k = (dps, dur, at) => ({ dps, dur, at });
   const O = core.zuletztGeoeffnet({ "x.txt": { fights: [{ at: 3600000 * 21, dur: 5 }] } });
   ok(O.length === 1 && O[0].tag === "" && O[0].von === "21:00", "zuletzt: Zeit ohne Datum, kein Tag", O);
   ok(core.zuletztGeoeffnet({}).length === 0 && core.zuletztGeoeffnet(undefined).length === 0, "zuletzt: leer, keine Zeilen");
+  // mitDatum (Fix verlauf-ohne-datum): ein Beginn unter einem Jahr ab 1970 ist eine Uhrzeit ohne Tag
+  ok(!core.mitDatum(3600000 * 21) && !core.mitDatum(0) && !core.mitDatum(NaN) && core.mitDatum(at(20, 21, 0)),
+    "mitDatum: 21:00 ohne Datum nein, 20.09.2026 21:00 ja");
   // Rekorde (Spezifikation 3): eine Datei, die nur nachgelesen und nie geoeffnet wurde (nach), steht nicht unter "Zuletzt geoeffnet"
   const R = core.zuletztGeoeffnet({
     "auf.txt": { fights: [{ at: at(20, 20, 0), dur: 60 }] },
@@ -289,6 +292,20 @@ const k = (dps, dur, at) => ({ dps, dur, at });
   ok(core.berlinTag(Date.UTC(2026, 8, 25, 22, 30)) === "2026-09-26" && core.berlinTag(Date.UTC(2026, 8, 25, 21, 59)) === "2026-09-25",
     "tage: berlinTag rechnet die Mitternacht in Berlin");
   ok(core.logTage([]).length === 0 && core.logTage(undefined).length === 0, "tage: leer, keine Tage");
+}
+
+{
+  // Gold von aussen (Spezifikation Bester Pull 5.4): der beste Pull nach der Regel, nicht der hoechste Punkt
+  const K = [{ at: 0, dps: 100, dur: 90 }, { at: 1000, dps: 300, dur: 14 }, { at: 2000, dps: 200, dur: 120 }];
+  const F = { breite: 400, hoehe: 200, rand: 20 };
+  const S = { von: 0, bis: 3000, tage: 1 };
+  const Z = core.zeitLagen(K, F, S, 4, 2);
+  const Z0 = core.zeitLagen(K, F, S, 4);
+  ok(Z.bester === 2 && Z.max >= 300, "zeitLagen: Gold von aussen, Achse nach dem hoechsten Punkt", { b: Z.bester, max: Z.max });
+  ok(Z0.bester === 1 && Z.max === Z0.max, "zeitLagen: ohne Angabe der hoechste, die Achse bleibt mit und ohne Gold gleich", { b: Z0.bester, m: Z0.max, mg: Z.max });
+  ok(core.pullLagen(K, F, 4, -1).bester === -1, "pullLagen: -1 zeichnet kein Gold");
+  ok(core.pullLagen(K, F, 4).bester === 1, "ohne Angabe wie bisher: der hoechste");
+  ok(core.pullLagen(K, F, 4, 0).max === core.pullLagen(K, F, 4).max, "pullLagen: Achse unabhaengig von Gold");
 }
 
 console.log(failed ? `\n${failed} FAILED` : "\nall ok");

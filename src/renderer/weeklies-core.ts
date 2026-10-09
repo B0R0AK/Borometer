@@ -22,8 +22,19 @@ export interface WeeklyPunkt { schluessel: string; gruppe: string; menge: number
 export interface Zaehler { stand: number; seit: number }
 export interface EigenerPunkt { schluessel: string; name: string; menge: number; takt: Takt; geloest?: boolean }
 export interface Vorwoche { reset: number; zaehler: Record<string, Zaehler> }
+/** Die Wahl beim Ein- oder Aufklappen eines Bereichs und der Fertig-Zustand dabei (Spezifikation Weeklies neu, 4.4). */
+export interface ZuWahl { zu: boolean; bei: boolean }
+/** Eine Erinnerung, wie die Datei sie haelt (src/main/weeklies.ts: Reminder); die Seite zeigt und aendert sie nur. */
+export interface Erinnerung { id: string; an: boolean; tage: number[]; zeit: string; text: string; nurOffen: boolean; geloest?: boolean }
+export interface Fortschritt {
+  woche: { n: number; g: number; anteil: number };
+  tag: { n: number; g: number };
+  fertig: boolean;
+}
+export interface LetzteWoche { id: string; name: string; n: number; g: number }
 export interface WeeklyProfil {
   id: string; name: string; geloest?: boolean;
+  zu?: Record<string, ZuWahl>;
   zaehler: Record<string, Zaehler>;
   aus: string[]; namen: Record<string, string>;
   eigene: EigenerPunkt[];
@@ -153,4 +164,46 @@ export function vorwocheSichern<P extends WeeklyProfil>(profil: P, jetztMs: numb
   }
   if(!dazu) return profil;
   return {...profil, vorwoche: {reset: r0, zaehler: {...(alt || {}), ...neu}}};
+}
+
+/* Die Punkte eines Charakters, die gezeigt und gezaehlt werden: die Grundliste ohne die
+   ausgeblendeten, dazu seine eigenen, soweit nicht geloest (Spezifikation Weeklies neu, 4.1). */
+export function sichtbarePunkte(profil: WeeklyProfil): WeeklyPunkt[] {
+  const aus = new Set(profil.aus || []);
+  const grund = GRUNDLISTE.filter(g => !aus.has(g.schluessel));
+  const eigene = (profil.eigene || []).filter(e => e && !e.geloest).map(e => p(e.schluessel, "eigene", e.menge, e.takt));
+  return [...grund, ...eigene];
+}
+
+/** Woche (alles ausser taeglich) und Tag getrennt; der Ring zeigt den Anteil nach Menge, "fertig" rechnet nur die Woche (4.2). */
+export function fortschrittVon(profil: WeeklyProfil, jetztMs: number): Fortschritt {
+  let wn = 0, wg = 0, wa = 0, tn = 0, tg = 0;
+  for(const x of sichtbarePunkte(profil)){
+    const s = Math.min(x.menge, anzeigeStand(profil.zaehler ? profil.zaehler[x.schluessel] : undefined, x.takt, jetztMs));
+    if(x.takt === "tag"){ tg++; if(s >= x.menge) tn++; }
+    else { wg++; wa += s / x.menge; if(s >= x.menge) wn++; }
+  }
+  return {woche: {n: wn, g: wg, anteil: wg ? wa / wg : 0}, tag: {n: tn, g: tg}, fertig: wg > 0 && wn === wg};
+}
+
+/** Ob ein Bereich zu ist: die Wahl gilt nur, solange der Fertig-Zustand noch der von damals ist; sonst "zu, wenn fertig" (4.4). */
+export function bereichZu(wahl: ZuWahl | undefined, fertig: boolean): boolean {
+  return wahl && wahl.bei === fertig ? wahl.zu : fertig;
+}
+
+/** Die Wochenzaehler der Woche davor, je Charakter "n von g"; null, wenn in der laufenden Woche schon etwas gesetzt ist oder nichts zu zeigen ist (4.5). */
+export function letzteWoche(profile: WeeklyProfil[], jetztMs: number): LetzteWoche[] | null {
+  const r = letzterReset(jetztMs, "woche"), r0 = letzterReset(r - 1, "woche");
+  const gesetzt = (z: Zaehler | undefined): z is Zaehler => !!z && typeof z.seit === "number" && typeof z.stand === "number";
+  if(profile.some(q => Object.values(q.zaehler || {}).some(z => gesetzt(z) && z.seit >= r))) return null;
+  const out: LetzteWoche[] = [];
+  for(const q of profile){
+    const stand: Record<string, number> = {};
+    for(const [k, z] of Object.entries(q.zaehler || {})) if(gesetzt(z) && z.seit >= r0 && z.seit < r && taktVon(q, k) === "woche") stand[k] = z.stand;
+    if(q.vorwoche && q.vorwoche.reset === r0) for(const [k, z] of Object.entries(q.vorwoche.zaehler || {})) if(gesetzt(z)) stand[k] = z.stand;
+    if(!Object.keys(stand).length) continue;
+    const punkte = sichtbarePunkte(q).filter(x => x.takt === "woche");
+    out.push({id: q.id, name: q.name, n: punkte.filter(x => Math.min(x.menge, stand[x.schluessel] ?? 0) >= x.menge).length, g: punkte.length});
+  }
+  return out.length ? out : null;
 }

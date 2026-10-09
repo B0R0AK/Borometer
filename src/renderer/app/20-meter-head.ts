@@ -9,8 +9,8 @@ import { groupRows, partyForFight } from "./19-grouping-and-party-fights";
 import { istLivePausiert } from "./23-kampfwahl";
 import { histVerdict } from "./32-history";
 import { whenSavedText } from "./34-menus-drop-and-tabs";
+import { kampfLaeuft, kampfRestMs } from "./41-server-mode";
 import { syncBestBtn } from "./46-best-pull";
-import { syncKampfQuestlog } from "./51-plan";
 import { nebenzielKopf } from "./53-fenster";
 import type { Fight, FightStats, PartyView } from "../types";
 
@@ -82,9 +82,10 @@ export function kampfSatz(seg: Fight, s: FightStats){
    in der Kopfzeile hat sie rund 200 Punkt, und ein ganzer Satz waere nach
    vier Woertern abgeschnitten. Genau dort wertet man aber zwischen zwei
    Pulls aus. Also eine eigene Zeile ueber die volle Breite, mit denselben
-   vier Regeln wie kampfSatz, nur ohne Nebensatz - und dahinter, was der
-   Kompaktmodus sonst nirgends sagt: ob das besser war als eben. */
-function kampfKurz(seg: Fight, s: FightStats){
+   vier Regeln wie kampfSatz, nur ohne Nebensatz; der Vergleich zum letzten
+   Pull steht unter der Zahl (#hPrev). Die Meldung nach dem Kampf (66)
+   nimmt dieselbe Kurzfassung. */
+export function kampfKurz(seg: Fight, s: FightStats){
   if(!seg || !s) return "";
   if(s.hits < LIEST_AB_TREFFER) return t("head.shortThin", {n: s.hits});
   if(!state.noTime && s.fought != null && s.seconds - s.fought >= 5)
@@ -117,28 +118,31 @@ function gegenLetzten(seg: Fight, s: FightStats){
   if(!vor) return null;
   return 100 * (s.dps - vor.stats.dps) / vor.stats.dps;
 }
+let kampfWecker: ReturnType<typeof setTimeout> | null = null;
 function setCompactRead(seg: Fight | null, s: FightStats | null){
   const el = $("#hCompact");
   if(!el) return;
+  /* Im Kampf (Spezifikation Kompakt-Fenster 3): "Kampf laeuft" statt des
+     Satzes, der Vergleich wartet bis zum Ende - ein halber Kampf gegen einen
+     ganzen sagt nichts. Ohne neue Zeilen zeichnet niemand neu: ein Wecker
+     auf das Ende der Kampftrennung. */
+  const laeuft = !!seg && kampfLaeuft();
+  document.body.classList.toggle("kampf-laeuft", laeuft);
+  clearTimeout(kampfWecker ?? undefined);
+  if(laeuft) kampfWecker = setTimeout(() => renderHead(), kampfRestMs() + 50);
   /* Ein frueherer Tag ist offen und Live nur pausiert (Abschlusspruefung,
      H2): im Streifen gibt es die Kampfwahl nicht, die das sonst sagt - also
      steht es hier vorn. */
   const pause = istLivePausiert() ? t("kw.pausiert") : "";
-  const satz = [pause, seg && s ? kampfKurz(seg, s) : ""].filter(Boolean).join(" \u00b7 ");
-  const d = seg && s ? gegenLetzten(seg, s) : null;
-  let delta = "";
-  if(d != null){
-    const gleich = Math.abs(d) < 0.5;
-    delta = '<span class="cdelta'+(gleich ? "" : d > 0 ? " up" : " down")+'">'+
-      esc(gleich ? t("head.shortSame") : t("head.shortPrev", {d: (d > 0 ? "+" : "\u2212")+pctOf(Math.abs(d))}))+
-      "</span>";
-  }
-  /* Der Trenner steht als Text da, nicht nur als Abstand: sonst laufen
-     Satz und Differenz im title und beim Vorleser ineinander. */
-  el.innerHTML = (satz ? "<span>"+esc(satz)+"</span>" : "") +
-    (satz && delta ? '<span class="csep"> \u00b7 </span>' : "") + delta;
+  const satz = laeuft ? t("compact.imKampf")
+    : [pause, seg && s ? kampfKurz(seg, s) : ""].filter(Boolean).join(" \u00b7 ");
+  /* Der Vergleich zum letzten Pull steht im Streifen unter der Zahl
+     (#hPrev, setPrevLine, Spezifikation Kompakt-Fenster 7, #157): bei 300
+     Punkt kuerzte er im Deutschen sonst den Namen der Faehigkeit. Die
+     Lesezeile traegt nur noch den Satz, ueber die volle Breite. */
+  el.innerHTML = satz ? "<span>"+esc(satz)+"</span>" : "";
   el.title = el.textContent || "";
-  el.hidden = !satz && !delta;
+  el.hidden = !satz;
 }
 /* "+7 % zum letzten Pull" als zweite Zeile unter der grossen Zahl
    (Feinschliff 02.10., Abschnitt 2; bestaetigt). Dieselbe Rechnung und
@@ -150,7 +154,9 @@ function setPrevLine(seg: Fight | null, s: FightStats | null){
   const el = $("#hPrev");
   if(!el) return;
   const d = seg && s ? gegenLetzten(seg, s) : null;
-  const text = d == null ? "" : Math.abs(d) < 0.5 ? t("head.shortSame")
+  // im Streifen wartet der Vergleich, solange der Kampf laeuft (Spezifikation Kompakt-Fenster 3)
+  const warten = document.body.classList.contains("compact") && document.body.classList.contains("kampf-laeuft");
+  const text = d == null || warten ? "" : Math.abs(d) < 0.5 ? t("head.shortSame")
     : t("head.shortPrev", {d: (d > 0 ? "+" : "\u2212") + pctOf(Math.abs(d))});
   if(el.textContent !== text) el.textContent = text;
   el.hidden = !text;
@@ -277,12 +283,11 @@ export function renderHead(){
     document.body.classList.toggle("partyEmpty", !live.length);
     // die Tafel misst die Gruppe; der Knopf zum besten Pull geht (bestInfo)
     syncBestBtn();
-    syncKampfQuestlog();
     return;
   }
   const seg = state.encounters[state.sel];
   // ohne Kampf bleibt kein Satz ueber den zuletzt gezeigten stehen (Pruefung B3)
-  if(!seg){ setPrevLine(null, null); return; }
+  if(!seg){ setPrevLine(null, null); setCompactRead(null, null); return; }
   const s = seg.stats;
   document.body.classList.remove("partyEmpty");
   saveKnopf(t("head.saveAsRun"));
@@ -360,8 +365,6 @@ export function renderHead(){
     fakt("treffer", esc(t("head.treffer", {n: full(s.hits)})))+
     schild;
   syncBestBtn();
-  // "Build in Questlog", wenn eine Karte die Waffen dieses Kampfs hat (51-plan.ts)
-  syncKampfQuestlog();
 }
 
 /* Der Speichern-Knopf in zwei Laengen. Voll steht er in der breiten

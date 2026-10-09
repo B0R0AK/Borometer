@@ -72,6 +72,8 @@ const wk = await bundle("src/main/weeklies.ts", [electron]);
 const kern = await bundle("src/renderer/weeklies-core.ts");
 /* folgt Spezifikation 10: die Groesse der Grundliste kommt aus dem Kern (keine feste Zahl), die Haendler und Kacheln in ihrer Folge */
 const N = kern.GRUNDLISTE.length;
+/* folgt Weeklies neu: die Karte zaehlt nur die Wochenpunkte (alles ausser taeglich); Tagespunkte stehen getrennt (121) */
+const NW = kern.GRUNDLISTE.filter((x) => x.takt !== "tag").length;
 const HAENDLER = ["gemischtwaren", "gildenhaendler", "vertragsmuenzen", "widerstandswaren", "ehrenmuenzen", "raidwaren"];
 const KACHELN = ["raid", "geheimdungeon", "events", "dimension", "haendler"];
 const vonGruppe = (g) => kern.GRUNDLISTE.filter((x) => x.gruppe === g).map((x) => x.schluessel);
@@ -130,7 +132,7 @@ const neuesLager = (data = LEER) => ({ data: structuredClone(data), posts: [], a
 async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLager(), uhr = MI_0955, datei = false, thema = null } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   // die Uhr der Seite: gestellte Zeit plus was seitdem verging; vorspulen() rechnet das Vorspulen dazu
-  const s = { page, fehler: [], lager, uhr: { basis: uhr, echt: Date.now() } };
+  const s = { page, fehler: [], lager, uhr: { basis: uhr, echt: performance.now() } };
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.clock.install({ time: uhr });
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
@@ -158,9 +160,7 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLa
       if (path === "/api/state") return json({ dir: "", file: "", nativeFrame: false, material: false, stayOnTop: false });
       if (path === "/api/config" && req.method() === "GET") return json(thema ? { theme: thema } : {});
       if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-      if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
       if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
-      if (path === "/api/plans" && req.method() === "GET") return json({ ok: true, plans: {} });
       if (path.startsWith("/api/")) return json({ ok: true });
       return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
     });
@@ -173,7 +173,8 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLa
   if (!datei && lager.getStatus === 200) await page.waitForFunction(() => document.querySelector("#wkBody")?.dataset.lage === "da");
   return s;
 }
-const seitenUhr = (s) => s.uhr.basis + (Date.now() - s.uhr.echt);
+/* monotone Uhr: die Wanduhr springt in WSL2 (timesyncd) um ~1,2 s zurueck, die Seitenuhr (Playwright) laeuft monoton */
+const seitenUhr = (s) => s.uhr.basis + (performance.now() - s.uhr.echt);
 async function vorspulen(s, ms) { await s.page.clock.fastForward(ms); s.uhr.basis += ms; }
 /* auf einen Zustand warten, nie auf eine feste Zeit */
 async function bis(fn, ms = 4000) {
@@ -190,19 +191,20 @@ const blick = (p) => p.evaluate(() => {
   const sicht = (e) => !!e && e.getClientRects().length > 0;
   return {
     lage: q("#wkBody")?.dataset.lage || "",
-    woche: q("#wkWoche")?.textContent || "", tag: q("#wkTag")?.textContent || "", status: q("#wkStatus")?.textContent || "",
-    reiter: qa('#wkReiter [role="tab"]').map((t) => ({ id: t.dataset.wkReiter, name: q(".wkrname", t)?.textContent, fort: q(".wkfort", t)?.textContent,
+    // folgt Entwurf Weeklies neu (06.10.): der Wochen-Reset steht nur im Band, der Kopf nennt den taeglichen; ein Reiter ist eine Karte
+    woche: q("#wkBand .wkbandunten")?.textContent || "", tag: q("#wkTag")?.textContent || "", status: q("#wkStatus")?.textContent || "",
+    reiter: qa('#wkReiter [role="tab"]').map((t) => ({ id: t.dataset.wkReiter, name: q(".wkkname", t)?.textContent, fort: t.dataset.wkWoche, heute: t.dataset.wkHeute, satz: q(".wkkstand2", t)?.textContent, vh: t.getAttribute("aria-label"),
       an: t.getAttribute("aria-selected") === "true", tab: t.tabIndex })),
     neu: sicht(q("#wkNeu")), voll: q("#wkVoll")?.textContent || "",
     /* folgt Entwurf 01.10.: Kacheln statt aufklappbarer Gruppen (fertig statt zugeklappt), die Punkte des Raids
        als Felder im Raster (data-wk-punkt am Feld, der Name an der Checkbox) */
-    gruppen: qa("#wkPanel .wkgruppe").map((g) => ({ g: g.dataset.wkG, name: q(".wkgname", g)?.textContent, zahl: q(".wkgzahl", g)?.textContent,
+    gruppen: qa("#wkPanel .wkgruppe").map((g) => ({ g: g.dataset.wkG, name: q(".wkbname", g)?.textContent, zahl: q(".wkgzahl", g)?.textContent,
       fertig: g.classList.contains("fertig"), erl: q(".wkkerl", g)?.textContent || "", liste: sicht(q(".wkliste, .wkraster", g)) })),
     punkte: qa("#wkPanel [data-wk-punkt]").map((li) => {
-      const h = q("input[data-wk-haken]", li), z = q('[role="spinbutton"]', li);
+      const h = q("input[data-wk-haken]", li), z = q("input[data-wk-stand]", li), v = q(".wkvon", li)?.textContent.replace("/", "");
       return { k: li.dataset.wkPunkt, name: q(".wkname", li)?.textContent ?? h?.getAttribute("aria-label"), sicht: sicht(li), tag: q(".wktag", li)?.textContent || "",
-        haken: h ? h.checked : null, stand: z ? +z.getAttribute("aria-valuenow") : null, menge: z ? +z.getAttribute("aria-valuemax") : null,
-        text: z?.textContent || "", wert: z?.getAttribute("aria-valuetext") || "", kisten: qa("button.wkkiste", li).length };
+        haken: h ? h.checked : null, stand: z ? +z.value : null, menge: z ? +v : null,
+        text: z ? z.value + "/" + v : "", wert: z?.getAttribute("aria-label") || "", kisten: qa("button.wkkiste", li).length };
     }),
     satz: (q("#wkBody .wksatz")?.textContent || "").trim(),
   };
@@ -224,7 +226,7 @@ try {
     const b = await blick(s.page);
     assert(b.lage === "nurApp" && /nur in der App/.test(b.satz) && !b.reiter.length && !b.neu,
       "Datei-Modus: der Satz, dass Weeklies nur in der App gespeichert werden; kein Reiter, kein \u201e+ Charakter\u201c", b);
-    assert(/^N\u00e4chster Wochen-Reset: Do 10:00 \u00b7 in 1\u00a0T 0\u00a0Std$/.test(b.woche), "Datei-Modus: die Reset-Anzeige steht trotzdem", b.woche);
+    assert(/^T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 5\u00a0Min$/.test(b.tag) && !(await s.page.evaluate(() => !!document.querySelector("#wkWoche"))), "Datei-Modus: der t\u00e4gliche Reset steht trotzdem im Kopf, der Wochen-Reset nicht (125.1)", b.tag);
     assert(!s.fehler.length, "Datei-Modus: keine Fehler", s.fehler);
     await s.page.close();
   }
@@ -283,10 +285,14 @@ try {
     for (const [i, name] of ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"].entries()) {
       await anlegen(s, name);
       b = await blick(p);
-      assert(b.reiter.length === i + 1 && b.reiter[i].name === name && b.reiter[i].an && b.reiter[i].fort === `0/${N}`,
-        `anlegen ${i + 1}: Reiter \u201e${name}\u201c gewaehlt, Fortschritt 0/${N} (folgt Spezifikation 10)`, b.reiter);
+      assert(b.reiter.length === i + 1 && b.reiter[i].name === name && b.reiter[i].an && b.reiter[i].fort === `0/${NW}`,
+        `anlegen ${i + 1}: Karte \u201e${name}\u201c gewaehlt, Woche 0/${NW} (folgt Weeklies neu)`, b.reiter);
     }
-    assert(!b.neu && /h\u00f6chstens sechs|Sechs Charaktere/i.test(b.voll), "beim siebten ein Satz statt des Knopfs", { neu: b.neu, voll: b.voll });
+    // folgt Weeklies neu (125.3): bei sechs bleibt der Knopf, der Satz erscheint erst, wenn man ihn drueckt
+    assert(b.neu && b.voll === "", "bei sechs Charakteren steht der Satz noch nicht da", { neu: b.neu, voll: b.voll });
+    await klick(p, "#wkNeu");
+    b = await blick(p);
+    assert(b.neu && /Sechs Charaktere/i.test(b.voll), "nach \u201e+ Charakter\u201c bei sechs steht der Satz da (125.3)", { neu: b.neu, voll: b.voll });
     // Pruefung W3, W1/K7: der Satz ist ein Satz - kein Rahmen, kein Zeiger, keine feste Hoehe
     const gestalt = await p.evaluate(() => { const e = document.querySelector("#wkVoll"), c = getComputedStyle(e);
       return { tag: e.tagName, rolle: e.getAttribute("role"), cursor: c.cursor, rahmen: c.boxShadow, rand: c.borderTopStyle, display: c.display,
@@ -417,8 +423,8 @@ try {
     await nachPost(s, n);
     b = await blick(p);
     let z = lager.data.profile.find((x) => x.id === eins).zaehler;
-    assert(punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${N}` && z.zitadelleNormal?.stand === 1 && Math.abs(z.zitadelleNormal.seit - MI_0955) < 600000,
-      `Haken: gesetzt, Reiter 1/${N}, gespeichert als {stand 1, seit jetzt} (folgt Spezifikation 10)`, { z: z.zitadelleNormal, fort: b.reiter[0].fort });
+    assert(punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${NW}` && z.zitadelleNormal?.stand === 1 && Math.abs(z.zitadelleNormal.seit - MI_0955) < 600000,
+      `Haken: gesetzt, Karte 1/${NW}, gespeichert als {stand 1, seit jetzt} (folgt Weeklies neu)`, { z: z.zitadelleNormal, fort: b.reiter[0].fort });
     // Pruefung W3, K8: der Vorleser hoert "taeglich" am Haken (aria-describedby)
     const beschr = await p.evaluate(() => { const e = document.querySelector('input[data-wk-haken="phantomstein"]'), w = document.querySelector('input[data-wk-haken="zitadelleNormal"]');
       return { tag: (e.getAttribute("aria-describedby") || "").split(" ").map((i) => document.getElementById(i)?.textContent).join(" "), woche: (w.getAttribute("aria-describedby") || "").split(" ").map((i) => document.getElementById(i)?.textContent).join(" ") }; });
@@ -430,33 +436,54 @@ try {
     await p.click('.wkzelle[data-wk-punkt="zitadelleSchwer"]');
     await nachPost(s, n);
     b = await blick(p);
-    assert(punkt(b, "zitadelleSchwer").haken && b.reiter[0].fort === `2/${N}`, "Klick auf das Feld im Raid-Raster setzt den Haken", b.reiter[0].fort);
+    assert(punkt(b, "zitadelleSchwer").haken && b.reiter[0].fort === `2/${NW}`, "Klick auf das Feld im Raid-Raster setzt den Haken", b.reiter[0].fort);
     // Klick auf den Namen eines Hakens setzt ihn auch - und wieder zurueck
     n = nPosts(s);
     await p.click('li[data-wk-punkt="siegelschluessel"] .wkname');
     await nachPost(s, n);
     b = await blick(p);
-    assert(punkt(b, "siegelschluessel").haken && b.reiter[0].fort === `3/${N}`, "Klick auf den Namen eines Hakens setzt ihn", b.reiter[0].fort);
+    assert(punkt(b, "siegelschluessel").haken && b.reiter[0].fort === `3/${NW}`, "Klick auf den Namen eines Hakens setzt ihn", b.reiter[0].fort);
     n = nPosts(s);
     await p.click('li[data-wk-punkt="siegelschluessel"] .wkname');
     await nachPost(s, n);
     b = await blick(p);
-    assert(!punkt(b, "siegelschluessel").haken && b.reiter[0].fort === `2/${N}`, "noch ein Klick auf den Namen nimmt ihn zurueck", b.reiter[0].fort);
+    assert(!punkt(b, "siegelschluessel").haken && b.reiter[0].fort === `2/${NW}`, "noch ein Klick auf den Namen nimmt ihn zurueck", b.reiter[0].fort);
     // Zaehler
     const stand = async (k) => punkt(await blick(p), k);
     n = nPosts(s);
     await p.click('.wkschritt[data-wk-plus="illusionen"]');
     await nachPost(s, n);
     let x = await stand("illusionen");
-    assert(x.stand === 1 && x.text === "1/3" && x.wert === "1 von 3", "Zaehler +: 1/3, fuer den Vorleser \u201e1 von 3\u201c", x);
+    assert(x.stand === 1 && x.text === "1/3" && /von 3/.test(x.wert), "Zaehler +: 1/3, das Feld tr\u00e4gt f\u00fcr den Vorleser Namen und Grenze", x);
     await p.click('[data-wk-minus="illusionen"]');
     x = await stand("illusionen");
     assert(x.stand === 0 && x.text === "0/3", "Zaehler \u2212: 0/3", x);
     const minusAus = await p.evaluate(() => document.querySelector('[data-wk-minus="illusionen"]').disabled);
     assert(minusAus, "bei 0 ist \u2212 gesperrt", minusAus);
-    await p.click('li[data-wk-punkt="illusionen"] button.wkname');
+    // folgt Weeklies neu (122.2): der Name ist nur Text, ein Klick darauf zaehlt nichts
+    const nameBtn = await p.evaluate(() => document.querySelector('li[data-wk-punkt="illusionen"] button.wkname') !== null);
+    await p.click('li[data-wk-punkt="illusionen"] .wkname');
     x = await stand("illusionen");
-    assert(x.stand === 1, "Klick auf den Namen zaehlt +1", x);
+    assert(!nameBtn && x.stand === 0, "Klick auf den Namen eines Zaehlers zaehlt nichts mehr, und der Name ist kein Knopf", { nameBtn, x });
+    // Umschalt+Klick auf + zaehlt zehn, ein Feld zum Eintippen (122.1)
+    await p.click('li[data-wk-punkt="umwandlungsstein"] [data-wk-plus]', { modifiers: ["Shift"] });
+    x = await stand("umwandlungsstein");
+    assert(x.stand === 10, "Umschalt+Klick auf + zaehlt zehn", x);
+    await p.fill('input[data-wk-stand="umwandlungsstein"]', "40");
+    await p.press('input[data-wk-stand="umwandlungsstein"]', "Enter");
+    x = await stand("umwandlungsstein");
+    assert(x.stand === 40, "der Stand l\u00e4sst sich eintippen: 40", x);
+    await p.click('li[data-wk-punkt="umwandlungsstein"] [data-wk-zehn]');
+    x = await stand("umwandlungsstein");
+    assert(x.stand === 50, "+10 zaehlt zehn", x);
+    await p.fill('input[data-wk-stand="umwandlungsstein"]', "999");
+    await p.press('input[data-wk-stand="umwandlungsstein"]', "Enter");
+    x = await stand("umwandlungsstein");
+    assert(x.stand === 100, "ein Wert \u00fcber der Menge wird auf die Menge begrenzt", x);
+    const zehnWeg = await p.evaluate(() => ({ illu: !!document.querySelector('li[data-wk-punkt="illusionen"] [data-wk-zehn]'), umw: !!document.querySelector('li[data-wk-punkt="umwandlungsstein"] [data-wk-zehn]') }));
+    assert(!zehnWeg.illu && zehnWeg.umw, "+10 gibt es nur an gro\u00dfen Z\u00e4hlern (Menge \u00fcber 12)", zehnWeg);
+    await p.fill('input[data-wk-stand="umwandlungsstein"]', "0");
+    await p.press('input[data-wk-stand="umwandlungsstein"]', "Enter");
     n = nPosts(s);
     await p.click('[data-wk-voll="umwandlungsstein"]');
     await nachPost(s, n);
@@ -467,7 +494,7 @@ try {
     assert(vollAus.fokus === "umwandlungsstein", "nach \u201evoll\u201c steht der Fokus auf dem Zaehler", vollAus.fokus);
     await bis(() => lager.data.profile.find((y) => y.id === eins).zaehler.umwandlungsstein?.stand === 100);
     // Tastatur am Zaehler (in einer Kachel, die dabei nicht fertig wird)
-    await p.focus('[role="spinbutton"][data-wk-stand="mystischerSchluessel"]');
+    await p.focus('input[data-wk-stand="mystischerSchluessel"]');
     await p.keyboard.press("ArrowUp");
     await p.keyboard.press("ArrowUp");
     x = await stand("mystischerSchluessel");
@@ -475,43 +502,56 @@ try {
     assert(x.stand === 2 && f1 === "mystischerSchluessel", "Tastatur: zweimal Pfeil hoch zaehlt 2, der Fokus bleibt", { x, f1 });
     await p.keyboard.press("ArrowDown");
     assert((await stand("mystischerSchluessel")).stand === 1, "Tastatur: Pfeil runter zaehlt 1");
-    await p.keyboard.press("End");
-    assert((await stand("mystischerSchluessel")).stand === 5, "Tastatur: Ende setzt voll");
-    await p.keyboard.press("Home");
-    assert((await stand("mystischerSchluessel")).stand === 0, "Tastatur: Pos1 setzt 0");
+    await p.keyboard.press("PageUp");
+    assert((await stand("mystischerSchluessel")).stand === 5, "Tastatur: Bild auf z\u00e4hlt zehn, begrenzt auf die Menge");
+    await p.keyboard.press("PageDown");
+    assert((await stand("mystischerSchluessel")).stand === 0, "Tastatur: Bild ab z\u00e4hlt zehn zur\u00fcck, begrenzt auf 0");
     const rolle = await p.evaluate(() => { const e = document.querySelector('[data-wk-stand="mystischerSchluessel"]');
-      return { r: e.getAttribute("role"), min: e.getAttribute("aria-valuemin"), max: e.getAttribute("aria-valuemax"), name: e.getAttribute("aria-label"), tab: e.tabIndex }; });
-    assert(rolle.r === "spinbutton" && rolle.min === "0" && rolle.max === "5" && rolle.name === "Mystischer Schlüssel" && rolle.tab === 0,
-      "Vorleser: der Zaehler ist ein spinbutton mit Namen und Grenzen", rolle);
+      return { tag: e.tagName, modus: e.getAttribute("inputmode"), name: e.getAttribute("aria-label"), tab: e.tabIndex }; });
+    assert(rolle.tag === "INPUT" && rolle.modus === "numeric" && rolle.name === "Stand Mystischer Schlüssel, von 5" && rolle.tab === 0,
+      "Vorleser: der Stand ist ein Zahlenfeld mit Namen und Grenze", rolle);
     /* Kachel Geheimdungeon fertig - folgt Entwurf 01.10. (Spezifikation 9): erledigte Kacheln treten zurueck und
        verschwinden nicht (statt zuzuklappen); dieselben Fragen: Zustand, Fokus, zurueck, die anderen - dazu der Grund.
        Folgt Spezifikation 10: die Zahl der Punkte der Kachel kommt aus dem Kern; weitere Haken darin werden vorher gesetzt */
+    n = nPosts(s);
     await p.click('[data-wk-voll="illusionen"]');
+    await nachPost(s, n);
     for (const k of GD_MEHR) { n = nPosts(s); await p.click(`input[data-wk-haken="${k}"]`); await nachPost(s, n); }
     n = nPosts(s);
     await p.click('input[data-wk-haken="unendlichkeit"]');
     await nachPost(s, n);
     b = await blick(p);
     let g = b.gruppen.find((y) => y.g === "geheimdungeon");
-    const gf = await p.evaluate(() => document.activeElement?.dataset.wkHaken);
-    assert(g.fertig && g.erl === "erledigt" && g.liste && g.zahl === `${GD.length}/${GD.length}` && GD.every((k) => punkt(b, k).sicht),
-      `erledigte Kachel tritt zurueck (fertig, „erledigt“, ${GD.length}/${GD.length}), ihre Punkte bleiben sichtbar`, g);
-    assert(gf === "unendlichkeit", "der Fokus bleibt auf dem Haken", gf);
+        // folgt Weeklies neu (3.5): ein fertiger Bereich klappt zu und zeigt einen Haken; der Fokus geht auf seinen Kopf
+    const kopf = await p.evaluate(() => { const k = document.querySelector('[data-wk-zu="geheimdungeon"]'); return { auf: k?.getAttribute("aria-expanded"), fokus: document.activeElement === k, haken: !!k?.querySelector(".wkhk"), ansage: document.querySelector("#wkAnsage")?.textContent || "" }; });
+    assert(g.fertig && g.erl === "erledigt" && !g.liste && g.zahl === `${GD.length}/${GD.length}` && kopf.auf === "false" && kopf.haken,
+      `erledigter Bereich klappt zu (fertig, „erledigt“, ${GD.length}/${GD.length}), mit Haken`, { g, kopf });
+    assert(kopf.fokus && /klappt ein/.test(kopf.ansage), "der Fokus liegt auf dem Kopf des zugeklappten Bereichs, die Ansage nennt es", kopf);
+    await p.click('[data-wk-zu="geheimdungeon"]');
+    b = await blick(p);
+    g = b.gruppen.find((y) => y.g === "geheimdungeon");
+    assert(g.liste && g.fertig && GD.every((k) => punkt(b, k).sicht), "wieder aufgeklappt: die Punkte sind da, der Bereich bleibt fertig", g);
+    assert(/aufgeklappt/.test(await p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "")), "Aufklappen wird angesagt");
     const grund = await p.evaluate(() => [...document.querySelectorAll("#wkPanel .wkgruppe")].map((x) => ({ g: x.dataset.wkG, bg: getComputedStyle(x).backgroundColor })));
     const bgFertig = grund.find((x) => x.g === "geheimdungeon")?.bg;
     assert(grund.filter((x) => x.g !== "geheimdungeon").every((x) => x.bg !== bgFertig), "die erledigte Kachel hat einen anderen Grund als die offenen", grund);
+    // Der Haken wird mit 200 ms Verzug gesendet. Den Post des Zuruecks abwarten, sonst zaehlt er unter Last als der des naechsten
+    // Klicks, der Test schliesst die Seite, bevor der Stand der Datei stimmt, und die naechsten Bloecke lesen 2 statt 3 (#221).
+    n = nPosts(s);
     await p.click('[data-wk-minus="illusionen"]');
     b = await blick(p);
     g = b.gruppen.find((y) => y.g === "geheimdungeon");
     assert(!g.fertig && !g.erl && g.liste && g.zahl === `${GD.length - 1}/${GD.length}`, `ein Punkt zurueck: die Kachel ist wieder offen, ${GD.length - 1}/${GD.length}`, g);
+    await nachPost(s, n);
     n = nPosts(s);
     await p.click('[data-wk-voll="illusionen"]');
     await nachPost(s, n);
+    assert(await bis(() => lager.data.profile.find((y) => y.id === eins).zaehler.illusionen?.stand === 3), "voll: der Stand 3 steht in der Datei, bevor die Seite schliesst");
     b = await blick(p);
     const offen = b.gruppen.filter((y) => y.g !== "geheimdungeon").every((y) => !y.fertig && y.liste) && b.gruppen.find((y) => y.g === "geheimdungeon").fertig;
     assert(offen, "offene Kacheln treten nicht zurueck", b.gruppen);
     // Fortschritt: Zitadelle 2, Umwandlung, Illusionen, Unendlichkeit (und die weiteren Haken des Geheimdungeons)
-    assert(b.reiter[0].fort === `${ERL}/${N}`, "Reiter: erledigt/gesamt der sichtbaren Punkte", b.reiter[0].fort);
+    assert(b.reiter[0].fort === `${ERL}/${NW}`, "Karte: erledigt/gesamt der sichtbaren Wochenpunkte", b.reiter[0].fort);
     assert(!lager.abgelehnt.length && !s.fehler.length, "Haken und Zaehler: jeder gesendete Stand gilt, keine Fehler", { a: lager.abgelehnt, f: s.fehler });
     await p.close();
   }
@@ -557,12 +597,12 @@ try {
     await klick(p, "[data-wk-anpassen]");
     let b = await blick(p);
     const kiste = punkt(b, ei.schluessel);
-    const kb = await p.evaluate((k) => { const e = document.querySelector(`[role="spinbutton"][data-wk-stand="${k}"]`);
+    const kb = await p.evaluate((k) => { const e = document.querySelector(`input[data-wk-stand="${k}"]`);
       return (e?.getAttribute("aria-describedby") || "").split(" ").map((i) => document.getElementById(i)?.textContent).join(" "); }, ei.schluessel);
     assert(kb === "t\u00e4glich", "Vorleser: der Zaehler eines taeglichen eigenen Punkts beschreibt \u201et\u00e4glich\u201c (K8)", kb);
     assert(!punkt(b, "katalysator") && punkt(b, "chaosprisma").name === "Prisma fuer Waffe" && kiste && kiste.menge === 2 && kiste.tag === "t\u00e4glich"
       && b.gruppen.at(-1).g === "eigene" && b.gruppen.at(-1).name === "Eigene", "Liste: ohne Katalysator, Prisma umbenannt, Gildenkiste unter \u201eEigene\u201c, täglich", b.gruppen);
-    assert(b.reiter[0].fort === `${ERL}/${N}`, `Fortschritt der sichtbaren: ${N - 1} der Grundliste und 1 eigener (folgt Spezifikation 10)`, b.reiter[0].fort);
+    assert(b.reiter[0].fort === `${ERL}/${NW - 1}`, `Fortschritt der sichtbaren Wochenpunkte: ${NW - 1} (Katalysator ausgeblendet, der eigene Punkt ist t\u00e4glich)`, b.reiter[0].fort);
     // eigener Punkt zaehlt
     n = nPosts(s);
     await p.click(`.wkschritt[data-wk-plus="${ei.schluessel}"]`);
@@ -590,7 +630,7 @@ try {
     assert(pr.aus.length === 0 && pr.namen.chaosprisma === "Prisma fuer Waffe", "Grundliste wiederherstellen: alles eingeblendet, Namen bleiben", pr);
     await klick(p, "[data-wk-anpassen]");
     b = await blick(p);
-    assert(punkt(b, "katalysator") && b.punkte.length === N + 1 && b.reiter[0].fort === `${ERL}/${N + 1}`, `danach wieder ${N} Grundpunkte und der eigene (folgt Spezifikation 10)`, b.reiter[0]);
+    assert(punkt(b, "katalysator") && b.punkte.length === N + 1 && b.reiter[0].fort === `${ERL}/${NW}`, `danach wieder ${NW} Wochenpunkte, der eigene ist t\u00e4glich (folgt Weeklies neu)`, b.reiter[0]);
     assert(!lager.abgelehnt.length && !s.fehler.length, "Anpassen: jeder gesendete Stand gilt, keine Fehler", { a: lager.abgelehnt, f: s.fehler });
     await p.close();
   }
@@ -620,16 +660,16 @@ try {
     let bd = await band();
     const W = 7 * 1440;
     assert(Math.abs(bd.x - bd.w * (6 * 1440 - 5) / W) <= 1, "Wochenband Mi 09:55: der Jetzt-Strich steht bei 6 Tagen weniger 5 Minuten von 7 Tagen", { x: bd.x, soll: bd.w * (6 * 1440 - 5) / W });
-    assert(bd.tage.map((t) => t.t).join() === "Do,Fr,Sa,So,Mo,Di,Mi" && bd.tage.findIndex((t) => t.heute) === 5 && bd.tage.filter((t) => t.vorbei).length === 5
+    assert(bd.tage.map((t) => t.t).join() === "Do ab 10:00,Fr,Sa,So,Mo,Di,Mi" && bd.tage.findIndex((t) => t.heute) === 5 && bd.tage.filter((t) => t.vorbei).length === 5
       && bd.tage.every((t, i) => Math.abs(t.l - bd.w * i / 7) <= 1) && bd.x >= bd.tage[5].l && bd.x <= bd.tage[5].r,
-      "Wochenband: sieben Tage Do bis Mi ab 10:00, heute ist noch der Dienstag-Abschnitt (vor dem Tages-Reset), der Strich steht darin", bd.tage);
-    assert(bd.text === "jetzt Mi 09:55 \u00b7 Reset in 1\u00a0T 0\u00a0Std" && bd.name === "Die Woche vom Do 17.09. 10:00 bis Do 24.09. 10:00",
-      "Wochenband: „jetzt Mi 09:55 \u00b7 Reset in 1 T 0 Std“, fuer den Vorleser die Woche mit Datum (Pruefung N4)", { t: bd.text, n: bd.name });
+      "Wochenband: sieben Tage Do bis Mi, der erste \u201eDo ab 10:00\u201c (125.4), heute ist noch der Dienstag-Abschnitt (vor dem Tages-Reset), der Strich steht darin", bd.tage);
+    assert(bd.text === "jetzt Mi 09:55" && bd.name === "Die Woche vom Do 17.09. 10:00 bis Do 24.09. 10:00",
+      "Wochenband: „jetzt Mi 09:55“ (der Reset steht unter dem Band), fuer den Vorleser die Woche mit Datum (Pruefung N4)", { t: bd.text, n: bd.name });
     assert(Math.abs(bd.breit - bd.waben) <= 1 && bd.gold === bd.zahl, "Wochenband ueber die volle Breite, der Strich in Gold wie die Fortschrittszahl", bd);
     await vorspulen(s, 6 * 60000);
     await bis(async () => (await band()).text.includes("10:01"));
     bd = await band();
-    assert(Math.abs(bd.x - bd.w * (6 * 1440 + 1) / W) <= 1 && bd.tage.findIndex((t) => t.heute) === 6 && bd.text === "jetzt Mi 10:01 \u00b7 Reset in 23\u00a0Std 59\u00a0Min",
+    assert(Math.abs(bd.x - bd.w * (6 * 1440 + 1) / W) <= 1 && bd.tage.findIndex((t) => t.heute) === 6 && bd.text === "jetzt Mi 10:01",
       "im Minutentakt ueber den Tages-Reset: der Strich wandert, heute ist der Mittwoch-Abschnitt", { x: bd.x, soll: bd.w * (6 * 1440 + 1) / W, t: bd.text, h: bd.tage.map((t) => t.heute) });
     // --- das Raster
     const raster = () => p.evaluate((bilder) => {
@@ -678,11 +718,11 @@ try {
     /* ohne Spielbilder: die Marke, die jeder Punkt zeigen soll (WK_MARKE[k] ?? WK_MARKE.eigen, wie 59-weeklies.ts) */
     const SOLL = BILDER ? null : Object.fromEntries([...kern.GRUNDLISTE.map((g) => g.schluessel), "eigenband01"].map((k) => [k, bilder.WK_MARKE[k] ?? bilder.WK_MARKE.eigen]));
     const ringe = () => p.evaluate((soll) => [...document.querySelectorAll("#wkPanel li.wkpunkt")].map((li) => {
-      const rf = li.querySelector(".wksym .wkring .rf"), icon = li.querySelector(".wksym .wkicon"), z = li.querySelector('[role="spinbutton"]'), h = li.querySelector("input[data-wk-haken]");
+      const rf = li.querySelector(".wksym .wkring .rf"), icon = li.querySelector(".wksym .wkicon"), z = li.querySelector("input[data-wk-stand]"), h = li.querySelector("input[data-wk-haken]");
       const ki = li.querySelectorAll("button.wkkiste");
       return { k: li.dataset.wkPunkt, a: rf ? parseFloat(rf.getAttribute("stroke-dasharray")) : null, strich: rf ? getComputedStyle(rf).stroke : "",
-        s: z ? +z.getAttribute("aria-valuenow") : ki.length ? li.querySelectorAll('button.wkkiste[aria-pressed="true"]').length : h?.checked ? 1 : 0,
-        m: z ? +z.getAttribute("aria-valuemax") : ki.length || 1,
+        s: z ? +z.value : ki.length ? li.querySelectorAll('button.wkkiste[aria-pressed="true"]').length : h?.checked ? 1 : 0,
+        m: z ? +li.querySelector(".wkvon").textContent.slice(1) : ki.length || 1,
         bild: icon ? getComputedStyle(icon).backgroundImage.startsWith("url(") : false, marke: !!icon?.querySelector("svg"), w: icon?.getBoundingClientRect().width,
         ring: li.querySelector(".wksym .wkring")?.getBoundingClientRect().width,
         ...(soll ? { sollMarke: (() => { const v = document.createElement("span"); v.innerHTML = soll[li.dataset.wkPunkt] ?? ""; return !!icon && !!v.innerHTML && v.innerHTML === icon.innerHTML; })() } : {}) };
@@ -708,21 +748,22 @@ try {
     assert(rg.find((x) => x.k === "umwandlungsstein").a === 61 && rg.find((x) => x.k === "umwandlungsstein").s === 61, "Fuellring: + zaehlt, der Ring folgt (61/100)",
       rg.find((x) => x.k === "umwandlungsstein"));
     // --- die Ringe an den Reitern: erledigt/gesamt, 16 Punkt (folgt Spezifikation 10: die Gesamtzahl aus dem Kern)
-    const reiterRinge = () => p.evaluate(() => [...document.querySelectorAll('#wkReiter [role="tab"]')].map((t) => ({ fort: t.querySelector(".wkfort")?.textContent,
+    // folgt Weeklies neu (121): der Ring der Karte zeigt den Anteil nach Menge, gerechnet vom Kern; 44 Punkt
+    const reiterRinge = () => p.evaluate(() => [...document.querySelectorAll('#wkReiter [role="tab"]')].map((t) => ({ id: t.dataset.wkReiter, fort: t.dataset.wkWoche,
       a: parseFloat(t.querySelector(".wkring .rf")?.getAttribute("stroke-dasharray")), w: t.querySelector(".wkring")?.getBoundingClientRect().width })));
-    const passt = (rr) => rr.every((x) => { const [a, g] = x.fort.split("/").map(Number); return Math.abs(x.a - Math.round(a / g * 10000) / 100) < 0.001 && x.w === 16; });
+    const sollKern = (id) => kern.fortschrittVon(wl.data.profile.find((y) => y.id === id), seitenUhr(s)).woche;
+    const passt = (rr) => rr.every((x) => { const k = sollKern(x.id); return x.fort === `${k.n}/${k.g}` && Math.abs(x.a - Math.round(k.anteil * 10000) / 100) < 0.01 && x.w === 44; });
     let rr = await reiterRinge();
-    assert(rr.length === 2 && rr[0].fort === `4/${N + 1}` && rr[0].a === ringWert(4, N + 1) && rr[1].fort === `1/${N - 4}` && rr[1].a === ringWert(1, N - 4) && passt(rr),
-      `Reiter-Ringe: je Charakter erledigt/gesamt der sichtbaren Punkte (4/${N + 1} mit einem eigenen, 1/${N - 4} mit vier ausgeblendeten), 16 Punkt`, rr);
+    assert(rr.length === 2 && passt(rr) && rr[0].a > 0 && rr[1].a > 0, "Karten-Ringe: je Charakter der Anteil nach Menge und n/g der Wochenpunkte, 44 Punkt", rr);
     n = nPosts(s);
     await p.click('input[data-wk-haken="siegelschluessel"]');
     await nachPost(s, n);
     rr = await reiterRinge();
-    assert(rr[0].fort === `5/${N + 1}` && rr[0].a === ringWert(5, N + 1) && passt(rr), `Reiter-Ring folgt dem Haken (5/${N + 1})`, rr);
+    assert(passt(rr), "Karten-Ring folgt dem Haken", rr);
     // Pruefung N6: ein eigener taeglicher Punkt steht in "Eigene" - folgt Spezifikation 10: nicht bei den Haendlern, eine Kachel "Taeglich" gibt es nicht
     const kiste = await p.evaluate(() => ({ eigene: !!document.querySelector('[data-wk-g="eigene"] [data-wk-punkt="eigenband01"]'),
       taeglich: !!document.querySelector('[data-wk-g="taeglich"]'), haendler: !!document.querySelector('[data-wk-g="haendler"] [data-wk-punkt="eigenband01"]'),
-      tag: document.querySelector('[data-wk-punkt="eigenband01"] .wktag')?.textContent, name: document.querySelector('[data-wk-g="eigene"] .wkgname')?.textContent }));
+      tag: document.querySelector('[data-wk-punkt="eigenband01"] .wktag')?.textContent, name: document.querySelector('[data-wk-g="eigene"] .wkbname')?.textContent }));
     assert(kiste.eigene && !kiste.taeglich && !kiste.haendler && kiste.tag === "täglich" && kiste.name === "Eigene",
       "ein eigener taeglicher Punkt steht in „Eigene“ (mit „täglich“), nicht bei den Händlern; keine Kachel „Täglich“", kiste);
     // Pruefung M2: ein umbenannter Raid-Punkt zeigt seinen Namen klein im Feld, einzeilig mit Auslassung, das Feld bleibt 44 hoch
@@ -784,7 +825,7 @@ try {
     await vorspulen(s, 120000);
     await bis(async () => !punkt(await blick(p), "zitadelleNormal").haken);
     b = await blick(p);
-    assert(!punkt(b, "zitadelleNormal").haken && punkt(b, "illusionen").stand === 0 && !punkt(b, "phantomstein").haken && b.reiter[0].fort === `0/${N}`,
+    assert(!punkt(b, "zitadelleNormal").haken && punkt(b, "illusionen").stand === 0 && !punkt(b, "phantomstein").haken && b.reiter[0].fort === `0/${NW}`,
       "Do 10:01 (ohne Neuladen, im Minutentakt): alle Wochen- und Tagespunkte 0", b.punkte.filter((x) => x.haken || x.stand));
     assert(!rl.posts.length, "der Reset allein schreibt nichts");
     const n = nPosts(s);
@@ -807,7 +848,7 @@ try {
     await vorspulen(t, 120000);
     await bis(async () => !punkt(await blick(t.page), "phantomstein").haken);
     b = await blick(t.page);
-    assert(!punkt(b, "phantomstein").haken && !punkt(b, "vertragNyx").haken && punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${N}`,
+    assert(!punkt(b, "phantomstein").haken && !punkt(b, "vertragNyx").haken && punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${NW}`,
       "Fr 10:01: die Tagespunkte 0, der Wochenpunkt bleibt", b.punkte.filter((x) => x.haken));
     await t.page.close();
   }
@@ -829,8 +870,8 @@ try {
     {
       const e = await oeffne({ lager: neuesLager(hl.data), lang: "en" });
       const d = await e.page.evaluate(() => { const li = document.querySelector('li[data-wk-punkt="dimensionDungeons"]');
-        return { pkt: li?.querySelector(".wkpkt")?.textContent, wert: li?.querySelector('[role="spinbutton"]')?.getAttribute("aria-valuetext"),
-          feld: document.querySelector('[data-wk-g="haendler"] .wkgname')?.textContent, dim: document.querySelector('[data-wk-g="dimension"] .wkgname')?.textContent,
+        return { pkt: li?.querySelector(".wkpkt")?.textContent, wert: document.getElementById("wkP-dimensionDungeons")?.textContent,
+          feld: document.querySelector('[data-wk-g="haendler"] .wkbname')?.textContent, dim: document.querySelector('[data-wk-g="dimension"] .wkbname')?.textContent,
           kiste: document.querySelector('button.wkkiste[data-wk-kiste="3"]')?.getAttribute("aria-label"),
           tag: document.querySelector('li[data-wk-punkt="vererbungsstein"] .wktag')?.textContent }; });
       assert(Number.isInteger(DP) && d.pkt === `${en(3 * DP)} / 42,000 points` && d.wert === `3 of ${DM}, ${en(3 * DP)} points` && d.feld === "Merchants" && d.dim === "Dimensional Trial"
@@ -844,7 +885,7 @@ try {
     // --- das Feld "Haendler": sechs Bloecke in ihrer Folge, je Name, Ring und erledigt/gesamt; im Kopf die Summe
     const feld = () => p.evaluate(() => {
       const f = document.querySelector('#wkPanel section.wk-haendler.wkgruppe[data-wk-g="haendler"]');
-      return f && { name: f.querySelector(".wkkkopf h3")?.textContent, kopf: f.querySelector(".wkkkopf .wkgzahl")?.textContent, kopfVh: f.querySelector(".wkkkopf .vh")?.textContent,
+      return f && { name: f.querySelector(".wkkkopf .wkbname")?.textContent, kopf: f.querySelector(".wkkkopf .wkgzahl")?.textContent, kopfVh: f.querySelector(".wkkkopf .vh")?.textContent,
         bloecke: [...f.querySelectorAll("section.wkhd")].map((h) => ({ g: h.dataset.wkH, h4: h.querySelector(".wkhkopf h4")?.textContent, zahl: h.querySelector(".wkhkopf .wkgzahl")?.textContent,
           vh: h.querySelector(".wkhkopf .vh")?.textContent, ring: !!h.querySelector(".wkhkopf .wkring"), fertig: h.classList.contains("fertig"), erl: !!h.querySelector(".wkkerl"),
           von: h.getAttribute("aria-labelledby"), hid: h.querySelector(".wkhkopf h4")?.id, punkte: [...h.querySelectorAll("[data-wk-punkt]")].map((x) => x.dataset.wkPunkt) })),
@@ -876,7 +917,7 @@ try {
     assert(tg.slice(0, 2).every((x) => x.block === "gemischtwaren" && x.tag === "täglich" && x.id === "wkT-" + x.k && x.beschr === "täglich") && tg[2].taeglich === 0,
       "Tagespunkte im Block Gemischtwarenhändler mit „täglich“ (auch fuer den Vorleser), keine Kachel „Täglich“", tg);
     // --- "monatlich" am Vererbungsstein: unter dem Namen, fuer den Vorleser am Zaehler
-    const mon = await p.evaluate(() => { const li = document.querySelector('li[data-wk-punkt="vererbungsstein"]'), t = li?.querySelector(".wktag"), z = li?.querySelector('[role="spinbutton"]');
+    const mon = await p.evaluate(() => { const li = document.querySelector('li[data-wk-punkt="vererbungsstein"]'), t = li?.querySelector(".wktag"), z = li?.querySelector("input[data-wk-stand]");
       const nm = li?.querySelector(".wknamen .wkname");
       return { t: t?.textContent, id: t?.id, inNamen: !!t?.parentElement?.classList.contains("wknamen"), unter: !!t && !!nm && t.getBoundingClientRect().top >= nm.getBoundingClientRect().bottom - 1,
         beschr: (z?.getAttribute("aria-describedby") || "").split(" ").map((i) => document.getElementById(i)?.textContent).join(" "), px: t ? parseFloat(getComputedStyle(t).fontSize) : 0,
@@ -884,9 +925,9 @@ try {
     assert(mon.t === "monatlich" && mon.id === "wkT-vererbungsstein" && mon.inNamen && mon.unter && mon.beschr === "monatlich" && mon.px >= 11 && mon.block === "widerstandswaren" && mon.andere === 1,
       "„monatlich“ am Vererbungsstein: in span.wknamen unter dem Namen, aria-describedby am Zaehler, nur dort", mon);
     // --- Dimensionspruefung: Dungeons mit Punkten (3000 je Dungeon)
-    const dim = () => p.evaluate(() => { const li = document.querySelector('li[data-wk-punkt="dimensionDungeons"]'), z = li?.querySelector('[role="spinbutton"]'), pk = li?.querySelector(".wkpkt");
-      return { pkt: pk?.textContent, versteckt: pk?.getAttribute("aria-hidden"), inNamen: !!pk?.closest(".wknamen"), wert: z?.getAttribute("aria-valuetext"), jetzt: z?.getAttribute("aria-valuenow"),
-        max: z?.getAttribute("aria-valuemax"), kachel: li?.closest(".wkgruppe")?.dataset.wkG, px: pk ? parseFloat(getComputedStyle(pk).fontSize) : 0 }; });
+    const dim = () => p.evaluate(() => { const li = document.querySelector('li[data-wk-punkt="dimensionDungeons"]'), z = li?.querySelector("input[data-wk-stand]"), pk = li?.querySelector(".wkpkt");
+      return { pkt: pk?.textContent, versteckt: pk?.getAttribute("aria-hidden"), inNamen: !!pk?.closest(".wknamen"), wert: document.getElementById("wkP-dimensionDungeons")?.textContent, jetzt: z?.value,
+        max: li?.querySelector(".wkvon")?.textContent.slice(1), kachel: li?.closest(".wkgruppe")?.dataset.wkG, px: pk ? parseFloat(getComputedStyle(pk).fontSize) : 0 }; });
     let d = await dim();
     assert(d.pkt === `${de(3 * DP)} / 42.000 Punkte` && d.versteckt === "true" && d.inNamen && d.wert === `3 von ${DM}, ${de(3 * DP)} Punkte` && d.jetzt === "3" && d.max === String(DM)
       && d.kachel === "dimension" && d.px >= 11,
@@ -897,8 +938,8 @@ try {
     d = await dim();
     assert(d.pkt === `${de(4 * DP)} / 42.000 Punkte` && d.wert === `4 von ${DM}, ${de(4 * DP)} Punkte` && await bis(() => hl.data.profile[0].zaehler.dimensionDungeons?.stand === 4),
       `Dungeons +: 4 von ${DM}, ${de(4 * DP)} Punkte, gespeichert`, d);
-    await p.focus('[role="spinbutton"][data-wk-stand="dimensionDungeons"]');
-    await p.keyboard.press("End");
+    await p.fill('input[data-wk-stand="dimensionDungeons"]', String(DM));
+    await p.press('input[data-wk-stand="dimensionDungeons"]', "Enter");
     d = await dim();
     assert(d.pkt === "42.000 / 42.000 Punkte" && d.wert === `${DM} von ${DM}, 42.000 Punkte`, "Dungeons Ende: voll, 42.000 / 42.000 Punkte", d);
     // --- die goldenen Truhen: fuenf Knoepfe, Klick fuellt bis i, Klick auf eine gefuellte nimmt bis i-1 zurueck
@@ -912,14 +953,24 @@ try {
       && t.k.every((x, j) => x.i === String(j + 1) && x.an === String(j < n) && x.cls === (j < n) && x.name === `Goldene Truhe ${j + 1} von 5` && x.tab === (j + 1 === tab ? 0 : -1));
     const gespeichert = (n) => bis(() => hl.data.profile[0].zaehler.goldeneKiste?.stand === n);
     let t = await truhen();
-    assert(truheStimmt(t, 0, 1) && t.aRolle === "status" && t.aDraussen && !t.ansage,
-      "Truhen: fuenf Knoepfe „Goldene Truhe i von 5“ in einer Gruppe, keine gedrueckt, ein Tabstopp auf der ersten; die Ansage-Region (status) ausserhalb von #wkBody, leer", t);
+    assert(truheStimmt(t, 0, 1) && t.aRolle === "status" && t.aDraussen && !/Goldene Truhen/.test(t.ansage),
+      "Truhen: fuenf Knoepfe „Goldene Truhe i von 5“ in einer Gruppe, keine gedrueckt, ein Tabstopp auf der ersten; die Ansage-Region (status) ausserhalb von #wkBody, noch ohne Truhenansage (folgt Weeklies neu: Haken und Zaehler sagen dort an)", t);
     for (const [i, soll, wie] of [[3, 3, "Klick auf die leere dritte fuellt bis zu ihr"], [2, 1, "Klick auf die gefuellte zweite nimmt bis vor sie zurueck"],
       [1, 0, "Klick auf die gefuellte erste leert alle"], [5, 5, "Klick auf die fuenfte fuellt alle"], [5, 4, "Klick auf die gefuellte fuenfte nimmt nur sie zurueck"]]) {
       n = nPosts(s);
       await p.click(`button.wkkiste[data-wk-kiste="${i}"]`);
       await nachPost(s, n);
       t = await truhen();
+      if (soll === 5) {
+        // folgt Weeklies neu: mit der letzten Truhe ist die Dimensionspruefung fertig (Dungeons voll) und klappt zu, der Fokus liegt auf ihrem Kopf
+        const k = await p.evaluate(() => ({ zu: document.querySelector('[data-wk-g="dimension"]')?.dataset.zu, fokus: document.activeElement?.dataset.wkZu }));
+        assert(k.zu === "true" && k.fokus === "dimension" && t.ansage === "Goldene Truhen, 5 von 5" && await gespeichert(5),
+          "Truhen: mit der fuenften ist die Dimensionspruefung fertig, klappt zu, der Fokus liegt auf ihrem Kopf, angesagt, gespeichert", { k, t });
+        await p.click('[data-wk-zu="dimension"]');
+        t = await truhen();
+        assert(truheStimmt(t, 5, 5), "Truhen: wieder aufgeklappt, alle fuenf gedrueckt, der Tabstopp auf der fuenften", t);
+        continue;
+      }
       assert(truheStimmt(t, soll, i) && t.fokus === String(i) && t.ansage === `Goldene Truhen, ${soll} von 5` && await gespeichert(soll),
         `Truhen: ${wie} (${soll} von 5), aria-pressed stimmt, gespeichert als zaehler.goldeneKiste, der Fokus bleibt auf der Truhe, angesagt`,
         { t, z: hl.data.profile[0].zaehler.goldeneKiste });
@@ -1050,17 +1101,18 @@ try {
   {
     const s = await oeffne({ lager });
     let b = await blick(s.page);
-    assert(b.woche === "N\u00e4chster Wochen-Reset: Do 10:00 \u00b7 in 1\u00a0T 0\u00a0Std" && b.tag === "T\u00e4glicher Reset: 10:00 \u00b7 in 5\u00a0Min",
-      "Reset-Anzeige Mi 09:55: Wochen-Reset Do 10:00 in 1 T 0 Std, taeglich in 5 Min", { w: b.woche, t: b.tag });
+    // folgt Weeklies neu (125.1): der Wochen-Reset steht nur im Band, der Kopf nennt den taeglichen
+    assert(b.woche === "Wochen-Reset Do ab 10:00 (deutsche Zeit) \u00b7 in 1\u00a0T 0\u00a0Std" && b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 5\u00a0Min",
+      "Reset-Anzeige Mi 09:55: Wochen-Reset im Band (Do ab 10:00) in 1 T 0 Std, der Kopf nennt den taeglichen in 5 Min", { w: b.woche, t: b.tag });
     await vorspulen(s, 60000);
     await bis(async () => (await blick(s.page)).tag.endsWith("4\u00a0Min"));
     b = await blick(s.page);
-    assert(b.tag === "T\u00e4glicher Reset: 10:00 \u00b7 in 4\u00a0Min", "eine Minute spaeter: in 4 Min (Minutentakt)", b.tag);
+    assert(b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 4\u00a0Min", "eine Minute spaeter: in 4 Min (Minutentakt)", b.tag);
     // auf 10:01:30: der Tages-Reset liegt hinter uns, beide kommen Do 10:00 (aufgerundet 23 Std 59 Min)
     await vorspulen(s, 5 * 60000 + 30000);
     await bis(async () => (await blick(s.page)).tag.includes("Std"));
     b = await blick(s.page);
-    assert(b.woche === "N\u00e4chster Wochen-Reset: Do 10:00 \u00b7 in 23\u00a0Std 59\u00a0Min" && b.tag === "T\u00e4glicher Reset: 10:00 \u00b7 in 23\u00a0Std 59\u00a0Min",
+    assert(b.woche === "Wochen-Reset Do ab 10:00 (deutsche Zeit) \u00b7 in 23\u00a0Std 59\u00a0Min" && b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 23\u00a0Std 59\u00a0Min",
       "nach dem Tages-Reset: beide in Stunden und Minuten", { w: b.woche, t: b.tag });
     // der Takt laeuft nur, solange der Bereich offen ist
     const vorher = await s.page.evaluate(() => document.querySelector("#wkTag").textContent);
@@ -1075,9 +1127,9 @@ try {
     const e = await oeffne({ lager, lang: "en" });
     b = await blick(e.page);
     const en = await e.page.evaluate(() => ({ neu: document.querySelector("#wkNeu")?.textContent || document.querySelector("#wkVoll")?.textContent,
-      werk: [...document.querySelectorAll(".wkwerk button")].map((x) => x.textContent), titel: document.querySelector("#weekliesTitel")?.textContent }));
-    assert(b.woche === "Next weekly reset: Thu 10:00 \u00b7 in 1\u00a0d 0\u00a0h" && b.tag === "Daily reset: 10:00 \u00b7 in 5\u00a0min",
-      "English: Next weekly reset: Thu 10:00 in 1 d 0 h, daily in 5 min", { w: b.woche, t: b.tag });
+      werk: [...document.querySelectorAll(".wkwerk button:not([data-wk-allezu])")].map((x) => x.textContent), titel: document.querySelector("#weekliesTitel")?.textContent }));
+    assert(b.woche === "Weekly reset Thu from 10:00 (German time) \u00b7 in 1\u00a0d 0\u00a0h" && b.tag === "Daily reset 10:00 German time \u00b7 in 5\u00a0min",
+      "English: weekly reset Thu from 10:00 in the band, daily reset in the header", { w: b.woche, t: b.tag });
     assert(b.gruppen[0].name === "Raid \u2013 Altar of Calanthia" && punkt(b, "zitadelleNormal").name === "The Forgotten Citadel \u2013 Normal"
       && punkt(b, "phantomstein").tag === "daily" && punkt(b, "vertragNyx").name === "Allied Resistance Forces Contract Scroll: Nix",
       "English: groups, points and \u201edaily\u201c", { g: b.gruppen[0].name, p: punkt(b, "zitadelleNormal").name });
@@ -1090,7 +1142,7 @@ try {
       "English: the raid grid rows, columns and keyboard hint (Pruefung N6)" + (BILDER ? "" : " (without game images: plates F, C, A)"), enRaster);
     // Sprachwechsel auf der Seite
     await e.page.evaluate(() => document.querySelector("#btnLang")?.click());
-    await bis(async () => (await blick(e.page)).woche.startsWith("N\u00e4chster"));
+    await bis(async () => (await blick(e.page)).woche.startsWith("Wochen-Reset"));
     b = await blick(e.page);
     assert(b.gruppen[0].name === "Raid \u2013 Altar von Calanthia" && punkt(b, "zitadelleNormal").name === "Die vergessene Zitadelle \u2013 Normal"
       && punkt(b, "phantomstein").tag === "t\u00e4glich", "Sprachwechsel: die Liste auf Deutsch", b.gruppen[0]);
@@ -1180,7 +1232,7 @@ try {
     await nachPost(s, n);
     await bis(async () => /nicht gespeichert/.test((await blick(p)).status));
     let b = await blick(p);
-    assert(/Zu gro\u00df oder ung\u00fcltig/.test(b.status) && /nicht gespeichert/.test(b.status) && punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${N}`,
+    assert(/Zu gro\u00df oder ung\u00fcltig/.test(b.status) && /nicht gespeichert/.test(b.status) && punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${NW}`,
       "400: \u201eZu groß oder ungültig \u2013 nicht gespeichert\u201c, der Haken bleibt sichtbar", b.status);
     const rolle = await p.evaluate(() => document.querySelector("#wkStatus")?.getAttribute("role"));
     assert(rolle === "status", "der Satz steht in einer Live-Region", rolle);
@@ -1296,6 +1348,154 @@ try {
       assert(punktK.best >= 3, `Thema ${thema}: der leere Punkt im Rasterfeld hat am Bildschirm mindestens 3:1, gemessen ${punktK.best}:1 (Finish 2)`, punktK);
       assert(!s.fehler.length, `Thema ${thema}: keine Fehler`, s.fehler);
       await p.close();
+    }
+  }
+  /* ===== Weeklies neu (Spezifikation 2026-10-06-weeklies-neu-design.md): Karten mit Ring nach Menge, fertige Bereiche klappen zu und
+     bleiben aufklappbar (gespeichert), Letzte Woche, Ansagen bei Haken, Loesen und Rueckgaengig, "Geloeste (n)" in der Leiste,
+     der Satz bei sechs erst nach dem Klick, 560 px ohne waagerechtes Rollen, der Kontrast der Karte in allen Themen (124.3) */
+  {
+    const WOCHE_KEYS = kern.GRUNDLISTE.filter((g) => g.takt !== "tag");
+    const wocheVoll = (seitMs) => Object.fromEntries(WOCHE_KEYS.map((g) => [g.schluessel, { stand: g.menge, seit: seitMs }]));
+    const tagVoll = (seitMs) => Object.fromEntries(kern.GRUNDLISTE.filter((g) => g.takt === "tag").map((g) => [g.schluessel, { stand: g.menge, seit: seitMs }]));
+    // Mo 21.09. 12:00: die Woche ab Do 17.09. ist voll, die Tagespunkte sind am Mi 23.09. 09:55 schon zurueckgesetzt
+    const fertigP = profil("wneufert01", "Fertig", { zaehler: { ...wocheVoll(berlin(21, 12)), ...tagVoll(berlin(21, 12)) } });
+    const teilP = profil("wneuteil01", "Teil", { zaehler: { dimensionDungeons: { stand: 3, seit: berlin(22, 20) }, goldeneKiste: { stand: 2, seit: berlin(22, 20) } } });
+    const nl = neuesLager({ v: 1, profile: [fertigP, teilP] });
+    const s = await oeffne({ lager: nl });
+    const p = s.page;
+    let b = await blick(p);
+    const kf = b.reiter.find((r) => r.name === "Fertig"), kt = b.reiter.find((r) => r.name === "Teil");
+    assert(kf.fort === `${NW}/${NW}` && kf.heute === "0/2" && /Woche erledigt/.test(kf.satz) && /Woche erledigt, heute 0 von 2/.test(kf.vh),
+      "Karte: nach dem Tagesreset bleibt die Woche erledigt, die Tagespunkte stehen getrennt (121)", kf);
+    assert(kt.fort === "0/" + NW && /noch 34 offen|noch \d+ offen/.test(kt.satz) && /Wochenpunkte offen/.test(kt.vh) && kt.vh.includes("Teil"),
+      "Karte: ein Charakter nennt, wie viel noch offen ist, auch dem Vorleser (120)", kt);
+    const ringe = await p.evaluate(() => [...document.querySelectorAll('#wkReiter [role="tab"]')].map((t) => ({ n: t.querySelector(".wkkname")?.textContent,
+      a: parseFloat(t.querySelector(".wkring .rf")?.getAttribute("stroke-dasharray")), haken: !!t.querySelector(".wkscheibe .wkhk"), ini: t.querySelector(".wkscheibe b")?.textContent })));
+    const soll = kern.fortschrittVon(teilP, seitenUhr(s)).woche.anteil;
+    assert(ringe[0].a === 100 && ringe[0].haken && !ringe[0].ini && ringe[1].a > 0 && Math.abs(ringe[1].a - Math.round(soll * 10000) / 100) < 0.01 && ringe[1].ini === "T" && !ringe[1].haken,
+      "Karte: fertig = Haken im vollen Ring, sonst die Initiale; der Ring zeigt Teilfortschritt nach Menge (3 von 7 Dungeons, 2 von 5 Truhen)", ringe);
+    // fertige Bereiche sind zu, mit Haken; Alle aufklappen, Wahl bleibt nach Neuladen
+    const bereiche = () => p.evaluate(() => [...document.querySelectorAll("#wkPanel .wkgruppe")].map((g) => ({ g: g.dataset.wkG, zu: g.dataset.zu, ex: g.querySelector("[data-wk-zu]")?.getAttribute("aria-expanded"),
+      haken: !!g.querySelector("[data-wk-zu] .wkhk"), liste: !!g.querySelector(".wkliste, .wkraster") })));
+    let br = await bereiche();
+    // Haendler hat Tagespunkte (Phantomstein, Nyx): nach dem Tagesreset ist der Bereich wieder offen, die anderen sind fertig und zu
+    assert(br.length === 5 && br.filter((x) => x.g !== "haendler").every((x) => x.zu === "true" && x.ex === "false" && x.haken && !x.liste)
+      && br.find((x) => x.g === "haendler").zu === "false" && br.find((x) => x.g === "haendler").liste,
+      "fertiger Charakter: die erledigten Bereiche sind zu, mit Haken, ohne Liste; der Bereich mit offenen Tagespunkten bleibt offen", br);
+    const allezu = () => p.evaluate(() => document.querySelector("[data-wk-allezu]")?.textContent);
+    assert(await allezu() === "Alle einklappen", "ist ein Bereich offen, bietet der Knopf \u201eAlle einklappen\u201c an", await allezu());
+    let n = nPosts(s);
+    await klick(p, "[data-wk-allezu]");
+    await nachPost(s, n);
+    br = await bereiche();
+    assert(br.every((x) => x.zu === "true" && x.ex === "false" && !x.liste) && await allezu() === "Alle aufklappen"
+      && /Alle Bereiche eingeklappt/.test(await p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "")),
+      "Alle einklappen: jeder Bereich ist zu, der Knopf wechselt, die Ansage nennt es", br);
+    n = nPosts(s);
+    await klick(p, "[data-wk-allezu]");
+    await nachPost(s, n);
+    br = await bereiche();
+    assert(br.every((x) => x.zu === "false" && x.ex === "true" && x.liste) && await allezu() === "Alle einklappen"
+      && /Alle Bereiche aufgeklappt/.test(await p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "")),
+      "Alle aufklappen: jeder Bereich ist offen, der Knopf wechselt, die Ansage nennt es", br);
+    const gespZu = nl.data.profile.find((x) => x.id === "wneufert01").zu;
+    assert(gespZu && Object.values(gespZu).every((w) => w.zu === false) && gespZu.raid.bei === true && gespZu.haendler.bei === false && !nl.abgelehnt.length,
+      "gespeichert: die Wahl je Bereich mit dem Fertig-Zustand dabei, die Datei nimmt sie an", gespZu);
+    await p.close();
+    {
+      const t = await oeffne({ lager: nl });
+      br = await (async () => t.page.evaluate(() => [...document.querySelectorAll("#wkPanel .wkgruppe")].map((g) => g.dataset.zu)))();
+      assert(br.length > 0 && br.every((x) => x === "false"), "nach Neuladen bleiben die aufgeklappten Bereiche offen, solange sie fertig sind", br);
+      // wird ein Punkt zurueckgenommen, gilt wieder die Regel: offen; fertig gesetzt klappt er von selbst zu
+      const n2 = nPosts(t);
+      await t.page.click('input[data-wk-haken="zitadelleNormal"]');
+      await nachPost(t, n2);
+      const raid = await t.page.evaluate(() => document.querySelector('[data-wk-g="raid"]').dataset.zu);
+      assert(raid === "false", "ein Punkt zurueckgenommen: der Bereich ist offen", raid);
+      await t.page.close();
+    }
+  }
+  // Letzte Woche (123): Mi 22:00 Haken, Do 10:05 - die Zeile steht da, nach dem ersten Haken ist sie weg
+  {
+    const lw = neuesLager({ v: 1, profile: [profil("wletzt0001", "Alt", { zaehler: { zitadelleNormal: { stand: 1, seit: berlin(23, 12) }, illusionen: { stand: 2, seit: berlin(23, 12) } } }),
+      profil("wletzt0002", "Neu", {})] });
+    const lwOrig = structuredClone(lw.data);
+    const s = await oeffne({ lager: lw, uhr: berlin(24, 10, 5) });
+    const p = s.page;
+    const zeile = () => p.evaluate(() => document.querySelector("#wkLetzte")?.textContent || "");
+    const z0 = await zeile();
+    assert(/^Letzte Woche: Alt 1\/\d+$/.test(z0) && !/Neu/.test(z0), "Letzte Woche: nach dem Reset steht je Charakter mit Stand die Zeile „Letzte Woche: Alt 1/…“", z0);
+    const n = nPosts(s);
+    await p.click('input[data-wk-haken="korridorNormal"]');
+    await nachPost(s, n);
+    assert((await zeile()) === "", "Letzte Woche: nach dem ersten Haken der neuen Woche ist die Zeile weg");
+    await p.close();
+    const e = await oeffne({ lager: neuesLager(lwOrig), uhr: berlin(24, 10, 5), lang: "en" });
+    assert(/^Last week: Alt 1\/\d+$/.test(await e.page.evaluate(() => document.querySelector("#wkLetzte")?.textContent || "")), "English: Last week: Alt 1/…");
+    await e.page.close();
+  }
+  // Ansagen bei Haken, Loesen, Rueckgaengig; Geloeste in der Leiste; der Satz bei sechs
+  {
+    const al = neuesLager({ v: 1, profile: ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"].map((nm, i) => profil("wansag000" + i, nm)) });
+    const s = await oeffne({ lager: al });
+    const p = s.page;
+    const ansage = () => p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "");
+    let n = nPosts(s);
+    await p.click('input[data-wk-haken="zitadelleNormal"]');
+    await nachPost(s, n);
+    assert(/Die vergessene Zitadelle . Normal erledigt, 1 von \d+/.test(await ansage()), "Haken: der neue Stand wird angesagt (124.1)", await ansage());
+    await p.click('input[data-wk-haken="zitadelleNormal"]');
+    assert(/zurückgenommen, 0 von/.test(await ansage()), "Haken zurueck: angesagt", await ansage());
+    await p.fill('input[data-wk-stand="illusionen"]', "2");
+    await p.press('input[data-wk-stand="illusionen"]', "Enter");
+    assert(/2 von 3, \d+ von \d+/.test(await ansage()), "Zaehler: Stand und Woche werden angesagt", await ansage());
+    const sechs0 = await p.evaluate(() => !!document.querySelector("#wkVoll"));
+    assert(!sechs0, "bei sechs Charakteren steht der Satz „Löse einen“ nicht dauerhaft da (125.3)");
+    n = nPosts(s);
+    await klick(p, "[data-wk-loesen]");
+    await nachPost(s, n);
+    const lo = await p.evaluate(() => { const u = document.querySelector("[data-wk-undo]"), d = document.getElementById(u?.getAttribute("aria-describedby") || "");
+      const g = document.querySelector(".wkleiste [data-wk-geloeste]");
+      return { desc: d?.textContent || "", ansage: document.querySelector("#wkAnsage")?.textContent || "", knopf: g?.textContent, inLeiste: !!g, ex: g?.getAttribute("aria-expanded") }; });
+    assert(/gelöst/.test(lo.ansage) && /Er bleibt gespeichert/.test(lo.ansage) && /Eins/.test(lo.desc) && /gelöst/.test(lo.desc),
+      "Loesen: der Satz steht in der Live-Region, und „Rückgängig“ hat ihn als Beschreibung (124.1, 124.2)", lo);
+    assert(lo.inLeiste && lo.knopf === "Gelöste (1)" && lo.ex === "false", "„Gelöste (1)“ steht in der Leiste neben „+ Charakter“ (125.2)", lo);
+    n = nPosts(s);
+    await klick(p, "[data-wk-undo]");
+    await nachPost(s, n);
+    assert(/zurück/.test(await ansage()), "Rueckgaengig: angesagt", await ansage());
+    // wieder sechs; der Satz erscheint erst nach dem Klick
+    await klick(p, "#wkNeu");
+    assert(await p.evaluate(() => /Sechs Charaktere/.test(document.querySelector("#wkVoll")?.textContent || "")), "bei sechs: der Satz erscheint nach „+ Charakter“");
+    assert(!s.fehler.length && !al.abgelehnt.length, "Weeklies neu: jeder gesendete Stand gilt, keine Fehler", { f: s.fehler, a: al.abgelehnt });
+    await p.close();
+  }
+  // 560 px: keine waagerechte Rolleiste, Karten in zwei Spalten; die Karte hat in allen Themen mindestens 4,5:1 (124.3)
+  {
+    const voll6 = { v: 1, profile: ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"].map((nm, i) => profil("wbreit000" + i, nm,
+      { zaehler: { dimensionDungeons: { stand: 3, seit: berlin(22, 20) }, umwandlungsstein: { stand: 40, seit: berlin(22, 20) }, zitadelleNormal: { stand: 1, seit: berlin(22, 20) } } })) };
+    for (const thema of ["dark", "light", "tnl", "glas"]) {
+      for (const lang of ["de", "en"]) {
+        const s = await oeffne({ lager: neuesLager(voll6), breite: 560, hoehe: 900, thema, lang });
+        const m = await s.page.evaluate(() => { const r = document.querySelector(".wkrollt"), k = [...document.querySelectorAll(".wkkarte")].map((c) => Math.round(c.getBoundingClientRect().left));
+          return { rolle: r.scrollWidth <= r.clientWidth + 1, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth, spalten: new Set(k).size }; });
+        assert(m.rolle && m.doc && m.spalten === 2, `560 px ${thema}/${lang}: keine waagerechte Rolleiste, die Karten in zwei Spalten`, m);
+        if (lang === "de") {
+          const png = (await s.page.locator('.wkkarte[aria-selected="true"]').screenshot()).toString("base64");
+          const k = await s.page.evaluate(async (b64) => {
+            const el = document.querySelector('.wkkarte[aria-selected="true"] .wkkstand2'), col = getComputedStyle(el).color.match(/[\d.]+/g).map(Number);
+            const img = new Image(); img.src = "data:image/png;base64," + b64; await img.decode();
+            const c = document.createElement("canvas"); c.width = img.width; c.height = img.height; const g = c.getContext("2d"); g.drawImage(img, 0, 0);
+            const d = g.getImageData(img.width - 8, Math.floor(img.height / 2), 1, 1).data;
+            const lum = (q) => { const l = q.map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; }); return 0.2126 * l[0] + 0.7152 * l[1] + 0.0722 * l[2]; };
+            const a = lum(col.slice(0, 3)), bgl = lum([d[0], d[1], d[2]]);
+            return Math.round((Math.max(a, bgl) + 0.05) / (Math.min(a, bgl) + 0.05) * 100) / 100;
+          }, png);
+          assert(k >= 4.5, `Thema ${thema}: der Satz in der gewählten Karte hat mindestens 4,5:1, gemessen ${k}:1 (124.3)`, k);
+        }
+        assert(!s.fehler.length, `560 px ${thema}/${lang}: keine Fehler`, s.fehler);
+        await s.page.close();
+      }
     }
   }
   assert((BILDER ? bilder.wkHatBild("korridor") && bilder.wkHatBild("umwandlungsstein") : !bilder.wkHatBild("korridor") && !bilder.wkHatBild("umwandlungsstein"))

@@ -10,6 +10,7 @@ import { serverStatusNachfuehren, syncPartyPill } from "./42-party";
 import { renderChangelog } from "./43-more-menu-and-dev-mode";
 import { syncLiveBtn } from "./45-startup";
 import { einstNachfuehren } from "./57-einstellungen";
+import { spracheMelden } from "./66-windows";
 
 /* ---------- static markup translation ---------- */
 export function applyStaticI18n(){
@@ -17,6 +18,9 @@ export function applyStaticI18n(){
   /* Zuletzt im Aufruf, nicht hier: syncPanelHeadings liest die Beschriftung
      der Reiterknoepfe ab, und die setzt diese Funktion erst weiter unten. */
   document.querySelectorAll<HTMLElement>("[data-i18n]").forEach(el => { el.textContent = t(el.dataset.i18n!); });
+  /* Den Zaehler der Kampfwahl schreibt sonst erst die Liste (railKopf in 30);
+     ohne Log stand deshalb im deutschen Fenster "No fights yet" (#155). */
+  if(!state.encounters.length && !state.entferntAktiv) $("#fightCount").textContent = t("rail.noneLoaded");
   document.querySelectorAll<HTMLElement>("[data-i18n-html]").forEach(el => { el.innerHTML = t(el.dataset.i18nHtml!); });
   document.querySelectorAll<HTMLInputElement>("[data-i18n-ph]").forEach(el => { el.placeholder = t(el.dataset.i18nPh!); });
   document.querySelectorAll<HTMLElement>("[data-i18n-title]").forEach(el => { el.title = t(el.dataset.i18nTitle!); });
@@ -60,4 +64,6 @@ export function setLang(l: string){
   retranslateToast();
   // das Segment der Einstellungen zeigt die neue Sprache
   einstNachfuehren();
+  // die Texte des Hauptprozesses (Infobereich, Sprungliste, Meldung) folgen (66)
+  spracheMelden();
 }

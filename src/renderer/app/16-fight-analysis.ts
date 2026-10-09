@@ -11,6 +11,8 @@ import { mitte } from "../build-core";
 import { mechanikSekunden, mechanikStempel, mechanikStrecken } from "./61-mechanik";
 import { luecken } from "../analyse-core";
 import { uiZoomFactor } from "./37-window-size-and-overlay";
+import { COMPACT_ROWS } from "./36-dialog";
+import { restZeile } from "../kompakt-core";
 import type { Fight, Insight, SavedRun, StackSeries } from "../types";
 
 /* One encoding for one fact. A --pitch band was the first idea for the gaps
@@ -24,34 +26,37 @@ import type { Fight, Insight, SavedRun, StackSeries } from "../types";
    dasteht. Gerechnet wird an den gemessenen Kaesten, nicht an der Zeilenzahl
    - eine aufgeklappte Zeile macht die Liste hoeher, ohne dass eine Zeile
    dazukommt. */
-/* Auf ganze Zeilen beschneiden - in beiden Ansichten.
+/* Auf ganze Zeilen beschneiden - im Kompakt und im Raster des Glutrings.
 
    Kompakt: das Fenster wird aus der Zeilenhoehe berechnet, von Hand
    gezogen passt es aber nicht mehr auf, und dann stand eine halb
    abgeschnittene Zeile unter einer Kopfzeile, die "4 von 12" sagte.
-   Volle Ansicht: der Kasten waechst mit dem Inhalt bis zu einem Deckel,
-   und der Deckel trifft nur zufaellig die Kante einer Zeile.
 
    Gemessen, nicht gerechnet: der Kasten wird an der Unterkante der
    letzten Zeile abgeschnitten, die noch ganz hineinpasst. Eine Rechnung
    aus Kopf- und Zeilenhoehe ging daneben, weil in der Liste mehr steht
    als Kopf und Zeilen - gemessen 255 Punkt Inhalt gegen 231 aus der
    Rechnung. Nur am Anfang der Liste: wer gerollt hat, bekommt seine
-   Hoehe nicht unter den Fingern weggeschnitten.
-
-   In der vollen Ansicht wandert das Panel darunter beim Aufklappen
-   mit, bis der Deckel greift - gewollt seit der Critique vom
-   23.09.2026, siehe .table #bars in styles.css. */
+   Hoehe nicht unter den Fingern weggeschnitten. */
 function schneideAufZeilen(box: HTMLElement, kompakt: boolean){
   /* Im Raster des Glutrings (64) rollt die Liste in sich und endet an der
      letzten ganzen Zeile (DESIGN.md "mehr Hoehe heisst mehr Zeilen").
-     Gestapelt (schmal oder flach) gilt der Deckel wie ausserhalb. */
+     Gestapelt (schmal oder flach) rollt die Seite, siehe unten. */
   if(box && document.body.classList.contains("glut") &&
      !document.documentElement.matches(".w-max-899,.h-max-699")){ ringSchnitt(box); return; }
+  box?.classList.remove("rollt");
   if(!box) return;
-  /* Gerollt wird nicht neu geschnitten - aber ein "none" aus dem Raster
-     darf gestapelt nicht stehen bleiben, sonst hatte die Tafel dort gar
-     keinen Deckel. Dann gilt wenigstens der aus styles.css. */
+  /* Gestapelt rollt die Seite, nicht die Liste (Spezifikation Feinschliff
+     4.4): kein Deckel, alle Zeilen stehen, "x von y sichtbar" entfaellt von
+     selbst. Ein Schnitt von vorher (Raster oder Kompakt) wird aufgehoben.
+     Ausserhalb des Glutrings und ausserhalb von Kompakt hat #bars keine
+     Flaeche (Feinschliff 7, Belegprobe in test-tafel-page): der Deckel der
+     alten Vollansicht entfiel, es gibt nichts zu schneiden. */
+  if(!kompakt){ box.style.maxHeight = ""; return; }
+  /* Hier kommt nur noch Kompakt an. Gerollt wird nicht neu geschnitten -
+     aber ein "none" aus dem Raster darf nicht stehen bleiben, sonst haette
+     die Liste im Kompakt gar keinen Deckel. Dann gilt wenigstens der aus
+     styles.css. */
   if(box.scrollTop >= 1){ if(box.style.maxHeight === "none") box.style.maxHeight = ""; return; }
   /* Erst freigeben, dann messen. Ohne das misst die Funktion ihren
      eigenen letzten Schnitt und kann nur noch kleiner werden: ein
@@ -67,63 +72,21 @@ function schneideAufZeilen(box: HTMLElement, kompakt: boolean){
      hoch und eine Zeile wieder angeschnitten; bei 200 % 66 gegen 88.
      Also alles, was aus einem Rechteck kommt, durch den Faktor teilen. */
   const zf = (typeof uiZoomFactor === "function" ? uiZoomFactor() : 1) || 1;
-  if(kompakt){
-    /* Gemessen: an der Unterkante der letzten Zeile, die ganz
-       hineinpasst. Hier ist das richtig, weil unter dem Kasten nichts
-       mehr kommt, was wandern koennte. */
-    const bk = box.getBoundingClientRect();
-    let letzte = 0;
-    for(const z of box.querySelectorAll(".row")){
-      const r = z.getBoundingClientRect();
-      if(r.bottom <= bk.bottom + 0.5) letzte = (r.bottom - bk.top) / zf; else break;
-    }
-    /* Der Kasten endet an der letzten ganzen Zeile (Pruefung Aufgabe 9,
-       M5): vorher kamen die vierzehn Punkte des Verlaufs dazu, und in ihnen
-       lief die sechste Zeile an. compactWindowSize rechnet die Punkte dem
-       Fenster weiter zu (COMPACT_FADE) - unter der Liste bleiben sie leer
-       wie der Griff im Entwurf. */
-    box.style.maxHeight = letzte > 1 ? Math.round(letzte) + "px" : "";
-    return;
-  }
-  /* Volle Ansicht: der Kasten waechst mit dem Inhalt bis zu einem Deckel
-     (styles.css, .table #bars). Der Deckel zaehlt Hauptzeilen - halb so
-     viel wie unter der Kopfleiste Platz ist, mindestens sechs, hoechstens
-     zwoelf. Bei 1280x860 sind das zwoelf, bei 150 % neun, bei 200 % sechs:
-     vorher stand dort eine feste Hoehe von 33 %, und bei 200 % waren das
-     vier Zeilen.
-     Die Zeilenhoehe kommt von der Hauptzeile, weil eine Unterzeile
-     niedriger ist (24 statt 28) und der Deckel sonst beim Aufklappen
-     wandern wuerde. */
-  const haupt = box.querySelector(".row:not(.sub)");
-  const kopf = box.querySelector(".bhead");
-  if(!haupt) return;
-  const zh = haupt.getBoundingClientRect().height / zf;
-  const kh = kopf ? kopf.getBoundingClientRect().height / zf : 0;
-  if(zh < 1) return;
-  /* Nur die obere Polsterung zaehlt. Die untere liegt in einem
-     Rollkasten HINTER dem Inhalt, nimmt also keinen sichtbaren Platz weg -
-     mitgerechnet gab sie sieben Punkte frei, in denen die naechste Zeile
-     anfing, und genau eine angeschnittene Zeile blieb stehen. */
-  const oben = parseFloat(getComputedStyle(box).paddingTop) || 0;
-  const wurzel = getComputedStyle(document.documentElement);
-  const fensterH = parseFloat(wurzel.getPropertyValue("--winh")) || innerHeight / zf;
-  const kopfleiste = parseFloat(wurzel.getPropertyValue("--chrome")) || 40;
-  // die Statusleiste unten nimmt ihren Teil auch (--sb-h; im Kompakt keine)
-  const fuss = kompakt ? 0 : parseFloat(wurzel.getPropertyValue("--sb-h")) || 0;
-  const deckelZeilen = Math.max(6, Math.min(12, Math.floor((fensterH - kopfleiste - fuss) * .5 / zh)));
-  const deckel = kh + oben + deckelZeilen * zh;
-  /* Gemessen, nicht gerechnet, wie im Kompaktmodus: die letzte Zeile -
-     Haupt- oder Unterzeile -, deren Unterkante noch unter dem Deckel
-     liegt. Passt alles, gibt es keinen Schnitt, und der Kasten ist so hoch
-     wie sein Inhalt samt der Luft unter der letzten Zeile. */
+  /* Gemessen: an der Unterkante der letzten Zeile, die ganz
+     hineinpasst. Hier ist das richtig, weil unter dem Kasten nichts
+     mehr kommt, was wandern koennte. */
   const bk = box.getBoundingClientRect();
-  let letzte = 0, allesDa = true;
+  let letzte = 0;
   for(const z of box.querySelectorAll(".row")){
-    const unterkante = (z.getBoundingClientRect().bottom - bk.top) / zf;
-    if(unterkante <= deckel + 0.5) letzte = unterkante;
-    else { allesDa = false; break; }
+    const r = z.getBoundingClientRect();
+    if(r.bottom <= bk.bottom + 0.5) letzte = (r.bottom - bk.top) / zf; else break;
   }
-  box.style.maxHeight = allesDa ? "none" : letzte > 1 ? Math.round(letzte) + "px" : "";
+  /* Der Kasten endet an der letzten ganzen Zeile (Pruefung Aufgabe 9,
+     M5): vorher kamen die vierzehn Punkte des Verlaufs dazu, und in ihnen
+     lief die sechste Zeile an. compactWindowSize rechnet die Punkte dem
+     Fenster weiter zu (COMPACT_FADE) - unter der Liste bleiben sie leer
+     wie der Griff im Entwurf. */
+  box.style.maxHeight = letzte > 1 ? Math.round(letzte) + "px" : "";
 }
 /* Der Schnitt im Raster des Glutrings: erst freigeben, dann messen - die
    Liste nimmt in ihrer Spalte, was Kopf und Urteil uebrig lassen (flex), und
@@ -144,7 +107,12 @@ function ringSchnitt(box: HTMLElement){
     if(r.bottom <= bk.bottom + 0.5) letzte = (r.bottom - bk.top) / zf;
     else { allesDa = false; break; }
   }
-  if(!allesDa && letzte > 1) box.style.maxHeight = Math.round(letzte) + "px";
+  const rollt = !allesDa && letzte > 1;
+  if(rollt) box.style.maxHeight = Math.round(letzte) + "px";
+  /* Rollt die Liste, fuellt sie die Spalte und das Urteil steht am Ende
+     (margin-top:auto, styles.css); passt alles, folgt das Urteil der Liste
+     (Spezifikation Feinschliff 6). */
+  box.classList.toggle("rollt", rollt);
 }
 /* Im Overlay beschneidet der Kasten die Faktenzeile, nicht der Text:
    die Teile geben nichts ab (flex:0 0 auto), ihre eigene Ellipse greift
@@ -191,12 +159,36 @@ function kopfBeschneiden(){
   if(bereich && beschnitten() && bereich.getBoundingClientRect().width < 30)
     bereich.classList.add("zuEng");
 }
+/* Die Restzeile (#160, Spezifikation Kompakt-Fenster 8a): was unter der
+   letzten ganzen Zeile liegt, als eigene Zeile darunter - "+9 weitere, 12 %". Gemessen an den Kaesten wie die Zaehlung im Spaltenkopf; ein
+   Klick fuehrt zur Vollansicht (37). Nur im Kompakt. */
+function restZeileSetzen(box: HTMLElement, kompakt: boolean){
+  const knopf = document.querySelector<HTMLButtonElement>("#kRest");
+  if(!knopf) return;
+  const haupt = [...box.querySelectorAll<HTMLElement>(".row:not(.sub)")];
+  const bk = box.getBoundingClientRect();
+  const unten = kompakt ? haupt.filter(z => z.getBoundingClientRect().bottom > bk.bottom + 0.5) : [];
+  const wert = (z: HTMLElement) => Number(z.dataset.dmg) || 0;
+  const r = restZeile(haupt.map(wert), unten.map(wert));
+  knopf.hidden = !r;
+  if(!r) return;
+  knopf.querySelector(".kresttext")!.textContent = t("compact.rest", {n: r.n, p: pctMin(r.anteil, 0)});
+  knopf.querySelector(".krestwert")!.textContent = fmt(r.schaden);
+  knopf.querySelector<HTMLElement>(".krestspur")!.style.width = (100 * r.anteil).toFixed(1) + "%";
+  // der Name sagt, was ein Klick tut; Anteil und Schaden stehen im sichtbaren Text, darauf zeigt die Beschreibung
+  knopf.setAttribute("aria-describedby", "kRestText");
+  knopf.setAttribute("aria-label", t(state.group === "party" ? "compact.restNameGruppe" : "compact.restName", {n: r.n}));
+}
 export function markiereRest(){
   const box = $("#bars");
   if(!box) return;
   const kompakt = document.body.classList.contains("compact");
   kopfBeschneiden();
+  /* Der Platz der Restzeile steht fest, sobald es mehr als fuenf Hauptzeilen
+     gibt - vor dem Schneiden, sonst kuerzt ihr Erscheinen die Liste erneut. */
+  document.body.classList.toggle("mitrest", kompakt && box.querySelectorAll(".row:not(.sub)").length > COMPACT_ROWS);
   schneideAufZeilen(box, kompakt);
+  restZeileSetzen(box, kompakt);
   const folgt = box.scrollHeight - box.clientHeight - box.scrollTop > 2;
   /* Die Blende am unteren Rand des Kompakts (.mehr) entfiel mit der
      Neugestaltung: die Liste endet dort an der letzten ganzen Zeile.

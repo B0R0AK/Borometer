@@ -840,7 +840,7 @@ export function skillEntry(name: string, sid?: string | null){
    ueber Rangstufen hinweg derselbe ist: der englische Name aus dem
    Woerterbuch, sonst der Name aus dem Log. Nicht die Skill-ID als
    Rueckfall wie cmpKey im Vergleich (28-compare.ts): eine Rangstufe bringt
-   eine neue ID, und das Bautagebuch haelt den Schluessel ueber Wochen. Der
+   eine neue ID, und eine Wahl in "Deine Rotation" soll ueber sie hinweg gelten. Der
    Name aus dem Log laesst sich ausserdem mit skillLabel() anzeigen. */
 export function skillKey(name: string, sid?: string | null){
   const e = skillEntry(name, sid);

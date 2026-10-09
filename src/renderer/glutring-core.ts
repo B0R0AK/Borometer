@@ -66,6 +66,12 @@ export function zwischen(alt: readonly Bogen[], neu: readonly Bogen[], f: number
     return {...b, a0: v.a0 + (b.a0 - v.a0) * k, a1: v.a1 + (b.a1 - v.a1) * k};
   });
 }
+/** Die Boegen beim Aufwachsen: alle Winkel ab OBEN mit ease (0 bis 1) gestaucht. Gezeichnet und getroffen wird dasselbe. */
+export function gewachsen(liste: readonly Bogen[], ease: number): Bogen[] {
+  if(ease >= 1) return liste as Bogen[];
+  const k = Math.max(0, ease);
+  return liste.map(b => ({...b, a0: OBEN + (b.a0 - OBEN) * k, a1: OBEN + (b.a1 - OBEN) * k}));
+}
 /** Der Durchmesser im Ringfeld (Punkt) und ob daneben Platz fuer Beschriftung ist (E 7). */
 export function ringMass(b: number, h: number, gestapelt: boolean): {d: number; schrift: boolean} {
   const roh = gestapelt ? Math.min(b - 32, 460) : Math.min(b * 0.6, h * 0.76);
@@ -118,16 +124,19 @@ export function wertBei(kum: readonly number[], t: number): number {
   return a + (b - a) * (t - i);
 }
 export interface RennPlatz { key: string; wert: number; platz: number }
-/** Die Rangliste zur Zeit t; Gleichstand: Reihenfolge der Eingabe. */
-export function rennStand(reihen: readonly {key: string; kum: readonly number[]}[], t: number): RennPlatz[] {
-  return reihen.map((r, i) => ({key: r.key, wert: wertBei(r.kum, t), i}))
-    .sort((a, b) => b.wert - a.wert || a.i - b.i)
+/** Die Rangliste zur Zeit t; Gleichstand: Reihenfolge der Eingabe. Der Rest
+    (z. B. "Uebrige") steht zuletzt ohne Platz (platz 0), er laeuft ausser Konkurrenz. */
+export function rennStand(reihen: readonly {key: string; kum: readonly number[]}[], t: number, rest?: string): RennPlatz[] {
+  const alle = reihen.map((r, i) => ({key: r.key, wert: wertBei(r.kum, t), i}));
+  const vorn = alle.filter(x => x.key !== rest).sort((a, b) => b.wert - a.wert || a.i - b.i)
     .map((x, p) => ({key: x.key, wert: x.wert, platz: p + 1}));
+  const hinten = alle.filter(x => x.key === rest).map(x => ({key: x.key, wert: x.wert, platz: 0}));
+  return [...vorn, ...hinten];
 }
-/** Seit welcher Sekunde der Sieger vorn liegt, ohne die Spitze wieder abzugeben; 0 von Anfang an. */
-export function fuehrtSeit(reihen: readonly {key: string; kum: readonly number[]}[]): number {
+/** Seit welcher Sekunde der Sieger vorn liegt, ohne die Spitze wieder abzugeben; 0 von Anfang an. Der Rest zaehlt nicht. */
+export function fuehrtSeit(reihen: readonly {key: string; kum: readonly number[]}[], rest?: string): number {
   const T = Math.max(0, ...reihen.map(r => r.kum.length));
-  const vorn = (s: number) => rennStand(reihen, s + 1)[0]?.key;
+  const vorn = (s: number) => rennStand(reihen, s + 1, rest)[0]?.key;
   let seit = 0;
   for(let s = 1; s < T; s++) if(vorn(s) !== vorn(s - 1)) seit = s;
   return seit;
@@ -145,4 +154,69 @@ export function farbeMitAlpha(farbe: string, a: number): string {
   if(m){ const n = parseInt(m[1]!, 16); return `rgba(${n >> 16 & 255},${n >> 8 & 255},${n & 255},${a})`; }
   const r = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(f);
   return r ? `rgba(${r[1]},${r[2]},${r[3]},${a})` : f;
+}
+
+/** Die ersten n nach Wert, der Rest als ein Teil mit der Summe (wie perSecond in 16 und das Rennen). */
+export function zusammenfassen(teile: readonly {key: string; wert: number}[], n = 12, key = "__rest__"):
+    {teile: {key: string; wert: number}[]; rest: string[]} {
+  const nach = teile.map((x, i) => ({...x, i})).sort((a, b) => b.wert - a.wert || a.i - b.i);
+  if(nach.length <= n) return {teile: nach.map(x => ({key: x.key, wert: x.wert})), rest: []};
+  const hinten = nach.slice(n);
+  return {teile: [...nach.slice(0, n).map(x => ({key: x.key, wert: x.wert})), {key, wert: hinten.reduce((s, x) => s + x.wert, 0)}],
+    rest: hinten.map(x => x.key)};
+}
+
+/** Abstand zweier Hex-Farben in OKLab, mal 100 (wie die Kommentare in styles.css). */
+export function oklabAbstand(a: string, b: string): number {
+  const lab = (hex: string) => {
+    const n = parseInt(hex.replace("#", ""), 16);
+    const lin = (c: number) => { const x = c / 255; return x <= 0.04045 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
+    const r = lin(n >> 16 & 255), g = lin(n >> 8 & 255), bl = lin(n & 255);
+    const l = Math.cbrt(0.4122214708 * r + 0.5363325363 * g + 0.0514459929 * bl);
+    const m = Math.cbrt(0.2119034982 * r + 0.6806995451 * g + 0.1073969566 * bl);
+    const s = Math.cbrt(0.0883024619 * r + 0.2817188376 * g + 0.6299787005 * bl);
+    return [0.2104542553 * l + 0.7936177850 * m - 0.0040720468 * s,
+      1.9779984951 * l - 2.4285922050 * m + 0.4505937099 * s,
+      0.0259040371 * l + 0.7827717662 * m - 0.8086757660 * s];
+  };
+  const p = lab(a), q = lab(b);
+  return 100 * Math.hypot(p[0]! - q[0]!, p[1]! - q[1]!, p[2]! - q[2]!);
+}
+
+/* ---------- Gruppenkurven (Spezifikation 2026-10-04) ----------
+   Die gemeldeten Kurven der Mitglieder auf einer gemeinsamen Uhr: der
+   frueheste Start ist der Nullpunkt, jede Reihe beginnt um ihren Versatz
+   spaeter. Fehlt bei einer Reihe die Wanduhr, beginnen alle bei 0 s - ein
+   halber Abgleich behauptete einen Versatz, den es nicht gibt. */
+export interface KurvenReihe { key: string; t0: number | null; werte: readonly number[] }
+export interface GruppenRennen { start: number | null; T: number; bahnen: {key: string; kum: number[]; ab: number}[]; total: number[] }
+/** Hoechster Versatz der Starts in Sekunden. Die Uhrzeit im Log hat keine
+    Zeitzone: ein Mitglied in einer anderen Zone oder mit falscher PC-Uhr liegt
+    Stunden daneben. Darueber beginnen alle Bahnen bei 0 s. */
+export const VERSATZ_MAX = 60;
+export function gruppenBahnen(reihen: readonly KurvenReihe[]): GruppenRennen {
+  const mitUhr = reihen.length > 0 && reihen.every(r => typeof r.t0 === "number" && isFinite(r.t0));
+  const fruehst = mitUhr ? Math.min(...reihen.map(r => r.t0 as number)) : null;
+  const spaet = mitUhr ? Math.max(...reihen.map(r => r.t0 as number)) : 0;
+  const start = fruehst !== null && Math.round((spaet - fruehst) / 1000) <= VERSATZ_MAX ? fruehst : null;
+  const ab = reihen.map(r => start === null ? 0 : Math.round(((r.t0 as number) - start) / 1000));
+  const T = Math.max(0, ...reihen.map((r, i) => ab[i]! + r.werte.length));
+  const total: number[] = new Array(T).fill(0);
+  const bahnen = reihen.map((r, i) => {
+    const v: number[] = new Array(T).fill(0);
+    r.werte.forEach((x, j) => { const s = ab[i]! + j; v[s] = x || 0; total[s] = (total[s] || 0) + (x || 0); });
+    return {key: r.key, kum: aufsummiert(v), ab: ab[i]!};
+  });
+  return {start, T, bahnen, total};
+}
+/** Gehoert eine geholte Kurve zu dieser Zeile? Der Server haelt je Mitglied nur
+    die neueste. Dauer hoechstens 3 s, Summe hoechstens 2 % daneben - mindestens
+    T, weil jede Sekunde der Kurve gerundet gemeldet wird. */
+export function kurvePasst(k: {T: number; total: readonly number[]} | null | undefined,
+                           z: {damage?: number | null; seconds?: number | null}): boolean {
+  if(!k || !(k.T > 0) || !Array.isArray(k.total) || !k.total.length) return false;
+  const d = z.damage || 0, s = z.seconds || 0;
+  if(!(d > 0) || !(s > 0)) return false;
+  const summe = k.total.reduce((a, v) => a + (v || 0), 0);
+  return Math.abs(k.T - s) <= 3 && Math.abs(summe - d) <= Math.max(0.02 * d, k.T);
 }

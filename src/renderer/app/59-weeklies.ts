@@ -3,7 +3,7 @@ import { full } from "./03-helpers";
 import { esc } from "./18-interface-basics";
 import { SERVED } from "./41-server-mode";
 import { WK_MARKE, wkAnfang, wkBilderCss, wkHatBild } from "./60-weeklies-bilder";
-import { anzeigeStand, GRUNDLISTE, letzterReset, naechsterReset, vorwocheSichern, type Takt, type WeeklyProfil } from "../weeklies-core";
+import { anzeigeStand, bereichZu, fortschrittVon, GRUNDLISTE, letzteWoche, letzterReset, naechsterReset, vorwocheSichern, type Erinnerung, type Takt, type WeeklyProfil } from "../weeklies-core";
 
 /* ---------- Weeklies (Spezifikation 2026-09-29-weeklies-design.md, Plan Aufgabe W3) ----------
    Eine Checkliste der Wochen- und Tagesaufgaben fuer bis zu sechs eigene
@@ -46,7 +46,7 @@ import { anzeigeStand, GRUNDLISTE, letzterReset, naechsterReset, vorwocheSichern
    renderAll, 32). Nichts hiervon geht ins Netz, in ein Gruppen-Log oder in
    den Fehlerbericht. */
 
-interface Stand { v: 1; profile: WeeklyProfil[] }
+export interface Stand { v: 1; profile: WeeklyProfil[]; erinnerungen?: Erinnerung[] }
 interface Punkt { schluessel: string; gruppe: string; menge: number; takt: Takt; name: string; grund: string; eigen: boolean; aus: boolean; geloest: boolean }
 type Lage = "laden" | "da" | "nurApp" | "gesperrt";
 type Speicher = "" | "nie" | "spaeter" | "anderswo";
@@ -69,6 +69,10 @@ let daten: Stand | null = null;
 let lage: Lage = "laden";
 let gewaehlt: string | null = null;
 let neuOffen = false, nameOffen = false, anpassen = false, geloesteAuf = false;
+/** "Nur Offenes zeigen" und der Satz bei sechs Charakteren; beides nur in der Sitzung. */
+let nurOffen = false, sechsHinweis = false;
+/** Der Bereich, der mit der letzten Handlung fertig wurde: sein Kopf bekommt danach den Fokus. */
+let fertigGeworden: string | null = null;
 /** Der Punkt, dessen Name in Anpassen gerade bearbeitet wird. */
 let punktEdit: string | null = null;
 let undo: Undo | null = null;
@@ -81,6 +85,9 @@ let fokus: string | null = null;
 let truhePos: number | null = null;
 /** Das Feld des Raid-Rasters, das den einen Tabstopp traegt (Schluessel), in der Sitzung. */
 let rasterPos: string | null = null;
+
+/** Haken fuer den Dialog der Erinnerungen (67): nach dem Zeichnen und nach dem Speichern. */
+export const haken: {gezeichnet: (() => void) | null; gespeichert: (() => void) | null} = {gezeichnet: null, gespeichert: null};
 
 /* ---------- Lesen: erst lesen, dann schreiben ---------- */
 let ladeTimer: ReturnType<typeof setTimeout> | null = null, ladeVersuch = 0;
@@ -96,7 +103,8 @@ function standVon(x: unknown): Stand | null {
     profile.push({...p, zaehler: isRec(p.zaehler) ? p.zaehler : {}, aus: Array.isArray(p.aus) ? p.aus : [],
       namen: isRec(p.namen) ? p.namen : {}, eigene: Array.isArray(p.eigene) ? p.eigene : []} as WeeklyProfil);
   }
-  return {v: 1, profile};
+  // die Erinnerungen bleiben im Stand: die Datei lehnt einen Stand ab, der gespeicherte wegliesse (weeklies.ts)
+  return {v: 1, profile, ...(Array.isArray(x.erinnerungen) ? {erinnerungen: x.erinnerungen as Erinnerung[]} : {})};
 }
 function laden(){
   if(!SERVED || ladeTimer) return;
@@ -145,7 +153,7 @@ function senden(keepalive = false){
     .then(r => r.ok ? "" : r.status === 400 ? "nie" : "spaeter", () => "spaeter" as const)
     .then((a: Speicher) => {
       unterwegs = false;
-      if(a === "") gespeichert = stand;
+      if(a === ""){ gespeichert = stand; haken.gespeichert?.(); }
       speicher = a;
       statusSetzen();
       if(a === "nie") return nachLesen();
@@ -199,10 +207,6 @@ function punkteVon(p: WeeklyProfil): Punkt[] {
 }
 const sichtbar = (x: Punkt) => !x.aus && !x.geloest;
 const standVonPunkt = (p: WeeklyProfil, x: Punkt, jetzt: number) => Math.min(x.menge, anzeigeStand(p.zaehler[x.schluessel], x.takt, jetzt));
-function fortschritt(p: WeeklyProfil, jetzt: number): {n: number; g: number} {
-  const s = punkteVon(p).filter(sichtbar);
-  return {n: s.filter(x => standVonPunkt(p, x, jetzt) >= x.menge).length, g: s.length};
-}
 
 /* Namen: ohne Steuer- und Formatzeichen, getrimmt, 1 bis max Zeichen (wie NAME_RX/TEXT_RX der Datei). */
 const STEUER = /[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]/gu;
@@ -233,10 +237,20 @@ function setzeStand(k: string, wert: number){
   const jetzt = Date.now();
   const neu = Math.max(0, Math.min(x.menge, Math.round(wert)));
   if(neu === standVonPunkt(p, x, jetzt)) return;
+  const kachel = kachelVon(x), davor = istFertig(p, kachel, jetzt);
   // erst die Vorwoche sichern (Spezifikation 5), dann setzen - der Schluessel bleibt, auch auf 0
   const q = vorwocheSichern(p, jetzt);
-  ersetze({...q, zaehler: {...q.zaehler, [k]: {stand: neu, seit: jetzt}}});
+  const p2 = {...q, zaehler: {...q.zaehler, [k]: {stand: neu, seit: jetzt}}};
+  ersetze(p2);
   merken();
+  // die Ansage nennt den Stand der Woche (Spezifikation 8); die goldenen Truhen sagen ihren Stand selbst an
+  const f = fortschrittVon(p2, jetzt), jetztFertig = !davor && istFertig(p2, kachel, jetzt);
+  if(x.eigen || k !== "goldeneKiste"){
+    const satz = x.menge === 1 ? t(neu ? "weeklies.angesagtHaken" : "weeklies.angesagtZurueck", {name: x.name, w: f.woche.n, g: f.woche.g})
+      : t("weeklies.angesagt", {name: x.name, n: neu, m: x.menge, w: f.woche.n, g: f.woche.g});
+    ansagen(jetztFertig ? satz + ". " + t("weeklies.fertigZu", {name: t("weeklies.gruppe." + kachel)}) : satz);
+  }
+  if(jetztFertig) fertigGeworden = kachel;
 }
 function anlegen(roh: string){
   const name = sauber(roh, 24);
@@ -264,6 +278,7 @@ function profilLoesen(){
   gewaehlt = aktive()[0]?.id ?? null;
   anpassen = false; nameOffen = false; punktEdit = null;
   fokus = "undo";
+  ansagen(t("weeklies.geloestAngesagt", {name: p.name}));
   merken();
 }
 function profilZurueck(id: string){
@@ -274,6 +289,7 @@ function profilZurueck(id: string){
   ersetze(neu);
   gewaehlt = id; undo = null; anpassen = false; nameOffen = false;
   fokus = "r:" + id;
+  ansagen(t("weeklies.zurueckAngesagt", {name: p.name}));
   merken();
 }
 function ausUmschalten(k: string){
@@ -327,6 +343,8 @@ function eigenLoesen(k: string, los: boolean){
   })});
   undo = los ? {art: "eigen", id: p.id, k} : null;
   fokus = los ? "undo" : "u:" + k;
+  const ep = p.eigene.find(e => e.schluessel === k);
+  if(ep) ansagen(t(los ? "weeklies.eigenGeloestAngesagt" : "weeklies.zurueckAngesagt", {name: ep.name}));
   merken();
 }
 function grundliste(){
@@ -346,6 +364,12 @@ function undoAusfuehren(){
 }
 /** Die Kachel eines Punkts: eigene in "Eigene", die der Haendler in "Haendler", sonst seine Gruppe. */
 const kachelVon = (x: Punkt): string => x.eigen ? "eigene" : HAENDLER.includes(x.gruppe) ? "haendler" : x.gruppe;
+/** Die sichtbaren Punkte eines Bereichs, wie kachelHtml sie gruppiert. */
+const punkteDes = (p: WeeklyProfil, g: string) => punkteVon(p).filter(sichtbar).filter(x => kachelVon(x) === g);
+/** Ein Bereich ist fertig, wenn er Punkte hat und alle voll sind. */
+const istFertig = (p: WeeklyProfil, g: string, jetzt: number) => { const s = punkteDes(p, g); return s.length > 0 && s.every(x => standVonPunkt(p, x, jetzt) >= x.menge); };
+/** Ob ein Bereich zu ist: die Wahl des Nutzers, solange sie gilt, sonst "zu, wenn fertig" (Kern, bereichZu). */
+const bereichIstZu = (p: WeeklyProfil, g: string, jetzt: number) => bereichZu(p.zu?.[g], istFertig(p, g, jetzt));
 
 /* ---------- Reset-Anzeige ----------
    Wochentag und Uhrzeit in Berlin, wie der Kern rechnet; die Dauer
@@ -365,9 +389,8 @@ function dauer(ms: number): string {
 }
 const setzen = (el: Element | null, text: string) => { if(el && el.textContent !== text) el.textContent = text; };
 function kopfSetzen(jetzt: number){
-  const w = naechsterReset(jetzt, "woche"), d = naechsterReset(jetzt, "tag"), bw = berlin(w), bd = berlin(d);
-  setzen(document.querySelector("#wkWoche"), t("weeklies.resetWoche", {tag: t("weeklies.wt." + bw.wt), zeit: bw.zeit, in: dauer(w - jetzt)}));
-  setzen(document.querySelector("#wkTag"), t("weeklies.resetTag", {zeit: bd.zeit, in: dauer(d - jetzt)}));
+  const d = naechsterReset(jetzt, "tag"), bd = berlin(d);
+  setzen(document.querySelector("#wkTag"), t("weeklies.resetTagKopf", {zeit: bd.zeit, in: dauer(d - jetzt)}));
 }
 function statusSetzen(){
   setzen(document.querySelector("#wkStatus"), meldung ? t(meldung) : speicher ? t("weeklies.sp." + speicher) : "");
@@ -387,6 +410,12 @@ function statusSetzen(){
 const wtZeit = (ms: number) => { const b = berlin(ms); return t("weeklies.wt." + b.wt) + " " + b.zeit; };
 /* Fuer den Namen des Bands mit Datum, damit die Region jede Woche anders heisst (Pruefung N4). */
 const wtDatumZeit = (ms: number) => { const b = berlin(ms); return t("weeklies.wt." + b.wt) + " " + t("weeklies.datum", {d: b.d, m: b.m}) + " " + b.zeit; };
+/* Die Zeile "Letzte Woche" unter dem Band, solange in der neuen Woche noch nichts gesetzt ist (Spezifikation 3.4). */
+function letzteHtml(jetzt: number): string {
+  const lw = daten && lage === "da" ? letzteWoche(aktive(), jetzt) : null;
+  return lw ? '<p class="wkletzte" id="wkLetzte">' + esc(t("weeklies.letzteWoche")) + " " +
+    lw.map(x => "<b>" + esc(x.name) + "</b> " + x.n + "/" + x.g).join(" \u00b7 ") + "</p>" : "";
+}
 function bandSetzen(jetzt: number){
   const band = document.querySelector<HTMLElement>("#wkBand");
   if(!band) return;
@@ -401,14 +430,16 @@ function bandSetzen(jetzt: number){
     const a = grenzen[i]!, b = grenzen[i + 1]!, l = anteil(a);
     const cls = jetzt >= b ? " vorbei" : jetzt >= a ? " heute" : "";
     const naechster = i > 0 && grenzen[i - 1]! <= jetzt && jetzt < a ? " naechster" : "";
+    // der erste Abschnitt sagt, ab wann: "Do ab 10:00" (125.4)
+    const bt = berlin(a), name = i === 0 ? t("weeklies.bandAb", {tag: t("weeklies.wt." + bt.wt), zeit: bt.zeit}) : t("weeklies.wt." + bt.wt);
     tage += '<span class="wkbtag' + cls + naechster + '" style="left:' + l.toFixed(3) + "%;width:" + (anteil(b) - l).toFixed(3) + '%">' +
-      esc(t("weeklies.wt." + berlin(a).wt)) + "</span>";
+      esc(name) + "</span>";
   }
   const h = '<div class="wkbandoben"><span class="wkbandjetzt" style="left:' + pct + "%;transform:translateX(-" + pct + '%)"><b>' + esc(t("weeklies.jetzt")) + "</b> " +
-      esc(wtZeit(jetzt)) + " \u00b7 " + esc(t("weeklies.bandReset", {in: dauer(bis - jetzt)})) + "</span></div>" +
+      esc(wtZeit(jetzt)) + "</span></div>" +
     '<div class="wkbahn" aria-hidden="true"><span class="wkvorbei" style="width:' + pct + '%"></span>' + tage +
       '<span class="wkjetzt" style="left:' + pct + '%"></span></div>' +
-    '<div class="wkbandunten" aria-hidden="true"><span>' + esc(wtZeit(von)) + "</span><span>" + esc(wtZeit(bis)) + "</span></div>";
+    '<div class="wkbandunten" aria-hidden="true"><span>' + esc(t("weeklies.bandWoche", {tag: t("weeklies.wt." + berlin(bis).wt), zeit: berlin(bis).zeit, in: dauer(bis - jetzt)})) + "</span></div>" + letzteHtml(jetzt);
   if(band.dataset.marke !== h){ band.innerHTML = h; band.dataset.marke = h; }
   const name = t("weeklies.bandName", {von: wtDatumZeit(von), bis: wtDatumZeit(bis)});
   if(band.getAttribute("aria-label") !== name) band.setAttribute("aria-label", name);
@@ -454,7 +485,18 @@ function undoHtml(): string {
     if(!e || !e.geloest || p.id !== profilJetzt()?.id) return "";
     satz = t("weeklies.eigenGeloest", {name: e.name});
   }
-  return '<p class="wkgeloest">' + esc(satz) + " " + knopf("btn sm", 'data-wk-undo data-f="undo"', t("weeklies.undo")) + "</p>";
+  return '<p class="wkgeloest"><span id="wkUndoSatz">' + esc(satz) + "</span> " + knopf("btn sm", 'data-wk-undo data-f="undo" aria-describedby="wkUndoSatz"', t("weeklies.undo")) + "</p>";
+}
+/* Die Liste der geloesten Charaktere unter der Leiste (Knopf "Geloeste (n)" in der Leiste, 125.2). */
+function geloesteListeHtml(): string {
+  const weg = daten!.profile.filter(p => p.geloest);
+  if(!weg.length || !geloesteAuf) return "";
+  const voll = aktive().length >= MAX_AKTIV;
+  let h = '<ul class="wkausliste" id="wkGeloeste">' + weg.map(p => '<li><span class="wkausname">' + esc(p.name) + "</span>" +
+    knopf("btn sm", 'data-wk-zurueck="' + p.id + '" data-f="zu:' + p.id + '" aria-label="' + esc(t("weeklies.zurueckName", {name: p.name})) + '"' +
+      (voll ? ' disabled aria-describedby="wkZurueckVoll"' : ""), t("weeklies.zurueck")) + "</li>").join("") + "</ul>";
+  if(voll) h += '<p class="wkhinweis" id="wkZurueckVoll">' + esc(t("weeklies.zurueckVoll")) + "</p>";
+  return '<div class="wkausw">' + h + "</div>";
 }
 function geloesteHtml(): string {
   const weg = daten!.profile.filter(p => p.geloest);
@@ -470,21 +512,39 @@ function geloesteHtml(): string {
   }
   return h + "</div>";
 }
+const KHAKEN = '<svg class="wkhk" viewBox="0 0 24 24" aria-hidden="true"><path d="M5.5 12.5l4.2 4.2L18.5 7.5"/></svg>';
+/* Eine Karte je Charakter (Spezifikation Weeklies neu, 3.2): Initiale im Ring nach Menge, Name und was diese Woche offen ist.
+   Der Vorleser hoert den ganzen Satz am Reiter. */
+function karteHtml(x: WeeklyProfil, an: boolean, jetzt: number): string {
+  const f = fortschrittVon(x, jetzt), offen = f.woche.g - f.woche.n;
+  const satz = f.fertig ? t("weeklies.karteFertig", {t: f.tag.n, tg: f.tag.g}) : t("weeklies.karteOffen", {n: offen, t: f.tag.n, tg: f.tag.g});
+  const vh = f.fertig ? t("weeklies.karteVhFertig", {name: x.name, t: f.tag.n, tg: f.tag.g}) : t("weeklies.karteVhOffen", {name: x.name, n: offen, t: f.tag.n, tg: f.tag.g});
+  const ini = [...x.name][0]?.toUpperCase() ?? "?";
+  return '<button type="button" role="tab" class="wkkarte' + (f.fertig ? " fertig" : "") + '" id="wkTab-' + x.id + '" data-wk-reiter="' + x.id + '" data-f="r:' + x.id +
+    '" aria-selected="' + an + '" aria-controls="wkPanel" tabindex="' + (an ? 0 : -1) + '" aria-label="' + esc(vh) + '" data-wk-woche="' + f.woche.n + "/" + f.woche.g + '" data-wk-heute="' + f.tag.n + "/" + f.tag.g + '"><span class="wkscheibe" aria-hidden="true">' +
+    ring(44, 3.5, f.woche.anteil) + (f.fertig ? KHAKEN : "<b>" + esc(ini) + "</b>") + '</span><span class="wkkname">' + esc(x.name) +
+    '</span><span class="wkkstand2" aria-hidden="true">' + esc(satz) + "</span></button>";
+}
+/* Sind alle Bereiche des Charakters zu? Dann bietet der Knopf "Alle aufklappen" an. */
+function alleSindZu(p: WeeklyProfil, jetzt: number): boolean {
+  const gs = KACHELN.filter(g => punkteDes(p, g).length);
+  return gs.length > 0 && gs.every(g => bereichIstZu(p, g, jetzt));
+}
 function reiterHtml(akt: WeeklyProfil[], p: WeeklyProfil, jetzt: number): string {
-  const tabs = akt.map(x => {
-    const f = fortschritt(x, jetzt), an = x.id === p.id;
-    return '<button type="button" role="tab" id="wkTab-' + x.id + '" data-wk-reiter="' + x.id + '" data-f="r:' + x.id + '" aria-selected="' + an +
-      '" aria-controls="wkPanel" tabindex="' + (an ? 0 : -1) + '"' + (f.g && f.n === f.g ? ' class="fertig"' : "") + ">" + ring(16, 3, f.g ? f.n / f.g : 0) +
-      '<span class="wkrname">' + esc(x.name) + '</span><span class="wkfort" aria-hidden="true"><b>' + f.n + "</b>/" + f.g + '</span><span class="vh">' +
-      esc(t("weeklies.fortVh", {n: f.n, g: f.g})) + "</span></button>";
-  }).join("");
-  const neu = akt.length >= MAX_AKTIV ? '<p class="wksechs" id="wkVoll">' + esc(t("weeklies.sechs")) + "</p>"
-    : neuOffen ? "" : knopf("btn sm wkneu", 'id="wkNeu" data-f="neu"', t("weeklies.neu"));
-  const werk = '<div class="wkwerk">' + knopf("btn sm", 'data-wk-umbenennen data-f="umb" aria-label="' + esc(t("weeklies.umbenennenName", {name: p.name})) + '"', t("weeklies.umbenennen")) +
+  const weg = daten!.profile.filter(q => q.geloest).length;
+  const voll = akt.length >= MAX_AKTIV;
+  const neu = neuOffen && !voll ? "" : knopf("btn sm wkneu", 'id="wkNeu" data-f="neu"' + (sechsHinweis && voll ? ' aria-describedby="wkVoll"' : ""), t("weeklies.neu"));
+  const geloeste = weg ? knopf("btn sm", 'data-wk-geloeste data-f="gz" aria-expanded="' + geloesteAuf + '"' + (geloesteAuf ? ' aria-controls="wkGeloeste"' : ""), t("weeklies.geloesteKnopf", {n: weg})) : "";
+  const nur = '<label class="wknur"><input type="checkbox" id="wkNurOffen" data-f="nur"' + (nurOffen ? " checked" : "") + "> " + esc(t("weeklies.nurOffen")) + "</label>";
+  const werk = '<div class="wkwerk">' + knopf("btn sm leise", 'data-wk-allezu data-f="allezu"', t(alleSindZu(p, jetzt) ? "weeklies.alleAuf" : "weeklies.alleZu")) +
+    knopf("btn sm", 'data-wk-umbenennen data-f="umb" aria-label="' + esc(t("weeklies.umbenennenName", {name: p.name})) + '"', t("weeklies.umbenennen")) +
     knopf("btn sm", 'data-wk-anpassen data-f="anp" aria-pressed="' + anpassen + '"', t("weeklies.anpassen")) +
     knopf("leise", 'data-wk-loesen data-f="los" aria-label="' + esc(t("weeklies.loesenName", {name: p.name})) + '"', t("weeklies.loesen")) + "</div>";
-  return '<div class="wkleiste"><div class="wkreiter" id="wkReiter" role="tablist" aria-label="' + esc(t("weeklies.reiter")) + '">' + tabs + "</div>" + neu + werk + "</div>" +
-    (neuOffen && akt.length < MAX_AKTIV ? neuFormHtml() : "");
+  return '<div class="wkkarten" id="wkReiter" role="tablist" aria-label="' + esc(t("weeklies.reiter")) + '">' + akt.map(x => karteHtml(x, x.id === p.id, jetzt)).join("") + "</div>" +
+    '<div class="wkleiste">' + neu + geloeste + nur + werk + "</div>" +
+    // der Satz zu sechs Charakteren erscheint erst, wenn man "+ Charakter" drueckt (125.3)
+    (sechsHinweis && voll ? '<p class="wksechs" id="wkVoll">' + esc(t("weeklies.sechs")) + "</p>" : "") +
+    (neuOffen && !voll ? neuFormHtml() : "") + geloesteListeHtml();
 }
 /* Die goldenen Kisten (Spezifikation 10): je Kiste ein Knopf mit ihrem Bild. Ein Klick auf eine
    leere fuellt bis zu ihr, auf eine gefuellte nimmt bis vor sie zurueck - fuenfmal klicken heisst
@@ -514,24 +574,29 @@ function zeileHtml(p: WeeklyProfil, x: Punkt, jetzt: number): string {
     return kopf + '<label class="wkhaken" for="wkH-' + k + '">' + sym + '<span class="wkname" title="' + esc(x.name) + '">' + esc(x.name) + "</span></label>" + tag +
       '<input type="checkbox" id="wkH-' + k + '" data-wk-haken="' + k + '" data-f="h:' + k + '"' + beschr + (fertig ? " checked" : "") + "></li>";
   const n = esc(x.name);
-  // die Dungeons der Dimensionspruefung tragen unter dem Namen die Punkte (3000 je Dungeon)
+  // die Dungeons der Dimensionspruefung tragen unter dem Namen die Punkte (6000 je Dungeon)
   const dim = k === "dimensionDungeons" && !x.eigen;
-  const name = '<button type="button" class="wkname" tabindex="-1" data-wk-plus="' + k + '" title="' + n + '" aria-label="' + esc(t("weeklies.nameZaehlt", {name: x.name})) + '"' +
-    (fertig ? " disabled" : "") + ">" + n + "</button>";
-  const wert = dim ? t("weeklies.dungeonsText", {n: s, m: x.menge, p: full(s * DIM_PUNKTE)}) : t("weeklies.vonText", {n: s, m: x.menge});
+  // der Name ist nur Text; gezaehlt wird an den Knoepfen und im Feld (122.2)
+  const name = '<span class="wkname" title="' + n + '">' + n + "</span>";
   // am Zaehler steht der Takt unter dem Namen, damit der Name in einer schmalen Haendlerspalte nicht bricht
   const unter = dim ? '<span class="wkpkt" aria-hidden="true">' + esc(t("weeklies.punkteVon", {n: full(s * DIM_PUNKTE), m: full(x.menge * DIM_PUNKTE)})) + "</span>" : tag;
+  const gross = x.menge > 12;
+  const dimVh = dim ? '<span class="vh" id="wkP-' + k + '">' + esc(t("weeklies.dungeonsText", {n: s, m: x.menge, p: full(s * DIM_PUNKTE)})) + "</span>" : "";
+  const beschrZ = dim ? ' aria-describedby="' + (taktWort ? "wkT-" + k + " " : "") + 'wkP-' + k + '"' : beschr;
+  const knopfZ = (attr: string, f: string, label: string, text: string, aus: boolean, cls = "wkschritt") =>
+    '<button type="button" class="' + cls + '" tabindex="-1" ' + attr + '="' + k + '" data-f="' + f + ":" + k + '" data-k="' + k + '" aria-label="' + esc(label) + '"' + (aus ? " disabled" : "") + ">" + text + "</button>";
   return kopf + sym + (unter ? '<span class="wknamen">' + name + unter + "</span>" : name) +
     '<span class="wkzahl">' +
-      '<button type="button" class="wkschritt" tabindex="-1" data-wk-minus="' + k + '" data-f="m:' + k + '" data-k="' + k + '" aria-label="' +
-        esc(t("weeklies.minusName", {name: x.name})) + '"' + (s <= 0 ? " disabled" : "") + ">\u2212</button>" +
-      '<span class="wkstand" role="spinbutton" tabindex="0" data-wk-stand="' + k + '" data-f="z:' + k + '" data-k="' + k + '" aria-label="' + n +
-        '" aria-valuemin="0" aria-valuemax="' + x.menge + '"' + beschr + ' aria-valuenow="' + s + '" aria-valuetext="' + esc(wert) + '"><b>' + s + "</b>/" + x.menge + "</span>" +
-      '<button type="button" class="wkschritt" tabindex="-1" data-wk-plus="' + k + '" data-f="p:' + k + '" data-k="' + k + '" aria-label="' +
-        esc(t("weeklies.plusName", {name: x.name})) + '"' + (fertig ? " disabled" : "") + ">+</button>" +
-      '<button type="button" class="wkvoll" data-wk-voll="' + k + '" data-f="v:' + k + '" data-k="' + k + '" aria-label="' +
-        esc(t("weeklies.vollName", {name: x.name})) + '"' + (fertig ? " disabled" : "") + ">" + esc(t("weeklies.vollKnopf")) + "</button>" +
-    "</span></li>";
+      knopfZ("data-wk-minus", "m", t("weeklies.minusName", {name: x.name}), "\u2212", s <= 0) +
+      '<input type="text" inputmode="numeric" maxlength="3" class="wkstand" data-wk-stand="' + k + '" data-f="z:' + k + '" data-k="' + k + '" value="' + s + '" aria-label="' +
+        esc(t("weeklies.stand", {name: x.name, m: x.menge})) + '"' + beschrZ + ">" + dimVh +
+      '<span class="wkvon" aria-hidden="true">/' + x.menge + "</span>" +
+      knopfZ("data-wk-plus", "p", t("weeklies.plusName", {name: x.name}) + ". " + t("weeklies.plusHinweis"), "+", fertig) +
+      (gross ? knopfZ("data-wk-zehn", "y", t("weeklies.plusZehnName", {name: x.name}), esc(t("weeklies.plusZehn")), fertig, "wkschritt wkzehn") : "") +
+      knopfZ("data-wk-voll", "v", t("weeklies.vollName", {name: x.name}), esc(t("weeklies.vollKnopf")), fertig, "wkvoll") +
+    "</span>" +
+    // ein Balken nach Menge unter grossen Zaehlern; er ist nur Bild, der Stand steht im Feld
+    (gross ? '<span class="wkbalken" aria-hidden="true"><i style="width:' + Math.round(s / x.menge * 100) + '%"></i></span>' : "") + "</li>";
 }
 /* Der Raid als 3x3-Raster (Entwurf, Variante B): Fluegel als Spalten mit Bossbild, Stufen als Zeilen.
    Ausgeblendete Felder bleiben leer; eine Spalte oder Zeile ganz ohne Punkt entfaellt. Fuer den
@@ -563,10 +628,17 @@ function kachelHtml(p: WeeklyProfil, id: string, s: Punkt[], jetzt: number): str
   // ein leeres Feld haelt die Flaeche, wenn alles darin ausgeblendet ist
   if(!s.length) return id === "eigene" ? "" : '<div class="wkfeld wkleerfeld wk-' + id + '" aria-hidden="true"></div>';
   const n = s.filter(x => standVonPunkt(p, x, jetzt) >= x.menge).length, fertig = n === s.length;
-  const inhalt = id === "raid" ? rasterHtml(p, s, jetzt) : id === "haendler" ? haendlerHtml(p, s, jetzt)
-    : '<ul class="wkliste" id="wkGL-' + id + '">' + s.map(x => zeileHtml(p, x, jetzt)).join("") + "</ul>";
-  return '<section class="wkfeld wkgruppe wk-' + id + (fertig ? " fertig" : "") + '" data-wk-g="' + id + '" aria-labelledby="wkGK-' + id + '">' +
-    '<div class="wkkkopf"><h3 class="wkgname" id="wkGK-' + id + '">' + esc(t("weeklies.gruppe." + id)) + "</h3>" + standHtml(n, s.length, 20, fertig) + "</div>" + inhalt + "</section>";
+  // fertig klappt zu, bis der Nutzer es anders will (Spezifikation Weeklies neu, 3.5 und 4.4)
+  const zu = bereichZu(p.zu?.[id], fertig);
+  const name = t("weeklies.gruppe." + id);
+  const sicht = nurOffen ? s.filter(x => standVonPunkt(p, x, jetzt) < x.menge) : s;
+  const inhalt = zu ? "" : id === "raid" ? rasterHtml(p, s, jetzt) : id === "haendler" ? haendlerHtml(p, sicht, jetzt)
+    : '<ul class="wkliste" id="wkGL-' + id + '">' + sicht.map(x => zeileHtml(p, x, jetzt)).join("") + "</ul>";
+  return '<section class="wkfeld wkgruppe wk-' + id + (fertig ? " fertig" : "") + (zu ? " zu" : "") + '" data-wk-g="' + id + '" data-zu="' + zu + '" aria-labelledby="wkGK-' + id + '">' +
+    '<div class="wkkkopf"><h3 class="wkgname" id="wkGK-' + id + '"><button type="button" class="wkbk" data-wk-zu="' + id + '" data-f="zu:' + id + '" aria-expanded="' + !zu +
+    '" aria-controls="wkGB-' + id + '"><span class="wkbname">' + esc(name) + "</span>" + standHtml(n, s.length, 20, fertig) + (fertig ? KHAKEN : "") +
+    '<svg class="wkpfeil" viewBox="0 0 24 24" aria-hidden="true"><path d="M9 5l7 7-7 7"/></svg></button></h3></div>' +
+    '<div class="wkbody" id="wkGB-' + id + '">' + inhalt + "</div></section>";
 }
 /* Ring und erledigt/gesamt im Kopf einer Kachel (20) oder eines Haendlers (16); "erledigt" steht nur an der Kachel. */
 function standHtml(n: number, g: number, px: number, fertig: boolean): string {
@@ -588,7 +660,8 @@ function haendlerHtml(p: WeeklyProfil, s: Punkt[], jetzt: number): string {
 function wabenHtml(p: WeeklyProfil, jetzt: number): string {
   const alle = punkteVon(p).filter(sichtbar);
   // die Huelle des Wochenbands fuellt bandSetzen (im Minutentakt, ohne den Rest neu zu bauen)
-  return '<div class="wkwaben"><section class="wkfeld wkband" id="wkBand"></section>' +
+  // ist der Raid zu, braucht er nur seine Kopfzeile: die Flaeche daneben faellt weg (.raidzu in styles.css)
+  return '<div class="wkwaben' + (bereichIstZu(p, "raid", jetzt) ? " raidzu" : "") + '"><section class="wkfeld wkband" id="wkBand"></section>' +
     KACHELN.map(id => kachelHtml(p, id, alle.filter(x => kachelVon(x) === id), jetzt)).join("") + "</div>";
 }
 function anpZeileHtml(x: Punkt): string {
@@ -638,7 +711,7 @@ function bodyHtml(jetzt: number): string {
     '<button type="submit" class="btn sm">' + esc(t("weeklies.speichern")) + "</button>" + knopf("btn sm", 'data-wk-abbrechen="name"', t("weeklies.abbrechen")) + "</form>";
   return reiterHtml(akt, p, jetzt) + undoHtml() +
     '<div class="wkpanel" id="wkPanel" role="tabpanel" aria-labelledby="wkTab-' + p.id + '">' + nameForm +
-      (anpassen ? anpassenHtml(p) : wabenHtml(p, jetzt)) + "</div>" + geloesteHtml();
+      (anpassen ? anpassenHtml(p) : wabenHtml(p, jetzt)) + "</div>";
 }
 
 /* Den Fokus setzen: das Element mit data-f; ist es gesperrt, sein Zaehler. */
@@ -679,9 +752,33 @@ export function renderWeeklies(){
   }
   bandSetzen(jetzt);
   if(fokus){ const f = fokus; fokus = null; fokusSetzen(box, f); }
+  haken.gezeichnet?.();
 }
 function nachHandlung(){
+  // ein Bereich, der mit dieser Handlung fertig wurde, klappt zu: der Fokus geht auf seinen Kopf
+  if(fertigGeworden){ fokus = "zu:" + fertigGeworden; fertigGeworden = null; }
   renderWeeklies();
+}
+/* Ein Bereich klappt auf oder zu: die Wahl merkt sich, ob der Bereich dabei fertig war (Kern, bereichZu). */
+function zuUmschalten(g: string){
+  const p = profilJetzt();
+  if(!p) return;
+  const jetzt = Date.now(), zu = bereichIstZu(p, g, jetzt);
+  ersetze({...p, zu: {...(p.zu ?? {}), [g]: {zu: !zu, bei: istFertig(p, g, jetzt)}}});
+  ansagen(t(zu ? "weeklies.auf" : "weeklies.zu", {name: t("weeklies.gruppe." + g)}));
+  fokus = "zu:" + g;
+  merken();
+}
+function alleUmschalten(){
+  const p = profilJetzt();
+  if(!p) return;
+  const jetzt = Date.now(), gs = KACHELN.filter(g => punkteDes(p, g).length), zuJetzt = gs.length > 0 && gs.every(g => bereichIstZu(p, g, jetzt));
+  const zu = {...(p.zu ?? {})};
+  for(const g of gs) zu[g] = {zu: !zuJetzt, bei: istFertig(p, g, jetzt)};
+  ersetze({...p, zu});
+  ansagen(t(zuJetzt ? "weeklies.alleAufAngesagt" : "weeklies.alleZuAngesagt"));
+  fokus = "allezu";
+  merken();
 }
 
 /* Eine Ansage fuer den Vorleser (die Truhen): eine eigene, leise Region ausserhalb des neu gezeichneten Inhalts. */
@@ -689,6 +786,13 @@ function ansagen(text: string){
   const a = document.querySelector("#wkAnsage");
   if(a) a.textContent = text;
 }
+
+/* Fuer den Dialog der Erinnerungen (67): der Stand, das Aendern mit Speichern und Neuzeichnen, die Ansage, die Zahl der Charaktere mit offener Woche. */
+export function weekliesDaten(): Stand | null { return lage === "da" ? daten : null; }
+export function weekliesAendern(fn: (s: Stand) => void){ if(!daten || lage !== "da") return; fn(daten); merken(); renderWeeklies(); }
+export function weekliesAnsage(text: string){ ansagen(text); }
+export function weekliesDauer(ms: number): string { return dauer(ms); }
+export function weekliesOffen(): number { const jetzt = Date.now(); return aktive().filter(p => !fortschrittVon(p, jetzt).fertig).length; }
 
 /* ---------- Minutentakt, nur solange der Bereich offen ist ---------- */
 let takt: ReturnType<typeof setTimeout> | null = null;
@@ -712,8 +816,8 @@ function klick(e: MouseEvent){
   const z = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
   if(!z || z.disabled || lage !== "da" && !z.matches("[data-wk-abbrechen]")) return;
   const d = z.dataset;
-  meldung = "";
-  if(z.id === "wkNeu"){ neuOffen = true; fokus = "nn"; }
+  meldung = ""; sechsHinweis = false;
+  if(z.id === "wkNeu"){ if(aktive().length >= MAX_AKTIV){ sechsHinweis = true; fokus = "neu"; } else { neuOffen = true; fokus = "nn"; } }
   else if(d.wkAbbrechen !== undefined){
     if(d.wkAbbrechen === "neu"){ neuOffen = false; fokus = "neu"; }
     else if(d.wkAbbrechen === "name"){ nameOffen = false; fokus = "umb"; }
@@ -727,8 +831,12 @@ function klick(e: MouseEvent){
   else if(d.wkUndo !== undefined) undoAusfuehren();
   else if(d.wkGeloeste !== undefined){ geloesteAuf = !geloesteAuf; fokus = "gz"; }
   else if(d.wkZurueck) profilZurueck(d.wkZurueck);
-  else if(d.wkPlus){ const x = aktuellerStand(d.wkPlus); if(x) setzeStand(d.wkPlus, x.s + 1); }
-  else if(d.wkMinus){ const x = aktuellerStand(d.wkMinus); if(x) setzeStand(d.wkMinus, x.s - 1); }
+  else if(d.wkZu) zuUmschalten(d.wkZu);
+  else if(d.wkAllezu !== undefined) alleUmschalten();
+  // Umschalt+Klick zaehlt zehn (122.1)
+  else if(d.wkPlus){ const x = aktuellerStand(d.wkPlus); if(x) setzeStand(d.wkPlus, x.s + (e.shiftKey ? 10 : 1)); }
+  else if(d.wkMinus){ const x = aktuellerStand(d.wkMinus); if(x) setzeStand(d.wkMinus, x.s - (e.shiftKey ? 10 : 1)); }
+  else if(d.wkZehn){ const x = aktuellerStand(d.wkZehn); if(x) setzeStand(d.wkZehn, x.s + 10); fokus = "y:" + d.wkZehn; }
   else if(d.wkKiste){
     // bis zur Kiste fuellen, oder bis vor sie zuruecknehmen, wenn sie schon gefuellt ist
     const x = aktuellerStand("goldeneKiste"), i = Number(d.wkKiste);
@@ -748,7 +856,7 @@ function klick(e: MouseEvent){
   else if(d.wkGrundliste !== undefined) grundliste();
   else return;
   // der Satz mit Rueckgaengig bleibt nur bis zur naechsten Handlung an einem anderen Ort
-  if(d.wkLoesen === undefined && d.wkEigenLos === undefined && d.wkUndo === undefined && d.wkGeloeste === undefined) undo = null;
+  if(d.wkLoesen === undefined && d.wkEigenLos === undefined && d.wkUndo === undefined && d.wkGeloeste === undefined && d.wkZu === undefined && d.wkAllezu === undefined) undo = null;
   nachHandlung();
 }
 function aktuellerStand(k: string): {s: number; menge: number} | null {
@@ -758,6 +866,16 @@ function aktuellerStand(k: string): {s: number; menge: number} | null {
 }
 function aendern(e: Event){
   const i = e.target as HTMLInputElement;
+  if(i.id === "wkNurOffen"){ nurOffen = i.checked; fokus = "nur"; ansagen(t(nurOffen ? "weeklies.nurOffenAn" : "weeklies.nurOffenAus")); return nachHandlung(); }
+  // der Stand eines Zaehlers laesst sich eintippen (122.1); setzeStand begrenzt auf 0 bis Menge
+  const sk = i.dataset.wkStand;
+  if(sk && lage === "da"){
+    const v = Number(i.value.replace(/\D/g, ""));
+    meldung = ""; undo = null;
+    setzeStand(sk, Number.isFinite(v) ? v : 0);
+    fokus = "z:" + sk;
+    return nachHandlung();
+  }
   const k = i.dataset.wkHaken;
   if(!k || lage !== "da") return;
   meldung = "";
@@ -829,12 +947,12 @@ function taste(e: KeyboardEvent){
     truhePos = j; fokus = "ki:" + j;
     return nachHandlung();
   }
-  const k = z.getAttribute("role") === "spinbutton" ? z.dataset.wkStand : undefined;
+  // am Feld des Standes: Pfeil hoch und runter zaehlen eins, Bild auf und ab zehn; links, rechts, Pos1 und Ende gehoeren dem Cursor
+  const k = z instanceof HTMLInputElement ? z.dataset.wkStand : undefined;
   if(k){
     const x = aktuellerStand(k);
     if(!x) return;
-    const neu = e.key === "ArrowUp" || e.key === "ArrowRight" ? x.s + 1 : e.key === "ArrowDown" || e.key === "ArrowLeft" ? x.s - 1
-      : e.key === "PageUp" ? x.s + 10 : e.key === "PageDown" ? x.s - 10 : e.key === "Home" ? 0 : e.key === "End" ? x.menge : null;
+    const neu = e.key === "ArrowUp" ? x.s + 1 : e.key === "ArrowDown" ? x.s - 1 : e.key === "PageUp" ? x.s + 10 : e.key === "PageDown" ? x.s - 10 : null;
     if(neu == null) return;
     e.preventDefault();
     meldung = ""; undo = null;

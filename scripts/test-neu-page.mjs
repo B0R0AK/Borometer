@@ -31,7 +31,7 @@
 // Abschnitt 6: Verlauf (Luecken 6) - Zeitraum Woche | Monat | Alles im Kopf, Diagramm ueber das
 // Datum mit allen gelesenen und gespeicherten Kaempfen des Bosses, runden y-Schritten, Median, bester in
 // Gold und dem gewaehlten Tag als Band, die Einordnung (DECISION 2.4); die Liste "Kaempfe" mit hoechstens
-// fuenf Zeilen, haftendem Kopf, Boss als Auswahlfeld, Spalte Build (6.7), "Im Vergleich oeffnen" (6.10).
+// fuenf Zeilen, haftendem Kopf, Boss als Auswahlfeld, "Im Vergleich oeffnen" (6.10); die Spalte Build (6.7) entfiel mit #207.
 // Abschnitt 7: Gruppe (Luecken 7) - Starten auf diesem PC oder dem eigenen Server, Beitreten mit dem Code
 // und optionaler Server-Adresse, "Dein Charakter" ueber beiden (DECISION 7.4); ohne Gruppe nur der Satz, das
 // Beispiel-Board nur im Entwicklermodus (7.9); laufend Mitglieder und das Board mit Code, Status, Entfernen
@@ -59,13 +59,10 @@
 // Abschnitt 14: Umschalter Leiste | Reihenfolge (Nachtrag 29.09., Aufgabe 11) - in der Steuerzeile als Radiogruppe,
 // die Reihenfolge als umbrechende Reihe von 32-Punkt-Symbolen ohne Zeitachse, Auge und Abspielen wie in der Leiste,
 // der Zeitverlauf bleibt darunter; die Wahl gilt fuer die Sitzung.
-// Abschnitt 15: Builds als Links zu Questlog (Nachtrag 29.09., Aufgabe 12) - 15.0 die Proben bleibender Funktionen
+// Abschnitt 15: Builds als Links zu Questlog (Nachtrag 29.09., Aufgabe 12; der Bereich entfiel mit #207) - 15.0 die Proben bleibender Funktionen
 // aus test-builds-page und test-steckbrief-page (Builderkennung je Kampf, Lesen vor Schreiben, Treffer je Kampf,
-// Hinweis im Vergleich, Uebungspuppe, Verlauf im Beispiel, Deutsch und Kompakt); 15.1 bis 15.12 der Bereich: Feld
-// "Questlog-Link einfuegen" mit Name und Speichern, je Link eine Karte (Waffen, Name, zuletzt gespielt, bis zu drei
-// Bosse mit Median und Kampfzahl, In Questlog oeffnen, Loesen mit Rueckgaengig), die Karte des offenen Kampfs oben
-// und golden umrandet, gleiche Waffen, im Kampf "Build in Questlog", gespeichert nur Link, Waffen und eigener Name,
-// dazu aus test-plan-page Linkpruefung, Auswahl, Fehler und Neustart; Deutsch, drei Themen, Groessen.
+// Hinweis im Vergleich, Uebungspuppe, Verlauf im Beispiel, Deutsch und Kompakt); 15.1 bis 15.12, der Bereich Builds,
+// entfielen mit ihm (#207).
 // Abschnitt 16: breite Schrift (Aufgabe 13, CI unter Linux) - mit Verdana und Sperrung nachgebaut: der Fuss der
 // Kampfwahl kuerzt die Hinweise und haelt die Knoepfe in der Zeile, die Namen im Vergleich bei 560 kuerzen mit title.
 //
@@ -112,13 +109,18 @@ const KERNE_SHA = {
   "Silver Reaper's Soul Harvest": "b43363fd9afcb763803a8319c6172a739e67a60048d2828c6a844d0656e00ce0",
 };
 const SYMBOL_VON = { timeline: "kampf", rotation: "rotation", analysis: "analyse", compare: "vergleich", history: "verlauf",
-  party: "gruppe", builds: "builds", weeklies: "weeklies", rekorde: "rekorde", start: "start", settings: "einstellungen" };
+  party: "gruppe", weeklies: "weeklies", gilde: "gilde", rekorde: "rekorde", start: "start", settings: "einstellungen" };
+/* Das Wappen der Gilde (Spezifikation Gilde 5; Entscheidung 07.10.2026, statt der drei Koepfe): ein eigenes Symbol im Stil
+   der Leiste, der Funke im oberen Feld ist der Akzent; festgehalten wie gebaut, gleich streng gefragt wie die anderen. */
+const RAIL_GILDE = '<svg viewBox="0 0 24 24"><path d="M12 2.6l7.6 2.7v5.6c0 4.8-3.2 8.6-7.6 10.4-4.4-1.8-7.6-5.6-7.6-10.4V5.3z"/><path d="M4.4 11.4h15.2"/><path d="M8.6 14.4l3.4 2.6 3.4-2.6"/>'
+  + '<path d="M12 4.9l.65 1.45 1.45.65-1.45.65-.65 1.45-.65-1.45-1.45-.65 1.45-.65z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg>';
 /* Der Pokal der Rekorde steht nicht im Entwurf der Neugestaltung, sondern im freigegebenen Entwurf des
    Sammelalbums (Spezifikation Rekorde 2a, 02.10.2026, vorhaben/rekorde/album/bauen.cjs): dieselbe
    Zeichnung, Element fuer Element, gleich streng gefragt wie die anderen Symbole. */
 RAIL.rekorde = '<svg viewBox="0 0 24 24"><path d="M7 3.6h10v5a5 5 0 0 1-10 0z"/><path d="M7 5.4H4.3c0 2.9 1.2 4.6 3.4 5.2M17 5.4h2.7c0 2.9-1.2 4.6-3.4 5.2"/>'
   + '<path d="M12 13.6v3.2"/><path d="M8.6 20.4h6.8l-.9-3.6H9.5z"/>'
   + '<path d="M12 5.5l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg>';
+RAIL.gilde = RAIL_GILDE;
 // der Inhalt eines Symbols ohne Leerraum, zum Vergleich Element fuer Element
 // (selbstschliessende Elemente wie im Entwurf, ausgeschrieben wie im DOM)
 const innen = (svg) => svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
@@ -167,8 +169,8 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
   partyServer = "", lager = null, kuerzel = false, ordnerAuf = { ok: true } } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, ...(ruhig ? { reducedMotion: "reduce" } : {}) });
   /* party: die Handlungen der Gruppe (POST /api/party/...), wie sie beim Helfer ankaemen (Abschnitt 7).
-     lager: Builds und Plaene wie boro-builds.json und boro-plans.json, der Abruf bei Questlog gestellt
-     (Abschnitt 8); ohne lager antwortet der Helfer leer wie bisher. */
+     lager: seit #207 nur noch ein Zaehler - jede Anfrage an /api/builds, /api/plans oder /api/plan/fetch
+     landet in lager.ereignisse und bekommt 404 wie beim Helfer (soll nie kommen). */
   /* ordnerAuf: was der Helfer auf POST /api/folder/open antwortet ("keine": die Anfrage bricht ab, der Helfer
      antwortet nicht); s.ordner die gesendeten Anfragen (Nachtraege N1) */
   const s = { page, fehler: [], posts: [], win: [], party: [], ordner: [] };
@@ -200,24 +202,7 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
       if (path === "/api/party/server") { const b = s.party[s.party.length - 1].body; return json({ ok: true, server: String(b.server || "").trim() }); }
       return json(path === "/api/party/kick" ? { ok: true } : { ok: false, error: "Testhelfer" });
     }
-    /* lager.gesperrt: der Helfer kann boro-builds.json gerade nicht lesen (503, Abschnitt 15.0);
-       lager.ereignisse: GET und POST in ihrer Reihenfolge */
-    if (lager && path === "/api/builds") {
-      if (req.method() === "GET") {
-        lager.ereignisse?.push(lager.gesperrt ? "GET 503" : "GET 200");
-        return lager.gesperrt ? json({ ok: false }, 503) : json({ ok: true, builds: lager.builds });
-      }
-      const b = JSON.parse(req.postData() || "{}"); lager.builds[b.id] = b.build; lager.ereignisse?.push("POST " + b.id); return json({ ok: true });
-    }
-    if (lager && path === "/api/plans") {
-      // lager.plansWarte: der Helfer antwortet auf das Lesen erst spaet (Abschnitt 15, Fixrunde 1)
-      if (req.method() === "GET") { if (lager.plansWarte) await lager.plansWarte; return json({ ok: true, plans: lager.plans }); }
-      // lager.plansAblehnen: der Helfer nimmt den Eintrag nicht an (400, Abschnitt 15.8)
-      const b = JSON.parse(req.postData() || "{}"); lager.planPosts?.push(b);
-      if (lager.plansAblehnen) return json({ ok: false }, 400);
-      lager.plans[b.id] = b.plan; return json({ ok: true });
-    }
-    if (lager && path === "/api/plan/fetch") return json(lager.abruf(JSON.parse(req.postData() || "{}")));
+    if (/^\/api\/(builds|plans?)\b/.test(path)) { if (lager) lager.ereignisse.push(req.method() + " " + path); return json({ ok: false }, 404); }
     if (path === "/api/folder/open" && req.method() === "POST") {
       s.ordner.push(req.postData() || "");
       return ordnerAuf === "keine" ? route.abort().catch(() => {}) : json(ordnerAuf);
@@ -238,7 +223,6 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
     }
     // die Weeklies wie die Route: immer mit data (Pruefung W3, K3)
     if (path === "/api/weeklies" && req.method() === "GET") return json({ ok: true, data: { v: 1, profile: [] } });
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
     if (path.startsWith("/api/")) return json({ ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
@@ -311,7 +295,9 @@ function rotLog(start = at(21, 0, 0)) {
    - bei 33 und 34 s je ein Treffer zu 10 - unter 2 % der gewoehnlichen
      Sekunde, also eine Luecke von 2 s, obwohl etwas traf (die alte Rechnung
      ueber Abstaende zwischen Treffern sah dort keine),
-   - nichts von 56 bis 59,5 s - in den letzten 5 s, also keine Luecke;
+   - nichts von 56 bis 59,5 s - in den letzten 5 s, also keine Luecke,
+   - von 47 bis 50 s Quick Fire nur mit 30 % - die schwaechste Stelle, unter
+     dem halben Median und weit genug von jeder Luecke (Issue #105);
    sechs lesbare Salven Auge von Ventius (Decisive Sniping), vier mit 3
    Nachbeben (je Treffer 2000), zwei mit 2 (je Treffer 1500), dazu bei 16 s
    eine unlesbare (eine Welle aus zwei Treffern); einmal Detonation Mark mit
@@ -325,7 +311,8 @@ function anaTreffer() {
     if ((t >= 1000 && t < 3000) || (t >= 20000 && t < 26000) || (t >= 40000 && t < 42000)) continue;
     if (t >= 33000 && t < 35000) { if (t % 1000 === 0) tr.push([t, "Quick Fire", 964762401, 10, 0, 0]); continue; }
     const a = k % 4;
-    tr.push([t, "Quick Fire", 964762401, 3000 + 100 * ((k % 5) - 2), a === 0 || a === 2 ? 1 : 0, a === 1 || a === 2 ? 1 : 0]);
+    const delle = t >= 47000 && t < 50000 ? 0.3 : 1;
+    tr.push([t, "Quick Fire", 964762401, Math.round(delle * (3000 + 100 * ((k % 5) - 2))), a === 0 || a === 2 ? 1 : 0, a === 1 || a === 2 ? 1 : 0]);
     k++;
   }
   tr.push([59500, "Quick Fire", 964762401, 3000, 0, 0]);
@@ -558,7 +545,8 @@ try {
       const zeile = zeilen.map((z) => { const kd = z.querySelector(".kd"), a = r(z), b = kd && r(kd);
         const fx = z.parentElement.querySelector(".fx"), x = fx && fx.getClientRects().length ? r(fx) : null;
         return { h: a.height, rechts: b ? (x ? (x.left >= b.right ? 0 : -1) : a.right - b.right) : -1, mitte: b ? Math.abs((b.top + b.bottom) / 2 - (a.top + a.bottom) / 2) : 99,
-          meta: z.querySelector(".b")?.textContent || "", label: z.getAttribute("aria-label"), best: z.querySelectorAll(".best").length }; });
+          meta: z.querySelector(".b")?.textContent || "", label: z.getAttribute("aria-label"), best: z.querySelectorAll(".best").length,
+          lbar: !!z.querySelector(".lbar") }; });
       return { tag: document.querySelector("#kwTag")?.textContent, zahl: document.querySelector("#fightCount").textContent,
         kopfOben: kopf && r(kopf).bottom <= r(suche).top + 1, live: document.querySelector("#kwLive")?.getAttribute("aria-pressed"),
         liveKnopf: document.querySelector("#btnWatch").getAttribute("aria-pressed"),
@@ -574,8 +562,12 @@ try {
       "0.9 zwei Koepfe mit haftenden Koepfen: 2 fights \u00b7 21:30 und 2 fights \u00b7 20:00\u201320:31", f.gz);
     assert(f.zeile.length >= 4 && f.zeile.every((z) => z.h >= 38 && z.h <= 44 && z.rechts >= 0 && z.rechts < 16 && z.mitte < 3),
       "0.9 Zeile: hoechstens 44 Punkt, DPS rechts in der Mitte", f.zeile.filter((z) => !(z.h >= 38 && z.h <= 44 && z.rechts >= 0 && z.rechts < 16 && z.mitte < 3)));
-    assert(f.zeile.every((z) => /^\d\d:\d\d \u00b7 /.test(z.meta) && !/\d\.\d+M|\dk$/.test(z.meta)),
-      "0.9 Zeile: Uhrzeit \u00b7 Dauer, ohne die Schadenssumme", f.zeile.map((z) => z.meta));
+    /* folgt #152: eine Pull-Zeile ("Pull N" im Namen, mit Laengenbalken) nennt erst die Dauer, dann die
+       Uhrzeit ("1m 0s \u00b7 20:30", "38.0 s \u00b7 21:24"); jede andere Zeile bleibt "Uhrzeit \u00b7 Dauer". */
+    const pullZeile = (z) => /, Pull \d+, /.test(z.label || "");
+    assert(f.zeile.some(pullZeile) && f.zeile.some((z) => !pullZeile(z)) && f.zeile.every((z) => z.lbar === pullZeile(z)
+        && (pullZeile(z) ? /^(\d+m \d+[\u00a0 ]?s|\d+\.\d[\u00a0 ]?s) \u00b7 \d\d:\d\d$/ : /^\d\d:\d\d \u00b7 /).test(z.meta) && !/\d\.\d+M|\dk$/.test(z.meta)),
+      "0.9 Zeile: Uhrzeit \u00b7 Dauer (Pull-Zeile: Dauer \u00b7 Uhrzeit, mit Balken), ohne die Schadenssumme", f.zeile.map((z) => [z.meta, z.lbar, z.label]));
     const beste = f.zeile.filter((z) => z.best);
     assert(beste.length === 1 && beste[0].label.includes("Vulcanus") && beste[0].label.includes("20:30:00") && beste[0].label.includes("best pull"),
       "0.11 Goldpunkt: der beste Kampf je Boss, auch fuer den Vorleser", f.zeile.map((z) => [z.label, z.best]));
@@ -653,6 +645,8 @@ try {
     const blick5 = (p) => p.evaluate(() => {
       const r = (e) => e.getBoundingClientRect();
       const liste = document.querySelector("#kwListe"), lr = r(liste);
+      // folgt #152/#155: unter einem Kopf mit einem Boss heisst die Zeile "Pull N" - Name und Uhrzeit stehen im aria-label
+      const nz = (z) => { const l = z.getAttribute("aria-label") || ""; return l.split(", ")[0] + "@" + ((l.match(/(\d\d:\d\d):\d\d/) || [])[1] || ""); };
       // ein Klappkopf ist selbst der Kopf: er muss nur in der Liste stehen
       const frei = (z) => { if (!z) return null; const g = z.closest(".blockhead") ? null : z.closest(".blockgroup"), k = g && g.querySelector(".blockhead");
         const a = r(z), kb = k ? r(k).bottom : lr.top; return { oben: a.top - Math.max(kb, lr.top), unten: lr.bottom - a.bottom }; };
@@ -665,7 +659,7 @@ try {
             // Zahl und Spanne ganz sichtbar, die Faktenzeile endet mit einer Ellipse (Pruefung, Befund 5)
             gzGanz: (() => { const z = k.querySelector(".gz"); return !!z && z.scrollWidth <= z.clientWidth + 0.5 && r(z).right <= Math.min(r(k).right, lr.right) + 0.5; })(),
             ellipse: k.querySelector(".factline") ? getComputedStyle(k.querySelector(".factline")).textOverflow : "ellipsis",
-            zeilen: [...g.querySelectorAll(".fight")].map((z) => (z.querySelector(".a b")?.textContent || "") + "@" + (z.querySelector(".b")?.textContent || "").slice(0, 5)),
+            zeilen: [...g.querySelectorAll(".fight")].map((z) => nz(z)),
             trash: [...g.querySelectorAll(".trashhead")].map((t) => t.querySelector(".n")?.textContent) }; }),
         on: frei(document.querySelector("#fightList .fight.on")),
         aktiv: frei(document.querySelector("#fightList .aktiv")),
@@ -680,7 +674,7 @@ try {
       await p.waitForFunction(() => !document.querySelector("#kampfwahl").hidden && document.querySelectorAll("#fightList .fight").length > 0);
       let v = await blick5(p);
       const ort = lang === "de" ? "Frostatemhöhle" : "Frostbreath Cave";
-      const frost = v.koepfe.filter((k) => k.name === ort);
+      const frost = v.koepfe.filter((k) => k.name === ort + " · Vulcanus");   // folgt #152/#155: ein Boss unter dem Kopf, "Ort · Boss"
       // Fixrunde 1: sechs Pulls am Boss sind sechs Kaempfe, die Fledermaeuse zaehlen in den Trashmobs
       const zahl = lang === "de" ? "6 Kämpfe · 19:04–19:20" : "6 fights · 19:04–19:20";
       assert(v.koepfe.length === 2 && frost.length === 1 && frost[0].gz === zahl && /★★★★ ?Dungeon/i.test(frost[0].ort),
@@ -698,7 +692,7 @@ try {
       await p.setViewportSize({ width: 1280, height: 640 });
       await p.keyboard.press("Control+K");
       await p.waitForFunction(() => !document.querySelector("#kampfwahl").hidden);
-      await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].find((z) => (z.querySelector(".b")?.textContent || "").startsWith("19:07"))?.click());
+      await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].find((z) => /, 19:07:\d\d, /.test(z.getAttribute("aria-label") || ""))?.click());   // folgt #152/#155: Pull-Zeilen beginnen mit der Laenge, die Uhrzeit steht im aria-label
       await p.waitForFunction(() => document.querySelector("#kampfwahl").hidden);
       await p.keyboard.press("Control+K");
       await p.waitForFunction(() => !document.querySelector("#kampfwahl").hidden);
@@ -725,7 +719,7 @@ try {
       await p.keyboard.press("Control+K");
       await p.evaluate((o) => [...document.querySelectorAll("#fightList .blockfold")].find((b) => b.textContent.includes(o))?.click(), ort);
       v = await blick5(p);
-      const zu = v.koepfe.find((k) => k.name === ort);
+      const zu = v.koepfe.find((k) => k.name === ort + " · Vulcanus");   // folgt #152/#155: der Kopf heisst "Ort · Boss"
       assert(!!zu && zu.zeilen.length === 1 && zu.zeilen[0] === "Vulcanus@19:07", `5 (${lang}): der Kopf klappt alle Pulls am Ort zu, die gewaehlte Zeile bleibt`, zu);
       await p.keyboard.press("Escape");
       assert(!s.fehler.length, `5 (${lang}): keine Fehler`, s.fehler);
@@ -834,6 +828,25 @@ try {
           lauf: z.closest(".blockgroup")?.querySelector(".blockhead b")?.textContent })));
       assert(neben.length === 3 && neben.every((x) => x.name === "Ego-less Great Tree Warrior" && !x.bild && x.lauf === "Vegamor"),
         `Vegamor (${lang}): die drei Krieger in den Pausen stehen im Lauf Vegamor, ohne Bossbild`, neben);
+      /* #154 Abschlussdurchsicht: waehrend der Suche ist der Kopf "Trashmobs" weg; seine Kaempfe ruecken eine
+         Ebene hoch und zaehlen mit den Bosskaempfen als Geschwister, statt einen Bosskampf zum Vater zu haben.
+         Ohne Suche stehen sie wieder auf Ebene 3 unter ihrem Kopf. */
+      const baum = () => p.evaluate(() => {
+        const sicht = [...document.querySelectorAll("#fightList .fight")].filter((f) => !f.closest("[hidden]"));
+        return { n: sicht.length, krieger: sicht.filter((f) => f.classList.contains("trash")).length,
+          ebenen: sicht.map((f) => f.getAttribute("aria-level")), plaetze: sicht.map((f) => f.getAttribute("aria-posinset") + "/" + f.getAttribute("aria-setsize")),
+          koepfeSichtbar: [...document.querySelectorAll("#fightList .trashhead")].filter((h) => !h.closest("[hidden]")).length };
+      });
+      await p.fill("#kwSuche", "vegamor");
+      await p.waitForFunction(() => [...document.querySelectorAll("#fightList .trashhead")].every((h) => h.hidden));
+      const imSuchen = await baum();
+      assert(imSuchen.krieger === 3 && imSuchen.koepfeSichtbar === 0 && imSuchen.ebenen.every((e) => e === "2")
+        && imSuchen.plaetze.join() === imSuchen.ebenen.map((_, i) => (i + 1) + "/" + imSuchen.n).join(),
+        `Vegamor (${lang}): Suche "vegamor": Krieger auf Ebene 2, alle Kaempfe Geschwister 1..n`, imSuchen);
+      await p.fill("#kwSuche", "");
+      await p.waitForFunction(() => [...document.querySelectorAll("#fightList .trashhead")].some((h) => !h.hidden));
+      const ohneSuche = await p.evaluate(() => [...document.querySelectorAll("#fightList .fight.trash")].filter((f) => !f.closest("[hidden]")).map((f) => f.getAttribute("aria-level")));
+      assert(ohneSuche.length === 3 && ohneSuche.every((e) => e === "3"), `Vegamor (${lang}): ohne Suche stehen die Krieger wieder auf Ebene 3`, ohneSuche);
       assert(!s.fehler.length, `Vegamor (${lang}): keine Fehler auf der Seite`, s.fehler);
       await p.close();
     }
@@ -873,10 +886,13 @@ try {
        (.blockgroup); welcher Lauf eine Zeile ist, sagt data-lauf an ihrer Huelle. Die Proben unten gelten den
        Laeufen wie bisher, der Kopf ist der, unter dem der Lauf steht. */
     const laeufe = await p.evaluate(() => { const je = new Map();
+      // folgt #152/#155: Name und Uhrzeit aus dem aria-label (Pull-Zeilen), der Kopf ohne den Boss ("Ort · Boss" -> Ort)
+      const nz = (z) => { const l = z.getAttribute("aria-label") || ""; return l.split(", ")[0] + "@" + ((l.match(/(\d\d:\d\d):\d\d/) || [])[1] || ""); };
+      const ortKopf = (g) => { const b = g?.querySelector(".blockhead b"); return b ? [...b.childNodes].filter((n) => !(n.classList && n.classList.contains("kboss"))).map((n) => n.textContent).join("") : ""; };
       for (const r of document.querySelectorAll("#fightList .fightrow")) {
         const z = r.querySelector(".fight"), l = r.dataset.lauf || "";
-        if (!je.has(l)) je.set(l, { lauf: l, kopf: r.closest(".blockgroup")?.querySelector(".blockhead b")?.textContent || "", kaempfe: [] });
-        je.get(l).kaempfe.push((z.querySelector(".a b")?.textContent || "") + "@" + (z.querySelector(".b")?.textContent || "").slice(0, 5));
+        if (!je.has(l)) je.set(l, { lauf: l, kopf: ortKopf(r.closest(".blockgroup")), kaempfe: [] });
+        je.get(l).kaempfe.push(nz(z));
       }
       return [...je.values()]; });
     assert(laeufe.length >= 6 && laeufe.every((l) => /^\d+$/.test(l.lauf)), "M3: jede Zeile nennt ihren Lauf (data-lauf)", laeufe);
@@ -887,8 +903,9 @@ try {
     assert(!!b1 && !!b2 && b1 !== b2, "M3 B: 181 s Stille - zwei Laeufe", laeufe);
     const c1 = lauf("Akman", "22:00"), c2 = lauf("Akman", "22:01");
     assert(!!c1 && !!c2 && c1 !== c2 && c1.kopf === "Manticus" && c2.kopf === "Manticus", "M3 C: Manticus mit 90 s Stille - zwei Laeufe, die Koloss-Regel gilt nicht", laeufe);
-    const ckoepfe = await p.evaluate(() => [...document.querySelectorAll("#fightList .blockgroup")].filter((g) => /Akman@22:0[01]/.test([...g.querySelectorAll(".fight")]
-      .map((z) => (z.querySelector(".a b")?.textContent || "") + "@" + (z.querySelector(".b")?.textContent || "").slice(0, 5)).join())).length);
+    const ckoepfe = await p.evaluate(() => { const nz = (z) => { const l = z.getAttribute("aria-label") || ""; return l.split(", ")[0] + "@" + ((l.match(/(\d\d:\d\d):\d\d/) || [])[1] || ""); };
+      return [...document.querySelectorAll("#fightList .blockgroup")].filter((g) => /Akman@22:0[01]/.test([...g.querySelectorAll(".fight")]
+      .map((z) => nz(z)).join())).length; });
     assert(ckoepfe === 1, "M3 C (Feinschliff 5): die zwei Laeufe an Manticus stehen hintereinander unter einem Kopf", ckoepfe);
     const d1 = lauf("Vegamor", "23:00"), d2 = lauf("Stone Beetle", "23:01");
     assert(!!d1 && !!d2 && d1 !== d2 && d1.kopf === "Vegamor" && d2.kopf !== "Vegamor", "M3 D: ein fremder Gegner 90 s nach Vagamont steht nicht im Lauf Vegamor", laeufe);
@@ -959,9 +976,10 @@ try {
         knopf: k.map((b) => Math.round(b.getBoundingClientRect().width) + "x" + Math.round(b.getBoundingClientRect().height)) };
     });
     // folgt Spezifikation Rekorde 2a (02.10.2026): der Pokal unten nach den Weeklies, gleich streng
-    assert(JSON.stringify(l.folge) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "builds", "weeklies", "rekorde", "start", "settings"]),
-      "0.17 Reihenfolge: Kampf bis Builds, unten Weeklies, Rekorde, Start, Einstellungen", l.folge);
-    assert(JSON.stringify(l.unten) === JSON.stringify(["weeklies", "rekorde", "start", "settings"]), "0.17 Weeklies, Rekorde, Start und Einstellungen unten", l.unten);
+    // folgt Spezifikation Gilde 5 (06.10.2026): die Gilde zwischen Weeklies und Rekorden, gleich streng
+    assert(JSON.stringify(l.folge) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "start", "settings"]),
+      "0.17 Reihenfolge: Kampf bis Gruppe, unten Weeklies, Gilde, Rekorde, Start, Einstellungen (Builds entfiel, #207)", l.folge);
+    assert(JSON.stringify(l.unten) === JSON.stringify(["weeklies", "gilde", "rekorde", "start", "settings"]), "0.17 Weeklies, Gilde, Rekorde, Start und Einstellungen unten", l.unten);
     const falsch = l.svg.filter((v) => v.box !== "0 0 24 24" || v.w !== 22 || v.h !== 22 || v.versteckt !== "true"
       || innen(v.inhalt) !== innen(RAIL[SYMBOL_VON[v.tab]]));
     assert(!falsch.length, "0.16 die eigenen Symbole aus dem Entwurf, 22 Punkt, fuer den Vorleser verborgen", falsch.map((v) => v.tab));
@@ -998,7 +1016,7 @@ try {
     await p.close();
   }
   {
-    // 0.18 Entwicklermodus: Waffen und Log-Einrichtung nach Builds, ueber dem Abstand
+    // 0.18 Entwicklermodus: Waffen und Log-Einrichtung nach der Gruppe (vorher nach Builds), ueber dem Abstand
     const s = await oeffne();
     const p = s.page;
     await beispiel(p);
@@ -1007,12 +1025,12 @@ try {
     await p.click("#eDev");
     await p.waitForTimeout(150);
     const folge = await p.evaluate(() => [...document.querySelectorAll("#bereiche .tab")].filter((b) => !b.hidden).map((b) => b.dataset.tab));
-    assert(JSON.stringify(folge.slice(0, 8)) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "builds", "weapons"]),
-      "0.18 Entwicklermodus: Waffen nach Builds", folge);
+    assert(JSON.stringify(folge.slice(0, 8)) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "weapons", "setup"]),
+      "0.18 Entwicklermodus: Waffen nach der Gruppe", folge);
     await p.close();
   }
 
-  // --- Builds und Weeklies (9.1) als Bereiche
+  // --- Weeklies (9.1) als Bereich; Builds entfiel (#207), die Leiste nennt den Reiter nicht mehr
   {
     const s = await oeffne();
     const p = s.page;
@@ -1044,25 +1062,19 @@ try {
     await d.page.keyboard.press("Enter");
     await d.page.waitForTimeout(200);
     assert(await d.page.evaluate(() => document.querySelector("#weeklies").hidden && !document.querySelector("#app").hidden), "9.1 ein Kampf aus der Kampfwahl verlaesst Weeklies");
-    /* Builds: der Bereich zeigt die Builds - seit Aufgabe 7 eine eigene Flaeche (#p-builds, Luecken 8.1;
-       folgt Entwurf, vorher der Abschnitt aus dem Verlauf), mit einem eigenen Log (das Beispiel legt keine Builds an) */
+    /* Builds entfiel (#207): kein Knopf, keine Flaeche; der Verlauf hat keinen Abschnitt zu Builds */
     await mitLog(d);
-    await bereich(d.page, "builds");
-    const b = await d.page.evaluate(() => ({ panel: document.querySelector(".panel.on")?.id, bau: document.querySelector("#bauBody").getClientRects().length > 0,
-      verlauf: document.querySelector("#histWrap").getClientRects().length + document.querySelector("#histNote").getClientRects().length,
-      aktuell: document.querySelector('#bereiche .tab[aria-current="page"]')?.dataset.tab }));
-    assert(b.panel === "p-builds" && b.bau && b.verlauf === 0 && b.aktuell === "builds", "Builds: eigener Eintrag und eigene Flaeche, zeigt die Builds ohne den Verlauf", b);
-    const ueb = await d.page.evaluate(() => document.querySelector("#p-builds > h2.vh")?.textContent);
-    assert(ueb === "Builds", "Builds: die Ueberschrift der Flaeche heisst fuer den Vorleser Builds (Pruefung Befund 5)", ueb);
+    const weg = await d.page.evaluate(() => ({ knopf: !!document.querySelector('[data-tab="builds"]'), flaeche: !!document.querySelector("#p-builds, #bauBody, #bdFeld, #kampfQuestlog") }));
+    assert(!weg.knopf && !weg.flaeche, "Builds: kein Reiter, keine Flaeche, kein Feld am Kampf, kein Questlog-Link", weg);
     await bereich(d.page, "history");
     /* Folgt Entwurf (Neugestaltung 28.09., Luecken 6): mit einem Verlauf steht statt des
        Einleitungssatzes das Diagramm (#histWrap); der Satz nur, solange er leer ist. */
-    const h = await d.page.evaluate(() => ({ bau: document.querySelector("#bauBody").getClientRects().length > 0,
+    const h = await d.page.evaluate(() => ({ bau: !!document.querySelector("#bauBody"),
       verlauf: document.querySelector("#histWrap").getClientRects().length > 0 && !document.querySelector("#histNote").getClientRects().length,
       ueb: document.querySelector("#p-history > h2.vh")?.textContent }));
     // seit Aufgabe 7 ohne "Deine Builds" darunter (Luecken 8.1)
     assert(!h.bau && h.verlauf && h.ueb === "Verlauf", "Verlauf mit Diagramm, ohne Deine Builds, heisst Verlauf", h);
-    assert(!d.fehler.length, "Weeklies und Builds: keine Fehler auf der Seite", d.fehler);
+    assert(!d.fehler.length, "Weeklies und Verlauf: keine Fehler auf der Seite", d.fehler);
     await d.page.close();
   }
 
@@ -1242,6 +1254,23 @@ try {
   }
 
   // ===== Abschnitt 2: Kampf (Luecken 2) =====
+  /* --- 2.0 (#155): ohne Log nennt der Kopf der Kampfwahl "keine Kaempfe" in der Sprache der Seite. Der
+     Zaehler wird sonst erst mit der Liste geschrieben, und so stand im deutschen Fenster "No fights yet". */
+  {
+    const s = await oeffne({ app: true, lang: "de" });
+    const p = s.page;
+    const zahl = () => p.evaluate(() => document.querySelector("#fightCount").textContent);
+    const de = await zahl();
+    await p.click('#bereiche [data-tab="settings"]').catch(() => {});
+    const umschalter = await p.$('#eSprache button[data-lang="en"]');
+    if (umschalter) await umschalter.click();
+    else await p.evaluate(() => document.querySelector("#btnLang")?.click());
+    await p.waitForTimeout(200);
+    const en = await zahl(), sprache = await p.evaluate(() => document.documentElement.lang);
+    assert(de === "Noch keine Kämpfe" && sprache === "en" && en === "No fights yet", "2.0 ohne Log: Noch keine Kämpfe / No fights yet, je nach Sprache", { de, en, sprache });
+    assert(!s.fehler.length, "2.0 ohne Log: keine Fehler", s.fehler);
+    await p.close();
+  }
   // --- 2.1, 2.2, 2.3, 2.4, 2.5, 2.6: der Kopf
   {
     const s = await oeffne({ app: true });
@@ -1285,7 +1314,9 @@ try {
       const zeilen = [...document.querySelectorAll("#bars .row:not(.sub)")];
       return { titel: document.querySelector("#tafelKopf h2")?.textContent, zahl: document.querySelector("#tafelZahl")?.textContent,
         segImKopf: !!document.querySelector("#tafelKopf #groupSeg"), seg: seg.map((b) => b.textContent),
-        kopf: [...document.querySelectorAll("#bars .bhead [data-k]")].filter((e) => e.getClientRects().length).map((e) => e.dataset.k),
+        // folgt Spezifikation Feinschliff 4: die Spalten stehen in der Zeile, der Kopf ist Name und Knopf "Ordnen"
+        kopf: [...(document.querySelector("#bars .row:not(.sub)")?.querySelectorAll("[role=gridcell]") || [])].filter((e) => e.getClientRects().length).map((e) => e.dataset.k || "name"),
+        kopfZeile: [...document.querySelectorAll("#bars .bhead > *")].filter((e) => e.getClientRects().length).map((e) => e.dataset.k || (e.querySelector("#ringOrdnen") ? "ordnen" : "?")),
         zeilen: zeilen.map((z) => {
           const f = r(z.querySelector(".fill")), n = r(z.querySelector(".nmt")), nm = r(z.querySelector(".nm")), zr = r(z);
           return { hoch: zr.height, f, n, nm, unten: zr.bottom };
@@ -1294,8 +1325,9 @@ try {
     assert(t.titel === "Damage" && t.zahl === "3 skills \u00b7 110 hits" && t.segImKopf, "2.7 Feldkopf: Schaden, Zahl der Faehigkeiten und Treffer, Umschalter rechts", t);
     assert(JSON.stringify(t.seg) === JSON.stringify(["By skill", "Targets"]), "2.7 Umschalter ohne Gruppe: Nach Faehigkeit / Ziele", t.seg);
     // folgt Spezifikation Glutring 4: der Kopf der Liste neben dem Ring
-    assert(JSON.stringify(t.kopf) === JSON.stringify(["name", "dps", "share", "hits", "critRate", "heavyRate"]),
-      "2.8 Kopf der Liste: Name, DPS, Anteil, Treffer, Kritisch, Stark", t.kopf);
+    assert(JSON.stringify(t.kopf) === JSON.stringify(["name", "dps", "share", "hits", "critRate", "heavyRate"]) &&
+      JSON.stringify(t.kopfZeile) === JSON.stringify(["name", "ordnen"]),
+      "2.8 Liste: Name, DPS, Anteil, Treffer, Kritisch, Stark je Zeile; der Kopf Name und Ordnen", t);
     assert(t.zeilen.length === 3 && t.zeilen.every((z) => Math.abs(z.hoch - 44) < 0.5), "2.8 Zeilen fest 44 Punkt", t.zeilen.map((z) => z.hoch));
     assert(t.zeilen.every((z) => z.f && Math.abs(z.f.height - 4) < 0.5 && z.f.top >= z.n.bottom - 1 && z.f.bottom <= z.unten &&
       Math.abs(z.f.left - t.zeilen[0].f.left) < 0.5), "2.8 der Balken ist eine 4-Punkt-Spur unter Name und DPS, alle an derselben Kante", t.zeilen);
@@ -1487,7 +1519,8 @@ try {
       assert(m.steuert === "kurveFeld" && m.spuren[0] === null && m.spuren[1] === null && m.spuren[2] === "Timeline and rotation \u203a" && m.spuren[3] && !m.stapel,
         `2.16 ${wo}: der Knopf der Kurve steuert das Band, der gestapelte Zeitverlauf hat einen eigenen Knopf und steht nicht im Kampf`, m);
       // folgt Spezifikation Glutring 2 (E 10): das Band ist zu bei jeder Hoehe, auch bei 1480 Punkt
-      assert(m.auf === "false" && Math.abs(m.kurve.height - 78) <= 1 && m.linien === "0" && !m.rollt, `2.14 ${wo}: das Band zu, die Kurve 78 Punkt, nichts rollt`, m);
+      // folgt Spezifikation Feinschliff 6: ab 1200 Punkt Hoehe ist die Kurve 150 hoch (das Band bleibt zu)
+      assert(m.auf === "false" && Math.abs(m.kurve.height - (hoehe >= 1200 ? 150 : 78)) <= 1 && m.linien === "0" && !m.rollt, `2.14 ${wo}: das Band zu, die Kurve ${hoehe >= 1200 ? 150 : 78} Punkt, nichts rollt`, m);
     }
     /* folgt Spezifikation Glutring 4 und 7 (E 8): nebeneinander ab 900 Punkt, darunter gestapelt; die Liste hat bei
        jeder Breite alle sechs Spalten (aus Aufgabe 3) */
@@ -1761,6 +1794,7 @@ try {
     const q = (x) => document.querySelector(x);
     const r = (e) => e && e.getClientRects().length ? e.getBoundingClientRect().toJSON() : null;
     const txt = (x) => (q(x)?.textContent || "").trim();
+    const ohneKnopf = (e) => { const c = e?.cloneNode(true); c?.querySelectorAll("button").forEach((k) => k.remove()); return (c?.textContent || "").trim(); };
     const sicht = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).display !== "none" && getComputedStyle(e).visibility !== "hidden";
     const klein = [];
     const it = document.createTreeWalker(q("#p-analysis"), NodeFilter.SHOW_TEXT);
@@ -1773,7 +1807,8 @@ try {
     const sa = q("#saeulen");
     return {
       kopf: q("#bereichKopf")?.innerText || "",
-      urteil: { uv: txt("#analysisCall .uv"), un: txt("#analysisCall .un"), r: r(q("#analysisCall")), uk: !!q("#analysisCall .uk") },
+      // der Satz ohne den Knopf "Zum Beleg" an seinem Ende (#107)
+      urteil: { uv: txt("#analysisCall .uv"), un: ohneKnopf(q("#analysisCall .un")), r: r(q("#analysisCall")), uk: !!q("#analysisCall .uk") },
       titel: document.querySelectorAll("#weitere [title]").length, weitereText: q("#weitere")?.innerText || "",
       weitere: { h: txt("#weitereTitel"), r: r(q("#weitere")),
         items: [...document.querySelectorAll("#weitere .find")].map((f) => ({ k: f.dataset.k, dt: (f.querySelector(".k")?.textContent || "").trim(),
@@ -1784,8 +1819,9 @@ try {
         zonen: sa ? [...sa.querySelectorAll(".gapz")].map((z) => z.dataset.zeit) : [],
         med: sa?.querySelector(".med") ? parseFloat(sa.querySelector(".med").style.bottom) : -1,
         medStrich: sa?.querySelector(".med") ? getComputedStyle(sa.querySelector(".med")).borderTopStyle : "" },
+      // die Knoepfe in den leisen Saetzen (Wege in die Rotation, #107) gehoeren nicht zum Satz
       drei: [...document.querySelectorAll("#drei > section")].map((s) => ({ id: s.id, h: (s.querySelector("h3")?.textContent || "").trim(),
-        ant: (s.querySelector(".ant")?.textContent || "").trim(), leise: [...s.querySelectorAll(".fein")].map((x) => x.textContent.trim()).join(" | "), r: r(s) })),
+        ant: (s.querySelector(".ant")?.textContent || "").trim(), leise: [...s.querySelectorAll(".fein")].map((x) => { const c = x.cloneNode(true); c.querySelectorAll("button").forEach((k) => k.remove()); return c.textContent.trim(); }).join(" | "), r: r(s) })),
       stapel: [...document.querySelectorAll("#dWie .stapel i")].map((i) => ({ art: i.dataset.art, w: parseFloat(i.style.width) })),
       lg: [...document.querySelectorAll("#dWie .lg > span")].map((x) => x.textContent.trim()),
       vent: { h: txt(".vkasten h3"), vkw: txt(".vkasten .vkw"), r: r(q(".vkasten")),
@@ -1796,7 +1832,7 @@ try {
           (z.querySelector(".vpips b")?.textContent || "").trim(), (z.querySelector(".tr")?.textContent || "").trim()]),
         vkz: [...document.querySelectorAll(".vkasten .vkz > div")].map((d) => [...d.children].map((c) => c.textContent.trim())),
         tab: !!q(".vkasten .vtab") },
-      fuss: { h: txt("#afuss h2"), li: [...document.querySelectorAll("#afuss li")].map((l) => l.textContent.trim()), r: r(q("#afuss")) },
+      fuss: { h: txt("#afussTitel"), li: [...document.querySelectorAll("#afuss li")].map((l) => l.textContent.trim()), r: r(q("#afuss")) },
       status: r(q("#statusleiste")), rollY: scrollY + (q("#app")?.scrollTop || 0) + (q(".stage")?.scrollTop || 0),
       klein, quer: document.documentElement.scrollWidth > innerWidth,
     };
@@ -1838,7 +1874,7 @@ try {
        haelt ihre drei Sekunden Abstand (vorher lag sie bei 0:33-0:36, mitten in der Luecke 0:33-0:35) */
     const sek = (u) => { const [m, x] = u.split(":"); return +m * 60 + +x; };
     const stelle = /^(\d+:\d+)\u2013(\d+:\d+) /.exec(w.schwach?.v || "");
-    assert(!!stelle && [[20, 26], [33, 35], [40, 42]].every(([a, e]) => sek(stelle[2]) <= a - 3 || sek(stelle[1]) >= e + 3),
+    assert(!!stelle && stelle[1] === "0:47" && [[20, 26], [33, 35], [40, 42]].every(([a, e]) => sek(stelle[2]) <= a - 3 || sek(stelle[1]) >= e + 3),
       "4.14 die schwaechste Stelle liegt nicht in oder an einer Luecke nach dem Median", w.schwach);
     // Fixrunde 1 (Pruefung Befund 2): die Erklaersaetze stehen sichtbar unter dem Wert, nicht im title
     assert(b.titel === 0 && !!w.skillung?.n && !!w.schwach?.n && /Ein Fehlschlag steht im Log als Treffer ohne Schaden\./.test(w.fehl?.n || "") &&
@@ -1868,13 +1904,14 @@ try {
     assert(d1.ant === "Schnellfeuer mit " + prozDe(erst[1] / ANA.gesamt, 1) + " des Schadens." && d1.leise.includes("Danach ") && d1.leise.includes(prozDe(zweit[1] / ANA.gesamt, 1)),
       "4.7 Wer traegt: die staerkste Faehigkeit mit ihrem Anteil, danach die zweite", { ant: d1.ant, leise: d1.leise });
     const N = ANA.hits;
-    assert(d2.ant === prozDe(ANA.krit / N) + " kritisch, " + prozDe(ANA.stark / N) + " stark.", "4.8 Wie triffst du: Anteil kritisch und stark", d2.ant);
+    // #106: der Satz sagt, worauf sich der Anteil bezieht (die Treffer)
+    assert(d2.ant === prozDe(ANA.krit / N) + " deiner Treffer kritisch, " + prozDe(ANA.stark / N) + " stark.", "4.8 Wie triffst du: Anteil kritisch und stark", d2.ant);
     assert(JSON.stringify(b.stapel.map((x) => x.art)) === JSON.stringify(["normal", "crit", "heavy", "critheavy"]) &&
       b.stapel.every((x) => Math.abs(x.w - 100 * ANA.arten[x.art] / N) < 0.2) &&
       JSON.stringify(b.lg) === JSON.stringify(["normal " + prozDe(ANA.arten.normal / N), "kritisch " + prozDe(ANA.arten.crit / N),
         "stark " + prozDe(ANA.arten.heavy / N), "kritisch stark " + prozDe(ANA.arten.critheavy / N)]),
       "4.8 die vier Trefferarten als geteilter Balken mit Legende", { stapel: b.stapel, lg: b.lg, soll: ANA.arten });
-    const m3 = /^(\d+) Einsätze in .+\.$/.exec(d3.ant), m3b = /^Ohne die Lücken (\d+,\d) je Minute, mit ihnen (\d+,\d)\. Die Folge steht unter Rotation\.$/.exec(d3.leise);
+    const m3 = /^(\d+) Einsätze in .+\.$/.exec(d3.ant), m3b = /^Ohne die Lücken (\d+,\d) je Minute, mit ihnen (\d+,\d)\.$/.exec(d3.leise);
     const zahl = (x) => +x.replace(",", ".");
     assert(!!m3 && +m3[1] === rotZahl && !!m3b && Math.abs(zahl(m3b[2]) - rotZahl / 59.5 * 60) < 0.06 && Math.abs(zahl(m3b[1]) - rotZahl / 49.5 * 60) < 0.06 &&
       w.jeMinute?.v === m3b[2], "4.9 Hast du durchgedrueckt: dieselben Einsaetze wie die Rotation, je Minute mit und ohne die 10 s Luecken",
@@ -1962,11 +1999,44 @@ try {
         if (breite === 2000)
           assert(b.fuss.r && b.status && b.fuss.r.bottom <= b.status.top + 0.5 && b.rollY === 0,
             `4 ${wo}: „Was das Log nicht weiß“ ist ohne Rollen im Blick (gewuenscht)`, { fuss: b.fuss.r, status: b.status, rollY: b.rollY });
+        /* Issue #110: Weitere Befunde als Raster mit der Ueberschrift darueber, die Erklaersaetze hoechstens
+           70 Zeichen breit, die Ventius-Tabelle hoechstens 900 Punkt - in jeder Groesse */
+        /* Issue #110: ab 1200 Punkt Hoehe nimmt die Form den Platz, der da ist - der Fuss endet 8 Punkt ueber
+           der Statusleiste, ausser die Form steht an ihrer Grenze (112 oder 320 Punkt) */
+        if (hoehe >= 1200) {
+          const frei = b.status.top - b.fuss.r.bottom - 8, h = b.form.sa.height;
+          assert(Math.abs(frei) <= 2 || (frei > 2 && Math.abs(h - 320) < 1) || (frei < -2 && Math.abs(h - 112) < 1),
+            `#110 ${wo}: die Form nimmt den freien Platz (112 bis 320 Punkt), der Fuss bleibt im Blick`, { frei, h });
+        }
+        if (datei) {
+          const m = await p.evaluate(() => {
+            const inCh = (e) => { if (!e || !e.getClientRects().length) return -1; const m = document.createElement("span");
+          m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+          e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return e.getBoundingClientRect().width / ch; };
+            const h = document.querySelector("#weitereTitel").getBoundingClientRect(), dl = document.querySelector("#weitereListe");
+            const items = [...dl.children].map((x) => x.getBoundingClientRect());
+            return { ueber: h.bottom <= dl.getBoundingClientRect().top + 0.5, raster: getComputedStyle(dl).display === "grid",
+              links: items.length > 0 && Math.abs(items[0].left - dl.getBoundingClientRect().left) < 1,
+              /* im Raster beginnt jede Reihe links; ein Eintrag allein in seiner Reihe steht nur in der letzten
+                 (bei einer Spalte steht jeder allein, das ist dann richtig) */
+              allein: new Set(items.map((r) => Math.round(r.left))).size < 2 ? 0
+                : items.filter((r, i) => i < items.length - 1 && !items.some((o, j) => j !== i && Math.abs(o.top - r.top) < 1)).length,
+              def: inCh(document.querySelector("#lueckeDef")), salven: inCh(document.querySelector(".salvenwort")),
+              vtab: document.querySelector(".vtab")?.getBoundingClientRect().width || -1 };
+          });
+          assert(m.ueber && m.raster && m.links && m.allein === 0, `#110 ${wo}: Weitere Befunde als Raster, die Ueberschrift darueber`, m);
+          assert(m.def > 0 && m.def <= 70.5 && m.salven > 0 && m.salven <= 70.5 && m.vtab > 0 && m.vtab <= 900.5,
+            `#110 ${wo}: Erklaersaetze hoechstens 70 Zeichen, Ventius-Tabelle hoechstens 900 Punkt`, m);
+        }
         await p.close();
       }
     }
-    assert(hoehen["2000x1480"] > hoehen["1280x860"] + 40 && hoehen["1280x860"] >= 120,
-      "4.5 grosse Fenster nutzen die Hoehe: die Saeulen wachsen mit dem Fenster", hoehen);
+    /* Entscheidung vom 04.10.2026 (Issue #110): ab 1200 Punkt Fensterhoehe nimmt die Form den freien Platz
+       (112 bis 320 Punkt), geprueft je Groesse oben; im vollen Kampf kann sie dann flacher sein als vorher,
+       der Fuss bleibt im Blick. Vorher hier: bei 2000 x 1480 mindestens 40 Punkt hoeher als bei 1280 x 860. */
+    assert(hoehen["1280x860"] >= 120 && hoehen["2000x1480"] >= 112,
+      "4.5 die Saeulen: bei 1280 x 860 mindestens 120 Punkt, im grossen Fenster nie unter 112", hoehen);
+
   }
 
   // ===== Abschnitt 5: Vergleich (Luecken 5) =====
@@ -2213,7 +2283,7 @@ try {
     const svg = q("#histPlotFeld svg");
     const kreise = [...document.querySelectorAll("#histPlotFeld svg circle.hp")].map((c) => ({ k: c.dataset.k, at: +c.dataset.at, dps: +c.dataset.dps,
       cx: +c.getAttribute("cx"), cy: +c.getAttribute("cy"), log: c.classList.contains("hplog"), spitze: c.classList.contains("hpspitze"), cur: c.classList.contains("hpcur"),
-      fill: getComputedStyle(c).fill, stroke: getComputedStyle(c).stroke }));
+      dur: +c.dataset.dur, fill: getComputedStyle(c).fill, stroke: getComputedStyle(c).stroke }));
     const band = q("#histPlotFeld svg .hpband");
     const roll = q("#histDetail .histroll"), th = q("#histDetail thead th");
     const zeilen = [...document.querySelectorAll("#histDetail tbody tr")];
@@ -2291,9 +2361,16 @@ try {
     const hoechster = v.kreise.reduce((a, c) => (c.dps > a.dps ? c : a), { dps: -1 });
     assert(!!v.med && Math.abs(v.med.wert - median) < 1e-6 && v.med.dash !== "none" && v.leg.some((l) => l.startsWith("Median ") && l.length > 7),
       "6 Median: gestrichelte Linie auf dem Median der Kaempfe im Zeitraum, in der Legende mit Zahl", { med: v.med, median, leg: v.leg });
-    assert(hoechster.spitze && v.kreise.filter((c) => c.spitze).length === 1 && hoechster.fill === v.tok.gold &&
+    /* Spezifikation Bester Pull 5.4 (#143): Gold traegt der beste Pull nach der Regel, nicht mehr der hoechste
+       Punkt. Der laengste Kampf am Boss dauert 120 s (16.09.), die Schwelle ist also min(60, 60) = 60 s. Die drei
+       Pulls aus VGL_LOG (20.09.) enden knapp vor 60 s und sind keine Kandidaten, auch der hoechste (26.9k) nicht;
+       der beste Pull ist der 22k-Kampf vom 16.09. (120 s). Vorher trug der hoechste Punkt das Gold. */
+    const goldSoll = v.kreise.find((c) => c.at === Date.UTC(2026, 8, 16, 21, 0, 0));
+    assert(!!goldSoll && goldSoll.dps === 22000 && goldSoll.dur === 120 && hoechster.dps > 26000 && hoechster.dur < 60 && !hoechster.spitze &&
+      goldSoll.spitze && v.kreise.filter((c) => c.spitze).length === 1 && goldSoll.fill === v.tok.gold &&
       v.kreise.filter((c) => !c.spitze).every((c) => c.fill !== v.tok.gold && c.stroke !== v.tok.gold) && v.leg.includes("bester"),
-      "6 bester in Gold, sonst kein Gold", v.kreise.map((c) => [c.dps, c.spitze, c.fill]));
+      "6 bester Pull nach der Regel in Gold (22k am 16.09., 120 s), nicht der hoechste Punkt unter der Schwelle; sonst kein Gold",
+      v.kreise.map((c) => [c.dps, c.dur, c.spitze, c.fill]));
     // aus diesem Log gefuellt, fruehere hohl; die Legende sagt beides
     assert(v.kreise.filter((c) => c.log).length === 3 && v.kreise.filter((c) => c.log).every((c) => new Date(c.at).getUTCDate() === 20) &&
       v.kreise.filter((c) => !c.log && !c.spitze).every((c) => c.fill === "none") && v.kreise.filter((c) => c.log && !c.spitze).every((c) => c.fill === v.tok.text) &&
@@ -2311,8 +2388,8 @@ try {
     assert(!!v.boss && v.boss.tag === "SELECT" && v.boss.label === "Boss" && v.boss.inKopf && v.boss.optionen.join("|") === "Vulcanus|Ramux" && v.boss.wert.length > 0 &&
       v.boss.optionen[0] === "Vulcanus", "6.5 Boss als Auswahlfeld im Kopf der Liste, Vulcanus gewaehlt (der Boss des gewaehlten Kampfs)", v.boss);
     // 6.6 Liste: Kopf, neueste zuerst, hoechstens 5 Zeilen, rollt in sich, haftender Kopf
-    assert(v.liste.titel === "Kämpfe" && v.liste.fz === "8 an Vulcanus \u00b7 neueste zuerst" && v.liste.kopf.join("|") === "Tag|Uhrzeit|Dauer|Build|DPS",
-      "6.6/6.7 Liste „Kämpfe“: Tag, Uhrzeit, Dauer, Build, DPS", v.liste);
+    assert(v.liste.titel === "Kämpfe" && v.liste.fz === "8 an Vulcanus \u00b7 neueste zuerst" && v.liste.kopf.join("|") === "Tag|Uhrzeit|Dauer|DPS",
+      "6.6 Liste „Kämpfe“: Tag, Uhrzeit, Dauer, DPS (die Spalte Build entfiel, #207)", v.liste);
     const zeiten = v.liste.zeilen.map((z) => z.zellen[0].slice(-6) + z.zellen[1]);
     assert(!!v.liste.zeilen[7] && v.liste.zeilen[0].zellen[0].endsWith("20.09.") && v.liste.zeilen[0].zellen[1] === "21:00" && v.liste.zeilen[7].zellen[0].endsWith("01.09."),
       "6.6 neueste zuerst", zeiten);
@@ -2327,9 +2404,8 @@ try {
     await p.waitForFunction(() => document.querySelector("#histDetail .histroll")?.scrollTop > 0, null, { timeout: 3000 }).catch(() => {});
     const haft = await p.evaluate(() => ({ th: document.querySelector("#histDetail thead th")?.getBoundingClientRect().top ?? -99, roll: document.querySelector("#histDetail .histroll")?.getBoundingClientRect().top ?? 99 }));
     assert(Math.abs(haft.th - haft.roll) <= 1, "6.6 gerollt: der Kopf der Liste bleibt oben stehen", haft);
-    // 6.7 Spalte Build: fruehere Kaempfe ohne Build tragen einen Strich
-    assert(v.liste.zeilen.filter((z) => !z.zellen[0].endsWith("20.09.")).every((z) => z.zellen[3] === "\u2013"), "6.7 Spalte Build: ohne erkannten Build ein Strich",
-      v.liste.zeilen.map((z) => z.zellen));
+    // 6.7 Spalte Build entfiel (#207): jede Zeile hat vier Zellen
+    assert(v.liste.zeilen.every((z) => z.zellen.length === 4), "6.7 ohne Spalte Build: vier Zellen je Zeile", v.liste.zeilen.map((z) => z.zellen));
     // 6.10 "Im Vergleich öffnen" als leiser Knopf ueber der Liste
     assert(!!v.imVergleich && v.imVergleich.text === "Im Vergleich öffnen" && v.imVergleich.leise && v.imVergleich.inKopf,
       "6.10 „Im Vergleich öffnen“ als leiser Knopf im Kopf der Liste", v.imVergleich);
@@ -2360,6 +2436,14 @@ try {
     await p.click("#histCmp", { timeout: 3000 }).catch(() => {});
     await p.waitForFunction(() => document.querySelector("#p-compare")?.classList.contains("on"), null, { timeout: 3000 }).catch(() => {});
     assert(await p.evaluate(() => document.querySelector("#p-compare").classList.contains("on")), "6.10 „Im Vergleich öffnen“ oeffnet den Vergleich");
+    /* Bester Pull 5.4 (#143), der Satz: der kurze 26.9k-Kampf (20.09. 20:00, unter der Schwelle) ist nicht
+       "Dein bester", obwohl er die hoechste DPS hat - der Satz folgt dem Gold, nicht der hoechsten Zahl. */
+    await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].find((z) => /, 20:00:\d\d, /.test(z.getAttribute("aria-label") || ""))?.click());   // folgt #152: Pull-Zeilen beginnen mit der Laenge, die Uhrzeit steht im aria-label
+    await p.waitForFunction(() => (document.querySelector("#hHist")?.dataset.dps || "").startsWith("268"), null, { timeout: 5000 }).catch(() => {});
+    const kurz = await p.evaluate(() => { const h = document.querySelector("#hHist");
+      return { text: h?.textContent.trim() || "", best: !!h?.classList.contains("best"), dps: +(h?.dataset.dps || 0) }; });
+    assert(kurz.dps > 26000 && !kurz.text.startsWith("Dein bester") && !kurz.best && /sonst/.test(kurz.text),
+      "6 der kurze 26.9k-Kampf (unter der Schwelle): nicht „Dein bester“, kein Gold, der Satz gegen den Median", kurz);
     assert(!s.fehler.length, "6 Verlauf: keine Fehler", s.fehler);
     await p.close();
   }
@@ -2369,7 +2453,7 @@ try {
     await zumVerlauf(s);
     const v = await verlaufBlick(p);
     assert(v.zeit.map((z) => z.text).join("|") === "Week|Month|All" && v.zeitName === "Period" && v.kopf === "Vulcanus \u00b7 8 fights \u00b7 30 days to 20/09" &&
-      v.liste.titel === "Fights" && v.liste.fz === "8 on Vulcanus \u00b7 newest first" && v.liste.kopf.join("|") === "Day|Time|Length|Build|DPS" &&
+      v.liste.titel === "Fights" && v.liste.fz === "8 on Vulcanus \u00b7 newest first" && v.liste.kopf.join("|") === "Day|Time|Length|DPS" &&
       v.boss?.label === "Boss" && v.imVergleich?.text === "Open in Compare" && v.leg.includes("from this log") && v.leg.includes("earlier logs and saved fights") &&
       v.xText[v.xText.length - 1]?.text === "20/09",
       "6 Englisch: Zeitraum, Kopf, Liste, Legende, Datumsachse", { zeit: v.zeit, kopf: v.kopf, liste: v.liste.kopf, leg: v.leg, x: v.xText.map((t) => t.text) });
@@ -3065,6 +3149,129 @@ try {
     await p.close();
   }
 
+  /* --- 7.12 (#133): die Gruppe in der Rolle eines Mitglieds. Ueber dem Code stand der rohe Schluessel
+     "party.codeTitelIn". Kein sichtbarer Text im Bereich Gruppe und in seinem Kopf darf ein Schluessel sein,
+     in beiden Sprachen. */
+  {
+    const s = await oeffne({ app: true, gruppe: { ...GRUPPE7, role: "member", address: "", join: "K7QX", name: "Mitglied Zwei" } });
+    const p = s.page;
+    await zurGruppe(s);
+    await p.waitForFunction(() => document.querySelectorAll("#pTafel .btr").length === 3, null, { timeout: 8000 }).catch(() => {});
+    const roh = () => p.evaluate(() => {
+      const sicht = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== "hidden";
+      const funde = [];
+      for (const wurzel of [document.querySelector("#p-party"), document.querySelector("#bereichKopf")]) {
+        const it = document.createTreeWalker(wurzel, NodeFilter.SHOW_TEXT);
+        for (let n; (n = it.nextNode()); ) if (/\bparty\.[A-Za-z]/.test(n.textContent) && sicht(n.parentElement)) funde.push(n.textContent.trim());
+        for (const e of wurzel.querySelectorAll("[aria-label]")) if (/\bparty\./.test(e.getAttribute("aria-label"))) funde.push(e.getAttribute("aria-label"));
+      }
+      return { titel: (document.querySelector("#pCodeT")?.textContent || "").trim(), funde };
+    });
+    const en = await roh();
+    await p.click('#bereiche [data-tab="settings"]');
+    await p.click('#eSprache button[data-lang="de"]');
+    await bereich(p, "party");
+    await p.waitForFunction(() => document.querySelectorAll("#pTafel .btr").length === 3, null, { timeout: 8000 }).catch(() => {});
+    const de = await roh();
+    assert(en.titel === "Party code" && de.titel === "Code der Gruppe" && !en.funde.length && !de.funde.length,
+      "7.12 Mitglied: ueber dem Code Party code / Code der Gruppe, kein roher Schluessel im Bereich Gruppe (EN und DE)", { en, de });
+    assert(!s.fehler.length, "7.12 Mitglied: keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  /* --- 7.13 (#135): der Satz party.hinaus nennt alles, was beim Melden hinausgeht. Gesammelt wird jeder
+     Pfad im Koerper von POST /api/party/report; der Hauptprozess legt den Charakternamen und den Code dazu
+     (src/main/party.ts, pushToHost). Jeder Pfad muss in FELDER stehen - ein neues Feld laesst die Probe
+     scheitern, bis es hier eingetragen und im Satz genannt ist - und das Wort zu jedem Eintrag steht im
+     Satz, auf Englisch und auf Deutsch. Der Code ist der Schluessel zum Raum, keine Angabe ueber den
+     Spieler; er steht deshalb ohne Wort in der Liste. */
+  {
+    const NAME = [/character name/, /Charaktername/], ZIEL = [/target/, /Ziel/], UHR = [/time/, /Uhrzeit/], DAUER = [/length/, /Dauer/],
+      SCHADEN = [/damage/, /Schaden/], TREFFER = [/hits/, /Treffer/], SKILL = [/per skill/, /je Fähigkeit/],
+      KURVE = [/per second/, /je Sekunde/], EINSATZ = [/when you used what/, /wann du was eingesetzt hast/],
+      SPRACHE = [/game language/, /Spielsprache/], WAFFEN = [/weapons/, /Waffen/], ROLLE = [/role/, /Rolle/], LOG = [/Never a log file/, /Nie eine Logdatei/];
+    const FELDER = {
+      "(Hauptprozess) name": [NAME], "(Hauptprozess) code": [],
+      weapons: [WAFFEN], ventius: [ROLLE], payload: [],
+      "payload.target": [ZIEL], "payload.targetKey": [ZIEL], "payload.lang": [SPRACHE],
+      "payload.damage": [SCHADEN], "payload.dps": [SCHADEN], "payload.max": [SCHADEN], "payload.hits": [TREFFER],
+      "payload.crit": [TREFFER], "payload.heavy": [TREFFER], "payload.seconds": [DAUER],
+      "payload.skills": [SKILL], "payload.skills[].name": [SKILL], "payload.skills[].sid": [SKILL],
+      "payload.skills[].damage": [SCHADEN, SKILL], "payload.skills[].dps": [SCHADEN, SKILL], "payload.skills[].max": [SCHADEN, SKILL],
+      "payload.skills[].hits": [TREFFER, SKILL], "payload.skills[].crit": [TREFFER, SKILL], "payload.skills[].heavy": [TREFFER, SKILL],
+      "payload.skills[].cats": [TREFFER, SKILL], "payload.skills[].cats[].k": [TREFFER], "payload.skills[].cats[].h": [TREFFER],
+      "payload.skills[].cats[].d": [SCHADEN], "payload.skills[].cats[].m": [SCHADEN],
+      "payload.curve": [KURVE], "payload.curve.t0": [UHR], "payload.curve.T": [KURVE, DAUER], "payload.curve.total": [KURVE],
+      "payload.curve.lanes": [KURVE, SKILL], "payload.curve.lanes[].n": [KURVE, SKILL], "payload.curve.lanes[].sid": [KURVE, SKILL],
+      "payload.curve.lanes[].v": [KURVE, SKILL],
+      "payload.casts": [EINSATZ], "payload.casts[].n": [EINSATZ], "payload.casts[].s": [EINSATZ], "payload.casts[].c": [EINSATZ],
+    };
+    const pfade = (o, vor, raus) => {
+      for (const [k, v] of Object.entries(o)) {
+        const pf = vor ? vor + "." + k : k;
+        raus.add(pf);
+        if (Array.isArray(v)) { for (const x of v) if (x && typeof x === "object" && !Array.isArray(x)) pfade(x, pf + "[]", raus); }
+        else if (v && typeof v === "object") pfade(v, pf, raus);
+      }
+      return raus;
+    };
+    const s = await oeffne({ app: true, gruppe: { ...GRUPPE7, role: "member", name: "Mitglied Zwei" } });
+    const p = s.page;
+    await mitLog(s);
+    const berichte = () => s.party.filter((x) => x.path === "/api/party/report" && x.body.payload);
+    await bis(() => berichte().length >= 1, 6000);
+    /* Eine Waffe von Hand meldet sofort neu (setWeaponByHand), mit den Waffen. Beim zweiten Melden
+       desselben Kampfes steht er (partyKurve), dann gehen auch die Spuren und die Einsaetze mit. */
+    // der Bereich Waffen steht im Entwicklermodus (0.18); erst dort traegt die Auswahl ihr onchange
+    await bis(() => berichte().length >= 1, 6000);
+    await p.waitForTimeout(3500);
+    await p.click('#bereiche [data-tab="settings"]');
+    await p.click('#einstNav button[data-gruppe="logs"]');
+    await p.click("#eDev");
+    await bereich(p, "weapons");
+    await p.selectOption("#wMain", "Staff");
+    await bis(() => berichte().some((x) => x.body.payload.casts && x.body.weapons));
+    const gesehen = new Set(["(Hauptprozess) name", "(Hauptprozess) code"]);
+    for (const b of berichte()) pfade(b.body, "", gesehen);
+    const fremd = [...gesehen].filter((pf) => !(pf in FELDER));
+    const satz = await p.evaluate(() => document.querySelector('[data-i18n="party.hinaus"]')?.textContent || "");
+    await p.click('#bereiche [data-tab="settings"]');
+    await p.click('#eSprache button[data-lang="de"]');
+    await p.waitForTimeout(200);
+    const satzDe = await p.evaluate(() => document.querySelector('[data-i18n="party.hinaus"]')?.textContent || "");
+    const fehlt = [];
+    for (const [pf, woerter] of Object.entries(FELDER)) for (const [en, de] of woerter) {
+      if (!en.test(satz)) fehlt.push(pf + " EN " + en);
+      if (!de.test(satzDe)) fehlt.push(pf + " DE " + de);
+    }
+    if (!LOG[0].test(satz) || !LOG[1].test(satzDe)) fehlt.push("Nie eine Logdatei");
+    assert(berichte().length >= 1 && gesehen.has("payload.casts") && gesehen.has("payload.curve.lanes") && gesehen.has("weapons"),
+      "7.13 gemeldet wird ein Kampf mit Kurve, Spuren, Einsaetzen und Waffen (die Probe sieht alle Felder)", [...gesehen]);
+    assert(!fremd.length && !fehlt.length, "7.13 party.hinaus nennt jedes Feld, das hinausgeht (EN und DE)", { fremd, fehlt, satz, satzDe });
+    assert(!s.fehler.length, "7.13 Melden: keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  // --- 7.14 Bericht an die Gruppe: steht der Kampf, gehen Spuren und Einsaetze einmal mit - ohne Waffenwahl.
+  // Die Kennung des Berichts kannte die Spuren nicht; beim zweiten Abruf (Kampf steht) war sie gleich, und
+  // curve.lanes und casts kamen nie an, bis zufaellig etwas anderes den Bericht erzwang.
+  {
+    const s = await oeffne({ app: true, gruppe: { role: "host", code: "QX7K", board: [], target: "", error: "" } });
+    await mitLog(s);
+    // vier Abrufe zu je 3 s: der erste sieht den Kampf neu, ab dem zweiten steht er
+    await s.page.waitForTimeout(12500);
+    const berichte = s.party.filter((x) => x.path === "/api/party/report" && x.body.payload).map((x) => x.body.payload);
+    const mitSpuren = berichte.filter((p) => p.curve && Array.isArray(p.curve.lanes) && p.curve.lanes.length);
+    const mitEinsaetzen = berichte.filter((p) => Array.isArray(p.casts) && p.casts.length);
+    assert(berichte.length >= 1 && mitSpuren.length === 1 && mitEinsaetzen.length === 1 && mitSpuren[0] === mitEinsaetzen[0],
+      "7.14 Kampf steht: genau ein Bericht traegt curve.lanes und casts, ohne Waffenwahl",
+      berichte.map((p) => ({ lanes: p.curve?.lanes?.length ?? 0, casts: p.casts?.length ?? 0 })));
+    const letzter = berichte[berichte.length - 1];
+    assert(letzter === mitSpuren[0], "7.14 danach geht nichts mehr: der Bericht mit Spuren ist der letzte", berichte.length);
+    assert(!s.fehler.length, "7.14 Bericht: keine Fehler", s.fehler);
+    await s.page.close();
+  }
+
   // ===== Abschnitt 8: Builds (Luecken 8) =====
   /* Die Karte eines erkannten Builds mit Stufe, Erkannt an, Trefferquoten und Kaempfen je Boss, die Ausruestung
      aus dem Plan und "Planer oeffnen / Plan schliessen" entfielen mit Aufgabe 12 (Entscheidung 29.09.: Builds als
@@ -3279,10 +3486,10 @@ try {
         skelett: x ? x.querySelectorAll("ul,ol,li,table,[class*=skel],[class*=zeile],.zr,[role=list],[role=row]").length : -1,
         texte: x ? [...x.querySelectorAll("*")].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => e.tagName + ":" + e.textContent.trim()) : [] };
     });
-    assert(/^Weeklies Nächster Wochen-Reset: Do 10:00 \u00b7 in \d.* Täglicher Reset: 10:00 \u00b7 in \d.*$/.test(w.kopf) && w.kopfR && w.w && Math.abs(w.kopfR.top - w.w.top) < 1,
-      "9.1 Kopf wie im Entwurf: „Weeklies“ und die Reset-Anzeige oben", { kopf: w.kopf, kopfR: w.kopfR });
-    assert(w.skelett === 0 && JSON.stringify(w.texte.map((x) => x.split(":")[0])) === JSON.stringify(["H2", "SPAN", "SPAN", "P", "BUTTON"]),
-      "9.1 ruhig: keine Skelettzeilen, nur Ueberschrift, Reset-Anzeige, Satz und „+ Charakter“", w.texte);
+    assert(/^Weeklies Erinnerungen\d+ Täglicher Reset 10:00 deutsche Zeit \u00b7 in \d.*$/.test(w.kopf) && w.kopfR && w.w && Math.abs(w.kopfR.top - w.w.top) < 1,
+      "9.1 Kopf (folgt Weeklies neu): „Weeklies“, die Glocke „Erinnerungen“ mit Zahl und der tägliche Reset oben; der Wochen-Reset steht im Band", { kopf: w.kopf, kopfR: w.kopfR });
+    assert(w.skelett === 0 && JSON.stringify(w.texte.map((x) => x.split(":")[0])) === JSON.stringify(["H2", "SPAN", "SPAN", "SPAN", "P", "BUTTON"]),
+      "9.1 ruhig: keine Skelettzeilen, nur Ueberschrift, Glocke (Name und Zahl), Reset-Anzeige, Satz und „+ Charakter“", w.texte);
     const mitte = w.box && w.kopfR ? Math.abs((w.box.top + w.box.bottom) / 2 - (w.kopfR.bottom + w.w.bottom) / 2) : null;
     assert(mitte !== null && mitte <= 24, "9.1 das leere Feld steht in der Mitte der Flaeche unter dem Kopf", { mitte });
     assert(!s.fehler.length, "Weeklies: keine Fehler", s.fehler);
@@ -3336,9 +3543,13 @@ try {
       }
     }
     return {
-      abschnitte: [...document.querySelectorAll("#einst section.egruppe")].map((x) => ({ id: x.id, h: (x.querySelector("h3")?.textContent || "").trim(), sicht: sicht(x), r: r(x),
+      /* folgt Spezifikation Windows-Einbindung 9: der Abschnitt "Windows" steht nur im eigenen Fenster unter Windows
+         (GET /api/config bringt windows); ohne windows ist er mit seinem Eintrag verborgen. Gezaehlt werden die
+         sichtbaren - verborgen sein duerfen genau diese beiden (verborgen, geprueft in 10.1 und bei den Groessen) */
+      verborgen: [...document.querySelectorAll("#einst section.egruppe[hidden], #einstNav button[hidden]")].map((x) => x.id),
+      abschnitte: [...document.querySelectorAll("#einst section.egruppe:not([hidden])")].map((x) => ({ id: x.id, h: (x.querySelector("h3")?.textContent || "").trim(), sicht: sicht(x), r: r(x),
         hid: x.querySelector("h3")?.id, lab: x.getAttribute("aria-labelledby") })),
-      nav: [...document.querySelectorAll("#einstNav button")].map((b) => ({ k: b.dataset.gruppe, text: b.textContent.trim(), svg: !!b.querySelector("svg"), an: b.getAttribute("aria-current") })),
+      nav: [...document.querySelectorAll("#einstNav button:not([hidden])")].map((b) => ({ k: b.dataset.gruppe, text: b.textContent.trim(), svg: !!b.querySelector("svg"), an: b.getAttribute("aria-current") })),
       navR: r(q("#einstNav")), kopf: q("header.top").getBoundingClientRect().bottom, hoch: innerHeight,
       zeilen: [...document.querySelectorAll("#einst .ezeile")].filter(sicht).map((z) => Math.round(z.getBoundingClientRect().height)),
       fokus: document.activeElement?.id || "", klein, quer: document.documentElement.scrollWidth > innerWidth,
@@ -3360,6 +3571,8 @@ try {
       "10.2 acht Abschnitte in der Reihenfolge des Entwurfs, jeder eine Region mit seiner Ueberschrift", e.abschnitte.map((x) => x.id + ":" + x.h));
     assert(e.abschnitte.length === 8 && e.abschnitte.every((x) => x.sicht) && e.abschnitte.every((x, i) => i === 0 || x.r.top >= e.abschnitte[i - 1].r.bottom - 1),
       "10.1 eine rollende Seite: alle Abschnitte stehen untereinander, keiner ist verborgen", e.abschnitte.map((x) => x.r && Math.round(x.r.top)));
+    assert(JSON.stringify(e.verborgen) === JSON.stringify(["einstNavWin", "eg-win"]),
+      "10.1 ohne windows aus /api/config: nur der Abschnitt Windows und sein Eintrag verborgen (Windows-Einbindung 9)", e.verborgen);
     assert(JSON.stringify(e.nav.map((x) => x.k)) === JSON.stringify(ABSCHNITTE) && e.nav.every((x, i) => x.text === e.abschnitte[i]?.h && x.svg),
       "10.1 Sprungleiste: ein Knopf mit Symbol je Abschnitt, gleiche Namen und Reihenfolge", e.nav);
     assert(e.nav.length === 8 && e.navR && e.abschnitte[0].r && e.navR.right <= e.abschnitte[0].r.left && JSON.stringify(e.aktuell) === '["darst"]',
@@ -3427,9 +3640,9 @@ try {
         bewegungName: (document.querySelector("#eBewegung")?.closest(".ezeile")?.querySelector(".ezt b")?.textContent || "").trim() };
     });
     if (!ruhig) {
-      assert(d.rolle === "radiogroup" && d.name === "Thema" && JSON.stringify(d.kacheln.map((x) => x.th)) === '["dark","light","tnl","auto"]' &&
-        d.kacheln.every((x) => x.rolle === "radio" && x.vorschau) && JSON.stringify(d.kacheln.map((x) => x.name)) === '["Dunkel","Hell","TnL","Auto wie Windows"]',
-        "10.3 Themen als vier Kacheln mit Vorschau: Dunkel, Hell, TnL, Auto (wie Windows)", d.kacheln);
+      assert(d.rolle === "radiogroup" && d.name === "Thema" && JSON.stringify(d.kacheln.map((x) => x.th)) === '["dark","light","tnl","glas","auto"]' &&
+        d.kacheln.every((x) => x.rolle === "radio" && x.vorschau) && JSON.stringify(d.kacheln.map((x) => x.name)) === '["Dunkel","Hell","TnL","Rauchglas","Auto wie Windows"]',
+        "10.3 Themen als fünf Kacheln mit Vorschau: Dunkel, Hell, TnL, Rauchglas, Auto (wie Windows)", d.kacheln);
       assert(d.kacheln.every((x) => Math.abs(x.r.top - d.kacheln[0].r.top) < 1 && x.r.width >= 120 && x.r.height >= 100) &&
         d.kacheln.filter((x) => x.an === "true").length === 1 && d.kacheln.find((x) => x.an === "true").th === "dark" && d.kacheln.filter((x) => x.tab === 0).length === 1,
         "10.3 in einer Reihe, gewaehlt ist Dunkel, ein Tabstopp", d.kacheln);
@@ -3731,12 +3944,15 @@ try {
     const lokal = [...alle.matchAll(/localStorage\.setItem\(/g)].length;
     /* folgt Spezifikation Update-Hinweis 2.4 (Entscheidung 02.10.): updatePruefen kommt dazu, und die Einstellungen schreiben
        genau ihn, an genau einer Stelle; folgt Spezifikation Rundgang 02.10.2026, 6: rundgangGesehen kommt dazu (aus 63,
-       nicht aus den Einstellungen) - gleich streng: Liste genau, sonst nichts */
+       nicht aus den Einstellungen) - gleich streng: Liste genau, sonst nichts;
+       folgt Spezifikation Windows-Einbindung 8: lang kommt dazu (aus 66, die Sprache fuer die Texte des Hauptprozesses);
+       folgt Spezifikation Windows-Einbindung 9 und 3.4: meldenKampf, meldenNurBest und trayBeimSchliessen kommen dazu, und
+       die Einstellungen schreiben sie, je an genau einer Stelle (der Autostart geht ueber /api/win, kein Schluessel) */
     const eigene = [...quelle.matchAll(/persistPref\(([^)]*)\)/g)].map((m) => m[1]);
-    assert(JSON.stringify(schluessel) === JSON.stringify(["compactAlpha", "devMode", "ghost", "logIndex", "mergePhases", "minDur", "randlosGesehen", "rundgangGesehen", "skillNames",
-      "splitAfter", "theme", "themeResolved", "uiZoom", "updatePruefen", "ventiusTop"]) && lokal === 2 && !/localStorage\./.test(quelle)
-      && JSON.stringify(eigene) === JSON.stringify(['"updatePruefen", updateAn']),
-      "kein neuer Speicherschluessel ausser updatePruefen und rundgangGesehen: dieselben 13, der Update-Hinweis und der Rundgang in /api/config, zwei in localStorage, die Einstellungen schreiben nur updatePruefen",
+    assert(JSON.stringify(schluessel) === JSON.stringify(["compactAlpha", "devMode", "ghost", "lang", "logIndex", "meldenKampf", "meldenNurBest", "mergePhases", "minDur", "randlosGesehen",
+      "rundgangGesehen", "skillNames", "splitAfter", "theme", "themeResolved", "trayBeimSchliessen", "uiZoom", "updatePruefen", "ventiusTop"]) && lokal === 2 && !/localStorage\./.test(quelle)
+      && JSON.stringify(eigene) === JSON.stringify(['"updatePruefen", updateAn', '"meldenKampf", w.melden', '"meldenNurBest", w.nurBest', '"trayBeimSchliessen", w.tray']),
+      "kein neuer Speicherschluessel ausser updatePruefen, rundgangGesehen, lang und den drei Schaltern von Windows: 19 Schluessel - die alten 13, der Update-Hinweis, der Rundgang und Windows in /api/config, zwei in localStorage, die Einstellungen schreiben nur updatePruefen und die drei von Windows",
       { schluessel, lokal, eigene });
   }
 
@@ -3748,7 +3964,7 @@ try {
     await zuEinst(p);
     const e = await einstBlick(p);
     const wo = `${breite} × ${hoehe}`;
-    assert(e.abschnitte.length === 8 && !e.quer && !e.klein.length && !s.fehler.length, `10 ${wo}: acht Abschnitte, kein waagerechtes Rollen, Text mindestens 11 Punkt, keine Fehler`, { n: e.abschnitte.length, klein: e.klein, fehler: s.fehler });
+    assert(e.abschnitte.length === 8 && JSON.stringify(e.verborgen) === '["einstNavWin","eg-win"]' && !e.quer && !e.klein.length && !s.fehler.length, `10 ${wo}: acht Abschnitte (Windows verborgen), kein waagerechtes Rollen, Text mindestens 11 Punkt, keine Fehler`, { n: e.abschnitte.length, klein: e.klein, fehler: s.fehler });
     const breit = Math.max(...e.abschnitte.map((x) => x.r?.width || 0));
     assert(e.abschnitte.length === 8 && breit <= 820 && e.abschnitte.every((x) => x.sicht), `10 ${wo}: alle Abschnitte da, hoechstens 820 Punkt breit`, breit);
     if (breite >= 1000) assert(e.nav.length === 8 && e.navR && e.navR.right <= e.abschnitte[0].r.left, `10 ${wo}: die Sprungleiste links`, e.navR);
@@ -3827,6 +4043,24 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     // folgt Entwurf E:1017ff. (300 Punkt breit); die Leiste liegt ueber der oberen Zeile und verlangt keine Breite (Pruefung W1)
     assert(w && w.w >= 300 && w.w <= 320, `11.2 ${lang}: das Fenster ist ein schmaler Streifen (300 bis 320 Punkt)`, w);
     assert(z.zahl >= 12 && z.ganz === 5 && z.halb === 0, `11.2 ${lang}: Top 5 - genau fuenf ganze Zeilen im Streifen, keine angeschnittene sechste`, { zahl: z.zahl, ganz: z.ganz, halb: z.halb });
+    const rest = await p.evaluate(() => {
+      const b = document.querySelector("#kRest"), haupt = [...document.querySelectorAll("#bars .row:not(.sub)")];
+      const r = b && !b.hidden && b.getClientRects().length ? b.getBoundingClientRect() : null;
+      const dmg = haupt.map((z) => Number(z.dataset.dmg)), ges = dmg.reduce((a, x) => a + x, 0);
+      return { da: !!r, text: b ? b.querySelector(".kresttext").textContent : "", name: b ? b.getAttribute("aria-label") : "",
+        beschr: b && b.getAttribute("aria-describedby") ? (document.getElementById(b.getAttribute("aria-describedby")) || {}).textContent : "",
+        h: r ? r.height : 0, unten: r ? r.bottom : 0, fenster: innerHeight, alle: haupt.length,
+        rest: dmg.slice(5).reduce((a, x) => a + x, 0) / (ges || 1) };
+    });
+    // wie die Seite den Anteil setzt (pctMin, ganze Zahlen): unter 1 % steht "< 1", ueber 99 % "> 99", nie "0"
+    const anteilZahl = (f) => f > 0 && f < 0.01 ? "< 1" : f < 1 && f > 0.99 ? "> 99" : String(Math.round(f * 100));
+    const n = rest.alle - 5;
+    const wort = lang === "de" ? "weitere" : "more";
+    assert(rest.alle > 5 && rest.da && rest.text.startsWith(`+${n} ${wort} \u00b7 `) && Math.abs(rest.h - 27) < 1 && rest.unten <= rest.fenster + 0.5,
+      `11.2 ${lang} (#160): die Restzeile "+${n} ${wort} \u00b7 x %" unter Zeile 5, 27 Punkt, ganz im Fenster`, rest);
+    assert(rest.text.endsWith(anteilZahl(rest.rest) + "\u00a0%".slice(lang === "de" ? 0 : 1)), `11.2 ${lang}: ihr Anteil ist der Schaden der Zeilen darunter`, rest);
+    assert(rest.beschr && rest.beschr === rest.text && rest.beschr.startsWith("+" + n), `11.2 ${lang}: aria-describedby zeigt auf den sichtbaren Text der Restzeile (Anteil und Schaden gehen dem Vorleser nicht verloren)`, rest);
+    assert(/^(\d+ weitere F\u00e4higkeiten in der Vollansicht zeigen|Show \d+ more skills in full view)$/.test(rest.name), `11.2 ${lang}: ihr Name sagt, was ein Klick tut`, rest);
     assert(!z.kopfSicht && z.spaltenKoepfe >= 2, `11.2 ${lang}: kein sichtbarer Spaltenkopf, fuer den Vorleser bleiben die Spaltenkoepfe`, z);
     const zeilenGut = z.zeilen.every((x) => !x.rang && !x.pfeil && !x.andere.length && x.bild && Math.abs(x.bild.width - 16) < 0.6 && x.name && x.schaden &&
       x.h <= 32 && x.fill && Math.abs(x.fill.height - 3) < 0.6 && x.fill.top >= x.name.bottom - 1 && Math.abs(x.fill.left - x.name.left) <= 2 &&
@@ -3841,11 +4075,57 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     // Uhrzeit vor der Dauer wie in der Faktenzeile (der Entwurf stellt die Dauer vorn, E:1024)
     assert(JSON.stringify(k.fakten) === JSON.stringify(["zeit", "dauer"]) && /^\d{1,2}:\d{2} \u00b7 \S+/.test(k.metaText),
       `11.2 ${lang}: unter dem Boss nur Uhrzeit \u00b7 Dauer`, { fakten: k.fakten, text: k.metaText });
+    if (lang === "de") {
+      const l = await p.evaluate(() => {
+        const s = document.querySelector("#hCompact > span"), pv = document.querySelector("#hPrev");
+        const r = pv && pv.getClientRects().length ? pv.getBoundingClientRect() : null;
+        return { ganz: !!s && s.scrollWidth <= s.clientWidth + 0.5, satz: s ? s.textContent : "",
+          prev: r ? { l: r.left, r: r.right, t: r.top, b: r.bottom } : null, w: innerWidth, h: innerHeight };
+      });
+      assert(l.ganz && (!l.prev || (l.prev.l >= 0 && l.prev.r <= l.w && l.prev.b <= l.h)),
+        "11.2 de (#157): bei 300 Punkt steht der Satz der Lesezeile ungekuerzt, der Vergleich ganz unter der Zahl", l);
+    }
     /* Der Kompakt rollt nie (html und body schneiden ab): gefragt wird, ob etwas ueber den rechten Rand ragt */
     const drueber = await p.evaluate(() => [...document.querySelectorAll(".top > *, .headwrap, .headwrap *, #bars, #bars .row:not(.sub) > *")]
       .filter((e) => e.getClientRects().length && getComputedStyle(e).position !== "absolute" && e.getBoundingClientRect().right > innerWidth + 0.5)
       .map((e) => e.id || e.className || e.tagName));
     assert(!(await quer(p)) && !drueber.length && !s.fehler.length, `11.2 ${lang}: nichts ragt ueber den Rand, kein waagerechtes Rollen, keine Fehler`, { drueber, fehler: s.fehler });
+    await p.close();
+  }
+  /* 11.2 (#157): mit einem Pull davor steht der Vergleich unter der Zahl; er nimmt der linken Spalte nichts.
+     belegLog: der gewaehlte Pull hat fruehere am selben Ziel, #hPrev ist sichtbar. */
+  for (const lang of ["de", "en"]) {
+    const s = await oeffne({ app: true, lang, config: { randlosGesehen: true } });
+    const p = s.page;
+    const datei = join(work, "TLCombatLog-20260920-beleg.txt");
+    writeFileSync(datei, belegLog());
+    await mitLog(s, datei);
+    await insKompakt(s);
+    // #157: der Vergleich zum letzten Pull nimmt der linken Spalte nichts: Boss, Uhrzeit und Dauer bleiben ganz,
+    // er steht rechtsbuendig unter der Zahl und ganz im Fenster
+    const vg = await p.evaluate(() => {
+      const pv = document.querySelector("#hPrev"), zahl = document.querySelector("#hDps"), nm = document.querySelector("#hName .hnt");
+      const r = (e) => e.getBoundingClientRect();
+      const fakten = [...document.querySelectorAll("#hMeta .f")].filter((f) => f.getClientRects().length && getComputedStyle(f).visibility === "visible");
+      const k = (e) => e.scrollWidth <= e.clientWidth + 0.5;
+      const zr = zahl.parentElement.querySelector("#hDpsKurz");
+      const rechts = Math.max(r(zahl).right, zr && zr.getClientRects().length ? r(zr).right : 0);
+      const pr = pv.getClientRects().length ? r(pv) : null;
+      return { da: !!pr, nameGanz: k(nm), faktenGanz: fakten.every(k), dauer: fakten.some((f) => f.dataset.f === "dauer"), anzahl: fakten.length,
+        pr: pr && { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom }, zahlUnten: r(zahl).bottom, zahlRechts: rechts, w: innerWidth, h: innerHeight };
+    });
+    assert(vg.da && vg.nameGanz && vg.faktenGanz && vg.dauer && vg.anzahl >= 2 && vg.pr.l >= 0 && vg.pr.r <= vg.w + 0.5 && vg.pr.b <= vg.h + 0.5 &&
+      vg.pr.t >= vg.zahlUnten - 1 && Math.abs(vg.pr.r - vg.zahlRechts) <= 1,
+      `11.2 ${lang} (#157): der Vergleich unter der Zahl nimmt der linken Spalte nichts - Boss, Uhrzeit und Dauer ungekuerzt, er steht rechtsbuendig unter der Zahl`, vg);
+    // Gruppenansicht ohne Lebende (body.partyEmpty): die Zahl und ihre Einheit bleiben aus, auch wenn .big sich im Streifen aufloest
+    const zeigt = () => p.evaluate(() => ["#hDps", "#hDpsKurz"].map((q) => document.querySelector(q).getClientRects().length > 0));
+    const ohneGruppe = await zeigt();
+    await p.evaluate(() => document.body.classList.add("partyEmpty"));
+    const leer = await zeigt();
+    await p.evaluate(() => document.body.classList.remove("partyEmpty"));
+    assert(ohneGruppe.every(Boolean) && leer.every((x) => !x),
+      `11.2 ${lang} (#157): Zahl und DPS stehen im Streifen, mit leerer Gruppenansicht (partyEmpty) nicht`, { ohneGruppe, leer });
+    assert(!s.fehler.length, `11.2 ${lang} (#157): mit Vergleich keine Fehler`, s.fehler);
     await p.close();
   }
   /* 11.2 buendig ohne Symbol (Entscheidung 03.10.): ein Skill, den die App nicht kennt, traegt auch mit
@@ -4043,8 +4323,10 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const s = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true } });
     const p = s.page;
     await beispiel(p);
-    await p.evaluate(() => document.querySelector('#bars .bhead [data-k="hits"]').click());
-    await p.waitForFunction(() => document.querySelector("#bars .bhead .sorted")?.dataset.k === "hits");
+    // folgt Spezifikation Feinschliff 4: geordnet ueber das Menue "Ordnen", die Wahl steht dort als aria-checked
+    await p.evaluate(() => document.querySelector("#ringOrdnen").click());
+    await p.evaluate(() => document.querySelector('#ringOrdnenMenue [data-k="hits"]').click());
+    await p.waitForFunction(() => document.querySelector('#ringOrdnenMenue [aria-checked="true"]')?.dataset.k === "hits");
     await insKompakt(s);
     const zahl = (t) => parseFloat(t) * ({ k: 1e3, M: 1e6, B: 1e9 }[t.trim().slice(-1)] || 1);
     const top = await p.evaluate(() => [...document.querySelectorAll("#bars .row:not(.sub)")].slice(0, 5).map((z) => ({
@@ -4054,7 +4336,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const anteil = top.every((x, i) => Math.abs(x.w / top[0].w - d[i] / d[0]) < 0.02);
     await p.evaluate(() => document.querySelector("#btnCompact").click());
     await p.waitForFunction(() => !document.body.classList.contains("compact"));
-    const zurueck = await p.evaluate(() => document.querySelector("#bars .bhead .sorted")?.dataset.k);
+    const zurueck = await p.evaluate(() => document.querySelector('#ringOrdnenMenue [aria-checked="true"]')?.dataset.k);
     assert(d.every((v) => v > 0) && fallend && anteil && zurueck === "hits",
       "11.2 nach Treffern sortiert: der Streifen zeigt Top 5 nach Schaden, die Spur folgt dem Schaden; die Vollansicht behaelt ihre Sortierung", { top, d, zurueck });
     await p.close();
@@ -4063,14 +4345,15 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
   // --- 11.7: bei 55 % Durchsicht lesbar, Zahlen deckend (Acrylic: die Toenung ist durchsichtig, nicht die Schrift)
   {
     /* der Grund unter dem Streifen: die graue Szene des Entwurfs (r11-overlay-55.png, neben dem Streifen gemessen)
-       und eine helle Szene (Schnee, 235 Grau) - Text verlangt 4,5 : 1, die grosse Zahl (24 Punkt) 3 : 1 */
-    const SZENEN = { grau: [132, 139, 144], hell: [235, 235, 235] };
+       und eine helle Szene (Schnee, 235 Grau) und eine dunkle, satte (Wald bei Nacht, #156) - Text verlangt 4,5 : 1, die grosse Zahl (24 Punkt) 3 : 1 */
+    const SZENEN = { grau: [132, 139, 144], hell: [235, 235, 235], dunkel: [38, 52, 30] };
     for (const theme of ["dark", "light", "tnl"]) {
       const s = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true, compactAlpha: 0.45, theme } });
       const p = s.page;
       await beispiel(p);
       await p.evaluate(() => document.documentElement.classList.add("acrylic"));
       await insKompakt(s);
+      await p.evaluate(() => document.body.classList.add("watching")); // der Beispielkampf laeuft nicht live; die Klasse nur fuer die Messung des Punkts
       for (const [wo, szene_] of Object.entries(SZENEN)) {
       const m = await p.evaluate(([szene]) => {
         const parse = (c) => { const x = c.match(/rgba?\(([^)]+)\)/); if (!x) return null; const v = x[1].split(/[ ,\/]+/).filter(Boolean).map(Number); return [v[0], v[1], v[2], v.length > 3 ? v[3] : 1]; };
@@ -4091,25 +4374,118 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
           const g = grund(e), f = parse(getComputedStyle(e).color);
           out[n] = { k: Math.round(k(ueber([f[0], f[1], f[2], f[3] * o], g), g) * 100) / 100, deckend: o === 1 && f[3] === 1, fs: parseFloat(getComputedStyle(e).fontSize) };
         }
+        // der Live-Punkt (#158): Flaeche gegen den Grund, 3 : 1
+        { const m = document.querySelector("#hMeta"), b = getComputedStyle(m, "::before"), f = parse(b.backgroundColor), g = grund(m);
+          out.punkt = f ? { k: Math.round(k(ueber(f, g), g) * 100) / 100 } : null; }
+        out.zahlFarbe = getComputedStyle(document.querySelector("#hDps")).color;
         out.glas = getComputedStyle(document.documentElement).getPropertyValue("--glass-a").trim();
         return out;
       }, [szene_]);
       const teile = ["boss", "zeit", "dauer", "dps", "einheit", "lese", "name", "zahl"];
-      const gut = teile.every((n) => m[n] && m[n].deckend && m[n].k >= (m[n].fs >= 24 ? 3 : 4.5));
+      const gut = teile.every((n) => m[n] && m[n].deckend && m[n].k >= (m[n].fs >= 24 ? 3 : 4.5)) && m.punkt && m.punkt.k >= 3 && (theme !== "light" || m.zahlFarbe === "rgb(109, 60, 0)");
       // Toenung am Anschlag .65 (Entscheidung vom 29.09. (an Claude uebertragen)), vorher .5
-      assert(m.glas === "0.650" && gut, `11.7 ${theme}, ${wo}e Szene: bei 55 % Durchsicht (Toenung 0,65) alles deckend, Text mindestens 4,5 : 1, die Zahl 3 : 1`, m);
+      assert(m.glas === "0.650" && gut, `11.7 ${theme}, ${wo}e Szene: bei 55 % Durchsicht (Toenung 0,65) alles deckend, Text mindestens 4,5 : 1, die Zahl 3 : 1, der Live-Punkt 3 : 1, im hellen Thema die Zahl #6d3c00 (#156)`, m);
       }
       await p.close();
     }
   }
 
+  /* --- 11.8 (#159): die Leiste oben ist im Kompakt in Ruhe gedimmt und beim Zeigen und bei Fokus ganz da,
+     in jedem Thema. Die Themenregeln fuer hell und tnl waren spezifischer als die fuer :hover/:focus-within. */
+  {
+    const deckung = (p) => p.evaluate(() => [...document.querySelectorAll(".top > *")].filter((e) => e.getClientRects().length)
+      .map((e) => (e.id || e.className || e.tagName) + ":" + getComputedStyle(e).opacity));
+    for (const theme of ["dark", "light", "tnl", "glas"]) {
+      const s = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true, theme } });
+      const p = s.page;
+      await beispiel(p);
+      const w = await insKompakt(s);
+      /* in Ruhe wie in 11.4: die Maus nicht ueber dem Fenster (in der CI steht sie sonst schon darueber), der
+         Fokus nicht darin, und kein Uebergang (0,16 s) laeuft mehr */
+      const still = () => p.waitForFunction(() => !document.body.matches(":hover") && !document.body.matches(":focus-within") &&
+        [...document.querySelectorAll(".top > *")].every((e) => !e.getAnimations().length), null, { timeout: 3000 }).then(() => true).catch(() => false);
+      const durch = () => p.waitForFunction(() => [...document.querySelectorAll(".top > *")].every((e) => !e.getAnimations().length), null, { timeout: 3000 }).catch(() => {});
+      await p.mouse.move(-20, -20);
+      await p.evaluate(() => document.activeElement?.blur());
+      const ruhig = await still();
+      const ruhe = await deckung(p);
+      await p.mouse.move(w.w / 2, w.h / 2);
+      await durch();
+      const maus = await deckung(p);
+      await p.mouse.move(-20, -20);
+      await p.focus("#btnCompact");
+      await durch();
+      const fokus = await deckung(p);
+      // der Ziehgriff ist unsichtbar und wird nie gedimmt (styles.css, body.compact .top .tdrag)
+      const ganz = (l) => l.length === ruhe.length && l.every((x) => x.endsWith(":1"));
+      assert(ruhig && ruhe.some((x) => parseFloat(x.split(":").pop()) < 1) && ruhe.includes("tdrag:1") && ganz(maus) && ganz(fokus),
+        `11.8 Kompakt, Thema ${theme}: die Leiste in Ruhe gedimmt (der Ziehgriff nicht), mit der Maus und bei Fokus ganz (Deckkraft 1)`, { ruhig, ruhe, maus, fokus });
+      assert(!s.fehler.length, `11.8 Thema ${theme}: keine Fehler`, s.fehler);
+      await p.close();
+    }
+  }
+
+  /* --- 11.9 (#182): Geist und Kompakt ohne Kampf. Die Themenregeln (hell .274 im Geist, hell/tnl/glas in
+     Ruhe) waren spezifischer als Zeigen, Fokus und noFight. Im Durchklick bleibt die Leiste beim Zeigen gedimmt. */
+  {
+    const deckung = (p) => p.evaluate(() => [...document.querySelectorAll(".top > *")].filter((e) => e.getClientRects().length)
+      .map((e) => (e.id || e.className || e.tagName) + ":" + getComputedStyle(e).opacity));
+    const ganz = (l) => l.length > 0 && l.every((x) => x.endsWith(":1"));
+    for (const theme of ["dark", "light", "tnl", "glas"]) {
+      // Geist mit Kampf: Maus und Fokus -> 1
+      const s = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true, theme } });
+      const p = s.page;
+      await beispiel(p);
+      const w = await insKompakt(s);
+      await p.evaluate(() => document.querySelector("#btnGhost").click());
+      await p.waitForFunction(() => document.body.classList.contains("ghost"));
+      const durch = () => p.waitForFunction(() => [...document.querySelectorAll(".top > *")].every((e) => !e.getAnimations().length), null, { timeout: 3000 }).catch(() => {});
+      await p.mouse.move(-20, -20);
+      await p.evaluate(() => document.activeElement?.blur());
+      await durch();
+      const ruhe = await deckung(p);
+      await p.mouse.move(w.w / 2, w.h / 2);
+      await durch();
+      const maus = await deckung(p);
+      await p.mouse.move(-20, -20);
+      await p.focus("#btnCompact");
+      await durch();
+      const fokus = await deckung(p);
+      assert(ruhe.some((x) => parseFloat(x.split(":").pop()) < 1) && ganz(maus) && ganz(fokus),
+        `11.9 Geist, Thema ${theme}: in Ruhe gedimmt, mit der Maus und bei Fokus ganz (Deckkraft 1)`, { ruhe, maus, fokus });
+      // Durchklick: beim Zeigen bleibt Live gedimmt (.317), der Hinweis ganz
+      await p.evaluate(() => document.querySelector("#btnDurch").click());
+      await p.waitForFunction(() => document.body.classList.contains("through"), null, { timeout: 3000 }).catch(() => {});
+      await p.evaluate(() => document.activeElement?.blur());
+      await p.mouse.move(w.w / 2, w.h / 2);
+      await durch();
+      const dk = await p.evaluate(() => ({ live: getComputedStyle(document.querySelector("#live")).opacity, // #btnWatch ist im Durchklick ausgeblendet, sichtbar bleibt #live
+        hint: getComputedStyle(document.querySelector("#throughHint")).opacity }));
+      assert(dk.live === "0.317" && dk.hint === "1", `11.9 Geist im Durchklick, Thema ${theme}: beim Zeigen gedimmt, der Hinweis ganz`, dk);
+      assert(!s.fehler.length, `11.9 Geist, Thema ${theme}: keine Fehler`, s.fehler);
+      await p.close();
+      // Kompakt ohne Kampf: ganz da, auch in Ruhe
+      const n = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true, theme } });
+      // ohne Kampf gibt es keine Zeilen: nicht insKompakt (wartet auf #bars .row), sondern wie 11.5
+      await n.page.evaluate(() => document.querySelector("#btnCompact").click());
+      await n.page.waitForFunction(() => document.body.classList.contains("compact") && document.body.classList.contains("noFight"));
+      await n.page.mouse.move(-20, -20);
+      await n.page.evaluate(() => document.activeElement?.blur());
+      await n.page.waitForFunction(() => document.body.classList.contains("noFight") &&
+        [...document.querySelectorAll(".top > *")].every((e) => !e.getAnimations().length), null, { timeout: 3000 }).catch(() => {});
+      const leer = await deckung(n.page);
+      assert(ganz(leer), `11.9 Kompakt ohne Kampf, Thema ${theme}: die Leiste ist ganz da (Deckkraft 1)`, leer);
+      await n.page.close();
+    }
+  }
+
   // ===== Abschnitt 12: Querschnitt (Luecken 12) =====
-  // seit Spezifikation Rekorde 2a auch die Rekorde: dieselben Proben fuer einen Bereich mehr
-  const BEREICHE = ["timeline", "rotation", "analysis", "compare", "history", "party", "builds", "weeklies", "rekorde", "start", "settings"];
+  // seit Spezifikation Rekorde 2a auch die Rekorde, seit Spezifikation Gilde 5 die Gilde: dieselben Proben fuer je einen Bereich mehr
+  const BEREICHE = ["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "start", "settings"];
   const zu = async (p, b) => {
     await p.evaluate((b) => document.querySelector(`#bereiche [data-tab="${b}"]`).click(), b);
     await p.waitForFunction((b) => b === "settings" ? !document.querySelector("#einst").hidden : b === "start" ? !document.querySelector("#land").hidden
-      : b === "weeklies" ? !document.querySelector("#weeklies").hidden : b === "rekorde" ? !document.querySelector("#rekorde").hidden : document.querySelector(`#bereiche [data-tab="${b}"]`).getAttribute("aria-current") === "page", b);
+      : b === "weeklies" ? !document.querySelector("#weeklies").hidden : b === "rekorde" ? !document.querySelector("#rekorde").hidden : b === "gilde" ? !document.querySelector("#gilde").hidden : document.querySelector(`#bereiche [data-tab="${b}"]`).getAttribute("aria-current") === "page", b);
     // der Bereich gleitet herein (translateX): gemessen wird, wenn er steht
     await p.waitForFunction(() => document.getAnimations().every((a) => a.playState !== "running" || a.effect?.getComputedTiming().iterations === Infinity));
   };
@@ -4143,17 +4519,20 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     await p.close();
   }
   // --- 12.3 (Nachpruefung Aufgabe 9): im schmalen Fenster steht die sortierte Spalte wieder da, auch wenn die Breite sie sonst ausblendet
+  // (folgt Spezifikation Feinschliff 4: geordnet ueber das Menue; statt der Kopfzelle nennt der Knopf die Ordnung)
   for (const [breite, spalten] of [[560, ["hits", "critRate", "heavyRate"]], [640, ["critRate", "heavyRate"]]]) {
     const s = await oeffne({ breite, lang: "de" });
     const p = s.page;
     await beispiel(p);
     const zu_ = [];
     for (const k of spalten) {
-      await p.evaluate((k) => document.querySelector(`#bars .bhead [data-k="${k}"]`).click(), k);
-      await p.waitForFunction((k) => document.querySelector("#bars .bhead .sorted")?.dataset.k === k, k);
+      await p.evaluate(() => document.querySelector("#ringOrdnen").click());
+      await p.evaluate((k) => document.querySelector(`#ringOrdnenMenue [data-k="${k}"]`).click(), k);
+      await p.waitForFunction((k) => document.querySelector('#ringOrdnenMenue [aria-checked="true"]')?.dataset.k === k, k);
       const z = await p.evaluate((k) => { const sicht = (e) => !!e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0;
         const zeilen = [...document.querySelectorAll("#bars .row:not(.sub)")];
-        return { kopf: sicht(document.querySelector(`#bars .bhead [data-k="${k}"]`)), zellen: zeilen.filter((r) => sicht(r.querySelector(`[data-k="${k}"]`))).length, zeilen: zeilen.length }; }, k);
+        const b = document.querySelector("#ringOrdnen"), wort = document.querySelector(`#ringOrdnenMenue [data-k="${k}"]`)?.textContent || "\u0000";
+        return { kopf: sicht(b) && b.textContent.includes(wort) && b.scrollWidth <= b.clientWidth, zellen: zeilen.filter((r) => sicht(r.querySelector(`[data-k="${k}"]`))).length, zeilen: zeilen.length }; }, k);
       if (!z.kopf || z.zellen !== z.zeilen) zu_.push({ k, ...z });
     }
     assert(!zu_.length && !(await quer(p)) && !s.fehler.length, `12.3 ${breite}: nach Treffer, Kritisch oder Stark sortiert steht die Spalte in Kopf und jeder Zeile`, zu_);
@@ -4327,7 +4706,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       bundle: true, format: "esm", platform: "node", write: false, logLevel: "silent", plugins: [bilderPlugin(root, bilderModus(root))] });
     const { I18N } = await import("data:text/javascript;base64," + Buffer.from(b.outputFiles[0].text).toString("base64"));
     const neu = ["kw.vor", "kw.nach", "kw.vorTitle", "kw.nachTitle", "kw.tag", "kw.spanne", "kw.bester", "kw.tasten", "kw.live", "kw.kbdStrg",
-      "kw.tWaehlen", "kw.tOeffnen", "kw.tBlaettern", "tabs.builds", "tabs.weeklies",
+      "kw.tWaehlen", "kw.tOeffnen", "kw.tBlaettern", "tabs.weeklies",
       // Feinschliff 02.10. (Abschnitte 4 und 5)
       "verlauf.lgAbend", "verlauf.plotNamePull", "verlauf.plotNamePullFew",
       // folgt Spezifikation Weeklies (W3): "kommt spaeter" entfiel, statt dessen der Kopf mit der Reset-Anzeige und das leere Feld
@@ -4365,16 +4744,6 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       "party.verbunden", "party.vorSek", "party.board", "party.dabei", "party.stand", "party.bsp", "party.codeTitel", "party.colMitglied",
       "party.colKlasse", "party.colDps", "party.aufName", "party.summe", "party.zusammen", "party.msatz", "party.msatzLeer", "party.zuKampf",
       "party.sp.skill", "party.sp.dmg", "party.sp.dps", "party.sp.hits", "party.sp.crit", "party.sp.heavy", "party.sp.max", "party.artenName",
-      // Abschnitt 8 (was davon bleibt)
-      "bau.waffenUnd",
-      // Abschnitt 15 (Aufgabe 12)
-      "ql.ctx", "ql.ctxLeer", "ql.linkLabel", "ql.nameLabel", "ql.save", "ql.hint", "ql.busy", "ql.choose", "ql.chooseBtn", "ql.cancel",
-      "ql.err.link", "ql.err.buildId", "ql.err.timeout", "ql.err.missing", "ql.err.shape", "ql.err.busy", "ql.err.full", "ql.zuletzt",
-      "ql.kaempfe", "ql.leer", "ql.gleich", "ql.offen", "ql.open", "ql.los", "ql.geloest", "ql.noch", "ql.appOnly", "ql.ohneWaffen",
-      "ql.kampfLink", "ql.kampfName",
-      // Fixrunde 1 zu Aufgabe 12
-      "ql.unbekannt", "ql.warte", "ql.openName", "ql.openFremd", "ql.openFremdName", "ql.losName", "ql.zurueck", "ql.zurueckName",
-      "ql.zeigen", "ql.verbergen",
       // Fixrunde 1
       "party.serverSave", "party.serverSaved", "party.serverCleared", "party.serverOffen",
       // Abschnitt 9
@@ -4414,7 +4783,21 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       // entfallen mit der Liste der Weeklies (Spezifikation Weeklies, W3): der Platzhalter "kommt spaeter"
       "weeklies.titel", "weeklies.satz", "weeklies.kopf",
       // entfallen mit Feinschliff 6 (02.10.): der Status "verbunden" ohne Zahl (jetzt party.nVerbunden)
-      "party.connected"];
+      "party.connected",
+      /* entfallen mit dem Builds-Reiter (#51, Spez 9): die Karten und ihre Worte, der Name mit Nummer je Paar, "100 Links"
+         (ql.err.full: Grenze von boro-plans.json, die die Seite nicht mehr schreibt); die neuen Worte bd.* prueft
+         test-plan-core.mjs (beide Sprachen, kein "Bau") */
+      "bau.waffenUnd", "bau.defaultName", "ql.ctx", "ql.ctxLeer", "ql.linkLabel", "ql.nameLabel", "ql.save", "ql.hint", "ql.err.full",
+      "ql.zuletzt", "ql.kaempfe", "ql.leer", "ql.gleich", "ql.offen", "ql.open", "ql.los", "ql.geloest", "ql.noch", "ql.ohneWaffen",
+      "ql.unbekannt", "ql.openName", "ql.openFremd", "ql.openFremdName", "ql.losName", "ql.zurueck", "ql.zurueckName", "ql.zeigen", "ql.verbergen",
+      // entfallen mit dem Builds-Reiter ganz (#207): der Abruf bei Questlog, seine Fehler, der Link im Kampf, Feld und Bereich
+      "ql.busy", "ql.choose", "ql.chooseBtn", "ql.cancel",
+      "ql.err.link", "ql.err.buildId", "ql.err.timeout", "ql.err.missing", "ql.err.shape", "ql.err.busy",
+      "ql.appOnly", "ql.kampfLink", "ql.kampfName", "ql.warte",
+      "tabs.builds", "verlauf.colBuild", "hist.withBuild", "bau.quoted", "bau.nameBad", "bau.openTitle",
+      "bd.titel", "bd.neu", "bd.feld", "bd.wahlKein", "bd.zugeordnet", "bd.ohneBuild", "bd.ctx", "bd.ctxLeer",
+      "deinerot.autoBau", "deinerot.fest", "deinerot.weg", "deinerot.grund.anderer", "deinerot.voll", "deinerot.abgelehnt",
+      "rot.zuordnenHinweis", "analysis.window.found", "analysis.window.noRef"];
     const noch = weg.filter((k) => k in I18N.en || k in I18N.de);
     assert(!noch.length, "7/8/9/10: entfallene Texte sind aus beiden Sprachen entfernt", noch);
     const fehlt = neu.filter((k) => !(k in I18N.en) || !(k in I18N.de));
@@ -4877,8 +5260,8 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
   // ===== Abschnitt 15: Builds als Links zu Questlog (Nachtrag 29.09., Aufgabe 12) =====
   /* 15.0: Proben bleibender Funktionen aus den Tests, die mit Aufgabe 12 entfallen (test-builds-page,
      test-steckbrief-page), hierher umgezogen (Spezifikation 3, "erst Proben umziehen"). Sie pruefen, was
-     ohne die alte Oberflaeche bleibt: die Builderkennung je Kampf (Feld b im Verlaufsverzeichnis), Lesen
-     vor Schreiben bei boro-builds.json, Treffer/kritisch/schwer/verfehlt je Kampf, den Hinweis im
+     ohne die alte Oberflaeche bleibt: Lesen vor Schreiben bei boro-builds.json (die Builderkennung je Kampf,
+     Feld b, entfiel mit dem Builds-Reiter #51 - b setzt nur der Spieler, test-builds-page 1), Treffer/kritisch/schwer/verfehlt je Kampf, den Hinweis im
      Vergleich, die Uebungspuppe im Verzeichnis und nicht im Verlauf, den Verlauf im Beispiel und in
      Deutsch, Kompakt ohne Bereiche. Gleich streng wie dort; wo dort die Karte eines Builds gefragt wurde,
      fragt die Probe hier das Verzeichnis und den Speicher (die Karte gibt es mit Aufgabe 12 nicht mehr). */
@@ -4933,23 +5316,18 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     if (anzahl) await warte15(s.page, () => kaempfe15(s).length >= anzahl);
   };
 
-  // --- 15.0.1 (aus test-builds-page 7 und test-steckbrief-page 1): erst lesen, dann schreiben; je Kampf b und vier ganze Zahlen
+  // --- 15.0.1 (aus test-builds-page 7 und test-steckbrief-page 1): erst lesen, dann schreiben; je Kampf vier ganze Zahlen
+  /* #207: die Seite fragt boro-builds.json und boro-plans.json nie mehr - weder lesen noch schreiben, auch nicht,
+     wenn der Helfer sie haette. Kein Kampf bekommt von selbst ein b; je Kampf vier ganze Zahlen wie bisher. */
   {
-    const lager = { builds: {}, plans: {}, gesperrt: true, ereignisse: [], abruf: () => ({ ok: false, error: "timeout" }) };
+    const lager = { ereignisse: [] };
     const s = await oeffne({ lager });
     const p = s.page;
     await laden15(s, L15_ZAHLEN, "Vulcanus", 2);
-    await p.waitForTimeout(1500);   // ein Takt Zeit, in dem ein falscher POST kaeme - geprueft wird der Zustand danach
-    assert(lager.ereignisse.length >= 1 && lager.ereignisse.every((e) => e === "GET 503"), "15.0.1 Lesen gescheitert (503): kein Build geschrieben", lager.ereignisse);
-    assert(kaempfe15(s).length === 2 && kaempfe15(s).every((f) => !f.b), "15.0.1 Lesen gescheitert: das Verzeichnis traegt noch keinen Build", kaempfe15(s));
-    lager.gesperrt = false;
-    await warte15(p, () => lager.ereignisse.some((e) => e.startsWith("POST")) && kaempfe15(s).every((f) => f.b), 30000);
-    const ersterOk = lager.ereignisse.indexOf("GET 200"), ersterPost = lager.ereignisse.findIndex((e) => e.startsWith("POST"));
-    assert(ersterOk >= 0 && ersterPost > ersterOk, "15.0.1 erst nach einem gelungenen Lesen wird ein Build geschrieben", lager.ereignisse);
+    await p.waitForTimeout(3500);   // laenger als ein Schreibtakt: was kaeme, waere jetzt da
+    assert(!lager.ereignisse.length, "15.0.1 keine Anfrage an /api/builds, /api/plans oder /api/plan/fetch", lager.ereignisse);
     const f = kaempfe15(s);
-    assert(f.length === 2 && f.every((x) => /^[0-9a-z]{10}$/.test(x.b || "")) && f[0].b === f[1].b, "15.0.1 danach traegt jeder Kampf im Verzeichnis seinen Build (b), beide denselben", f);
-    assert(lager.ereignisse.includes("POST " + f[0]?.b) && Object.keys(lager.builds).length === 1 && !!lager.builds[f[0]?.b],
-      "15.0.1 geschrieben wird der Build, den das Verzeichnis nennt, genau einer", { e: lager.ereignisse, builds: Object.keys(lager.builds) });
+    assert(f.length === 2 && f.every((x) => x.b === undefined), "15.0.1 kein Kampf bekommt von selbst einen Build", f.map((x) => x.b));
     const zahlen = f.map((x) => [x.hits, x.crit, x.heavy, x.miss]);
     assert(JSON.stringify(zahlen) === "[[600,334,280,2],[400,223,187,1]]", "15.0.1 je Kampf Treffer, kritisch, schwer, verfehlt als ganze Zahlen", zahlen);
     assert(!s.fehler.length, "15.0.1 keine Fehler", s.fehler);
@@ -4958,27 +5336,30 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
 
   // --- 15.0.2 (aus test-builds-page 1 bis 5): Waffenerkennung, der Hinweis im Vergleich, die Uebungspuppe
   {
-    const lager = { builds: {}, plans: {}, ereignisse: [], abruf: () => ({ ok: false, error: "timeout" }) };
+    const lager = { ereignisse: [] };
     const s = await oeffne({ lager });
     const p = s.page;
     await laden15(s, L15_A, "Vulcanus", 1);
     await laden15(s, L15_B, "Vulcanus", 2);
-    // Build B ist schwaecher als der beste Pull aus Build A: der Vergleich sagt es
+    // Paar B ist schwaecher als der beste Pull mit Paar A: der Vergleich sagt es
     await bereich(p, "compare");
-    await p.waitForFunction(() => (document.querySelector("#cmpBest")?.textContent || "").includes("different build"), null, { timeout: 10000 }).catch(() => {});
+    await p.waitForFunction(() => (document.querySelector("#cmpBest")?.textContent || "").includes("different weapon pair"), null, { timeout: 10000 }).catch(() => {});
     const hinweis = await p.evaluate(() => document.querySelector("#cmpBest")?.textContent || "");
-    assert(hinweis.includes("Your best pull comes from a different build (Longbow/Crossbow 1)."), "15.0.2 der beste Pull stammt aus einem anderen Build: der Vergleich sagt es", hinweis);
+    /* Builds-Reiter 6: "Longbow/Crossbow 1" war der erkannte Build; ohne gespeicherten Build nennt der Hinweis
+       das Waffenpaar des besten Pulls (mit " + "). Die Aussage - der beste Pull stammt aus einem anderen Build - bleibt. */
+    assert(hinweis.includes("Your best pull used a different weapon pair (Longbow + Crossbow)."), "15.0.2 der beste Pull hat ein anderes Waffenpaar: der Vergleich sagt es", hinweis);
     await laden15(s, L15_A2, "Vulcanus", 5);
-    await warte15(p, () => kaempfe15(s).every((x) => x.b));
+    await warte15(p, () => kaempfe15(s).length === 5 && kaempfe15(s).every((x) => Array.isArray(x.w)));
     const f = kaempfe15(s);
     const [a, b, ...a2] = f;
-    assert(f.length === 5 && !!a.b && a2.every((x) => x.b === a.b) && !!b.b && b.b !== a.b,
-      "15.0.2 A2 (fuenf von sechs gemeinsam) zaehlt zu Build A, B ist ein anderer Build", f.map((x) => x.b));
-    // geschrieben wird gebuendelt, nach drei Sekunden (planeSchreiben in 47-builds.ts)
-    await warte15(p, () => Object.keys(lager.builds).length >= 2, 10000);
-    const paare = Object.values(lager.builds).map((x) => [...x.weapons].sort().join("+")).sort();
-    assert(Object.keys(lager.builds).length === 2 && JSON.stringify(paare) === JSON.stringify(["Crossbow+Dagger", "Crossbow+Longbow"]),
-      "15.0.2 zwei Builds gespeichert: Armbrust und Langbogen, Armbrust und Dolch", paare);
+    /* Builds-Reiter 6: ersetzt "A2 zaehlt zu Build A, B ist ein anderer Build" (Erkennung ueber die Skills entfaellt).
+       Jetzt zaehlt das Waffenpaar im Verzeichnis (w): A2 hat dasselbe Paar wie A, B ein anderes; erkannt wird kein Build. */
+    const wA = JSON.stringify(a?.w);
+    assert(f.length === 5 && Array.isArray(a.w) && a2.every((x) => JSON.stringify(x.w) === wA) && JSON.stringify(b.w) !== wA && f.every((x) => !x.b),
+      "15.0.2 A2 (fuenf von sechs gemeinsam) hat dasselbe Paar wie A, B ein anderes, und kein Kampf bekommt von selbst einen Build", f.map((x) => [x.w, x.b]));
+    // Builds-Reiter 6: ersetzt "zwei Builds gespeichert" - ohne Zutun des Spielers legt die Seite keinen Build an
+    await p.waitForTimeout(3500);   // laenger als ein Schreibtakt
+    assert(!lager.ereignisse.length, "15.0.2 nichts wird erkannt oder gespeichert, /api/builds wird nie gefragt", lager.ereignisse);
     // die Uebungspuppe: im Verzeichnis mit ihrer Laengenklasse und dem Build A, im Verlauf nicht
     await bereich(p, "history");
     const verlauf = () => p.evaluate(() => document.querySelector("#histNote").textContent + " | " +
@@ -4986,13 +5367,190 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       (document.querySelector("#histDetail tbody")?.textContent || ""));
     const vorher = await verlauf();
     await laden15(s, L15_PUPPE, "Practice Dummy", 6);
-    await warte15(p, () => kaempfe15(s).some((x) => x.c === 60 && x.b));
+    await warte15(p, () => kaempfe15(s).some((x) => x.c === 60));
     const puppe = kaempfe15(s).find((x) => x.c === 60);
-    assert(!!puppe && puppe.b === a.b, "15.0.2 die Puppe steht im Verzeichnis beim Build A, mit ihrer Laenge (60 s)", puppe);
+    // Builds-Reiter 6: ersetzt "beim Build A" - die Puppe traegt das Paar von A (w), einen Build nur von Hand
+    assert(!!puppe && JSON.stringify(puppe.w) === wA && !puppe.b, "15.0.2 die Puppe steht im Verzeichnis mit dem Paar von A und ihrer Laenge (60 s)", puppe);
     await bereich(p, "history");
     const nachher = await verlauf();
     assert(!nachher.includes("Practice") && nachher === vorher, "15.0.2 der Verlauf zeigt die Puppe nicht und bleibt, wie er war", { vorher, nachher });
     assert(!s.fehler.length, "15.0.2 keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  /* --- 15.0.2b (Spezifikation Bester Pull 5.4, #143): Gold im Verlauf - Punkt, Zeile und Einordnung -
+     traegt nur der beste Pull am Boss, ueber alle Builds. Log A: ein starker Kampf mit Build A am 17.09.
+     Log B: drei schwaechere mit Build B am 26.09., der letzte der beste davon. Alle 80 s, also alle ueber
+     der Schwelle (min(60, 40) = 40 s). Vorher trug in B der beste des Zeitraums das Gold und die Einordnung
+     am besten Kampf von B ("mit diesem Build") ebenfalls. */
+  {
+    /* #207: der Bezug ist das Waffenpaar (A: Armbrust und Langbogen, B: Armbrust und Dolch). Das Verzeichnis traegt
+       noch b aus der Zeit des Builds-Reiters; es wird weitergereicht, aber nicht gelesen. Die Proben bleiben dieselben,
+       der Satz heisst "with these weapons". */
+    const GA15 = "golda00000", GB15 = "goldb00000";
+    const lager = { ereignisse: [] };
+    const zeileG = (at, b, dur = 80) => ({ name: "Vulcanus", dps: 1, dmg: 1, dur, at, b });
+    const s = await oeffne({ lager, config: { logIndex: {
+      "b15-gold-a.txt": { size: 1, fights: [zeileG(tag15(17, 21, 0), GA15)] },
+      "b15-gold-b.txt": { size: 1, fights: [zeileG(tag15(26, 21, 0), GB15), zeileG(tag15(26, 21, 10), GB15), zeileG(tag15(26, 21, 20), GB15),
+        zeileG(tag15(26, 21, 30), GB15, 30)] } } } });
+    const p = s.page;
+    const LA = log15("b15-gold-a.txt", [V15(BAU_A, 17, 21, 0, 2.0)]);
+    /* dazu als neuester ein kurzer Pull mit Build B (30 s, unter der Schwelle 40 s), staerker als jeder andere aus B */
+    const LB = log15("b15-gold-b.txt", [V15(BAU_B, 26, 21, 0, 1.0), V15(BAU_B, 26, 21, 10, 1.1), V15(BAU_B, 26, 21, 20, 1.2),
+      { ...V15(BAU_B, 26, 21, 30, 1.6), secs: 30 }]);
+    const A_AT = tag15(17, 21, 0), B_BEST = tag15(26, 21, 20);
+    await laden15(s, LA, "Vulcanus", 1);
+    await laden15(s, LB, "Vulcanus", 5);
+    /* Gewartet wird, bis das Verzeichnis die gerechneten Kaempfe traegt: die Vorlage hat dps 1 und b schon,
+       ohne diese Bedingung ging es mit dem Stand vor dem Lesen von Log B weiter (je nach Browser). */
+    await warte15(p, () => kaempfe15(s).length === 5 && kaempfe15(s).every((x) => x.b && x.dps > 1));
+    const f = kaempfe15(s);
+    assert(f.length === 5 && !!f[0].b && f.slice(1).every((x) => x.b && x.b !== f[0].b) && f[1].b === f[3].b && f[4].b === f[3].b && f[4].dur < 40 && f[4].dps > f[3].dps,
+      "15.0.2b Vorlage: das alte b bleibt stehen, A und B verschieden, die aus B gleich", f.map((x) => [x.at, x.b, x.dps]));
+    const goldBlick = () => p.evaluate(() => {
+      const probe = document.createElement("i"); document.body.appendChild(probe);
+      probe.style.color = "var(--gold-ink)"; const gold = getComputedStyle(probe).color; probe.remove();
+      const e = document.querySelector("#histEinord"), h = document.querySelector("#hHist");
+      return {
+        gold,
+        kreise: [...document.querySelectorAll("#histPlotFeld svg circle.hp")].map((c) => ({ at: +c.dataset.at, dps: +c.dataset.dps,
+          spitze: c.classList.contains("hpspitze"), fill: getComputedStyle(c).fill, stroke: getComputedStyle(c).stroke })),
+        zeilen: [...document.querySelectorAll("#histDetail tbody tr")].map((z) => ({ best: z.classList.contains("best"), zellen: [...z.cells].map((c) => c.textContent.trim()) })),
+        einord: e ? { best: e.classList.contains("best"), text: (e.querySelector(".etextzeile")?.textContent || "").trim(),
+          farbe: getComputedStyle(e.querySelector(".etextzeile")).color, marken: [...e.querySelectorAll(".emarke")].map((m) => [m.dataset.marke, +m.dataset.wert]) } : null,
+        hHist: h ? { text: h.textContent.trim(), best: h.classList.contains("best") } : null,
+        leg: [...document.querySelectorAll("#histPlotFeld .vlg > span")].map((x) => x.textContent.trim()),
+        name: document.querySelector("#histPlotFeld svg")?.getAttribute("aria-label") || "",
+      };
+    });
+    await bereich(p, "history");
+    await p.click('#verlaufZeit [data-z="alles"]', { timeout: 3000 }).catch(() => {});
+    await p.waitForFunction(() => document.querySelectorAll("#histPlotFeld svg circle.hp").length === 5, null, { timeout: 5000 }).catch(() => {});
+    let g = await goldBlick();
+    // gewaehlt ist der neueste, der kurze Pull: hoechste DPS von Build B, aber unter der Schwelle - nicht "Your best"
+    assert(!!g.hHist && !g.hHist.text.startsWith("Your best") && !g.hHist.best && /usual/.test(g.hHist.text) && !!g.einord && !g.einord.best,
+      "15.0.2b der kurze staerkste Pull von B: nicht „Your best“, kein Gold, der Satz gegen den Median", { hHist: g.hHist, einord: g.einord });
+    /* Die Marke der Skala zeigt die hoechste DPS der Menge, auch die eines kurzen Pulls unter der Schwelle -
+       sie heisst deshalb "highest", nicht "best" (Entscheidung 06.10.); die Zahl bleibt der hoechste Wert. */
+    const hoechst = await p.evaluate(() => {
+      const e = document.querySelector("#histEinord");
+      return { text: (e?.querySelector('.emarke[data-marke="bester"] .etext')?.textContent || "").trim(), name: e?.getAttribute("aria-label") || "" };
+    });
+    assert(hoechst.text === "highest" && /, highest [\d.,]+k?, this fight /.test(hoechst.name) && !/, best /.test(hoechst.name),
+      "15.0.2b die Marke der Skala heisst „highest“, auch im Namen fuer den Vorleser", hoechst);
+    await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].find((z) => /, 21:20:\d\d, /.test(z.getAttribute("aria-label") || ""))?.click());   // folgt #152: Pull-Zeilen beginnen mit der Laenge, die Uhrzeit steht im aria-label
+    await bereich(p, "history");
+    await p.waitForFunction(() => /^Your best/.test(document.querySelector("#hHist")?.textContent.trim() || ""), null, { timeout: 5000 }).catch(() => {});
+    g = await goldBlick();
+    const goldK = g.kreise.filter((c) => c.spitze);
+    assert(g.kreise.length === 5 && goldK.length === 1 && goldK[0].at === A_AT && goldK[0].fill === g.gold &&
+      g.kreise.filter((c) => !c.spitze).every((c) => c.fill !== g.gold && c.stroke !== g.gold),
+      "15.0.2b Log B, Alles: genau ein goldener Punkt, der Kampf aus A (17.09. 21:00), sonst kein Gold", g.kreise);
+    assert(g.leg.includes("best") && g.name.includes(" Best "), "15.0.2b Alles: „best“ steht in der Legende und im Namen des Diagramms", { leg: g.leg, name: g.name });
+    const bestZ = g.zeilen.filter((z) => z.best);
+    assert(bestZ.length === 1 && /17\/09$/.test(bestZ[0].zellen[0]) && bestZ[0].zellen[1] === "21:00",
+      "15.0.2b Log B, Alles: die Zeile best ist derselbe Kampf (17/09 21:00)", g.zeilen);
+    const bDps = f[3].dps, maxB = Math.max(f[1].dps, f[2].dps, f[3].dps, f[4].dps);
+    assert(bDps === Math.max(f[1].dps, f[2].dps, f[3].dps) && !!g.einord && g.einord.text.startsWith("Your best of 4 fights on this boss with these weapons") && !g.einord.best &&
+      g.einord.farbe !== g.gold && !!g.hHist && g.hHist.text === "Your best of 4 fights on this boss with these weapons" && !g.hHist.best,
+      "15.0.2b am besten Kampf von B: „with these weapons“, aber kein Gold (Einordnung im Verlauf und Zeile im Kampf)", { einord: g.einord, hHist: g.hHist });
+    // 5.4: die Skala bleibt der hoechste Wert der Menge der Einordnung (Build B, auch der kurze), nicht der beste Pull
+    assert(!!g.einord && g.einord.marken.some(([m, w]) => m === "bester" && Math.abs(w - maxB) < 1e-6),
+      "15.0.2b die Marke bester der Einordnung bleibt der beste von Build B", g.einord?.marken);
+    // Woche (20. bis 26.09.): der beste Pull liegt nicht im Zeitraum - dann traegt hier keiner Gold
+    await p.click('#verlaufZeit [data-z="woche"]', { timeout: 3000 }).catch(() => {});
+    await p.waitForFunction(() => document.querySelectorAll("#histPlotFeld svg circle.hp").length === 4, null, { timeout: 5000 }).catch(() => {});
+    g = await goldBlick();
+    assert(g.kreise.length === 4 && !g.kreise.some((c) => c.spitze || c.fill === g.gold || c.stroke === g.gold) && !g.zeilen.some((z) => z.best) && !g.leg.includes("best") &&
+      !/Best/.test(g.name) && /^Vulcanus: 4 fights, damage per second /.test(g.name),
+      "15.0.2b Woche ohne den besten Pull: kein goldener Punkt, keine Zeile best, kein „best“ in der Legende, kein „Best“ im Namen des Diagramms", { kreise: g.kreise, zeilen: g.zeilen, leg: g.leg, name: g.name });
+    // am Kampf aus A (Log A noch einmal geladen): die Einordnung traegt Gold
+    await laden15(s, LA, "Vulcanus");
+    await bereich(p, "history");
+    await p.click('#verlaufZeit [data-z="alles"]', { timeout: 3000 }).catch(() => {});
+    await p.waitForFunction(() => !!document.querySelector("#histEinord") && document.querySelectorAll("#histPlotFeld svg circle.hp").length === 5, null, { timeout: 5000 }).catch(() => {});
+    g = await goldBlick();
+    assert(!!g.einord && g.einord.best && g.einord.farbe === g.gold && g.einord.text.startsWith("Your best of 5 fights on this boss") && !!g.hHist?.best &&
+      g.kreise.filter((c) => c.spitze).map((c) => c.at).join() === String(A_AT),
+      "15.0.2b am Kampf aus A (dem Goldkampf): „Your best“, die Einordnung traegt Gold, derselbe Punkt", { einord: g.einord, hHist: g.hHist, kreise: g.kreise });
+    /* Der Verlauf zeigt immer das ganze Verzeichnis; sein Gold haengt nicht am geladenen Log (Schlusspruefung,
+       Befund 1). Vorher verschwand es im Beispielkampf (bossPulls leer) und bei einem Log ohne Datum (nur
+       seine eigenen Kaempfe zaehlten). Beide Male bleibt Vulcanus gewaehlt, Gold am Kampf aus A. */
+    const goldBleibt = async (wo) => {
+      await bereich(p, "history");
+      await p.click('#verlaufZeit [data-z="alles"]', { timeout: 3000 }).catch(() => {});
+      await p.waitForFunction(() => document.querySelectorAll("#histPlotFeld svg circle.hp").length === 5, null, { timeout: 5000 }).catch(() => {});
+      g = await goldBlick();
+      const goldZ = g.zeilen.filter((z) => z.best);
+      assert(g.kreise.length === 5 && g.kreise.filter((c) => c.spitze).map((c) => c.at).join() === String(A_AT) &&
+        goldZ.length === 1 && /17\/09$/.test(goldZ[0].zellen[0]) && goldZ[0].zellen[1] === "21:00" && g.leg.includes("best") && g.name.includes(" Best "),
+        `15.0.2b ${wo}: das Gold im Verlauf bleibt am Kampf aus A, „best“ in der Legende und „Best“ im Namen des Diagramms`,
+        { kreise: g.kreise, zeilen: g.zeilen, leg: g.leg, name: g.name });
+    };
+    await beispiel(p);
+    await p.waitForFunction(() => !/b15-gold/.test(document.querySelector("#sbDatei")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+    await goldBleibt("im Beispielkampf");
+    /* Ein Log ohne Datum (nur HH:MM:SS, state.wall falsch) an einem anderen Boss, damit es den Verlauf von
+       Vulcanus nicht beruehrt: zwei Pulls an Ramux, 80 s. */
+    const ohneDatum = join(work, "b15-gold-ohne-datum.txt");
+    writeFileSync(ohneDatum, pulls15([{ target: "Ramux", bau: BAU_B, start: tag15(26, 22, 0), secs: 80, scale: 1.0 },
+      { target: "Ramux", bau: BAU_B, start: tag15(26, 22, 5), secs: 80, scale: 1.1 }]).replace(/^\d{8}-(\d\d:\d\d:\d\d):\d{3}/gm, "$1"));
+    await laden15(s, ohneDatum, "Ramux");
+    await goldBleibt("bei einem Log ohne Datum");
+    assert(B_BEST === f[3].at && !s.fehler.length, "15.0.2b keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  /* --- 15.0.2c (#143, Fixrunde 2): ein Ziel ohne Schluessel (kein bekannter Boss, Quelle Log) und ohne
+     Build (unbekannte Faehigkeiten, keine Waffe): "bester" nach derselben Regel wie am Boss - die Rangfolge
+     ueber die Kaempfe im Log mit ihrer Schwelle (min(60, 40) = 40 s), ab zwei Kaempfen. Gold gibt es dort
+     nie. Drei Kaempfe an Stone Beetle: 80 s, 80 s (der beste lange) und als neuester 20 s mit der hoechsten DPS. */
+  {
+    const s = await oeffne({});
+    const p = s.page;
+    const OHNE = [["Probehieb", 111111111], ["Probestoss", 111111112]];
+    const LT = log15("b15-trash.txt", [{ target: "Stone Beetle", bau: OHNE, start: tag15(24, 21, 0), secs: 80, scale: 1.0 },
+      { target: "Stone Beetle", bau: OHNE, start: tag15(24, 21, 10), secs: 80, scale: 1.2 },
+      { target: "Stone Beetle", bau: OHNE, start: tag15(24, 21, 20), secs: 20, scale: 2.0 }]);
+    await laden15(s, LT, "Stone Beetle");
+    const satz = () => p.evaluate(() => { const h = document.querySelector("#hHist");
+      return { text: h?.textContent.trim() || "", best: !!h?.classList.contains("best"), dps: +(h?.dataset.dps || 0) }; });
+    await p.waitForFunction(() => !!document.querySelector("#hHist")?.textContent.trim(), null, { timeout: 5000 }).catch(() => {});
+    const kurz = await satz();
+    assert(!kurz.text.startsWith("Your best") && !kurz.best && /in this log/.test(kurz.text) && !/with these weapons/.test(kurz.text),
+      "15.0.2c der kurze Kampf mit der hoechsten DPS (unter der Schwelle): nicht „Your best“, kein Gold, der Satz gegen den Median im Log", kurz);
+    await p.evaluate(() => [...document.querySelectorAll("#fightList .fight")].find((z) => /, 21:10:\d\d, /.test(z.getAttribute("aria-label") || ""))?.click());   // folgt #152: Pull-Zeilen beginnen mit der Laenge, die Uhrzeit steht im aria-label
+    await p.waitForFunction(() => /^Your best/.test(document.querySelector("#hHist")?.textContent.trim() || ""), null, { timeout: 5000 }).catch(() => {});
+    const lang = await satz();
+    assert(lang.text === "Your best of 3 fights on this target in this log" && !lang.best && lang.dps > 0 && lang.dps < kurz.dps,
+      "15.0.2c der beste lange Kampf: „Your best … in this log“, ohne Gold", { lang, kurz });
+    assert(!s.fehler.length, "15.0.2c keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  /* --- 15.0.2d (Entscheidung 06.10.): die Summe einer Gruppe (g im Verzeichnis) ist nie "dein bester Kampf",
+     auch nicht mit diesem Build. Im Verzeichnis eine Gruppensumme mit Build B und hoher DPS, dazu ein eigenes
+     Log mit zwei Kaempfen desselben Builds, der staerkere zuletzt (gewaehlt). Er bekommt "Your best ... with this
+     build"; vorher stand die Summe in der Rangfolge vorn, und der Satz fiel weg. */
+  {
+    const GB = "goldg00000";
+    const lager = { ereignisse: [] };
+    const s = await oeffne({ lager, config: { logIndex: {
+      "b15-g-gruppe.txt": { size: 1, fights: [{ name: "Vulcanus", dps: 99999, dmg: 1, dur: 80, at: tag15(25, 21, 0), b: GB, g: 1 }] },
+      "b15-g-eigen.txt": { size: 1, fights: [{ name: "Vulcanus", dps: 1, dmg: 1, dur: 80, at: tag15(26, 21, 0), b: GB },
+                                              { name: "Vulcanus", dps: 1, dmg: 1, dur: 80, at: tag15(26, 21, 10), b: GB }] } } } });
+    const p = s.page;
+    await laden15(s, log15("b15-g-eigen.txt", [V15(BAU_B, 26, 21, 0, 1.0), V15(BAU_B, 26, 21, 10, 1.2)]), "Vulcanus", 3);
+    await warte15(p, () => kaempfe15(s).length === 3 && kaempfe15(s).every((x) => x.b === GB && x.dps > 1));
+    const f = kaempfe15(s);
+    assert(f.length === 3 && f[0].g === 1 && f[0].dps > 2 * f[2].dps && f.slice(1).every((x) => !("g" in x)) && f[2].dps > f[1].dps,
+      "15.0.2d Vorlage: die Gruppensumme (g) mit Build B vorn nach DPS, zwei eigene Kaempfe desselben Builds", f.map((x) => [x.at, x.b, x.g, x.dps]));
+    await p.waitForFunction(() => /^Your best/.test(document.querySelector("#hHist")?.textContent.trim() || ""), null, { timeout: 5000 }).catch(() => {});
+    const h = await p.evaluate(() => { const e = document.querySelector("#hHist"); return e ? { text: e.textContent.trim(), best: e.classList.contains("best") } : null; });
+    assert(!!h && /^Your best of \d+ fights on this boss with these weapons/.test(h.text),
+      "15.0.2d der beste eigene Kampf: „Your best … with these weapons“, die Gruppensumme steht nicht vorn", h);
+    assert(!s.fehler.length, "15.0.2d keine Fehler", s.fehler);
     await p.close();
   }
 
@@ -5006,578 +5564,23 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     assert(leiste.verlauf && !leiste.progress, "15.0.3 der Bereich Verlauf steht in der Leiste, einen Bereich Progress gibt es nicht", leiste);
     await bereich(p, "history");
     const txt = (q) => p.evaluate((x) => document.querySelector(x)?.textContent || "", q);
-    assert((await txt("#bkHinweis")).includes("nobody's performance") && (await txt("#histNote")).includes("your builds from your first")
+    assert((await txt("#bkHinweis")).includes("nobody's performance") && (await txt("#histNote")).includes("from your second fight on one.") && !(await txt("#histNote")).includes("builds")
       && (await txt("#histAkt")).includes("Open logs"),
-      "15.0.3 Beispiel: die Kopfzeile sagt warum, der Verlauf, ab wann ein Build erscheint, und traegt Open logs", [await txt("#bkHinweis"), await txt("#histNote")]);
+      "15.0.3 Beispiel: die Kopfzeile sagt warum, der Verlauf, ab wann ein Boss erscheint (keine Builds mehr), und traegt Open logs", [await txt("#bkHinweis"), await txt("#histNote")]);
     await p.evaluate(() => document.querySelector("#btnLang").click());
     await p.waitForFunction(() => (document.querySelector('[data-tab="history"] .vh')?.textContent || "").trim() === "Verlauf", null, { timeout: 5000 }).catch(() => {});
     assert((await txt('[data-tab="history"] .vh')).trim() === "Verlauf" && (await txt('[data-tab="history"] .btip')).trim() === "Verlauf",
       "15.0.3 Deutsch: der Bereich heisst Verlauf (Name und Blase)");
     await p.evaluate(() => document.querySelector("#btnCompact").click());
     await p.waitForFunction(() => document.body.classList.contains("compact"), null, { timeout: 5000 }).catch(() => {});
-    assert(await p.evaluate(() => !document.querySelector('[data-tab="history"]')?.offsetParent && !document.querySelector("#bauBody")?.offsetParent),
+    assert(await p.evaluate(() => !document.querySelector('[data-tab="history"]')?.offsetParent && !document.querySelector("#bauBody")),
       "15.0.3 Kompakt: kein Bereich Verlauf, keine Builds");
     await p.evaluate(() => document.querySelector("#btnCompact").click());
     assert(!s.fehler.length, "15.0.3 keine Fehler", s.fehler);
     await p.close();
   }
 
-  /* 15.1 bis 15.12: der Bereich Builds nach Aufgabe 12 (Entscheidung 29.09., Variante C). Oben ein Feld
-     "Questlog-Link einfuegen", dazu ein Name (optional) und "Speichern"; je Link eine Karte mit Waffensymbolen,
-     Name, "Langbogen und Armbrust \u00b7 zuletzt gespielt 18.09.", "In Questlog oeffnen" und bis zu drei Bossen mit
-     Median und Kampfzahl ueber dieselben Waffen aus dem Verzeichnis. Die Karte mit den Waffen des offenen
-     Kampfs ist golden umrandet, steht oben und traegt "im offenen Kampf"; ohne Kaempfe ein Satz; gleiche
-     Waffen bei zwei Karten: der Hinweis bei beiden und dieselben Zahlen; "Loesen" mit Rueckgaengig; im Kampf
-     ein leiser Link "Build in Questlog \u203a". Gespeichert wird in boro-plans.json nur Link, Waffen und der
-     eigene Name - Questlogs Buildname lebt nur in der Sitzung. Hier auch, was aus test-plan-page
-     bleibt (Linkpruefung ohne Anfrage, Auswahl bei mehreren Builds, Fehler, nichts gespeichert, Neustart,
-     Loesen und Rueckgaengig), gleich streng an der neuen Oberflaeche. */
-  const Q15 = "https://questlog.gg/throne-and-liberty/";
-  const CHAR15 = Q15 + "character-builder/TestChar";
-  const OWNER15 = Q15 + "en/character-builder/TestChar?build-id=500441&buildId=8498235";
-  const B15 = { bA: "aaaaaaaaaa", bB: "bbbbbbbbbb", bC: "cccccccccc" };
-  const baue15 = () => ({
-    [B15.bA]: { name: "", weapons: ["Longbow", "Crossbow"], core: ["x1", "x2", "x3", "x4"], first: 1 },
-    [B15.bB]: { name: "", weapons: ["Dagger", "Crossbow"], core: ["y1", "y2", "y3", "y4"], first: 2 },
-    // derselbe Waffensatz wie bA, ein anderer Build aus dem Log: seine Kaempfe zaehlen fuer dieselben Waffen mit
-    [B15.bC]: { name: "", weapons: ["Crossbow", "Longbow"], core: ["z1", "z2", "z3", "z4"], first: 3 },
-  });
-  /* Das Verzeichnis: King Khanzaizin 19-mal (15 mit bA, 4 mit bC), Vulcanus 4-mal, Tevent 2-mal, Kowazan einmal
-     mit Langbogen und Armbrust - drei Bosse zeigt die Karte, die meisten Kaempfe zuerst; Vulcanus 3-mal mit
-     Dolch und Armbrust; eine Uebungspuppe (c) mit bA am 20.09. - sie ist kein Boss, aber gespielt. */
-  const kk15 = [200, 205, 210, 215, 220, 222, 224, 225, 226, 226.5, 227, 228, 229, 230, 231, 233, 235, 236, 238].map((k) => k * 1000);
-  const f15 = (name, b, dps, d, h, extra = {}) => ({ name, dps, dmg: dps * 60, dur: 60, at: tag15(d, h, 0), b, ...extra });
-  const INDEX15 = { "TLCombatLog-20260915.txt": { size: 1, fights: [
-    ...kk15.map((dps, i) => f15("King Khanzaizin", i < 15 ? B15.bA : B15.bC, dps, 15 + (i % 3), 20)),
-    ...[180, 190, 200, 210].map((k) => f15("Vulcanus", B15.bA, k * 1000, 16, 21)),
-    f15("Tevent", B15.bA, 150000, 16, 22), f15("Tevent", B15.bA, 160000, 18, 22),
-    f15("Kowazan", B15.bA, 90000, 17, 23),
-    ...[120, 130, 140].map((k) => f15("Vulcanus", B15.bB, k * 1000, 14, 21)),
-    f15("Practice Dummy", B15.bA, 50000, 20, 19, { c: 60 }),
-  ] } };
-  /* boro-plans.json: ein alter Plan (vor Aufgabe 12, mit allem, was er damals trug), zwei neue Eintraege, einer
-     mit denselben Waffen wie der alte, einer ohne Kaempfe, und ein geloester. */
-  const pl15 = () => ({
-    palt000001: { link: CHAR15 + "?buildId=11", at: tag15(10, 12, 0), name: "Raid", bau: B15.bA, weapons: ["Longbow", "Crossbow"],
-      active: [{ id: "SkillSet_A", lvl: 20, traits: [] }], passive: [], mastery: [], gear: { main_hand: "item_a" }, keys: { SkillSet_A: "Quick Fire" },
-      sheet: { slots: {}, sets: [], fmt: {} } },
-    pneu000001: { link: Q15 + "skill-builder/SAA2YXzmmVK4?build-id=749549", at: tag15(12, 12, 0), name: "Burst", weapons: ["Dagger", "Crossbow"] },
-    pneu000002: { link: Q15 + "weapon-mastery/SAA2YXzmmVK4?build-id=500441", at: tag15(13, 12, 0), name: "Zwilling", weapons: ["Crossbow", "Longbow"] },
-    pneu000003: { link: Q15 + "skill-builder/SAA2YXzmmVK4?build-id=749550", at: tag15(11, 12, 0), name: "Heiler", weapons: ["Staff", "Wand and Tome"] },
-    pneu000004: { link: Q15 + "skill-builder/SAA2YXzmmVK4?build-id=749551", at: tag15(9, 12, 0), name: "Weg", weapons: ["Spear", "Dagger"], geloest: tag15(14, 12, 0) },
-  });
-  // der gestellte Abruf: ein Charakter mit zwei Builds, Questlogs Namen "Raid"/"PvP"/"Borometer"
-  const abrufe15 = [];
-  const abruf15 = (b) => {
-    abrufe15.push(b);
-    if (b.link.startsWith(CHAR15) && !/buildId=/.test(b.link) && b.pick == null) return { ok: true, choose: [{ id: 11, name: "Raid" }, { id: 12, name: "PvP" }] };
-    const id = b.pick ?? (Number((/buildId=(\d+)/.exec(b.link) || [])[1]) || 11);
-    const waffen = id === 12 ? ["Dagger", "Staff"] : ["Longbow", "Crossbow"];
-    return { ok: true, plan: { link: b.link, buildId: id, name: id === 12 ? "PvP" : id === 8498235 ? "Borometer" : "Raid", weapons: waffen,
-      active: [{ id: "SkillSet_A", lvl: 20, traits: [] }], passive: [], mastery: [], gear: { main_hand: "item_a" } },
-      names: { skills: { SkillSet_A: { name: "Questlog Skill", icon: "/x/S_A.S_A" } }, traits: {}, mastery: {}, gear: { item_a: "Questlog Bogen" }, sets: {}, stats: {}, perks: {} },
-      gear: { equip: {}, items: {}, runes: {}, syn: [], fmt: {}, mast: {} }, requests: 3 };
-  };
-  const lager15 = (extra = {}) => ({ builds: baue15(), plans: pl15(), ereignisse: [], planPosts: [], abruf: abruf15, ...extra });
-  const zuBuilds15 = async (s) => {
-    await bereich(s.page, "builds");
-    await s.page.waitForFunction(() => document.querySelectorAll("#bauBody .qlkarte").length > 0 || !!document.querySelector("#bauBody .qlnoch"), null, { timeout: 20000 }).catch(() => {});
-  };
-  /* Was der Bereich Builds zeigt. */
-  const blick15 = (p) => p.evaluate(() => {
-    const q = (x) => document.querySelector(x);
-    const r = (e) => e && e.getClientRects().length ? e.getBoundingClientRect().toJSON() : null;
-    const sicht = (e) => !!e && e.getClientRects().length > 0 && getComputedStyle(e).visibility !== "hidden";
-    const lbl = (id) => (q(`label[for="${id}"]`)?.textContent || "").trim();
-    const klein = [];
-    for (const wurzel of [q("#p-builds"), q("#bereichKopf")].filter(Boolean)) {
-      const it = document.createTreeWalker(wurzel, NodeFilter.SHOW_TEXT);
-      for (let n; (n = it.nextNode()); ) {
-        const e = n.parentElement;
-        if (!n.textContent.trim() || !e || e.closest(".vh") || !sicht(e)) continue;
-        const g = parseFloat(getComputedStyle(e).fontSize);
-        if (g < 11) klein.push(n.textContent.trim().slice(0, 24) + ":" + g);
-      }
-    }
-    const karte = (k) => {
-      const cs = getComputedStyle(k), a = k.querySelector("a.qloffnen");
-      return {
-        id: k.id, name: (k.querySelector("h3")?.textContent || "").trim(), h3fokus: k.querySelector("h3")?.getAttribute("tabindex"),
-        icons: k.querySelectorAll(".qlpaar .wic").length, paarName: k.querySelector(".qlpaar")?.getAttribute("aria-label") || "",
-        paarRolle: k.querySelector(".qlpaar")?.getAttribute("role") || "",
-        zeile: (k.querySelector(".qlzeile")?.textContent || "").replace(/\s+/g, " ").trim(),
-        gleich: (k.querySelector(".qlgleich")?.textContent || "").trim(),
-        bosse: [...k.querySelectorAll(".qlbosse li")].map((li) => li.textContent.replace(/\s+/g, " ").trim()),
-        bossTag: k.querySelector(".qlbosse")?.tagName || "",
-        leer: (k.querySelector(".qlleer")?.textContent || "").trim(),
-        offen: k.classList.contains("offen"), schild: (k.querySelector(".qlschild")?.textContent || "").trim(),
-        link: a ? { href: a.getAttribute("href"), target: a.target, rel: a.rel, text: a.textContent.trim(), title: a.title, name: a.getAttribute("aria-label") || "" } : null,
-        los: (k.querySelector("[data-ql-los]")?.textContent || "").trim(), losName: k.querySelector("[data-ql-los]")?.getAttribute("aria-label") || "",
-        zurueck: (k.querySelector("[data-ql-zurueck]")?.textContent || "").trim(), zurueckName: k.querySelector("[data-ql-zurueck]")?.getAttribute("aria-label") || "",
-        rand: cs.borderTopColor, randBreite: parseFloat(cs.borderTopWidth), schatten: cs.boxShadow,
-        pad: Math.min(parseFloat(cs.paddingTop), parseFloat(cs.paddingLeft)), box: r(k),
-      };
-    };
-    // die Karten der Liste; geloeste (Fixrunde 1) stehen aufgeklappt darunter, getrennt gezaehlt
-    const karten = [...document.querySelectorAll("#bauBody .qlkarte:not(.geloest)")].map(karte);
-    const geloeste = [...document.querySelectorAll("#bauBody .qlkarte.geloest")].map(karte);
-    const zeige = q("#bauBody [data-ql-zeige]");
-    const gold = (() => { const pr = document.createElement("span"); pr.style.color = "var(--gold-ink)"; document.body.append(pr); const c = getComputedStyle(pr).color; pr.remove(); return c; })();
-    return {
-      panel: q(".panel.on")?.id || "", bauSicht: sicht(q("#bauBody")), titel: (q("#bauBody h2, #bauBody h3.vh, #qlTitel")?.textContent || "").trim(),
-      form: !!q("#bauBody form#qlForm"), linkLabel: lbl("qlLink"), nameLabel: lbl("qlName"), linkTyp: q("#qlLink")?.type || "",
-      speichern: (q("#qlForm button[type=submit]")?.textContent || "").trim(), status: (q("#qlStatus")?.textContent || "").trim(),
-      hinweis: (q("#qlHinweis")?.textContent || "").trim(),
-      alt: [".bkarte", ".planblock", ".stbrief", ".bauneu", ".bauform", ".bautab", ".baukenn", "[data-edit]", "[data-plan-toggle]", ".planimport"]
-        .filter((x) => q("#p-builds " + x)),
-      text: q("#p-builds")?.innerText || "", ctx: (q("#bkCtx")?.textContent || "").trim(),
-      karten, geloeste, zeige: zeige ? { text: zeige.textContent.trim(), auf: zeige.getAttribute("aria-expanded") } : null,
-      gold, geloest: (q("#bauBody .qlgeloest")?.textContent || "").replace(/\s+/g, " ").trim(),
-      noch: (q("#bauBody .qlnoch")?.textContent || "").trim(),
-      quer: document.documentElement.scrollWidth > innerWidth, klein, rollt: document.documentElement.scrollHeight - innerHeight,
-    };
-  });
-  const kampfLink15 = (p) => p.evaluate(() => { const a = document.querySelector("#kampfQuestlog");
-    return a ? { da: !a.hidden && a.getClientRects().length > 0, href: a.getAttribute("href"), target: a.target, rel: a.rel, text: a.textContent.trim(),
-      name: a.getAttribute("aria-label") || "", imUrteil: !!a.closest("#urteilFeld .uknoepfe"), tag: a.tagName } : null; });
-  const median15 = (xs) => { const s = [...xs].sort((a, b) => a - b), m = s.length >> 1; return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2; };
-
-  // --- 15.1 bis 15.4: der Bereich, die Karten, ihre Zahlen, der leere und der doppelte Fall (Englisch)
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    let b = await blick15(p);
-    assert(b.panel === "p-builds" && b.bauSicht && b.form && b.linkLabel === "Paste a Questlog link" && b.nameLabel === "Name (optional)" &&
-      b.speichern === "Save" && b.linkTyp === "url",
-      "15.1 oben das Feld \u201ePaste a Questlog link\u201c mit Name (optional) und \u201eSave\u201c", { form: b.form, l: b.linkLabel, n: b.nameLabel, s: b.speichern });
-    assert(!b.alt.length && !/Rename or link|New build|too few fights|Equipment|Level|Hit rates|Open planner|Close plan|Recognised by/.test(b.text),
-      "15.1 entfallen: Steckbrief, Planer, Ausruestung, Stufen, Trefferquoten, \u201eNew build\u201c, \u201eRename or link\u201c, \u201etoo few fights\u201c", { alt: b.alt, text: b.text.slice(0, 300) });
-    assert(b.ctx === "4 builds \u00b7 links to Questlog", "15.1 Kopfzeile: vier Builds, Links zu Questlog", b.ctx);
-    const namen = b.karten.map((k) => k.name);
-    assert(b.karten.length === 4 && !namen.includes("Weg") && ["Raid", "Burst", "Zwilling", "Heiler"].every((n) => namen.includes(n)),
-      "15.2 je Eintrag eine Karte, auch der alte Plan; der geloeste steht nicht da", namen);
-    const k = Object.fromEntries(b.karten.map((x) => [x.name, x]));
-    const raid = k.Raid;
-    assert(raid && raid.icons === 2 && raid.paarRolle === "img" && raid.paarName === "Longbow + Crossbow" && raid.zeile === "Longbow and Crossbow \u00b7 last played 20/09",
-      "15.2 Karte: zwei Waffensymbole (fuer den Vorleser benannt), Name, \u201eLongbow and Crossbow \u00b7 last played 20/09\u201c (die Puppe zaehlt als gespielt)", raid);
-    assert(raid && raid.link && raid.link.href === CHAR15 + "?buildId=11" && raid.link.target === "_blank" && raid.link.rel === "noopener noreferrer" &&
-      raid.link.text === "Open in Questlog" && /browser/.test(raid.link.title) &&
-      // Fixrunde 1 (Befund 10): fuer den Vorleser mit dem Namen der Karte
-      raid.link.name === "Open \u201cRaid\u201d in Questlog" && raid.losName === "Detach \u201cRaid\u201d",
-      "15.2 \u201eOpen in Questlog\u201c ist ein Link nach draussen (neues Fenster, ohne Opener), Borometer laedt ihn nie", raid?.link);
-    const khz = median15(kk15), vul = median15([180, 190, 200, 210].map((x) => x * 1000));
-    const fmt15 = (v) => (v / 1000).toFixed(1) + "k";   // fmt() in 03-helpers.ts: Kurzzahl mit Punkt, eine Stelle
-    assert(raid && raid.bossTag === "UL" && JSON.stringify(raid.bosse) === JSON.stringify(["King Khanzaizin " + fmt15(khz) + " \u00b7 19 fights",
-      "Vulcanus " + fmt15(vul) + " \u00b7 4 fights", "Tevent \u00b7 2 fights"]),
-      "15.3 bis zu drei Bosse, die meisten Kaempfe zuerst: Median und Kampfzahl ueber dieselben Waffen (auch aus einem zweiten Build), unter drei Kaempfen ohne Median; die Puppe ist kein Boss",
-      raid?.bosse);
-    assert(fmt15(khz) === "226.5k", "15.3 der Median von King Khanzaizin ist 226.5k, wie in der Skizze", fmt15(khz));
-    assert(k.Burst && JSON.stringify(k.Burst.bosse) === JSON.stringify(["Vulcanus 130.0k \u00b7 3 fights"]) && !k.Burst.gleich && !k.Burst.leer,
-      "15.3 Dolch und Armbrust: ein Boss mit Median und Kampfzahl", k.Burst);
-    assert(k.Heiler && !k.Heiler.bosse.length && k.Heiler.leer === "No fights with these weapons yet." && k.Heiler.zeile === "Staff and Wand and Tome",
-      "15.3 ohne Kaempfe: der Satz statt der Bosse, kein \u201elast played\u201c", k.Heiler);
-    assert(k.Raid?.gleich === "same weapons as \u201cZwilling\u201d" && k.Zwilling?.gleich === "same weapons as \u201cRaid\u201d" &&
-      JSON.stringify(k.Raid.bosse) === JSON.stringify(k.Zwilling.bosse) && k.Raid.zeile === k.Zwilling.zeile.replace("Crossbow and Longbow", "Longbow and Crossbow"),
-      "15.4 gleiche Waffen: bei beiden der Hinweis auf die andere, beide mit denselben Zahlen", { raid: k.Raid, zw: k.Zwilling });
-    assert(b.karten.length === 4 && b.karten.every((x) => !x.offen && !x.schild), "15.5 ohne offenen Kampf mit diesen Waffen: keine Karte hervorgehoben", b.karten.map((x) => [x.name, x.offen]));
-    assert(b.karten.length === 4 && b.karten.every((x) => x.los === "Detach" && x.h3fokus === "-1" && x.pad >= 8), "15.2 je Karte \u201eDetach\u201c; die Ueberschrift nimmt den Fokus; Innenabstand mindestens 8", b.karten.map((x) => [x.los, x.pad]));
-    assert(!s.fehler.length, "15.1-15.4 keine Fehler", s.fehler);
-    await p.close();
-  }
-
-  // --- 15.5 und 15.6: der offene Kampf - die Karte oben, golden umrandet, mit Schild; im Kampf der leise Link
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await laden15(s, L15_A, "Vulcanus");
-    const kl = await kampfLink15(p);
-    assert(kl && kl.tag === "A" && kl.da && kl.imUrteil && kl.text === "Build in Questlog \u203a" && kl.href === pl15().pneu000002.link &&
-      kl.target === "_blank" && kl.rel === "noopener noreferrer" && kl.name.includes("Zwilling"),
-      "15.6 im Kampf: der leise Link \u201eBuild in Questlog \u203a\u201c neben den Knoepfen des Urteils, zur passenden Karte (die zuletzt gespeicherte), mit ihrem Namen fuer den Vorleser", kl);
-    await zuBuilds15(s);
-    const b = await blick15(p);
-    const offen = b.karten.filter((x) => x.offen);
-    assert(offen.length === 2 && b.karten[0].offen && b.karten[1].offen && offen.every((x) => x.schild === "in the open fight") &&
-      b.karten.filter((x) => !x.offen).every((x) => !x.schild),
-      "15.5 die Karten mit den Waffen des offenen Kampfs stehen oben und tragen \u201ein the open fight\u201c", b.karten.map((x) => [x.name, x.offen, x.schild]));
-    assert(offen.length === 2 && offen.every((x) => x.rand === b.gold && x.randBreite >= 1) && b.karten.filter((x) => !x.offen).every((x) => x.rand !== b.gold) &&
-      offen.every((x) => x.schatten === b.karten.find((y) => !y.offen)?.schatten),
-      "15.5 golden umrandet (--gold-ink, im hellen Thema dunkler), die anderen nicht; kein Leuchten: derselbe Schatten wie die anderen Karten", { gold: b.gold, karten: b.karten.map((x) => [x.name, x.rand, x.schatten]) });
-    assert(!s.fehler.length, "15.5/15.6 keine Fehler", s.fehler);
-    await p.close();
-    // ein offener Kampf ohne passende Karte: kein Link im Kampf, keine Karte hervorgehoben
-    const nur = lager15({ plans: { pneu000003: pl15().pneu000003 } });
-    const s2 = await oeffne({ app: true, lager: nur, config: { logIndex: INDEX15 } });
-    await laden15(s2, L15_A, "Vulcanus");
-    const kl2 = await kampfLink15(s2.page);
-    await zuBuilds15(s2);
-    const b2 = await blick15(s2.page);
-    assert(kl2 && !kl2.da && b2.karten.length === 1 && !b2.karten[0].offen, "15.6 ohne passende Karte: kein Link im Kampf, nichts hervorgehoben", { kl2, k: b2.karten });
-    await s2.page.close();
-  }
-
-  // --- 15.7: Einfuegen - Pruefung ohne Anfrage, Auswahl, nur Link, Waffen und eigener Name gespeichert
-  {
-    abrufe15.length = 0;
-    const lager = lager15({ plans: {} });
-    const s = await oeffne({ app: true, lager });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    let b = await blick15(p);
-    assert(!b.karten.length && b.noch.startsWith("No links yet."), "15.7 ohne Eintraege: ein Satz, wie es geht, keine Karte", b.noch);
-    const einfuegen = async (link, name = "") => {
-      await p.fill("#qlLink", link);
-      await p.fill("#qlName", name);
-      await p.press("#qlLink", "Enter");
-    };
-    const status = async (text) => { await p.waitForFunction((t) => (document.querySelector("#qlStatus")?.textContent || "").includes(t), text, { timeout: 5000 }).catch(() => {}); return (await blick15(p)).status; };
-    // seltsame Links, ein Builder-Link ohne Nummer und ein fremder Planer: die Seite sagt es sofort, keine Anfrage
-    for (const [link, satz] of [["https://Questlog.gg/throne-and-liberty/character-builder/TestChar", "Only links from questlog.gg"],
-      ["https://questlog.gg:443/throne-and-liberty/character-builder/TestChar", "Only links from questlog.gg"],
-      [Q15 + "skill-builder/SAA2YXzmmVK4", "This link does not say which build"],
-      ["https://maxroll.gg/tl/build/x", "Only links from questlog.gg"]]) {
-      await einfuegen(link);
-      const st = await status(satz);
-      assert(st.startsWith(satz) && abrufe15.length === 0 && !Object.keys(lager.plans).length, "15.7 " + link.slice(8, 60) + ": der Satz, keine Anfrage, nichts gespeichert", { st, abrufe: abrufe15.length });
-    }
-    // ein Charakter mit zwei Builds: die Seite fragt, der zweite Abruf nennt die Wahl
-    await einfuegen(CHAR15, "  Night  ");
-    await p.waitForFunction(() => !!document.querySelector("#qlForm fieldset legend"), null, { timeout: 10000 }).catch(() => {});
-    const legende = await p.evaluate(() => document.querySelector("#qlForm fieldset legend")?.textContent || "");
-    assert(legende.includes("several builds") && abrufe15.length === 1 && abrufe15[0].pick == null && abrufe15[0].lang === "en" && abrufe15[0].link === CHAR15,
-      "15.7 zwei Builds: die Seite fragt, welcher", { legende, abrufe: abrufe15 });
-    await p.check('#qlForm input[type=radio][value="12"]');
-    await p.click("#qlForm [data-ql-wahl]");
-    await p.waitForFunction(() => [...document.querySelectorAll("#bauBody .qlkarte h3")].some((h) => h.textContent.trim() === "Night"), null, { timeout: 10000 }).catch(() => {});
-    const ids = Object.keys(lager.plans), e = lager.plans[ids[0]];
-    assert(abrufe15.length === 2 && abrufe15[1].pick === 12 && ids.length === 1 && /^p[0-9a-z]{9}$/.test(ids[0]),
-      "15.7 Auswahl: zweiter Abruf mit pick 12, ein Eintrag unter seiner Kennung", { abrufe: abrufe15.slice(1), ids });
-    assert(e && JSON.stringify(Object.keys(e).sort()) === JSON.stringify(["at", "link", "name", "weapons"]) && e.link === CHAR15 + "?buildId=12" &&
-      e.name === "Night" && JSON.stringify(e.weapons) === JSON.stringify(["Dagger", "Staff"]) && Number.isFinite(e.at),
-      "15.7 gespeichert: nur Link (mit dem gewaehlten Build), Waffen und der eigene Name", e);
-    const roh = JSON.stringify(lager.plans);
-    assert(!/PvP|Raid|Questlog Skill|Questlog Bogen|SkillSet|item_a|sheet|active/.test(roh), "15.7 kein Name und nichts sonst von Questlog in boro-plans.json", roh);
-    b = await blick15(p);
-    const fokus = await p.evaluate(() => document.activeElement?.tagName === "H3" && document.activeElement.textContent.trim());
-    assert(b.karten.length === 1 && b.karten[0].name === "Night" && b.karten[0].zeile === "Dagger and Staff" && fokus === "Night" &&
-      await p.evaluate(() => document.querySelector("#qlLink").value === "" && document.querySelector("#qlName").value === ""),
-      "15.7 die neue Karte steht da, der Fokus auf ihrer Ueberschrift, das Feld ist leer", { k: b.karten, fokus });
-    // ohne eigenen Namen: Questlogs Buildname nur fuer die Sitzung
-    await einfuegen(OWNER15);
-    await p.waitForFunction(() => document.querySelectorAll("#bauBody .qlkarte").length === 2, null, { timeout: 10000 }).catch(() => {});
-    const owner = Object.entries(lager.plans).find(([, x]) => x.link === OWNER15);
-    b = await blick15(p);
-    assert(abrufe15.length === 3 && abrufe15[2].link === OWNER15 && abrufe15[2].pick == null && !!owner && owner[1].name === "" &&
-      b.karten.some((x) => x.name === "Borometer") && !JSON.stringify(lager.plans).includes("Borometer"),
-      "15.7 ohne eigenen Namen: die Karte zeigt Questlogs Namen dieser Sitzung, gespeichert wird er nicht; der Link geht, wie er ist", { abrufe: abrufe15.slice(2), owner, namen: b.karten.map((x) => x.name) });
-    assert(!s.fehler.length, "15.7 keine Fehler", s.fehler);
-    await p.close();
-    // Neustart: dieselben Eintraege, Questlogs Name ist weg, die Karte heisst nach den Waffen
-    const neu = await oeffne({ app: true, lager: { ...lager, plans: JSON.parse(JSON.stringify(lager.plans)) } });
-    await beispiel(neu.page);
-    await zuBuilds15(neu);
-    const nb = await blick15(neu.page);
-    assert(nb.karten.length === 2 && nb.karten.some((x) => x.name === "Night") && nb.karten.some((x) => x.name === "Longbow/Crossbow") &&
-      !nb.karten.some((x) => [x.name, x.zeile, x.gleich, x.paarName].join(" ").includes("Borometer")), "15.7 nach dem Neustart: die Eintraege sind lesbar, Questlogs Name ist fort", nb.karten.map((x) => x.name));
-    await neu.page.close();
-  }
-
-  // --- 15.8: Fehler - Zeitueberschreitung und eine abgelehnte Schreibung: ein Satz, nichts gespeichert, der Link bleibt im Feld
-  {
-    const lager = lager15({ plans: {}, abruf: () => ({ ok: false, error: "timeout" }) });
-    const s = await oeffne({ app: true, lager });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    await p.fill("#qlLink", CHAR15 + "?buildId=11");
-    await p.click("#qlForm button[type=submit]");
-    await p.waitForFunction(() => (document.querySelector("#qlStatus")?.textContent || "").includes("did not answer"), null, { timeout: 10000 }).catch(() => {});
-    let b = await blick15(p);
-    assert(b.status === "Questlog did not answer." && !Object.keys(lager.plans).length && !b.karten.length &&
-      await p.evaluate(() => document.querySelector("#qlLink").value.endsWith("?buildId=11")),
-      "15.8 Zeitueberschreitung: der Satz, nichts gespeichert, der Link bleibt fuer einen neuen Versuch", b.status);
-    lager.abruf = abruf15;
-    lager.plansAblehnen = true;
-    await p.click("#qlForm button[type=submit]");
-    await p.waitForFunction(() => (document.querySelector("#qlStatus")?.textContent || "").includes("differently"), null, { timeout: 10000 }).catch(() => {});
-    b = await blick15(p);
-    assert(b.status === "Questlog sends the data differently than expected. Borometer needs an update." && !Object.keys(lager.plans).length && !b.karten.length,
-      "15.8 abgelehnte Schreibung (400): der Satz, keine Karte, nichts gespeichert", b.status);
-    assert(!s.fehler.length, "15.8 keine Fehler", s.fehler);
-    await p.close();
-  }
-
-  // --- 15.9: Loesen und Rueckgaengig - nie endgueltig, der alte Plan behaelt alles, was er trug
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    const vorher = JSON.parse(JSON.stringify(lager.plans.palt000001));
-    await p.click("#ql-palt000001 [data-ql-los]");
-    await p.waitForFunction(() => !document.querySelector("#ql-palt000001") && !!document.querySelector("#bauBody .qlgeloest"), null, { timeout: 5000 }).catch(() => {});
-    let b = await blick15(p);
-    const nach = lager.plans.palt000001;
-    const fokus = await p.evaluate(() => document.activeElement?.hasAttribute("data-ql-undo"));
-    assert(b.karten.length === 3 && !b.karten.some((x) => x.name === "Raid") && b.geloest === "\u201cRaid\u201d detached. It stays stored. Undo" && fokus,
-      "15.9 Loesen: die Karte geht, ein Satz mit \u201eUndo\u201c (im Fokus)", { g: b.geloest, fokus });
-    const { geloest, ...rest } = nach || {};
-    assert(Number.isFinite(geloest) && JSON.stringify(rest) === JSON.stringify(vorher),
-      "15.9 geloest heisst markiert, nicht geloescht: der Eintrag bleibt mit allem, was er trug", nach);
-    const zw = b.karten.find((x) => x.name === "Zwilling");
-    assert(zw && !zw.gleich, "15.9 der Hinweis \u201esame weapons\u201c faellt mit der geloesten Karte weg", zw);
-    await p.click("#bauBody [data-ql-undo]");
-    await p.waitForFunction(() => !!document.querySelector("#ql-palt000001"), null, { timeout: 5000 }).catch(() => {});
-    b = await blick15(p);
-    const fokus2 = await p.evaluate(() => document.activeElement === document.querySelector("#ql-palt000001 h3"));
-    assert(b.karten.length === 4 && JSON.stringify(lager.plans.palt000001) === JSON.stringify(vorher) && !b.geloest && fokus2,
-      "15.9 Rueckgaengig: die Karte ist zurueck, der Eintrag wie vorher, der Fokus auf ihrer Ueberschrift", { plan: lager.plans.palt000001, fokus2 });
-    assert(!s.fehler.length, "15.9 keine Fehler", s.fehler);
-    await p.close();
-  }
-
-  /* Fixrunde 1 zu Aufgabe 12 (Pruefung 29.09.; Entscheidungen dazu): geloeste Builds auch nach einem Neustart
-     zurueckholen, Links aus boro-builds.json ohne Eintrag als Karte, Einfuegen fuehrt zusammen statt zu ersetzen
-     und ist vor dem Lesen gesperrt, nie Questlogs Buildname als Name, das Feld verliert beim Neuzeichnen nichts
-     (aus test-plan-page 5c), Esc in der Auswahl, Loesen bei abgelehnter Schreibung. */
-  const pcB15 = await esbuild.build({ entryPoints: [join(root, "src/renderer/plan-core.ts")], bundle: true, format: "esm", platform: "neutral",
-    write: false, logLevel: "silent", plugins: [bilderPlugin(root, bilderModus(root))] });
-  const pc15 = await import("data:text/javascript;base64," + Buffer.from(pcB15.outputFiles[0].text).toString("base64"));
-  const pid15 = (link, id) => pc15.planId(pc15.parseLink(link), id);
-
-  // --- 15.9b: Loesen, Neustart, "Show detached builds (n)", Zurueckholen - der Eintrag wie vorher, ohne geloest
-  {
-    const lager = lager15();
-    const vorher = JSON.parse(JSON.stringify(lager.plans.pneu000001));
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    await beispiel(s.page);
-    await zuBuilds15(s);
-    await s.page.click("#ql-pneu000001 [data-ql-los]");
-    await warte15(s.page, () => lager.plans.pneu000001.geloest !== undefined, 5000);
-    await s.page.close();
-    const n = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = n.page;
-    await beispiel(p);
-    await zuBuilds15(n);
-    let b = await blick15(p);
-    assert(b.zeige && b.zeige.text === "Show detached builds (2)" && b.zeige.auf === "false" && !b.geloeste.length && b.karten.length === 3,
-      "15.9b nach dem Neustart: ein leiser Umschalter nennt die zwei geloesten Builds, zugeklappt", { zeige: b.zeige, n: b.karten.length });
-    await p.click("#bauBody [data-ql-zeige]");
-    await p.waitForFunction(() => document.querySelectorAll("#bauBody .qlkarte.geloest").length === 2, null, { timeout: 5000 }).catch(() => {});
-    b = await blick15(p);
-    const burst = b.geloeste.find((x) => x.name === "Burst");
-    assert(b.zeige?.auf === "true" && b.zeige.text === "Hide detached builds" && !!burst && burst.zurueck === "Bring back" &&
-      burst.zurueckName === "Bring back \u201cBurst\u201d" && !burst.los && b.geloeste.some((x) => x.name === "Weg"),
-      "15.9b aufgeklappt: die geloesten Builds als Karten mit \u201eBring back\u201c (fuer den Vorleser mit Namen)", { zeige: b.zeige, g: b.geloeste });
-    await p.click("#ql-pneu000001 [data-ql-zurueck]");
-    await warte15(p, () => lager.plans.pneu000001.geloest === undefined, 5000);
-    b = await blick15(p);
-    const fokus = await p.evaluate(() => document.activeElement === document.querySelector("#ql-pneu000001 h3"));
-    assert(JSON.stringify(lager.plans.pneu000001) === JSON.stringify(vorher) && b.karten.some((x) => x.name === "Burst") && b.geloeste.length === 1 && fokus,
-      "15.9b Zurueckholen: boro-plans.json traegt den Eintrag wie vorher, ohne geloest; die Karte ist zurueck, der Fokus auf ihr", { plan: lager.plans.pneu000001, fokus });
-    assert(!s.fehler.length && !n.fehler.length, "15.9b keine Fehler", [...s.fehler, ...n.fehler]);
-    await p.close();
-  }
-
-  // --- 15.9c: Loesen, das der Helfer ablehnt (400): die Karte bleibt, Seite und Datei laufen nicht auseinander
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    lager.plansAblehnen = true;
-    await p.click("#ql-pneu000003 [data-ql-los]");
-    await p.waitForFunction(() => !!document.querySelector("#ql-pneu000003:not(.geloest)") && (document.querySelector("#qlStatus")?.textContent || "").includes("differently"),
-      null, { timeout: 5000 }).catch(() => {});
-    const b = await blick15(p);
-    assert(b.karten.some((x) => x.name === "Heiler") && lager.plans.pneu000003.geloest === undefined && !b.zeige?.text.includes("(2)") &&
-      b.status.startsWith("Questlog sends the data differently"), "15.9c abgelehnt: die Karte steht wieder da, die Datei ist unveraendert, ein Satz sagt es", b.status);
-    await p.close();
-  }
-
-  // --- 15.2b: Links aus boro-builds.json ohne Eintrag als Karte (Questlog, fremder Planer, ohne Waffen); loesen ueber den Build
-  {
-    const baue = { ...baue15(),
-      dddddddddd: { name: "Alt", weapons: ["Spear", "Orb"], core: ["d1", "d2", "d3", "d4"], first: 4, link: Q15 + "character-builder/Other?buildId=5" },
-      eeeeeeeeee: { name: "", weapons: ["Greatsword", "Dagger"], core: ["e1", "e2", "e3", "e4"], first: 5, link: "https://maxroll.gg/tl/build/x", rot: { "Quick Fire": 2 } },
-      ffffffffff: { name: "Ohne", weapons: ["", ""], core: ["f1"], first: 6, link: "https://maxroll.gg/tl/build/y" } };
-    // derselbe Link wie ein Eintrag: keine zweite Karte
-    baue[B15.bA] = { ...baue[B15.bA], link: pl15().palt000001.link };
-    const lager = lager15({ builds: baue });
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    await p.waitForFunction(() => document.querySelectorAll("#bauBody .qlkarte").length >= 7, null, { timeout: 8000 }).catch(() => {});
-    const b = await blick15(p);
-    const k = Object.fromEntries(b.karten.map((x) => [x.name, x]));
-    assert(b.karten.length === 7 && b.ctx === "7 builds \u00b7 links to Questlog", "15.2b drei Links aus boro-builds.json als Karten, der Link, den ein Eintrag schon hat, nicht doppelt",
-      b.karten.map((x) => x.name));
-    assert(k.Alt && k.Alt.link.href === Q15 + "character-builder/Other?buildId=5" && k.Alt.link.target === "_blank" && k.Alt.link.rel === "noopener noreferrer" &&
-      k.Alt.link.text === "Open in Questlog" && k.Alt.zeile === "Spear and Orb", "15.2b Build mit Questlog-Link: Name und Waffen aus dem Build, In Questlog oeffnen", k.Alt);
-    const mx = k["Greatsword/Dagger 1"];
-    assert(mx && mx.link.href === "https://maxroll.gg/tl/build/x" && mx.link.target === "_blank" && mx.link.rel === "noopener noreferrer" && mx.link.text === "Open link" &&
-      mx.link.name === "Open the link of \u201cGreatsword/Dagger 1\u201d", "15.2b fremder Planer: neutral \u201eOpen link\u201c, Name nach Paar und Nummer", mx);
-    assert(k.Ohne && k.Ohne.zeile === "Weapons unknown \u2013 paste the link again" && !k.Ohne.bosse.length && !k.Ohne.leer && k.Ohne.icons === 0,
-      "15.2b ohne Waffen: \u201eWeapons unknown \u2013 paste the link again\u201c, keine Zahlen", k.Ohne);
-    const vor = JSON.parse(JSON.stringify(lager.builds.eeeeeeeeee));
-    await p.click("#ql-b-eeeeeeeeee [data-ql-los]");
-    await warte15(p, () => lager.builds.eeeeeeeeee.geloest !== undefined, 8000);
-    const { geloest, ...rest } = lager.builds.eeeeeeeeee;
-    assert(Number.isFinite(geloest) && JSON.stringify(rest) === JSON.stringify(vor) && !(await blick15(p)).karten.some((x) => x.link?.href === "https://maxroll.gg/tl/build/x"),
-      "15.2b Loesen am Build: markiert in boro-builds.json, alles andere (auch rot) bleibt, die Karte geht", lager.builds.eeeeeeeeee);
-    await p.click("#bauBody [data-ql-undo]");
-    await warte15(p, () => lager.builds.eeeeeeeeee.geloest === undefined, 8000);
-    assert(JSON.stringify(lager.builds.eeeeeeeeee) === JSON.stringify(vor), "15.2b Rueckgaengig am Build: wie vorher", lager.builds.eeeeeeeeee);
-    assert(!s.fehler.length, "15.2b keine Fehler", s.fehler);
-    await p.close();
-  }
-
-  // --- 15.7b: Einfuegen vor dem Lesen gesperrt; derselbe Link fuehrt zusammen, nie Questlogs Buildname als Name
-  {
-    abrufe15.length = 0;
-    const p11 = pid15(CHAR15, 11), p13 = pid15(CHAR15, 13);
-    const altPlan = { link: CHAR15 + "?buildId=11", at: tag15(10, 12, 0), name: "Raid", bau: B15.bA, weapons: ["Longbow", "Crossbow"],
-      active: [{ id: "SkillSet_A", lvl: 20, traits: [] }], passive: [], mastery: [], gear: { main_hand: "item_a" }, keys: { SkillSet_A: "Quick Fire" },
-      sheet: { slots: {}, sets: [], fmt: {} } };
-    // ein neuer Eintrag in fremder Form (ohne at, mit einem Feld, das die Seite nicht kennt): keine Karte, aber in der Datei
-    const fremd = { link: CHAR15 + "?buildId=13", name: "Mein", weapons: ["Longbow", "Crossbow"], notiz: 7 };
-    let los;
-    const lager = lager15({ plans: { [p11]: altPlan, [p13]: fremd }, plansWarte: new Promise((r) => { los = r; }) });
-    const s = await oeffne({ app: true, lager });
-    const p = s.page;
-    await beispiel(p);
-    await bereich(p, "builds");
-    await p.waitForSelector("#qlLink", { timeout: 10000 });
-    await p.fill("#qlLink", CHAR15 + "?buildId=11");
-    await p.press("#qlLink", "Enter");
-    await p.waitForFunction(() => (document.querySelector("#qlStatus")?.textContent || "").includes("One moment"), null, { timeout: 5000 }).catch(() => {});
-    const st = (await blick15(p)).status;
-    assert(st === "One moment \u2013 Borometer is still reading your saved builds." && abrufe15.length === 0 && !lager.planPosts.length,
-      "15.7b vor dem Lesen der Datei: ein Satz, kein Abruf, nichts geschrieben", { st, abrufe: abrufe15.length });
-    los();
-    await p.waitForFunction(() => document.querySelectorAll("#bauBody .qlkarte").length === 1 && !(document.querySelector("#qlStatus")?.textContent || ""), null, { timeout: 15000 }).catch(() => {});
-    await p.press("#qlLink", "Enter");
-    await warte15(p, () => lager.planPosts.length >= 1, 10000);
-    const nach = lager.plans[p11];
-    const { name: n1, ...rest1 } = nach || {}, { name: n0, ...rest0 } = altPlan;
-    assert(n1 === "" && JSON.stringify(rest1) === JSON.stringify(rest0),
-      "15.7b derselbe Link ohne eigenen Namen: alles bleibt (Steckbrief, Skills, Build), Questlogs alter Buildname wird nicht wieder geschrieben", nach);
-    await p.fill("#qlLink", CHAR15 + "?buildId=13");
-    await p.press("#qlLink", "Enter");
-    await warte15(p, () => lager.planPosts.length >= 2, 10000);
-    const f = lager.plans[p13];
-    assert(f && f.name === "Mein" && f.notiz === 7 && Number.isFinite(f.at) && f.link === fremd.link && JSON.stringify(f.weapons) === JSON.stringify(fremd.weapons),
-      "15.7b ein Eintrag in fremder Form: zusammengefuehrt, der eigene Name und das unbekannte Feld bleiben", f);
-    await p.fill("#qlLink", CHAR15 + "?buildId=13");
-    await p.fill("#qlName", "Neu");
-    await p.press("#qlLink", "Enter");
-    await warte15(p, () => lager.planPosts.length >= 3, 10000);
-    assert(lager.plans[p13].name === "Neu" && lager.plans[p13].notiz === 7, "15.7b ein neuer eigener Name ersetzt den alten, sonst bleibt alles", lager.plans[p13]);
-    assert(!s.fehler.length, "15.7b keine Fehler", s.fehler);
-    await p.close();
-  }
-
-  // --- 15.7c (aus test-plan-page 5c, gleich streng): was im Feld steht, ueberlebt ein Neuzeichnen - neues Log, Fokus weg, Karten neu gebaut
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    await p.fill("#qlLink", "abc");
-    await p.fill("#qlName", "Tipp");
-    await p.focus("#qlLink");
-    await s.page.setInputFiles("#fileInput", L15_A);
-    await p.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"), null, { timeout: 10000 }).catch(() => {});
-    await bereich(p, "builds");
-    const w1 = await p.evaluate(() => [document.querySelector("#qlLink").value, document.querySelector("#qlName").value]);
-    assert(JSON.stringify(w1) === JSON.stringify(["abc", "Tipp"]), "15.7c ein neues Log: Link und Name stehen noch im Feld", w1);
-    await p.evaluate(() => document.activeElement?.blur());
-    // etwas anderes aendert den Bereich (Loesen und Rueckgaengig): die Karten werden wirklich neu gebaut
-    await p.evaluate(() => { window.__karteVorher = document.querySelector("#ql-pneu000003"); });
-    await p.click("#ql-pneu000003 [data-ql-los]");
-    await p.click("#bauBody [data-ql-undo]");
-    await p.waitForFunction(() => !!document.querySelector("#ql-pneu000003"), null, { timeout: 5000 }).catch(() => {});
-    const w2 = await p.evaluate(() => [document.querySelector("#qlLink").value, document.querySelector("#qlName").value,
-      !!document.querySelector("#ql-pneu000003") && document.querySelector("#ql-pneu000003") !== window.__karteVorher]);
-    assert(JSON.stringify(w2) === JSON.stringify(["abc", "Tipp", true]), "15.7c nach Fokusverlust und echtem Neubau der Karten: Link und Name stehen noch", w2);
-    await p.close();
-  }
-
-  // --- 15.7d: Esc in der Auswahl schliesst sie, der Fokus geht ins Feld, kein Abruf
-  {
-    abrufe15.length = 0;
-    const lager = lager15({ plans: {} });
-    const s = await oeffne({ app: true, lager });
-    const p = s.page;
-    await beispiel(p);
-    await zuBuilds15(s);
-    await p.fill("#qlLink", CHAR15);
-    await p.press("#qlLink", "Enter");
-    await p.waitForFunction(() => !!document.querySelector("#qlForm fieldset legend"), null, { timeout: 10000 }).catch(() => {});
-    const vor = abrufe15.length;
-    await p.keyboard.press("Escape");
-    await p.waitForFunction(() => !document.querySelector("#qlForm fieldset"), null, { timeout: 5000 }).catch(() => {});
-    const e = await p.evaluate(() => ({ auswahl: !!document.querySelector("#qlForm fieldset"), fokus: document.activeElement?.id }));
-    assert(vor === 1 && !e.auswahl && e.fokus === "qlLink" && abrufe15.length === 1 && !Object.keys(lager.plans).length,
-      "15.7d Esc in der Auswahl: sie geht, der Fokus steht im Feld, kein weiterer Abruf, nichts gespeichert", { vor, e, abrufe: abrufe15.length });
-    await p.close();
-  }
-
-  // --- 15.10: Deutsch - alle Worte, "Build", nie "Bau"
-  {
-    const lager = lager15();
-    const s = await oeffne({ app: true, lang: "de", lager, config: { logIndex: INDEX15 } });
-    const p = s.page;
-    await laden15(s, L15_A, "Vulcanus");
-    const kl = await kampfLink15(p);
-    await zuBuilds15(s);
-    const b = await blick15(p);
-    const k = Object.fromEntries(b.karten.map((x) => [x.name, x]));
-    assert(b.linkLabel === "Questlog-Link einfügen" && b.nameLabel === "Name (optional)" && b.speichern === "Speichern" && b.ctx === "4 Builds \u00b7 Links zu Questlog",
-      "15.10 Deutsch: Feld, Name, Speichern, Kopfzeile", { l: b.linkLabel, n: b.nameLabel, s: b.speichern, ctx: b.ctx });
-    assert(k.Raid?.zeile === "Langbogen und Armbrust \u00b7 zuletzt gespielt 20.09." && k.Raid.bosse[0] === "King Khanzaizin 226.5k \u00b7 19 Kämpfe" &&
-      k.Raid.bosse[2] === "Tevent \u00b7 2 Kämpfe" && k.Raid.link?.text === "In Questlog öffnen" && k.Raid.los === "Lösen" &&
-      k.Raid.schild === "im offenen Kampf" && k.Raid.gleich === "gleiche Waffen wie \u201eZwilling\u201c" && k.Heiler?.leer === "Noch keine Kämpfe mit diesen Waffen.",
-      "15.10 Deutsch: Karte wie in der Skizze (Kurzzahl mit Punkt), Schild, Hinweis, leerer Satz", k.Raid);
-    assert(kl && kl.text === "Build in Questlog \u203a" && !/\bBau(e|s|en)?\b/.test(b.text + b.ctx), "15.10 Deutsch: der Link im Kampf; Build, nie Bau", { kl, text: b.text.slice(0, 200) });
-    await p.close();
-  }
-
-  // --- 15.11: drei Themen - der goldene Rand traegt, Text mindestens 11 Punkt
-  for (const thema of ["dark", "light", "tnl"]) {
-    const s = await oeffne({ app: true, lager: lager15(), config: { logIndex: INDEX15, theme: thema } });
-    await laden15(s, L15_A, "Vulcanus");
-    await zuBuilds15(s);
-    const b = await blick15(s.page);
-    const an = await s.page.evaluate(() => document.documentElement.dataset.theme);
-    assert(an === thema && b.karten[0]?.offen && b.karten[0].rand === b.gold && b.gold !== "rgba(0, 0, 0, 0)" && !b.klein.length && !s.fehler.length,
-      `15.11 Thema ${thema}: die Karte des offenen Kampfs golden umrandet, Text mindestens 11 Punkt`, { an, rand: b.karten[0]?.rand, gold: b.gold, klein: b.klein });
-    await s.page.close();
-  }
-
-  // --- 15.12: Groessen - kein waagerechtes Rollen, nichts gestreckt, Text mindestens 11 Punkt; bei 1280 x 860 rollt Builds nicht
-  for (const [breite, hoehe] of [[2000, 1480], [1920, 1080], [1280, 860], [1000, 860], [760, 860], [560, 860]]) {
-    const s = await oeffne({ app: breite >= 760, lang: "de", breite, hoehe, lager: lager15(), config: { logIndex: INDEX15 } });
-    await laden15(s, L15_A, "Vulcanus");
-    await zuBuilds15(s);
-    await s.page.evaluate(() => { document.activeElement?.blur(); window.scrollTo(0, 0); });
-    const b = await blick15(s.page);
-    const wo = `${breite} \u00d7 ${hoehe}`;
-    assert(!b.quer && !b.klein.length && !s.fehler.length && b.karten.length === 4, `15.12 ${wo}: kein waagerechtes Rollen, Text mindestens 11 Punkt, vier Karten, keine Fehler`,
-      { quer: b.quer, klein: b.klein, fehler: s.fehler });
-    assert(b.karten.every((x) => x.box.width <= 561 && x.box.right <= breite), `15.12 ${wo}: nichts gestreckt - jede Karte hoechstens 560 Punkt breit`, b.karten.map((x) => Math.round(x.box.width)));
-    if (breite === 1280) assert(b.rollt <= 0, "15.12 1280 \u00d7 860: Builds rollt nicht - Feld und vier Karten im Bild", b.rollt);
-    await s.page.close();
-  }
+  // 15.1 bis 15.12 (der Bereich Builds, das Feld am Kampf, der Questlog-Abruf) entfielen mit dem Builds-Reiter (#207).
 
   // ===== Abschnitt 16: breite Schrift (Aufgabe 13, CI unter Linux) =====
   /* Die CI laeuft unter Linux mit dessen Standardschriften; die sind breiter als Palatino und Segoe unter

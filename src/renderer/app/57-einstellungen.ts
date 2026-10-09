@@ -5,9 +5,9 @@ import { $, esc } from "./18-interface-basics";
 import { persistPref } from "./27-weapons-tab";
 import { setLang } from "./31-static-translation";
 import { kampfdateiLaden, kampfdateiSpeichern, klemme, setzeTrennung, switchTab } from "./34-menus-drop-and-tabs";
-import { clampSee, clampUiZoom, kuerzelText, setSee, setUiZoom, ZOOM_MAX, ZOOM_MIN } from "./37-window-size-and-overlay";
+import { clampSee, clampUiZoom, kuerzelText, setSee, setUiZoom, winPost, ZOOM_MAX, ZOOM_MIN } from "./37-window-size-and-overlay";
 import { setzeThema } from "./39-themes";
-import { chooseServerDir, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";
+import { chooseServerDir, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";
 import { sample } from "./40-sample-fight";
 import { serverEinstNachfuehren } from "./42-party";
 import { beispielGruppe, setzeEntwicklermodus, toggleChangelog } from "./43-more-menu-and-dev-mode";
@@ -21,7 +21,8 @@ import { isWatching } from "./45-startup";
    der Titelleiste gibt es nur noch als Element). Im Kompakt gibt es den Ort
    nicht.
    EINE rollende Seite wie im Entwurf (E:919-966): links die Sprungleiste
-   (#einstNav, haftet), rechts Titel und acht Abschnitte untereinander, jeder
+   (#einstNav, haftet), rechts Titel und acht Abschnitte untereinander - im
+   eigenen Fenster unter Windows neun, mit "Windows" vor Info -, jeder
    eine section mit h3 (der Titel ist h2, das h1 ist die Wortmarke). Ein
    Klick in der Leiste springt zum Abschnitt und setzt den Fokus auf seine
    Ueberschrift (einstSpringen); beim Rollen leuchtet der Abschnitt mit, der
@@ -54,8 +55,9 @@ export function renderEinst(): void {
    Jede Zeile ruft die Setzfunktion, die auch das Menue oder der Knopf der
    Titelleiste ruft; die Setzfunktionen rufen am Ende einstNachfuehren(). So
    zeigen alle Orte immer denselben Stand, und es gibt nur einen Weg zu
-   persistPref. Einen eigenen Schluessel schreiben die Einstellungen nur
-   einen: updatePruefen, den Schalter des Update-Hinweises (unten). */
+   persistPref. Eigene Schluessel schreiben die Einstellungen nur diese:
+   updatePruefen, den Schalter des Update-Hinweises, und die drei Schalter
+   des Abschnitts Windows (unten). */
 
 /** Ein Schalter im Muster .esw: Zustand und Wort (An/Aus) setzen. */
 export function esSchalter(b: HTMLElement, an: boolean): void {
@@ -145,6 +147,33 @@ function updateNachfuehren(){
   esSchalter($("#eUpdatePruefen"), updateAn);
 }
 
+/* Windows (Windows-Einbindung 9, 3.4): nur im eigenen Fenster unter Windows
+   (der Hauptprozess meldet windows.da; ein Tab am Helfer und das
+   Kompaktfenster zeigen ihn nie). Melden ist der Hauptschalter,
+   Nur-Bestwert sein Zusatz: bedienbar nur, solange Melden an ist
+   (aria-disabled, der Klick tut dann nichts; er bleibt in der Tab-Folge,
+   damit der Vorleser ihn findet). Schliessen in den Infobereich; den
+   Autostart fuehrt Windows selbst (POST /api/win), der Schalter zeigt, was
+   die Antwort sagt. Die drei anderen gehen nur als Wahrheitswert ueber
+   persistPref nach /api/config. Den Stand bringt /api/config (41). */
+function winSchalter(){
+  const w = state.win;
+  const da = !!w && w.da && SERVED && OWN_WINDOW && !KOMPAKT_FENSTER;
+  const g = $("#eg-win"), nav = $("#einstNavWin");
+  if(g.hidden === da) g.hidden = !da;
+  if(nav.hidden === da) nav.hidden = !da;
+  if(!w || !da) return;
+  esSchalter($("#eWinMelden"), w.melden);
+  const nb = $("#eWinNurBest");
+  esSchalter(nb, w.nurBest);
+  const gesperrt = w.melden ? "false" : "true";
+  if(nb.getAttribute("aria-disabled") !== gesperrt) nb.setAttribute("aria-disabled", gesperrt);
+  esSchalter($("#eWinTray"), w.tray);
+  const az = $("#eWinAutoZeile");
+  if(az.hidden === w.autostartDa) az.hidden = !w.autostartDa;
+  esSchalter($("#eWinAuto"), w.autostart);
+}
+
 /* "Bewegung verringern" (DECISION 10.4): kein Schalter und kein Schluessel,
    nur die Anzeige, was Windows sagt - die App folgt prefers-reduced-motion
    ohnehin (die grosse Zahl zaehlt nicht hoch, Bildlaeufe springen). */
@@ -165,6 +194,7 @@ export function einstNachfuehren(): void {
   if(!einst) return;
   logsNachfuehren();
   updateNachfuehren();
+  winSchalter();
   bewegungNachfuehren();
   serverEinstNachfuehren();
   // Thema: role=radio, aria-checked, ein Tabstopp auf dem gewaehlten
@@ -175,6 +205,15 @@ export function einstNachfuehren(): void {
     b.classList.toggle("on", on);
     b.tabIndex = on ? 0 : -1;
   });
+  /* Rauchglas ohne Mica: leise, warum (Spezifikation 4.3). Im Browser weiss
+     die Seite es selbst, im Fenster sagt es /api/state (data-mica-grund, 37). */
+  const ohne = $("#eGlasOhne");
+  const root = document.documentElement;
+  const grund = state.theme !== "glas" || root.classList.contains("mica") ? ""
+              : !(SERVED && OWN_WINDOW) ? "browser" : (root.dataset.micaGrund || "");
+  const glasSatz = grund ? t("einst.glasOhne." + grund) : "";
+  if(ohne.textContent !== glasSatz) ohne.textContent = glasSatz;
+  if(ohne.hidden !== !glasSatz) ohne.hidden = !glasSatz;
   regler("eZoom", clampUiZoom(state.zoom));
   einst.querySelectorAll<HTMLElement>("#eSprache button").forEach(b => {
     const on = b.dataset.lang === state.lang;
@@ -292,6 +331,36 @@ function zeilenBinden(){
     persistPref("updatePruefen", updateAn);
     einstNachfuehren();
   };
+  $("#eWinMelden").onclick = () => {
+    const w = state.win;
+    if(!w) return;
+    w.melden = !w.melden;
+    persistPref("meldenKampf", w.melden);
+    einstNachfuehren();
+  };
+  $("#eWinNurBest").onclick = () => {
+    const w = state.win;
+    if(!w || !w.melden) return;
+    w.nurBest = !w.nurBest;
+    persistPref("meldenNurBest", w.nurBest);
+    einstNachfuehren();
+  };
+  $("#eWinTray").onclick = () => {
+    const w = state.win;
+    if(!w) return;
+    w.tray = !w.tray;
+    persistPref("trayBeimSchliessen", w.tray);
+    einstNachfuehren();
+  };
+  $("#eWinAuto").onclick = () => {
+    const w = state.win;
+    if(!w) return;
+    void winPost({do: "autostart", an: !w.autostart}).then(d => {
+      if(!d || typeof d.autostart !== "boolean" || !state.win) return;
+      state.win.autostart = d.autostart;
+      einstNachfuehren();
+    });
+  };
   if(ruhigMedia) ruhigMedia.addEventListener("change", bewegungNachfuehren);
 }
 
@@ -343,7 +412,8 @@ function einstMitleuchten(){
     if(unterwegs){ if(Math.abs(y - sprungZiel) <= 4) sprungVon = sprungZiel; return; }
     gesprungen = false;
   }
-  const teile = [...document.querySelectorAll<HTMLElement>("#einst section.egruppe")];
+  // ein verborgener Abschnitt (Windows ausserhalb des eigenen Fensters) leuchtet nie
+  const teile = [...document.querySelectorAll<HTMLElement>("#einst section.egruppe")].filter(s => !s.hidden);
   if(!teile.length) return;
   const kopf = document.querySelector("header.top")?.getBoundingClientRect().bottom ?? 0;
   let akt = teile[0]!.id.slice(3);

@@ -280,7 +280,7 @@ export interface HistFight {
   at: number;
   /** which log it came from */
   file?: string;
-  /** the build it was fought with (47-builds.ts, boro-builds.json); absent before the build journal */
+  /** the build an old entry was assigned to (the Builds tab is gone, #207): carried along when the index is rewritten, never read or shown */
   b?: string;
   /** a practice-dummy attempt: its length class, 60, 120 or 180 s - dps is over that length */
   c?: number;
@@ -293,6 +293,12 @@ export interface HistFight {
   /** the player's biggest single hit in this fight, and the id of the skill that landed it (spec Rekorde 3) - an id of a fixed pattern or "", never a name; absent before the records */
   top?: number;
   topSid?: string;
+  /** the fight's weapon pair as two indexes into WAFFEN (build-core.ts) - numbers, never text */
+  w?: [number, number];
+  /** 1: the sum of a group - a log with several attackers opened with "everyone" (state.player "__all").
+   *  Shown in the history, but never your best pull (bossPulls, verlaufPulls, rekordKaempfe). A number, never a name;
+   *  absent for your own fights and for entries written before 06.10.2026 */
+  g?: number;
 }
 
 /** The fight history kept across logs (the rail's "history"). */
@@ -345,6 +351,8 @@ export interface AppState {
   weeklies: boolean;
   /** Rekorde stehen (Spezifikation Rekorde 2a, 62-rekorde.ts): ein Ort wie die Weeklies */
   rekorde: boolean;
+  /** Gilde steht (Spezifikation Gilde 5, 68-gilde.ts): ein Ort wie die Weeklies */
+  gilde: boolean;
   /** Kampf-Tafel (56-tafel.ts): der Zeitverlauf der Kurve ist aufgeklappt (Kurve bis 540 Punkt mit den vier staerksten Faehigkeiten) */
   zeitAuf: boolean;
   /** Kampf-Tafel: die Faehigkeit, deren Spur die Kurve zeigt (Zeigen oder Fokus in der Tafel), sonst "" */
@@ -363,12 +371,6 @@ export interface AppState {
   best: BestStore;
   /** Rotation side by side: the whole shorter fight rather than its first 60 s */
   cmpRotAll: boolean;
-  /** the builds recognised so far (47-builds.ts) */
-  builds: BauStore;
-  /** the builds as links to questlog.gg (51-plan.ts, /api/plans) */
-  plans: PlanStore;
-  /** Questlog's build name that came with a fetch, per plan id - this session only, never written */
-  planNames: Record<string, string>;
   integrity: any;
   partyBoss: PartyBossFight[];
   hist: HistoryState;
@@ -395,9 +397,9 @@ export interface AppState {
   rotAus?: Set<string>;
   /**
    * "Your rotation" choices kept for this session only (54-deine-rotation.ts), in pots by where they were made:
-   * the fight's fingerprint (no build known yet) or, for a build that was full, that build's id
+   * the fight's weapon pair, or "ohne" for an unknown pair
    */
-  rotSitzung: Record<string, { fp: { weapons: [string, string]; core: string[] } | null; bau: string | null; rot: Record<string, 0 | 1 | 2> }>;
+  rotSitzung: Record<string, { paar: [string, string] | null; rot: Record<string, 0 | 1 | 2> }>;
   rotFrom?: number | null;
   rotTo?: number | null;
   rotZoom: number;
@@ -433,6 +435,8 @@ export interface AppState {
   rundgangGesehen: boolean | null;
   /** eine neue Installation: der Hauptprozess meldet einen ersten Start (firstStart) und logIndex ist leer; null, bis /api/config antwortet */
   ersterStart: boolean | null;
+  /** der Abschnitt Windows der Einstellungen (Windows-Einbindung 9): da nur im eigenen Fenster unter Windows; null, bis /api/config windows bringt */
+  win: { da: boolean; autostartDa: boolean; autostart: boolean; melden: boolean; nurBest: boolean; tray: boolean } | null;
   zeigeMitglied: string | null;
   kurveLaedt: string | null;
 
@@ -562,42 +566,6 @@ export interface BestEntry {
 /** Key "boss:<histKey>" or "dummy:<60|120|180>". */
 export type BestStore = Record<string, BestEntry>;
 
-/** A build as boro-builds.json keeps it (47-builds.ts, src/main/builds.ts). */
-export interface Bau {
-  /** empty until someone names it; shown as "Longbow/Dagger 1" meanwhile */
-  name: string;
-  /** the pair as first seen, main then off ("" for one weapon) */
-  weapons: [string, string];
-  /** the skills that carried 80 % of the damage, at most six, as language-free keys (skillKey) */
-  core: string[];
-  /** a planner link, https only; Borometer never loads it */
-  link?: string;
-  /** when its first fight began, ms on the log's clock */
-  first: number;
-  /** "Your rotation" (spec Deine Rotation, 7): skill key (skillKey) -> 1 on its own, 2 I press it, 0 taken back; at most 24 */
-  rot?: Record<string, 0 | 1 | 2>;
-  /** detached in Builds (its link card, 51-plan.ts): kept, shown no more; ms */
-  geloest?: number;
-}
-/** Key: the build id, ten lower-case letters or digits (build-core.ts, bauId). */
-export type BauStore = Record<string, Bau>;
-/** A build as a link to questlog.gg (Aufgabe 12 of the redesign, 29.09.): the link, when it was saved,
-    the weapons Questlog named and the player's own name ("" when none was given) - Questlog's build name
-    lives in the session only (state.planNames). Entries from before keep what the planner stored then
-    (ids, levels, numbers, the Steckbrief, Questlog's build name as name); the page reads only these
-    fields and writes the rest back untouched. */
-export interface Plan {
-  link: string;
-  at: number;
-  name: string;
-  weapons: string[];
-  /** detached ("Loesen"): kept in boro-plans.json, shown no more; ms */
-  geloest?: number;
-  /** whatever an older entry carries besides */
-  [alt: string]: unknown;
-}
-/** Key: the plan id, "p" and nine lower-case letters or digits (plan-core.ts, planId). */
-export type PlanStore = Record<string, Plan>;
 /** A finding of the analysis tab (insights()): a dictionary key and what fills it. */
 export interface Insight {
   key: string;
@@ -730,6 +698,8 @@ export interface Dungeon extends LocalizedName {
   lvl?: number;
   /** a solo dungeon */
   solo?: boolean;
+  /** a dungeon of its own kind, without stars (Halls of Illusion) */
+  separat?: boolean;
   /** the raid a part belongs to */
   of?: LocalizedName;
   boss: string[];

@@ -123,6 +123,8 @@ export const state = {
   tab:"skills", einst:false,   // einst: Einstellungen (57-einstellungen.ts)
   weeklies:false,   // Weeklies (Neugestaltung 28.09., Luecke 9.1): ein Ort wie Start
   rekorde:false,    // Rekorde (Spezifikation Rekorde 2a): ein Ort wie die Weeklies
+  gilde:false,      // Gilde (Spezifikation Gilde 5, 68-gilde.ts): ein Ort wie die Weeklies
+  win:null,         // Windows in den Einstellungen (Windows-Einbindung 9): null, bis /api/config windows bringt
   zeitAuf:false, kurveSkill:""   // Kampf-Tafel (56-tafel.ts)
 } as Partial<AppState> as AppState;   // the rest is filled in further down, before the first paint
 

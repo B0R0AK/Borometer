@@ -13,8 +13,11 @@
    kein Kampf steht: sie werden als leere Umrisse gezeigt.
 
    Was als Rekord gilt:
-   - bester DPS: der hoechste; bei gleichem Wert der fruehere. "vorher" ist
-     der beste Kampf davor, die Prozent rechnen gegen ihn.
+   - bester DPS: nach der Regel fuer den besten Pull (best-pull-core.ts,
+     Spezifikation Bester Pull 3): erst die Mindestlaenge, dann der hoechste
+     DPS; bei gleichem Wert der fruehere. Ein einzelner Kampf hat keinen
+     besten Pull (bester: false, dps 0). "vorher" ist der beste Kampf davor
+     nach derselben Regel, die Prozent rechnen gegen ihn.
    - staerkster Treffer: der hoechste Einzeltreffer (HistFight.top) mit der
      Faehigkeit, die ihn traf, als Kennung (topSid) - immer die des staerksten, auch
      wenn es Ventius ist (Entscheidung 02.10.). Bei gleichem Wert der fruehere.
@@ -23,6 +26,8 @@
      weiss nicht, ob ein Boss fiel). Sind aeltere Logs ungelesen, heisst ein
      erster Kampf am ersten Tag des Zeitraums "ab".
    Die Uhr ist die des Logs (UTC-Felder, wie im Verlauf). */
+
+import { besterPull, mindestLaenge, rangfolge } from "./best-pull-core";
 
 /** Ein Kampf des Verlaufs, so weit die Rekorde ihn brauchen (HistFight). */
 export interface RkKampf {
@@ -43,6 +48,7 @@ export interface RkDungeon {
   stars?: number | undefined;
   lvl?: number | undefined;
   solo?: boolean | undefined;
+  separat?: boolean | undefined;
   of?: { en: string; de?: string | undefined } | null | undefined;
   en: string;
   de?: string | undefined;
@@ -94,7 +100,8 @@ const klein = (n: string) => n.toLowerCase();
 
 /* Die Seiten des Albums aus der Tabelle: Raid, Uebungspuppe, Feldbosse
    (offene Welt, Erzbosse, Kolosse), Dungeons nach Sternen (ein Stern und
-   die Einstiegsdungeons mit Stufe zusammen, dann der Solo-Abgrund). Zwei
+   die Einstiegsdungeons mit Stufe zusammen, dann der Solo-Abgrund, dann
+   die Halle der Illusionen, die keine Sterne hat). Zwei
    Schreibweisen eines Dungeonbosses: die erste ist die englische, die zweite
    die deutsche, wie die Tabelle sie fuehrt. */
 export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOffen[]): RkSeite[] {
@@ -106,7 +113,7 @@ export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOf
   };
   const raid: RkOrt[] = [];
   let altar: RkName | null = null;
-  const sterne: Record<string, RkOrt[]> = {s4: [], s3: [], s2: [], s1: [], solo: []};
+  const sterne: Record<string, RkOrt[]> = {s4: [], s3: [], s2: [], s1: [], solo: [], separat: []};
   for(const d of dungeons){
     const unter = {de: d.de ?? d.en, en: d.en};
     const gruppen = (d.bosses || [d.boss]).map(g => [...g]);
@@ -127,7 +134,7 @@ export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOf
       }
       continue;
     }
-    const key = d.solo ? "solo" : d.stars === 4 ? "s4" : d.stars === 3 ? "s3" : d.stars === 2 ? "s2" : "s1";
+    const key = d.solo ? "solo" : d.separat ? "separat" : d.stars === 4 ? "s4" : d.stars === 3 ? "s3" : d.stars === 2 ? "s2" : "s1";
     for(const g of gruppen)
       sterne[key]!.push({id: id("dungeon", g[0]!), de: g[1] ?? g[0]!, en: g[0]!, namen: mitPhasen(d, g), teile: [], unter, klasse: null});
   }
@@ -148,7 +155,7 @@ export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOf
       namen: [], teile: [], unter: null, klasse: c}))}]},
     {id: "feld", unter: null, gruppen: [{key: null, orte: feld.field!}, {key: "erz", orte: feld.arch!}, {key: "koloss", orte: feld.koloss!}]
       .filter(g => g.orte.length)},
-    {id: "dungeon", unter: null, gruppen: (["s4", "s3", "s2", "s1", "solo"] as const).map(k => ({key: k, orte: sterne[k]!})).filter(g => g.orte.length)},
+    {id: "dungeon", unter: null, gruppen: (["s4", "s3", "s2", "s1", "solo", "separat"] as const).map(k => ({key: k, orte: sterne[k]!})).filter(g => g.orte.length)},
   ];
 }
 
@@ -156,6 +163,8 @@ export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOf
 export interface RkWert {
   /** wie viele Kaempfe */
   n: number;
+  /** gibt es einen besten Pull (Spezifikation Bester Pull 3)? Sonst sind dps und dpsAt 0 */
+  bester: boolean;
   dps: number;
   dpsAt: number;
   /** der beste Kampf vor dem besten, und um wie viel Prozent (ganz) der beste darueber liegt */
@@ -225,17 +234,21 @@ export function rekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten
   const werte = new Map<RkOrt, RkWert>();
   for(const [o, l0] of je){
     const l = l0.slice().sort((a, b) => a.at - b.at);
-    let best = l[0]!;
-    for(const k of l) if(k.dps > best.dps) best = k;            // gleich: der fruehere bleibt
-    let vor: RkKampf | null = null;
-    for(const k of l) if(k.at < best.at && (!vor || k.dps > vor.dps)) vor = k;
+    /* bester DPS nach der Regel fuer den besten Pull (best-pull-core.ts):
+       erst die Mindestlaenge, dann DPS, bei Gleichstand der fruehere. Alte
+       Eintraege ohne dur zaehlen als 0 s. vorher: der erste der Rangfolge
+       davor, mit der Schwelle der ganzen Menge. */
+    const pulls = l.map(k => ({...k, dur: Number.isFinite(k.dur) ? k.dur! : 0}));
+    const best = besterPull(pulls);
+    const vor = best ? rangfolge(pulls.filter(k => k.at < best.at), mindestLaenge(pulls))[0] ?? null : null;
     let top: RkKampf | null = null;
     for(const k of l) if(hatTop(k) && (!top || k.top! > top.top!)) top = k;
     const teil = top && o.teile.length ? nackt(top.name) : null;
     werte.set(o, {
       n: l.length,
-      dps: best.dps, dpsAt: best.at,
-      vorher: vor ? vor.dps : null, plus: vor && vor.dps > 0 ? Math.round((best.dps / vor.dps - 1) * 100) : null,
+      bester: !!best,
+      dps: best ? best.dps : 0, dpsAt: best ? best.at : 0,
+      vorher: vor ? vor.dps : null, plus: best && vor && vor.dps > 0 ? Math.round((best.dps / vor.dps - 1) * 100) : null,
       top: top ? top.top! : null, topSid: top ? top.topSid! : null,
       topTeil: teil && o.teile.includes(teil) ? teil : null, topAt: top ? top.at : null,
       erster: l[0]!.at, ab: aelterUngelesen && ersterTag != null && tagVon(l[0]!.at) === ersterTag,

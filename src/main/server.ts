@@ -14,22 +14,26 @@ import * as fs from "node:fs";
 import * as http from "node:http";
 import * as path from "node:path";
 import { loadBest, putBest } from "./best";
-import { loadBuilds, putBuild } from "./builds";
 import { CONFIG_MIGRATED, CONFIG_PATH, configString, loadConfig, updateConfig } from "./config";
 import { bareHost, errorName, fetchJson, HttpError, listenFrom, readJson, send, type Json } from "./http";
 import { eventCounts, onEvent, type EventName } from "./events";
 import { hotkeyState } from "./hotkey";
 import { guessLogDir, latestAnswer, listLogs, logAnswer, newestLog, readLog } from "./logs";
-import { loadPlans, putPlan } from "./plans";
 import { isFirstStart } from "./firststart";
-import { fetchPlan } from "./questlog";
 import {
   askRename, buildBoard, KICK_PAUSE, lanAddress, makeCode, PARTY, publicPort, pushOnce, pushToHost,
   record, resetParty, startMemberLoop, startPublic, stopMemberLoop, stopPublic, type Payload,
 } from "./party";
 import { bugReportsDir, FOLDERS, partyLogsDir, safeSaveName, savesDir } from "./paths";
+import { erinnerungAbfrage, erinnerungAntwort, erinnerungQuelle } from "./erinnerung";
 import { createWeeklies, loadWeeklies, putWeeklies } from "./weeklies";
-import { acrylicNow, currentWindow, kompaktMoeglich, kompaktStand, themeChanged, winAction, windowPlaced } from "./window";
+import { createGilde, loadGilde, putGilde } from "./gilde";
+import { leseFortschritt } from "./taskbar";
+import { startAuftrag } from "./start";
+import { autostartAn, autostartDa } from "./autostart";
+import { jumpListBauen } from "./jumplist";
+import { zuletztNeu } from "./windows-core";
+import { acrylicNow, currentWindow, kompaktMoeglich, kompaktStand, micaGrund, micaNow, themeChanged, winAction, windowPlaced } from "./window";
 
 export const FIRST_PORT = 8731;
 
@@ -150,6 +154,10 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         // whether compact can sit on Acrylic here (Windows 11 22H2 and later,
         // "Transparency effects" on)
         material: currentWindow() !== null && acrylicNow(),
+        // full view on its glass ground, Acrylic since #189 (theme smoked glass, spec Rauchglas 3.3), and why
+        // not where it cannot be - only in the app's own window
+        mica: currentWindow() !== null && micaNow(),
+        micaGrund: currentWindow() !== null ? micaGrund() : null,
         // the WebView2 black-window failure of the Python build; Electron
         // brings its own Chromium, so there is no such fallback any more
         windowBlank: false,
@@ -159,6 +167,8 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         // logging ran in full view, the hotkey asked for it)
         kompaktFenster: kompaktMoeglich(),
         kompakt: kompaktStand(),
+        // an order from the jump list until the page has done it (start.ts)
+        start: startAuftrag(),
         // a newer release, if the one check at start found one (update.ts)
         update: UPDATE,
       });
@@ -203,6 +213,7 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         // with from, only the new end as JSON (Live-Leistung specification 3), instead of the whole file as before
         if (q.has("from")) {
           const { status, body } = latestAnswer(found, q.get("file"), q.get("from"));
+          if (status === 200 && "to" in body) leseFortschritt(currentWindow(), body.to, body.size);
           return reply(res, body, status);
         }
         text(res, readLog(found));
@@ -224,6 +235,7 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
       // compared with a fresh listing of the watched folder, never opened
       try {
         const { status, body } = logAnswer(STATE.dir, q.get("name"), q.get("from"));
+        if (status === 200 && "to" in body) leseFortschritt(currentWindow(), body.to, body.size);
         return reply(res, body, status);
       } catch {
         return text(res, "", 500);
@@ -253,12 +265,19 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         theme: cfg.theme ?? null,
         // the one-time note on borderless mode was acknowledged (Fenster-Extras 3.5)
         randlosGesehen: cfg.randlosGesehen === true,
+        // the page's language for the main process's texts, only "de" or "en" (spec Windows-Einbindung 8)
+        lang: cfg.lang === "de" || cfg.lang === "en" ? cfg.lang : null,
         // the first-start tour was finished or skipped (spec Rundgang 02.10.2026, 6)
         rundgangGesehen: cfg.rundgangGesehen === true,
         // the settings held nothing a person set when this process started (firststart.ts)
         firstStart: FIRST_START,
         // the update notice: off unless turned on (spec Update-Hinweis 2.4)
         updatePruefen: cfg.updatePruefen === true,
+        // the Windows integration (spec Windows-Einbindung 9): off unless turned on
+        meldenKampf: cfg.meldenKampf === true,
+        meldenNurBest: cfg.meldenNurBest === true,
+        trayBeimSchliessen: cfg.trayBeimSchliessen === true,
+        windows: { da: currentWindow() !== null && process.platform === "win32", autostartDa: autostartDa(), autostart: autostartAn() },
         // the window opened at its remembered place: the page does not size it
         // from the default again at startup (Fenster-Extras, addendum 4)
         windowPlaced: windowPlaced(),
@@ -277,21 +296,19 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
       const best = loadBest();
       return best ? reply(res, { ok: true, best }) : reply(res, { ok: false }, 503);
     }
-    case "/api/builds": {
-      // the builds (builds.ts); a GET only reads. As with /api/best, a file
-      // that is there but unreadable answers 503, never an empty store.
-      const builds = loadBuilds();
-      return builds ? reply(res, { ok: true, builds }) : reply(res, { ok: false }, 503);
-    }
-    case "/api/plans": {
-      // the plans (plans.ts); a GET only reads, 503 when the file is there but unreadable
-      const plans = loadPlans();
-      return plans ? reply(res, { ok: true, plans }) : reply(res, { ok: false }, 503);
-    }
     case "/api/weeklies": {
       // the weeklies (weeklies.ts); a GET only reads, 503 when the file is there but unreadable
       const weeklies = loadWeeklies();
       return weeklies ? reply(res, { ok: true, data: weeklies }) : reply(res, { ok: false }, 503);
+    }
+    case "/api/erinnerung":
+      // open reminder requests and the next times (erinnerung.ts); reads the weeklies' file, answers 127.0.0.1 only
+      return reply(res, { ok: true, ...erinnerungAbfrage() });
+
+    case "/api/gilde": {
+      // the guild (gilde.ts); a GET only reads, 503 when the file is there but unreadable
+      const gilde = loadGilde();
+      return gilde ? reply(res, { ok: true, data: gilde }) : reply(res, { ok: false }, 503);
     }
     case "/api/party-log/list":
       return reply(res, listJson(partyLogsDir()));
@@ -334,26 +351,38 @@ const CONFIG_KEYS = [
   "splitAfter", "gap", "minDur", "ghost", "uiZoom", "devMode",
   "skillNames", "ventiusTop", "compactAlpha", "mergePhases",
   "theme", "themeResolved", "logIndex", "randlosGesehen", "rundgangGesehen", "updatePruefen",
+  "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "lang", "gildeErinnerung",
 ];
 /* Of those, the ones that hold a true/false and nothing else - every key
    that ends in "Gesehen" (a note or tour acknowledged) is one, and so is
    updatePruefen, the switch of the update notice (spec Update-Hinweis 2.4). "fenster"
    (where the window was) is not among the keys at all: only window.ts
    writes it (spec Fenster-Extras 4). */
-const BOOLEAN_KEYS = ["randlosGesehen", "rundgangGesehen", "updatePruefen"];
+const BOOLEAN_KEYS = ["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung"];
 /* A first start (spec Rundgang 2, review M6): when this process started, the
    settings held none of the keys a person sets - the page's keys but the
    resolved theme and the tour's own flag, the log folder, the party server,
    staying on top. Read once, before anything is written: a tour left
    half-way comes back on the next start only while nothing was chosen. */
 const FIRST_START = isFirstStart(loadConfig(),
-  [...CONFIG_KEYS.filter((k) => k !== "themeResolved" && k !== "rundgangGesehen"), "log_dir", "partyServer", "stayOnTop"]);
+  [...CONFIG_KEYS.filter((k) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang"), "log_dir", "partyServer", "stayOnTop"]);
 
 async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promise<void> {
   switch (url.pathname) {
     case "/api/win": {
       const { status, body } = winAction(sent);
       return reply(res, body, status);
+    }
+    case "/api/gelesen": {
+      // The page reports a log it read whole from the start (spec
+      // Windows-Einbindung 5). Only the name of a listed log is kept, for
+      // the jump list: it is compared with a fresh listing, never opened.
+      const name = String(sent.name ?? "");
+      const entry = listLogs(STATE.dir).find((f) => f.name === name);
+      if (!entry) return reply(res, { ok: false }, 404);
+      updateConfig({ zuletztGelesen: zuletztNeu(loadConfig().zuletztGelesen, entry.name) });
+      jumpListBauen();
+      return reply(res, { ok: true });
     }
     case "/api/runs/save":
       return saveJsonFile(res, sent, savesDir);
@@ -608,18 +637,6 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
     }
 
-    case "/api/builds": {
-      // one build at a time, never removed; builds.ts checks id, name, link, size and count before writing
-      const put = putBuild(sent.id, sent.build);
-      return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
-    }
-
-    case "/api/plans": {
-      // one plan at a time, never removed; plans.ts checks id, link, size and count before writing
-      const put = putPlan(sent.id, sent.plan);
-      return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
-    }
-
     case "/api/weeklies": {
       // the whole state at once; weeklies.ts checks schema, size and count and
       // refuses a state that leaves out anything the file holds
@@ -627,9 +644,17 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
     }
 
-    case "/api/plan/fetch": {
-      // the one request outside this computer, on a click (questlog.ts); stores nothing
-      return reply(res, await fetchPlan(sent.link, sent.lang, sent.pick));
+    case "/api/gilde": {
+      // the whole state at once; gilde.ts checks schema, size and count and
+      // refuses a state that leaves out anything the file holds
+      const put = putGilde(sent.data);
+      return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
+    }
+
+    case "/api/erinnerung": {
+      // the page's answer: an id and the number of characters with something open, nothing else is read
+      const done = erinnerungAntwort(sent.id, sent.n);
+      return reply(res, { ok: done }, done ? 200 : 400);
     }
 
     case "/api/config": {
@@ -637,7 +662,9 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       for (const key of CONFIG_KEYS) {
         if (key in sent && (!BOOLEAN_KEYS.includes(key) || typeof sent[key] === "boolean")) changes[key] = sent[key];
       }
+      if (changes.lang !== "de" && changes.lang !== "en") delete changes.lang;
       updateConfig(changes);
+      if ("lang" in changes) jumpListBauen();
       // the border and Windows' menus follow a new theme (window.ts)
       if ("theme" in changes || "themeResolved" in changes) themeChanged();
       return reply(res, { ok: true });
@@ -708,9 +735,13 @@ export async function startServer(pagePath: string): Promise<number> {
   server.on("clientError", (_err, socket) => socket.destroy());
   const port = await listenFrom(server, "127.0.0.1", FIRST_PORT, FIRST_PORT + 40);
   if (!port) throw new Error(`No free port between ${FIRST_PORT} and ${FIRST_PORT + 40}.`);
+  // the reminders' schedule reads the stored reminders only through this reader (erinnerung.ts)
+  erinnerungQuelle(() => loadWeeklies()?.erinnerungen ?? []);
   STATE.port = port;
   // the weeklies' file on the first start, empty with its version (weeklies.ts)
   createWeeklies();
+  // the guild's file on the first start, empty with its version (gilde.ts)
+  createGilde();
   return port;
 }
 

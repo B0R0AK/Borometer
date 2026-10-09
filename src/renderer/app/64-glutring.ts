@@ -1,11 +1,11 @@
-import { artenAusBericht, artenZaehlen, bogenBei, boegen, farbeMitAlpha, FUGE, mitSchrift, OBEN, ringMass, type ArtenBlock, type Bogen, type Kat, winkelNorm, zwischen } from "../glutring-core";
+import { artenAusBericht, artenZaehlen, bogenBei, boegen, farbeMitAlpha, FUGE, gewachsen, mitSchrift, ringMass, type ArtenBlock, type Bogen, type Kat, winkelNorm, zusammenfassen, zwischen } from "../glutring-core";
 import type { BarFigures, BarSubRow, Fight } from "../types";
 import { SERIES_N, seriesColor, state } from "./01-state";
 import { fmt, full } from "./03-helpers";
 import { stats } from "./06-blocks-and-places";
 import { t } from "./08-translation";
 import { skillMark } from "./11-skill-icons";
-import { markiereRest, pct } from "./16-fight-analysis";
+import { LIEST_AB_TREFFER, markiereRest, pct } from "./16-fight-analysis";
 import { className, classNameFor } from "./17-class-names";
 import { $, cssv, esc } from "./18-interface-basics";
 import { catOf, groupRows, partyForFight, partyGroupRows } from "./19-grouping-and-party-fights";
@@ -72,6 +72,11 @@ function mitgliedDaten(m: RingZeile): RingDaten {
     arten.set(s.key, artenAusBericht(s.subs.map(c => ({k: c.key, h: c.hits, d: c.damage, m: c.max ?? 0}))));
   return {modus: "mitglied", zeilen, arten: k => arten.get(k) || null};
 }
+/** Was der Ring gerade zeigt, fuer das Rennen (65): den eigenen Kampf, die Gruppe oder ein Mitglied. */
+export function ringStand(): {modus: "allein" | "gruppe" | "mitglied"; mitglied: string | null} {
+  if(state.group !== "party") return {modus: "allein", mitglied: null};
+  return mitglied ? {modus: "mitglied", mitglied} : {modus: "gruppe", mitglied: null};
+}
 /* Klasse und Waffen eines Mitglieds aus seinem Bericht (wie die Tafel im Bereich Gruppe, 42). */
 function klasseVon(name: string): string {
   const seg = state.encounters[state.sel];
@@ -80,23 +85,35 @@ function klasseVon(name: string): string {
   return [className(classNameFor(w)), waffenText(w)].filter(Boolean).join(" \u00b7 ");
 }
 
-/* Der Kopf: sechs sortierbare Spalten, ein Tabstopp (Pfeiltasten in 24).
-   Schaden, Anteil und DPS ordnen gleich; die Vorgabe "damage" steht an DPS.
-   In der Gruppe: Mitglied, DPS, Anteil und die Klasse (nicht sortierbar). */
+/* Der Kopf (Spezifikation Feinschliff 4, #100): eine Zeile - links der Name
+   der Spalte (dort haengt 16 "9 von 12 sichtbar" an), rechts der Knopf
+   "Ordnen: DPS \u2193" mit einem Menue. Spaltenkoepfe gibt es nicht mehr, die
+   Werte in den Zeilen tragen ihre Einheiten. Schaden, Anteil und DPS ordnen
+   gleich; die Vorgabe "damage" steht an DPS. In der Gruppe ordnen nur DPS
+   und Mitglied; die Klasse steht in der Zeile. */
 const sortSpalte = () => state.sortBars.key === "damage" ? "dps" : state.sortBars.key;
-type Spalte = readonly [key: string, text: string, sortierbar: boolean];
-const KOPF: readonly Spalte[] = [["name", "bars.name", true], ["dps", "bars.dps", true], ["share", "bars.share", true],
-  ["hits", "bars.hits", true], ["critRate", "bars.crit", true], ["heavyRate", "bars.heavy", true]];
-const KOPF_GRUPPE: readonly Spalte[] = [["name", "party.colMitglied", true], ["dps", "bars.dps", true], ["share", "bars.share", true],
-  ["klasse", "ring.kopfKlasse", false]];
-function kopfHtml(kopf: readonly Spalte[]): string {
+type Ordnung = readonly [key: string, text: string];
+const ORDNUNG: readonly Ordnung[] = [["dps", "bars.dps"], ["max", "bars.biggest"], ["hits", "bars.hits"],
+  ["critRate", "bars.crit"], ["heavyRate", "bars.heavy"], ["name", "bars.name"]];
+const ORDNUNG_GRUPPE: readonly Ordnung[] = [["dps", "bars.dps"], ["name", "party.colMitglied"]];
+let ordnungJetzt: readonly Ordnung[] = ORDNUNG;
+function kopfHtml(ordnung: readonly Ordnung[], gruppe: boolean): string {
   const k = sortSpalte(), ab = state.sortBars.dir < 0;
-  return '<div class="bhead ringkopf" role="row">' + kopf.map(([key, text, sortierbar]) => {
-    const an = sortierbar && key === k;
-    return '<span data-k="' + key + '" role="columnheader" class="' + (an ? "sorted" : "") + '"' +
-      (sortierbar ? ' tabindex="' + (an ? 0 : -1) + '" aria-sort="' + (an ? (ab ? "descending" : "ascending") : "none") + '"' : "") + ">" +
-      esc(t(text)) + (an ? '<span aria-hidden="true">' + (ab ? " \u2193" : " \u2191") + "</span>" : "") + "</span>";
-  }).join("") + "</div>";
+  const was = t((ordnung.find(([key]) => key === k) || ordnung[0]!)[1]);
+  /* Der Pfeil steht fuer Vorleser nicht da: der Name des Knopfs sagt
+     "absteigend" oder "aufsteigend" aus. */
+  const PFEIL = "\u0000";
+  const text = esc(t("ring.ordnen", {was, pfeil: PFEIL})).replace(PFEIL, '<span aria-hidden="true">' + (ab ? "\u2193" : "\u2191") + "</span>");
+  const auf = !$("#ringOrdnenMenue").hidden;
+  return '<div class="bhead ringkopf" role="row"><span data-k="name" role="columnheader">' + esc(t(gruppe ? "party.colMitglied" : "bars.name")) + "</span>" +
+    '<span role="columnheader" class="ordnenzelle"><button type="button" id="ringOrdnen" tabindex="0" aria-haspopup="menu" aria-expanded="' + auf +
+    '" aria-controls="ringOrdnenMenue" aria-label="' + esc(t("ring.ordnenName", {was, richtung: t(ab ? "ring.ab" : "ring.auf")})) + '">' + text + "</button></span></div>";
+}
+/* Die Eintraege des Menues: ein Radio je Ordnung, der gewaehlte mit Haken. */
+function menueFuellen(ordnung: readonly Ordnung[]){
+  const k = sortSpalte();
+  $("#ringOrdnenMenue").innerHTML = ordnung.map(([key, text]) =>
+    '<button type="button" role="menuitemradio" tabindex="-1" data-k="' + key + '" aria-checked="' + (key === k) + '">' + esc(t(text)) + "</button>").join("");
 }
 function ordnen(zeilen: RingZeile[]): RingZeile[] {
   const st = state.sortBars, k = sortSpalte();
@@ -190,19 +207,26 @@ function renderRingListe(seg: Fight, d: RingDaten){
      Mitglieds schon offen, nur weil sie beim eigenen Kampf offen stand. */
   const schluessel = d.modus + "\u0000" + (mitglied || "");
   if(schluessel !== listeModus){ if(listeModus) offen.clear(); listeModus = schluessel; }
-  const gruppe = d.modus === "gruppe", kopf = gruppe ? KOPF_GRUPPE : KOPF;
-  /* Eine Ordnung, fuer die keine Spalte dasteht, faellt auf die Vorgabe zurueck. */
-  if(state.sortBars.key !== "damage" && !kopf.some(([k, , s]) => s && k === state.sortBars.key)) state.sortBars = {key: "damage", dir: -1};
+  const gruppe = d.modus === "gruppe", ordnung = gruppe ? ORDNUNG_GRUPPE : ORDNUNG;
+  /* Eine Ordnung, die das Menue hier nicht anbietet (Groesster Treffer in der
+     Gruppe, ein gespeichertes "Anteil"), faellt auf die Vorgabe zurueck (#86). */
+  if(state.sortBars.key !== "damage" && !ordnung.some(([k]) => k === state.sortBars.key)) state.sortBars = {key: "damage", dir: -1};
+  /* Offen bleibt das Menue ueber ein Neuzeichnen (Live) stehen, wie es ist:
+     neu gefuellt nahm es dem Eintrag unter dem Fokus den Fokus. */
+  const menue = $("#ringOrdnenMenue");
+  if(menue.hidden || ordnung !== ordnungJetzt) menueFuellen(ordnung);
+  if(ordnung !== ordnungJetzt && !menue.hidden) menueZu(false);
+  ordnungJetzt = ordnung;
   const box = $("#bars");
   const spitze = Math.max(1, ...d.zeilen.map(r => r.damage || 0));
   const halten = focusKeeper(document.activeElement as HTMLElement | null, box);
   box.classList.remove("breit");
   box.classList.add("ring");
-  box.innerHTML = kopfHtml(kopf) + (gruppe ? gruppeHtml(d.zeilen, spitze) : ordnen(d.zeilen).map(r => zeileHtml(r, spitze, d, seg)).join(""));
+  box.innerHTML = kopfHtml(ordnung, gruppe) + (gruppe ? gruppeHtml(d.zeilen, spitze) : ordnen(d.zeilen).map(r => zeileHtml(r, spitze, d, seg)).join(""));
   markiereRest();
   binden(box);
   // die hervorgehobene Zeile behaelt ihren Ton ueber ein Neuzeichnen (Live)
-  if(hervor) box.querySelectorAll<HTMLElement>(".ringzeile").forEach(z => z.classList.toggle("ringan", z.dataset.ring === hervor.split("\u0000")[0]));
+  if(hervor) box.querySelectorAll<HTMLElement>(".ringzeile").forEach(z => z.classList.toggle("ringan", zeileGehoert(z, hervor.split("\u0000")[0]!)));
   halten();
   barsRoving();
   tafelKopfZahl(d.zeilen, gruppe);
@@ -216,16 +240,95 @@ function aufAus(el: HTMLElement, tun: (tastatur: boolean) => void){
     tun(true);
   };
 }
+/* ---------- Das Menue "Ordnen" (Spezifikation Feinschliff 4.2) ----------
+   Es liegt neben #bars in .table, nicht im Kopf: 24 nimmt jedes
+   ".bhead [tabindex]" als Kopfzelle und liesse die Pfeiltasten sonst dort
+   wandern. Pfeile laufen im Kreis, Pos1/Ende, Enter/Leertaste waehlen, Esc
+   und Tab schliessen, ein Klick daneben auch. */
+function menueEintraege(): HTMLElement[] {
+  return [...$("#ringOrdnenMenue").querySelectorAll<HTMLElement>("[role=menuitemradio]")];
+}
+function menueAuf(){
+  const menue = $("#ringOrdnenMenue"), knopf = document.querySelector<HTMLElement>("#ringOrdnen");
+  const tafel = menue.parentElement;
+  if(!knopf || !tafel) return;
+  menueFuellen(ordnungJetzt);
+  menue.hidden = false;
+  knopf.setAttribute("aria-expanded", "true");
+  /* Rechts unter dem Knopf, gemessen gegen .table. Die Vergroesserung sitzt
+     als zoom auf <html>: Rechtecke liefern sichtbare Punkte, style rechnet in
+     Layoutpunkten - darum durch den Faktor (wie in 16). */
+  const zf = (typeof uiZoomFactor === "function" ? uiZoomFactor() : 1) || 1;
+  const k = knopf.getBoundingClientRect(), tr = tafel.getBoundingClientRect();
+  menue.style.top = Math.round((k.bottom - tr.top) / zf + 4) + "px";
+  menue.style.right = Math.max(0, Math.round((tr.right - k.right) / zf)) + "px";
+  const eintraege = menueEintraege();
+  (eintraege.find(e => e.getAttribute("aria-checked") === "true") || eintraege[0])?.focus();
+  /* Gestapelt rollt die Seite: das Menue kommt ganz ins Bild. Nebeneinander
+     nicht - dort wuerde der Browser sonst #app rollen, das nur verdeckt. */
+  if(document.documentElement.matches(".w-max-899,.h-max-699")) menue.scrollIntoView({block: "nearest"});
+}
+function menueZu(fokus: boolean){
+  const menue = $("#ringOrdnenMenue");
+  if(menue.hidden) return;
+  menue.hidden = true;
+  const knopf = document.querySelector<HTMLElement>("#ringOrdnen");
+  knopf?.setAttribute("aria-expanded", "false");
+  if(fokus) knopf?.focus();
+}
+/* Wer den gewaehlten Eintrag noch einmal waehlt, kehrt die Richtung um;
+   sonst ordnen Zahlen absteigend und der Name aufsteigend. */
+function menueWaehlen(k: string){
+  const st = state.sortBars;
+  if(sortSpalte() === k) st.dir *= -1; else { st.key = k; st.dir = k === "name" ? 1 : -1; }
+  menueZu(false);
+  renderGlutring();
+  document.querySelector<HTMLElement>("#ringOrdnen")?.focus();
+}
+function menueBinden(){
+  const menue = $("#ringOrdnenMenue");
+  menue.addEventListener("click", e => {
+    const b = (e.target as HTMLElement).closest<HTMLElement>("[role=menuitemradio]");
+    if(b) menueWaehlen(b.dataset.k!);
+  });
+  menue.addEventListener("keydown", e => {
+    const eintraege = menueEintraege(), i = eintraege.indexOf(document.activeElement as HTMLElement);
+    let nach: HTMLElement | undefined;
+    if(e.key === "ArrowDown") nach = eintraege[(i + 1) % eintraege.length];
+    else if(e.key === "ArrowUp") nach = eintraege[(i - 1 + eintraege.length) % eintraege.length];
+    else if(e.key === "Home") nach = eintraege[0];
+    else if(e.key === "End") nach = eintraege[eintraege.length - 1];
+    else if(e.key === "Enter" || e.key === " "){
+      e.preventDefault();
+      if(i >= 0) menueWaehlen(eintraege[i]!.dataset.k!);
+      return;
+    }
+    else if(e.key === "Escape"){
+      /* Nur das Menue: 64 (Ring eines Mitglieds) und 65 (Rennen) lauschen am
+         Dokument und lassen eine schon genommene Taste liegen. */
+      e.preventDefault(); e.stopPropagation();
+      menueZu(true);
+      return;
+    }
+    else if(e.key === "Tab"){ menueZu(true); return; }
+    else return;
+    e.preventDefault();
+    nach?.focus();
+  });
+  /* Der Knopf wird mit der Liste neu geschrieben: der Klick haengt darum am
+     Dokument und fragt, ob er den Knopf traf. */
+  document.addEventListener("click", e => {
+    const ziel = e.target as HTMLElement | null;
+    if(!ziel || !ziel.closest || !ziel.closest("#ringOrdnen")) return;
+    if(menue.hidden) menueAuf(); else menueZu(true);
+  });
+  document.addEventListener("pointerdown", e => {
+    const ziel = e.target as HTMLElement | null;
+    if(menue.hidden || !ziel || !ziel.closest || ziel.closest("#ringOrdnenMenue, #ringOrdnen")) return;
+    menueZu(false);
+  });
+}
 function binden(box: HTMLElement){
-  const kopf = [...box.querySelectorAll<HTMLElement>(".bhead [data-k][tabindex]")];
-  if(kopf.length && !kopf.some(k => k.tabIndex === 0)) kopf[0]!.tabIndex = 0;
-  kopf.forEach(sp => aufAus(sp, () => {
-    const k = sp.dataset.k!, st = state.sortBars;
-    if(sortSpalte() === k) st.dir *= -1; else { st.key = k; st.dir = -1; }
-    const hatte = document.activeElement === sp;
-    renderGlutring();
-    if(hatte) box.querySelector<HTMLElement>('.bhead [data-k="' + k + '"]')?.focus();
-  }));
   box.querySelectorAll<HTMLElement>(".ringzeile[data-open]").forEach(z => aufAus(z, () => {
     const name = z.dataset.open!;
     selbstGeklappt = true;
@@ -295,6 +398,7 @@ export function syncGlutring(an: boolean){
   umhaengen(an);
   if(!an){ document.body.classList.remove("ringgruppe", "ringmitglied"); bandTitel(false); }
   if(!an) rennenSchliessen(false);
+  if(!an) menueZu(false);   // ausserhalb des Rings gibt es den Knopf nicht
   fussAngleichen();   // verlassen: keine Mindesthoehe bleibt an Band und Urteil haengen
   lage = null;
   /* Beim Betreten (Bereichswechsel, aus Kompakt, Start, Einstellungen)
@@ -317,17 +421,26 @@ interface RingBild {
   boegen: Bogen[]; innen: Bogen[] | null;
   arten: Map<string, ArtenBlock>; farbe: Map<string, string>; name: Map<string, string>;
   unter: Map<string, string>; erzaehl: Map<string, string>;
+  rest: Set<string>;     // die Schluessel hinter dem Bogen "Uebrige" (mehr als SERIES_N Teile)
+  leise: boolean;        // zu wenige Treffer fuer Anteile: der Ring steht still (halb gedeckt, ohne Rand und Schilder)
+  hinweis: string;       // der Satz in der Mitte (zu wenige Treffer, oder wohin aller Schaden ging)
 }
+const REST_BOGEN = "__rest__";
 interface Geo { w: number; h: number; cx: number; cy: number; R: number; d: number; schrift: boolean; z: number }
 let ringBild: RingBild | null = null;
+let sichtbar: Bogen[] = [], sichtbarInnen: Bogen[] | null = null;   // was gezeichnet ist (gewachsen): darauf trifft der Zeiger
 let gezeigt: Bogen[] = [];   // was gerade steht (beim Gleiten zwischen alt und neu, Aufgabe 7)
 let wachs = 1;               // 0 bis 1 beim Aufwachsen (Aufgabe 7)
 let hervor = "";             // der hervorgehobene Bogen (Aufgabe 6)
 
-function bildAus(d: RingDaten): RingBild {
-  const b: RingBild = {boegen: boegen(d.zeilen.map(r => ({key: r.name, wert: r.damage}))), innen: null,
-    arten: new Map(), farbe: new Map(), name: new Map(), unter: new Map(), erzaehl: new Map()};
+function bildAus(d: RingDaten, seg: Fight): RingBild {
+  const z = zusammenfassen(d.zeilen.map(r => ({key: r.name, wert: r.damage})), SERIES_N, REST_BOGEN);
+  const leise = d.modus === "allein" && seg.stats.hits < LIEST_AB_TREFFER;
+  const b: RingBild = {boegen: boegen(z.teile), innen: null,
+    arten: new Map(), farbe: new Map(), name: new Map(), unter: new Map(), erzaehl: new Map(),
+    rest: new Set(z.rest), leise, hinweis: ""};
   for(const r of d.zeilen){
+    if(b.rest.has(r.name)) continue;
     b.farbe.set(r.name, r.color);
     b.name.set(r.name, r.label);
     b.unter.set(r.name, (state.noTime ? "" : fmt(r.dps, 1e3) + " \u00b7 ") + pct(r.share, 0));
@@ -335,11 +448,21 @@ function bildAus(d: RingDaten): RingBild {
     if(a) b.arten.set(r.name, a);
     b.erzaehl.set(r.name, erzaehlHtml(r, a));
   }
+  if(z.rest.length){
+    // der Bogen "Uebrige": ohne Farbe im Bild, bogen() nimmt dann die Restfarbe der Lage
+    const hinten = d.zeilen.filter(r => b.rest.has(r.name));
+    const dps = hinten.reduce((a, r) => a + r.dps, 0), schaden = hinten.reduce((a, r) => a + r.damage, 0), teil = hinten.reduce((a, r) => a + r.share, 0);
+    b.name.set(REST_BOGEN, t("ring.uebrige"));
+    b.unter.set(REST_BOGEN, (state.noTime ? "" : fmt(dps, 1e3) + " \u00b7 ") + pct(teil, 0));
+    b.erzaehl.set(REST_BOGEN, "<b>" + esc(t("ring.uebrige")) + "</b> \u00b7 " + esc(t("ring.uebrigeErzaehl", {n: z.rest.length, d: fmt(schaden, 1e3)})));
+  }
+  if(leise) b.hinweis = t("ring.zuWenig", {n: seg.stats.hits});
+  else if(b.boegen.length === 1 && d.modus !== "gruppe") b.hinweis = t("ring.allesEin." + (d.modus === "mitglied" ? "skill" : state.group));
   return b;
 }
 /* Was die Mitte beim Zeigen erzaehlt: Name, Schaden, Treffer, Kritanteil, groesster Treffer. */
 function erzaehlHtml(r: RingZeile, a: ArtenBlock | null): string {
-  return "<b>" + esc(r.label) + "</b> \u00b7 " + esc(fmt(r.damage, 1e3)) + "<br><span>" +
+  return "<b>" + esc(r.label) + "</b> \u00b7 " + esc(t("ring.schaden", {d: fmt(r.damage, 1e3)})) + "<br><span>" +
     esc(t("ring.erzaehl", {n: full(r.hits), z: r.hits, krit: r.critRate == null ? "\u2014" : pct(r.critRate),
       max: fmt(a ? a.max : r.max, 1e3)})) + "</span>";
 }
@@ -373,8 +496,17 @@ function geometrie(): Geo {
    wird nur, wenn sie fehlt - nach einer neuen Groesse (ResizeObserver), einem
    neuen Bild (ringSetzen) oder beim Betreten des Rings (syncGlutring). Das
    Hervorheben zeichnet oft neu und liest dabei kein Layout. */
-interface Lage { g: Geo; q: number; schilder: Schild[] | null }
+/* Die Themenwerte (Farben, Schein) liest die Lage mit: je Bild nach
+   getComputedStyle zu fragen kostet beim Hervorheben jedes Mal. Ein
+   Themenwechsel zeichnet alles neu (applyTheme, renderAll, ringSetzen) und
+   verwirft die Lage damit. */
+interface Farben { schein: number; innenA: number; ember: string; rest: string; tinte: string; leise: string; linie: string; schrift: string }
+interface Lage { g: Geo; q: number; schilder: Schild[] | null; farben: Farben }
 let lage: Lage | null = null;
+const farbenLesen = (): Farben => ({
+  schein: parseFloat(cssv("--glutring-schein")) || 0, innenA: parseFloat(cssv("--glutring-innen")) || 0.5,
+  ember: cssv("--ember") || "rgba(0,0,0,0)", rest: cssv("--series-rest"),
+  tinte: cssv("--text"), leise: cssv("--dim"), linie: cssv("--ridge"), schrift: cssv("--sans")});
 function zeichneRing(){
   const cv = $<HTMLCanvasElement>("#ring");
   if(!ringBild || !document.body.classList.contains("glut")) return;
@@ -383,40 +515,46 @@ function zeichneRing(){
   if(!lage){
     const neu = geometrie(), dpr = window.devicePixelRatio || 1;
     if(neu.w < 1 || neu.h < 1) return;
-    lage = {g: neu, q: dpr, schilder: null};
+    lage = {g: neu, q: dpr, schilder: null, farben: farbenLesen()};
     cv.width = Math.round(neu.w * dpr); cv.height = Math.round(neu.h * dpr);
   }
-  const {g, q} = lage;
+  const {g, q, farben} = lage;
   gesehen = true;
   const ctx = cv.getContext("2d")!;
   ctx.setTransform(q, 0, 0, q, 0, 0);
   ctx.clearRect(0, 0, g.w, g.h);
   const ease = 1 - Math.pow(1 - wachs, 3);
-  const schein = parseFloat(cssv("--glutring-schein")) || 0, innenA = parseFloat(cssv("--glutring-innen")) || 0.5;
+  sichtbar = gewachsen(gezeigt, ease); sichtbarInnen = ringBild.innen ? gewachsen(ringBild.innen, ease) : null;
+  const {schein, innenA} = farben;
   // der Glutschein hinter dem Ring (--ember; im hellen Thema durchsichtig, "Tag ohne Glut")
   const glut = ctx.createRadialGradient(g.cx, g.cy, g.R * 0.2, g.cx, g.cy, g.R * 1.3);
-  glut.addColorStop(0, cssv("--ember") || "rgba(0,0,0,0)");
+  glut.addColorStop(0, farben.ember);
   glut.addColorStop(1, "rgba(0,0,0,0)");
   ctx.fillStyle = glut; ctx.fillRect(0, 0, g.w, g.h);
   const gruppe = !!ringBild.innen;
   const r0 = gruppe ? g.R * 0.73 : g.R * 0.70, r1 = g.R;
-  if(ringBild.innen) for(const b of ringBild.innen) bogen(ctx, g, b, g.R * 0.58, g.R * 0.70, ease, innenA, schein, false);
-  for(const b of gezeigt) bogen(ctx, g, b, r0, r1, ease, gruppe ? Math.min(1, innenA + 0.2) : innenA, schein, !gruppe);
+  // wenige Treffer: der Ring steht leise (halb gedeckt, ohne Rand der Trefferarten)
+  ctx.globalAlpha = ringBild.leise ? 0.5 : 1;
+  if(sichtbarInnen) for(const b of sichtbarInnen) bogen(ctx, g, b, g.R * 0.58, g.R * 0.70, innenA, schein, farben.rest, false);
+  for(const b of sichtbar) bogen(ctx, g, b, r0, r1, gruppe ? Math.min(1, innenA + 0.2) : innenA, schein, farben.rest, !gruppe && !ringBild.leise);
+  ctx.globalAlpha = 1;
   /* Beschriftet wird erst, wenn der Ring ganz steht; gesetzt nach dem Ziel
      (ringBild), nicht nach dem Zwischenstand - beim Gleiten misst so kein
      Bild die Ecken neu, und die Schilder springen nicht. */
   let beschriftet: Schild[] = [];
-  if(wachs >= 1 && g.schrift){
-    if(!lage.schilder) lage.schilder = schilderSetzen(ctx, g, ringBild.innen || ringBild.boegen, r1);
+  // Schilder nur, wenn es etwas zu vergleichen gibt: nicht im leisen Ring, nicht bei einem einzigen Bogen
+  if(wachs >= 1 && g.schrift && !ringBild.leise && ringBild.boegen.length + (ringBild.innen ? ringBild.innen.length : 0) > 1){
+    if(!lage.schilder) lage.schilder = schilderSetzen(ctx, g, ringBild.innen || ringBild.boegen, r1, farben.schrift);
     beschriftet = lage.schilder;
-    schilderMalen(ctx, beschriftet, g.z);
+    schilderMalen(ctx, beschriftet, g.z, farben);
   }
   const ds = cv.dataset;
   ds.d = String(g.d); ds.boegen = String(gezeigt.length); ds.innen = String(ringBild.innen ? ringBild.innen.length : 0);
   ds.schrift = g.schrift ? "1" : "0"; ds.beschriftet = String(beschriftet.length);
   ds.schilder = JSON.stringify(beschriftet.map(s => ({k: s.k, l: Math.round(s.l), t: Math.round(s.t), r: Math.round(s.r), b: Math.round(s.b)})));
   ds.hervor = hervor; ds.schein = String(schein);
-  ds.mitte = JSON.stringify({x: +g.cx.toFixed(1), y: +g.cy.toFixed(1), r0: +r0.toFixed(1), r1: +r1.toFixed(1)});
+  ds.mitte = JSON.stringify({x: +g.cx.toFixed(1), y: +g.cy.toFixed(1), r0: +r0.toFixed(1), r1: +r1.toFixed(1), z: +g.z.toFixed(3)});
+  ds.rand = JSON.stringify({ab: +(9 * g.z).toFixed(1), breit: +(4 * g.z).toFixed(1)});
   const erster = gezeigt[0] ? ringBild.arten.get(gezeigt[0].key) : undefined;
   ds.randErst = erster ? (erster.zeilen.find(z => z.d > 0)?.kat || "") : "";
   ds.punkte = JSON.stringify(gezeigt.slice(0, 16).map(b => {
@@ -426,31 +564,31 @@ function zeichneRing(){
   const name = beschreibung(ringBild);
   if(cv.getAttribute("aria-label") !== name) cv.setAttribute("aria-label", name);
 }
-function bogen(ctx: CanvasRenderingContext2D, g: Geo, b: Bogen, r0: number, r1: number, ease: number,
-               innenA: number, schein: number, artenRand: boolean){
+function bogen(ctx: CanvasRenderingContext2D, g: Geo, b: Bogen, r0: number, r1: number,
+               innenA: number, schein: number, rest: string, artenRand: boolean){
   if(!ringBild) return;
-  const a0 = OBEN + (b.a0 - OBEN) * ease, a1 = OBEN + (b.a1 - OBEN) * ease;
+  const a0 = b.a0, a1 = b.a1;
   if(!(a1 > a0)) return;
   // hervorgehoben: der Bogen selbst, oder alle Boegen des gezeigten Mitglieds (Gruppe, Aufgabe 8)
   const hi = !!hervor && (hervor === b.key || hervor === b.key.split("\u0000")[0]);
-  const aus = hi ? 6 : 0;
-  const farbe = ringBild.farbe.get(b.key) || cssv("--series-rest");
+  const z = g.z, aus = hi ? 6 * z : 0;
+  const farbe = ringBild.farbe.get(b.key) || rest;
   const verlauf = ctx.createRadialGradient(g.cx, g.cy, r0 + aus, g.cx, g.cy, r1 + aus);
   verlauf.addColorStop(0, farbeMitAlpha(farbe, innenA));
   verlauf.addColorStop(1, farbe);
   ctx.beginPath(); ctx.arc(g.cx, g.cy, r1 + aus, a0, a1); ctx.arc(g.cx, g.cy, r0 + aus, a1, a0, true); ctx.closePath();
   ctx.fillStyle = verlauf;
-  if(hi && schein > 0){ ctx.shadowColor = farbe; ctx.shadowBlur = schein; }
+  if(hi && schein > 0){ ctx.shadowColor = farbe; ctx.shadowBlur = schein * z; }
   ctx.fill();
   ctx.shadowBlur = 0;
   const arten = artenRand ? ringBild.arten.get(b.key) : undefined;
   if(!arten || !(arten.d > 0)) return;
   let c0 = a0;
-  for(const z of arten.zeilen){
-    const c1 = c0 + (a1 - a0) * z.d / arten.d;
+  for(const zl of arten.zeilen){
+    const c1 = c0 + (a1 - a0) * zl.d / arten.d;
     if(c1 > c0){
-      ctx.beginPath(); ctx.arc(g.cx, g.cy, r1 + 9 + aus, c0, c1);
-      ctx.strokeStyle = CAT_SWATCH[z.kat] || farbe; ctx.lineWidth = 4; ctx.stroke();
+      ctx.beginPath(); ctx.arc(g.cx, g.cy, r1 + 9 * z + aus, c0, c1);
+      ctx.strokeStyle = CAT_SWATCH[zl.kat] || farbe; ctx.lineWidth = 4 * z; ctx.stroke();
     }
     c0 = c1;
   }
@@ -469,7 +607,7 @@ interface Schild extends Kasten {
   k: string; name: string; unter: string; rechts: boolean;
   px: number; py: number; x1: number; y1: number;
 }
-const ECKEN = ["#ringLinks", "#ringMeta", "#ringRechts"] as const;
+const ECKEN = ["#ringLinks", "#ringMeta", "#ringRechts", "#ringLegende"] as const;
 function sperrflaechen(cv: HTMLCanvasElement): Kasten[] {
   const o = cv.getBoundingClientRect(), luft = 6;
   return ECKEN.map(q => document.querySelector(q)?.getBoundingClientRect()).filter((r): r is DOMRect => !!r && r.width > 0 && r.height > 0)
@@ -482,11 +620,11 @@ function abstand(x: number, y: number, ax: number, ay: number, bx: number, by: n
   const k = l ? Math.max(0, Math.min(1, ((x - ax) * dx + (y - ay) * dy) / l)) : 0;
   return Math.hypot(x - ax - k * dx, y - ay - k * dy);
 }
-function schilderSetzen(ctx: CanvasRenderingContext2D, g: Geo, liste: Bogen[], r1: number): Schild[] {
+function schilderSetzen(ctx: CanvasRenderingContext2D, g: Geo, liste: Bogen[], r1: number, schrift: string): Schild[] {
   if(!ringBild) return [];
   /* Schrift und Abstaende in Punkten der Seite: unter der Vergroesserung (g.z)
      waechst die Beschriftung mit, wie jede andere Schrift. */
-  const schrift = cssv("--sans"), z = g.z;
+  const z = g.z;
   const rho = r1 + 30 * z;
   const besetzt = sperrflaechen(ctx.canvas);
   const fertig: Schild[] = [];
@@ -518,9 +656,9 @@ function schilderSetzen(ctx: CanvasRenderingContext2D, g: Geo, liste: Bogen[], r
   }
   return fertig;
 }
-function schilderMalen(ctx: CanvasRenderingContext2D, schilder: readonly Schild[], z: number){
+function schilderMalen(ctx: CanvasRenderingContext2D, schilder: readonly Schild[], z: number, f: Farben){
   if(!schilder.length) return;
-  const tinte = cssv("--text"), leise = cssv("--dim"), linie = cssv("--ridge"), schrift = cssv("--sans");
+  const {tinte, leise, linie, schrift} = f;
   for(const s of schilder){
     const seite = s.rechts ? 1 : -1, x2 = s.x1 + seite * 14 * z, tx = x2 + seite * 6 * z;
     ctx.strokeStyle = linie; ctx.lineWidth = z;
@@ -541,7 +679,9 @@ function kuerzen(ctx: CanvasRenderingContext2D, s: string, max: number): string 
 /* "Ring: Beschuss 22 %, Detonierendes Mal 20 %, ..." - die ersten acht. */
 function beschreibung(b: RingBild): string {
   const liste = b.innen || b.boegen;
-  const teile = liste.slice(0, 8).map(x => (b.name.get(x.key) || x.key) + " " + pct(x.anteil, 0)).join(", ") +
+  // ein einziger Bogen traegt kein "100 %"; unter 0,5 % steht "unter 1 %", nicht "0 %"
+  const teile = liste.slice(0, 8).map(x => (b.name.get(x.key) || x.key) +
+    (liste.length === 1 && !b.innen ? "" : " " + (x.anteil < 0.005 ? t("ring.unterEins") : pct(x.anteil, 0)))).join(", ") +
     (liste.length > 8 ? ", \u2026" : "");
   return t(b.innen ? "ring.bildGruppe" : "ring.bild", {teile});
 }
@@ -595,9 +735,14 @@ function schreibeBewegung(){
 /* Das neue Bild setzen (die Lage wird einmal neu gemessen: Text und Ecken
    koennen sich geaendert haben), dann wachsen oder gleiten. */
 let bildKampf: number | null = null;
-function ringSetzen(d: RingDaten, kampf: number){
-  ringBild = d.modus === "gruppe" ? bildGruppe(d.zeilen) : bildAus(d);
+function ringSetzen(d: RingDaten, seg: Fight){
+  const kampf = seg.start;
+  ringBild = d.modus === "gruppe" ? bildGruppe(d.zeilen) : bildAus(d, seg);
   lage = null;
+  /* Legende des Aussenrands (#101): nur wo der Rand gezeichnet wird. */
+  $("#ringLegende").hidden = !(ringBild.arten.size > 0 && !ringBild.leise && !ringBild.innen);
+  /* Schild nennt die Legende nur, wenn der gezeigte Ring Schildtreffer hat (so entschieden 04.10.). */
+  $("#ringLegendeSchild").hidden = ![...ringBild.arten.values()].some(a => a.zeilen.some(z => z.kat === "shield" && z.n > 0));
   /* Was hervorgehoben war, folgt dem neuen Bild (Live, Sprache): die Mitte
      erzaehlt aus ihm neu. Ein anderer Kampf oder ein Schluessel, den das neue
      Bild nicht kennt, leert das Hervorheben - Zeile, Mitte und Spur. */
@@ -625,28 +770,33 @@ function hervorLeeren(){
    auf eine Zeile (56). Das Neuzeichnen nimmt die gemerkte Lage (lage),
    misst also nichts neu. */
 function zeige(key: string){
-  if(key === hervor) return;
+  // eine Zeile hinter dem Bogen "Uebrige" zeigt auf ihn, und er hebt alle seine Zeilen hervor
+  const k = ringBild && ringBild.rest.has(key) ? REST_BOGEN : key;
+  if(k === hervor) return;
+  key = k;
   hervor = key;
   const zeile = key.split("\u0000")[0]!;
-  $("#bars").querySelectorAll<HTMLElement>(".ringzeile").forEach(z => z.classList.toggle("ringan", !!key && z.dataset.ring === zeile));
+  $("#bars").querySelectorAll<HTMLElement>(".ringzeile").forEach(z => z.classList.toggle("ringan", !!key && zeileGehoert(z, zeile)));
   const html = key && ringBild ? ringBild.erzaehl.get(key) || ringBild.erzaehl.get(zeile) || "" : "";
   const f = $("#ringFokus");
   if(f.innerHTML !== html) f.innerHTML = html;
   if(state.group === "skill"){
-    const spur = key && ringBild && ringBild.name.has(key) ? key : "";
+    const spur = key && key !== REST_BOGEN && ringBild && ringBild.name.has(key) ? key : "";
     if(spur !== state.kurveSkill){ state.kurveSkill = spur; renderKurve(); }
   }
   zeichneRing();
 }
+/* Gehoert die Zeile zum gezeigten Bogen? Beim Bogen "Uebrige" alle Zeilen mit .rest. */
+const zeileGehoert = (z: HTMLElement, zeile: string) => zeile === REST_BOGEN ? z.classList.contains("rest") : z.dataset.ring === zeile;
 /* Welcher Bogen liegt unter dem Zeiger? Lage und Radien schreibt zeichneRing an den Canvas. */
 function bogenUnter(e: MouseEvent): string {
   if(!ringBild) return "";
   const cv = $<HTMLCanvasElement>("#ring"), r = cv.getBoundingClientRect();
-  const m = JSON.parse(cv.dataset.mitte || "null") as {x: number; y: number; r0: number; r1: number} | null;
+  const m = JSON.parse(cv.dataset.mitte || "null") as {x: number; y: number; r0: number; r1: number; z?: number} | null;
   if(!m) return "";
-  const dx = e.clientX - r.left - m.x, dy = e.clientY - r.top - m.y, abst = Math.hypot(dx, dy), w = winkelNorm(Math.atan2(dy, dx));
-  if(ringBild.innen && abst >= m.r1 * 0.58 && abst <= m.r1 * 0.70 + 3) return bogenBei(ringBild.innen, w)?.key || "";
-  if(abst >= m.r0 && abst <= m.r1 + 20) return bogenBei(gezeigt, w)?.key || "";
+  const z = m.z || 1, dx = e.clientX - r.left - m.x, dy = e.clientY - r.top - m.y, abst = Math.hypot(dx, dy), w = winkelNorm(Math.atan2(dy, dx));
+  if(sichtbarInnen && abst >= m.r1 * 0.58 && abst <= m.r1 * 0.70 + 3 * z) return bogenBei(sichtbarInnen, w)?.key || "";
+  if(abst >= m.r0 && abst <= m.r1 + 20 * z) return bogenBei(sichtbar, w)?.key || "";
   return "";
 }
 /* Klick auf einen Bogen klappt in der Liste dieselbe Zeile auf (Spezifikation 3).
@@ -654,6 +804,7 @@ function bogenUnter(e: MouseEvent): string {
    zu, ein zweiter Klick auf denselben Bogen klappt auch diese zu. In der
    Liste selbst bleiben mehrere offen. */
 function klickAufBogen(key: string){
+  if(key === REST_BOGEN) return;   // die Uebrigen sind keine einzelne Zeile
   // in der Gruppe oeffnet ein Mitglied (innen) oder eine seiner Faehigkeiten (aussen) seinen Ring
   if(state.group === "party" && !mitglied){ mitgliedOeffnen(key.split("\u0000")[0]!, false); return; }
   const zeile = key.split("\u0000")[0]!;
@@ -674,18 +825,19 @@ function erzaehlMitglied(klasse: string): string {
    ihre Faehigkeiten im Bogen ihres Mitglieds, in seiner Farbe und leiser. */
 function bildGruppe(zeilen: RingZeile[]): RingBild {
   const innen = boegen(zeilen.map(r => ({key: r.name, wert: r.damage})));
-  const b: RingBild = {boegen: [], innen, arten: new Map(), farbe: new Map(), name: new Map(), unter: new Map(), erzaehl: new Map()};
+  const b: RingBild = {boegen: [], innen, arten: new Map(), farbe: new Map(), name: new Map(), unter: new Map(), erzaehl: new Map(),
+    rest: new Set(), leise: false, hinweis: ""};
   for(const m of innen){
     const r = zeilen.find(z => z.name === m.key)!;
     b.farbe.set(r.name, r.color); b.name.set(r.name, r.label);
     b.unter.set(r.name, fmt(r.dps, 1e3) + " \u00b7 " + pct(m.anteil, 0));
-    b.erzaehl.set(r.name, "<b>" + esc(r.label) + "</b> \u00b7 " + esc(fmt(r.dps, 1e3)) + "<br><span>" +
+    b.erzaehl.set(r.name, "<b>" + esc(r.label) + "</b> \u00b7 " + esc(t("ring.proSek", {d: fmt(r.dps, 1e3)})) + "<br><span>" +
       esc(erzaehlMitglied(klasseVon(r.name))) + "</span>");
     for(const x of boegen(r.subs.map(s => ({key: r.name + "\u0000" + s.key, wert: s.damage || 0})), m.a0, m.a1 - m.a0, FUGE / 2)){
       const s = r.subs.find(y => r.name + "\u0000" + y.key === x.key)!;
       b.boegen.push(x);
       b.farbe.set(x.key, r.color); b.name.set(x.key, s.label);
-      b.erzaehl.set(x.key, "<b>" + esc(s.label) + "</b> \u00b7 " + esc(fmt(s.damage, 1e3)) + "<br><span>" + esc(r.label) + "</span>");
+      b.erzaehl.set(x.key, "<b>" + esc(s.label) + "</b> \u00b7 " + esc(t("ring.schaden", {d: fmt(s.damage, 1e3)})) + "<br><span>" + esc(r.label) + "</span>");
     }
   }
   return b;
@@ -702,6 +854,9 @@ function mitteSetzen(d: RingDaten){
   }
   if(du.textContent !== text) du.textContent = text;
   du.hidden = !text;
+  const hint = $("#ringMitteHinweis"), satz = ringBild ? ringBild.hinweis : "";
+  if(hint.textContent !== satz) hint.textContent = satz;
+  hint.hidden = !satz;
   const m = d.modus === "mitglied" ? partyGroupRows().find(r => r.name === mitglied) : undefined;
   $("#ringMitglied").hidden = !m;
   if(m){
@@ -748,16 +903,19 @@ function mitgliedOeffnen(name: string | null, tastatur: boolean){
   else if(vorher) box.querySelector<HTMLElement>('.ringzeile[data-member="' + CSS.escape(vorher) + '"]')?.focus();
 }
 
-/* Band und Urteil als gemeinsame Fusszeile (Fixrunde 1 zu Aufgabe 10):
-   nebeneinander sind beide gleich hoch, so laeuft ueber dem Band und dem
-   Urteil eine Fuge quer ueber das Raster, und die Flaeche darueber gehoert
-   zur Liste. Beide werden ohne Mindesthoehe gemessen (Punkte der Seite,
-   offsetHeight) und bekommen die groessere als Mindesthoehe. Gestapelt, in
-   der Gruppe (kein Urteil) und ausserhalb des Rings gilt keine. */
+/* Band und Urteil als gemeinsame Fusszeile (Fixrunde 1 zu Aufgabe 10,
+   Spezifikation Feinschliff 6.1): nur wo beide unten stehen - die Liste
+   rollt in sich - sind sie gleich hoch, so laeuft ueber Band und Urteil
+   eine Fuge quer ueber das Raster. Passt die Liste, folgt das Urteil ihr
+   und behaelt seine eigene Hoehe. Beide werden ohne Mindesthoehe gemessen
+   (Punkte der Seite, offsetHeight) und bekommen die groessere als
+   Mindesthoehe. Gestapelt, in der Gruppe (kein Urteil) und ausserhalb des
+   Rings gilt keine. .rollt setzt ringSchnitt (16, ueber markiereRest in
+   renderRingListe), also vor diesem Aufruf. */
 function fussAngleichen(){
   const band = $("#kurveFeld"), urteil = $("#urteilFeld");
   const gilt = document.body.classList.contains("glut") && !document.documentElement.matches(".w-max-899,.h-max-699") &&
-    urteil.getClientRects().length > 0 && band.getClientRects().length > 0;
+    urteil.getClientRects().length > 0 && band.getClientRects().length > 0 && $("#bars").classList.contains("rollt");
   const vorher = band.style.minHeight;
   band.style.minHeight = ""; urteil.style.minHeight = "";
   if(!gilt) return;
@@ -779,7 +937,7 @@ export function renderGlutring(){
   document.body.classList.toggle("ringmitglied", d.modus === "mitglied");
   $("#ringZurueck").hidden = d.modus !== "mitglied";
   renderRingListe(seg, d);
-  ringSetzen(d, seg.start);
+  ringSetzen(d, seg);
   mitteSetzen(d);
   bandGruppe(d);
   fussAngleichen();
@@ -787,6 +945,7 @@ export function renderGlutring(){
 
 // what this part did at the top level, run where it stands in the order
 export function setup(): void {
+  menueBinden();
   // die Buehne aendert ihre Groesse mit dem Fenster und dem Raster: neu zeichnen, ohne neu zu rechnen
   if(typeof ResizeObserver !== "undefined") new ResizeObserver(() => { lage = null; zeichneRing(); }).observe($("#ringBuehne"));
   /* Die Ecken des Ringfelds aendern ihre Groesse auch ohne neues Bild: der

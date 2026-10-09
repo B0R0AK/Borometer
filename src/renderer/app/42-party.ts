@@ -1,3 +1,4 @@
+import { kurvePasst } from "../glutring-core";
 import { PARTY_SKILLS, SERIES_N, seriesColor, state } from "./01-state";
 import { factLine, fmt, toast, toastFail } from "./03-helpers";
 import { stats } from "./06-blocks-and-places";
@@ -194,8 +195,13 @@ export function sendReport(force: boolean){
      the board is read while everyone is still waiting. A reader on an older
      server falls back to the skill list in the report. */
   const v = iPlayVentius();
+  /* Ob die Spuren dabei sind, gehoert in die Kennung: partyKurve haengt sie
+     erst beim zweiten Bericht mit demselben seg.end an, und der hat sonst
+     dieselbe Kennung wie der erste - Spuren und Einsaetze gingen nie mit.
+     Danach bleibt "L" stehen, die Kennung also gleich: sie gehen einmal. */
   const sig = (p ? p.target + "|" + p.seconds + "|" + p.damage : "—") + "|" +
-              (w ? w.join("+") : "") + "|" + (v ? "V" : "");
+              (w ? w.join("+") : "") + "|" + (v ? "V" : "") + "|" +
+              (p && p.curve && p.curve.lanes ? "L" : "");
   if(sig === lastReport && !force) return;
   lastReport = sig;
   fetch("/api/party/report", {method:"POST", headers:{"Content-Type":"application/json"},
@@ -267,6 +273,30 @@ function kurveNachziehen(){
     state.kurveLaedt = null;
     renderRotation();
   });
+}
+
+/* Die Kurven der Gruppe fuer das Rennen (65, Spezifikation Gruppenkurven 4.1).
+   Hoechstens elf Abrufe je Klick - zwoelf in einem Raid, ohne dich -, einer
+   nach dem anderen ueber kurveHolen, wie "Wessen". Gefragt wird nur, wer auf
+   der lebenden Tafel eine Kurve hat; was schon zur Tafelzeile passt, kommt aus
+   dem Speicher. Zurueck kommt nur, was zur GEZEIGTEN Zeile passt: der Server
+   haelt je Mitglied nur die neueste Kurve, ein frueherer Pull hat andere
+   Zahlen. */
+const GRUPPE_ABRUFE = 11;
+export async function gruppenKurvenHolen(zeilen: readonly {name: string; damage?: number | null; seconds?: number | null}[],
+                                         ohne: string): Promise<Map<string, PartyCurve>> {
+  const raus = new Map<string, PartyCurve>();
+  const tafel = (state.party && state.party.board) || [];
+  let abrufe = 0;
+  for(const z of zeilen){
+    if(z.name === ohne) continue;
+    const row = tafel.find(r => r.name === z.name);
+    if(!row) continue;
+    let k = kurveVon(row);
+    if(!k && row.hasCurve && abrufe < GRUPPE_ABRUFE){ abrufe++; k = await kurveHolen(row); }
+    if(k && kurvePasst(k.curve, z)) raus.set(z.name, k.curve);
+  }
+  return raus;
 }
 
 function segVonMitglied(row: BoardRow){
@@ -1002,7 +1032,8 @@ function boardKopf(p: Partial<PartyView>, hosting: boolean, imRaum: number, meld
   tausche($("#pCode"), '<span class="code" role="img" aria-label="' + esc(t("party.codeLabel", {code: [...code].join(" ")})) + '">' + esc(code) + "</span>" +
     (langerWeg ? '<p class="joinline"><span>' + esc(t("party.joinLabel")) + '</span> <b class="mono">' + esc(p.join!) + "</b></p>" : "") +
     (hosting ? '<button class="btn sm" type="button" id="pCopy">' + esc(t(langerWeg ? "party.copyJoin" : "party.copy")) + "</button>" : ""));
-  $("#pCodeT").textContent = t(hosting ? "party.codeTitel" : "party.codeTitelIn");
+  // fuer Host und Mitglied derselbe Titel, wie im Entwurf (#133)
+  $("#pCodeT").textContent = t("party.codeTitel");
   $("#pStale").hidden = !p.error;
   $("#pStale").textContent = p.error ? t("party.staleNote") : "";
   $("#pBoard").classList.toggle("stale", !!p.error);

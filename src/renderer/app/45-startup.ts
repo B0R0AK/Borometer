@@ -94,7 +94,7 @@ function showWatchPop(file?: string){
 export const isWatching = () => document.body.classList.contains("watching");
 /* pause (Nachtraege N3, Pruefung G4): ein frueherer Tag haelt Live nur an.
    Der letzte Kampf kann dann noch laufen - er wird nicht wie bei "Live aus"
-   als beendet eingetragen (histRecord mit bestRecord und Build); das
+   als beendet eingetragen (histRecord mit bestRecord und Paar); das
    Verzeichnis behaelt, was Live bis dahin schrieb. */
 export function setWatching(on: boolean, file?: string, pause = false){
   const was = isWatching();
@@ -103,8 +103,8 @@ export function setWatching(on: boolean, file?: string, pause = false){
   // beendet, waehrend das Band noch stand: es sagte weiter "Live-Aufzeichnung"
   if(!on && was){
     clearTimeout(watchPopTimer ?? undefined); $("#watchPop").classList.remove("on");
-    /* Der letzte Kampf des Abends zaehlt erst jetzt: bestRecord und die
-       Bauerkennung (bauFuer) lassen ihn waehrend Live aus. histRecord
+    /* Der letzte Kampf des Abends zaehlt erst jetzt: bestRecord laesst ihn
+       waehrend Live aus. histRecord
        traegt ihn ins Verzeichnis ein und ruft bestRecord mit. */
     if(!pause) histRecord();
     /* Ebenso das Fenster (fensterStand laesst den laufenden Kampf aus):
@@ -140,6 +140,16 @@ export function syncLiveBtn(){
      Live-Region darf ein Vorleser als neue Ansage nehmen. */
   if(region.textContent !== satz) region.textContent = satz;
   const an = isWatching(), gestoert = an && liveGestoert;
+  // der Ring statt des Punkts im Streifen (#158)
+  document.body.classList.toggle("livestoer", gestoert);
+  /* Die Datei im title der Faktenzeile im Streifen, solange Live laeuft
+     (#161: das Band entfaellt dort). Nur ein Dateiname, wie der Satz. */
+  const meta = document.querySelector<HTMLElement>("#hMeta");
+  if(meta){
+    const datei = an && typeof liveSatz === "string" ? liveSatz : "";
+    if(document.body.classList.contains("compact") && datei) meta.title = t("compact.liveTitle", {datei});
+    else if(meta.title.startsWith(t("compact.liveTitle", {datei: ""}))) meta.removeAttribute("title");
+  }
   const b = $("#btnWatch");
   b.setAttribute("aria-pressed", an ? "true" : "false");
   b.classList.toggle("on", an && !gestoert);

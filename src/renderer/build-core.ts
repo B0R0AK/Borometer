@@ -2,57 +2,41 @@
 // Copyright (C) 2026 B0R0AK
 // SPDX-License-Identifier: GPL-3.0-or-later
 
-/* Der rechnende Kern des Bautagebuchs (app/47-builds.ts).
-   Keine Seite, kein state, kein Import ausser Typen: scripts/test-builds-core.mjs
-   buendelt diese Datei allein und prueft sie unter Node. Was die Seite
-   weiss - welche Waffe eine Faehigkeit hat, wie sie sprachunabhaengig
-   heisst -, bekommt der Kern schon aufgeloest (BauSkill). */
+/* Der Kern des Waffenpaars und der Zahlen am Kampf (app/47-paar.ts):
+   Waffen und Paar, Bezug "dasselbe Paar", Median, Einordnung, Abendgrenze.
+   Der Builds-Reiter ist entfallen (#207); was an Builds, Plaenen und ihrer
+   Form hing, gibt es hier nicht mehr. Keine Seite, kein state, kein Import
+   ausser Typen: scripts/test-builds-core.mjs buendelt diese Datei allein und
+   prueft sie unter Node. Was die Seite weiss - welche Waffe eine Faehigkeit
+   hat -, bekommt der Kern schon aufgeloest (BauSkill). */
 
-import type { Bau, BauStore, Lang } from "./types";
+import type { Lang } from "./types";
 
-/** So viel des Schadens tragen die tragenden Faehigkeiten zusammen mindestens. */
-export const BAU_ANTEIL = 0.8;
-/** Hoechstens so viele tragende Faehigkeiten. */
-export const BAU_KERN_MAX = 6;
-/* Derselbe Bau: gleiches Waffenpaar und mindestens so viele tragende
-   Faehigkeiten gemeinsam. Vier von sechs, weil eine Faehigkeit auch mal
-   knapp unter die Schwelle rutscht (Spezifikation Fortschritt, offene
-   Frage 4 - der Standard, bis anders entschieden wird). Hat ein Kern
-   weniger als vier, muessen alle seine Faehigkeiten im anderen stehen. */
-export const BAU_GLEICH = 4;
-/* Unter so vielen Werten steht kein Median - fuer die Karten im Bereich
-   Builds (kartenZahlen in plan-core.ts) und den Verlauf: sonst waere der "Median"
+/* Unter so vielen Werten steht kein Median - fuer den Verlauf: sonst waere der "Median"
    von zweien nur ihr Mittelwert - keine Mitte, die ein Ausreisser nicht
    verschiebt. EIN Wert fuer eine Sache. */
 export const MIN_MEDIAN = 3;
-/** Dieselbe Regel wie ID_RX in src/main/builds.ts - beide gleich halten. */
-export const BAU_ID_RX = /^[0-9a-z]{10}$/;
-export const BAU_NAME_MAX = 40;
-/* Hoechstens so viele Wahlen von "Deine Rotation" je Bau (Bau.rot) -
-   dieselbe Grenze wie MAX_ROT in src/main/builds.ts, beide gleich halten.
-   Ein Bau hat etwa zwoelf Faehigkeiten und ein paar Procs. */
-export const BAU_ROT_MAX = 24;
-/** Ein Bau als JSON hoechstens so lang - dieselbe Grenze wie MAX_ENTRY in src/main/builds.ts, beide gleich halten. */
-export const BAU_ENTRY_MAX = 4096;
-/** Dieselbe Regel wie LINK_RX in src/main/builds.ts - beide gleich halten. */
-export const BAU_LINK_RX = /^https:\/\/[^\s\u0000-\u001f\u007f]{1,292}$/;
-
+/* Die Waffen, wie das Log sie nennt. Das Verlaufsverzeichnis traegt ein Paar als zwei Indizes in diese
+   Liste (HistFight.w) - Zahlen, nie Text. Nur hinten verlaengern, nie
+   umsortieren: alte Eintraege lesen sonst eine andere Waffe. */
+export const WAFFEN: readonly string[] = ["", "Greatsword", "Sword and Shield", "Dagger", "Crossbow", "Longbow",
+  "Staff", "Wand and Tome", "Spear", "Gauntlet", "Orb"];
+/** Ein Paar als zwei Indizes; null, wenn eine Waffe fremd ist oder die erste fehlt. */
+export function paarCode(w: readonly string[]): [number, number] | null {
+  const a = WAFFEN.indexOf(w[0] ?? ""), b = WAFFEN.indexOf(w[1] ?? "");
+  return a > 0 && b >= 0 ? [a, b] : null;
+}
+/** Zwei Indizes zurueck zum Paar; null bei jeder anderen Form. */
+export function paarAus(c: unknown): [string, string] | null {
+  if(!Array.isArray(c) || c.length !== 2 || !c.every(n => Number.isInteger(n) && n >= 0 && n < WAFFEN.length) || c[0] === 0) return null;
+  return [WAFFEN[c[0]]!, WAFFEN[c[1]]!];
+}
 /** Eine Faehigkeit, wie der Kern sie braucht: sprachfreier Schluessel, Waffe, Schaden. */
 export interface BauSkill {
   key: string;
   weapon: string;
   damage: number;
 }
-/** Woran ein Bau erkannt wird: das Waffenpaar und die tragenden Faehigkeiten. */
-export interface Fingerprint {
-  weapons: [string, string];
-  core: string[];
-}
-export interface HandPair {
-  main: string;
-  off: string;
-}
-
 /* Passiv und Unzugewiesen zaehlen nicht als Waffe - dieselbe Regel wie
    weaponShares() in 42-party.ts. Sie bleiben im Nenner. */
 const KEINE_WAFFE = new Set(["", "Passive", "Unassigned"]);
@@ -62,7 +46,7 @@ const nachSchaden = (a: [string, number], b: [string, number]) => b[1] - a[1] ||
    die Waffe mit dem meisten Schaden, dazu die zweite, wenn sie mindestens
    offMin Prozent des GANZEN Schadens traegt. Ohne das Mitschreiben ueber die
    Live-Durchlaeufe (state.autoSeen) - das braucht nur ein wachsender Kampf,
-   und es gehoert der Anzeige, nicht der Erkennung. */
+   und es gehoert der Anzeige. */
 export function pairFromSkills(skills: BauSkill[], total: number, offMin: number): [string, string] | null {
   if(!(total > 0)) return null;
   const je = new Map<string, number>();
@@ -76,85 +60,13 @@ export function pairFromSkills(skills: BauSkill[], total: number, offMin: number
   return [teile[0]![0], zweite && 100 * zweite[1] / total >= offMin ? zweite[0] : ""];
 }
 
-/* Die tragenden Faehigkeiten: nach Schaden, bis zusammen BAU_ANTEIL des
-   ganzen Schadens erreicht ist, hoechstens BAU_KERN_MAX. Ein Satzbonus
-   (Passiv) ist keine Faehigkeit, die jemand waehlt, und bleibt draussen;
-   er zaehlt nur im Nenner. Zwei Raenge derselben Faehigkeit haben denselben
-   Schluessel und werden zusammengezaehlt. */
-export function coreFromSkills(skills: BauSkill[], total: number): string[] {
-  if(!(total > 0)) return [];
-  const je = new Map<string, number>();
-  for(const k of skills){
-    if(k.weapon === "Passive" || !k.key || !(k.damage > 0)) continue;
-    je.set(k.key, (je.get(k.key) || 0) + k.damage);
-  }
-  const kern: string[] = [];
-  let summe = 0;
-  for(const [key, d] of [...je.entries()].sort(nachSchaden)){
-    if(kern.length >= BAU_KERN_MAX || summe >= BAU_ANTEIL * total) break;
-    kern.push(key);
-    summe += d;
-  }
-  return kern;
-}
-
-/** Der Fingerabdruck eines Kampfes. Eine Handauswahl (weaponPick) gewinnt beim Paar, wie ueberall. */
-export function fingerprint(skills: BauSkill[], total: number, offMin: number, hand?: HandPair | null): Fingerprint | null {
-  const core = coreFromSkills(skills, total);
-  if(!core.length) return null;
-  const weapons: [string, string] | null = hand && hand.main ? [hand.main, hand.off || ""] : pairFromSkills(skills, total, offMin);
-  return weapons ? {weapons, core} : null;
-}
-
 /** Dasselbe Paar, gleich in welcher Reihenfolge: welche Waffe vorn liegt, kann von Kampf zu Kampf kippen. */
 export function samePair(a: readonly string[], b: readonly string[]): boolean {
   return [...a].sort().join("|") === [...b].sort().join("|");
 }
 
-export function sharedCore(a: readonly string[], b: readonly string[]): number {
-  const s = new Set(a);
-  return b.filter(k => s.has(k)).length;
-}
-
-export function sameBau(a: Fingerprint, b: Fingerprint): boolean {
-  if(!samePair(a.weapons, b.weapons)) return false;
-  const noetig = Math.min(BAU_GLEICH, a.core.length, b.core.length);
-  return noetig > 0 && sharedCore(a.core, b.core) >= noetig;
-}
-
-/* FNV-1a, zweimal mit verschiedenem Anfang: zehn Zeichen aus zwei 32-Bit-
-   Werten. Keine Sicherheit, nur eine kurze Kennung, die fuer denselben
-   ersten Kampf auf jedem Rechner dieselbe ist. */
-function fnv(text: string, seed: number): number {
-  let h = seed >>> 0;
-  for(let i = 0; i < text.length; i++){
-    h ^= text.charCodeAt(i);
-    h = Math.imul(h, 16777619) >>> 0;
-  }
-  return h;
-}
-/** Die Kennung eines neuen Baus, aus seinem ersten Fingerabdruck. */
-export function bauId(fp: Fingerprint): string {
-  const text = [...fp.weapons].sort().join("+") + "|" + [...fp.core].sort().join(",");
-  return (fnv(text, 2166136261).toString(36).padStart(7, "0") +
-          fnv(text, 0x9e3779b9).toString(36).padStart(7, "0")).slice(0, 10);
-}
-
-/* Der bekannte Bau, zu dem ein Fingerabdruck gehoert: der mit den meisten
-   gemeinsamen tragenden Faehigkeiten, bei Gleichstand der aeltere. */
-export function findBau(fp: Fingerprint, store: BauStore): string | null {
-  let wahl: string | null = null, n = -1, first = Infinity;
-  for(const id of Object.keys(store)){
-    const b = store[id]!;
-    if(!sameBau(fp, b)) continue;
-    const k = sharedCore(fp.core, b.core);
-    if(k > n || (k === n && b.first < first)){ wahl = id; n = k; first = b.first; }
-  }
-  return wahl;
-}
-
-/* Der Median, und zwar der eine der App: die Karten im Bereich Builds
-   (kartenZahlen in plan-core.ts) und der Verlauf (histTargets und
+/* Der Median, und zwar der eine der App: die Boss-Tabelle im Bereich
+   Builds (bossTabelle) und der Verlauf (histTargets und
    histVerdict in 32-history.ts) rufen diese Funktion (der
    Clanabend-Rueckblick entfaellt, Neugestaltung 28.09.). Bei gerader Anzahl der Mittelwert der beiden
    mittleren Werte - der echte Median; frueher nahm er den oberen, und aus
@@ -200,68 +112,12 @@ export function abendText(tag: string, lang: Lang): string {
   return lang === "de" ? d + "." + m + "." : d + "/" + m;
 }
 
-/* "Langbogen/Dolch 1": die Nummer je Waffenpaar, in der Reihenfolge des
-   ersten Kampfes. Sie wird nicht gespeichert, sondern jedes Mal gezaehlt -
-   der Name ohne Namen folgt so der Sprache der Waffen. */
-export function bauNummern(store: BauStore): Record<string, number> {
-  const je = new Map<string, { id: string; first: number }[]>();
-  for(const id of Object.keys(store)){
-    const k = [...store[id]!.weapons].sort().join("|");
-    let l = je.get(k);
-    if(!l){ l = []; je.set(k, l); }
-    l.push({id, first: store[id]!.first});
-  }
-  const raus: Record<string, number> = {};
-  for(const l of je.values()){
-    l.sort((a, b) => a.first - b.first || (a.id < b.id ? -1 : 1));
-    l.forEach((e, i) => { raus[e.id] = i + 1; });
-  }
-  return raus;
+/** Das Paar eines Kampfs: w (zwei Indizes in WAFFEN), sonst unbekannt. Ein altes b im Verzeichnis zaehlt nicht mehr (#207). */
+export function kampfPaar(f: { w?: unknown }): [string, string] | null {
+  return paarAus(f.w);
 }
-
-/* ---------- Pruefungen fuer das, was aus der Datei oder dem Feld kommt ---------- */
-
-export function nameOk(n: unknown): n is string {
-  return typeof n === "string" && n.length <= BAU_NAME_MAX && !/[\u0000-\u001f\u007f]/.test(n);
-}
-/** Ein Name aus dem Feld: Steuerzeichen raus, Leerraum zusammengezogen; null, wenn er zu lang bleibt. */
-export function cleanName(roh: string): string | null {
-  const n = roh.replace(/[\u0000-\u001f\u007f]/g, " ").replace(/\s+/g, " ").trim();
-  return n.length <= BAU_NAME_MAX ? n : null;
-}
-export function linkOk(s: unknown): s is string {
-  if(typeof s !== "string" || !BAU_LINK_RX.test(s)) return false;
-  try { return new URL(s).protocol === "https:"; } catch { return false; }
-}
-
-/* Die Wahlen von "Deine Rotation" (Spezifikation Deine Rotation 7): ein
-   Objekt mit hoechstens BAU_ROT_MAX Schluesseln zu 1-80 Zeichen, jeder Wert
-   eine ganze Zahl 0, 1 oder 2; kein __proto__ oder prototype und kein Name,
-   den Object.prototype schon hat (constructor, toString ...) - dieselbe
-   Pruefung wie putBuild. */
-/** Dieselbe Regel wie ROT_KEY_RX in src/main/builds.ts - beide gleich halten: 1-80 Zeichen, nicht __proto__ oder prototype. */
-export const BAU_ROT_KEY_RX = /^(?!(?:__proto__|prototype)$)[\s\S]{1,80}$/;
-export function rotOk(r: unknown): r is Record<string, 0 | 1 | 2> {
-  if(!r || typeof r !== "object" || Array.isArray(r)) return false;
-  const e = Object.entries(r);
-  return e.length <= BAU_ROT_MAX &&
-    e.every(([k, v]) => BAU_ROT_KEY_RX.test(k) && !Object.hasOwn(Object.prototype, k) && Number.isInteger(v) && v >= 0 && v <= 2);
-}
-
-// any: die Pruefung entscheidet erst, ob der Wert die Form hat
-export function looksLikeBau(e: any): e is Bau {
-  return !!e && typeof e === "object" && !Array.isArray(e) && nameOk(e.name) &&
-    Array.isArray(e.weapons) && e.weapons.length === 2 &&
-    e.weapons.every((w: unknown) => typeof w === "string" && w.length <= 40) &&
-    Array.isArray(e.core) && e.core.length >= 1 && e.core.length <= BAU_KERN_MAX &&
-    e.core.every((k: unknown) => typeof k === "string" && k.length > 0 && k.length <= 80) &&
-    (e.link === undefined || linkOk(e.link)) && (e.rot === undefined || rotOk(e.rot)) && Number.isFinite(e.first) &&
-    // geloest (Fixrunde 1 zu Aufgabe 12): ein Zeitpunkt, der Bau bleibt gespeichert
-    (e.geloest === undefined || Number.isFinite(e.geloest));
-}
-/* Was putBuild annimmt: die Form und hoechstens BAU_ENTRY_MAX Zeichen als
-   JSON. Die Seite fragt vorher, statt einen POST mit 400 scheitern zu lassen
-   (ein Bau aus der Datei kann Felder tragen, die sie nicht kennt). */
-export function bauPasst(b: unknown): boolean {
-  return looksLikeBau(b) && JSON.stringify(b).length <= BAU_ENTRY_MAX;
+/* Derselbe Bezug (Spezifikation 6, seit #207 ohne Build): dasselbe Paar, in
+   jeder Reihenfolge. Unbekanntes nie. */
+export function gleicherBezug(hier: readonly string[] | null, dort: readonly string[] | null): boolean {
+  return !!hier && !!dort && samePair(hier, dort);
 }

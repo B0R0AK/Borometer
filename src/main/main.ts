@@ -33,7 +33,12 @@ import { logDir, setUpdate, startServer } from "./server";
 import { checkUpdate } from "./update";
 import { HOTKEY, registerHotkey, unregisterHotkey } from "./hotkey";
 import { setupTaskbar } from "./taskbar";
-import { createWindow, currentWindow, iconFile } from "./window";
+import { jumpListBauen } from "./jumplist";
+import { beendenErlauben, createWindow, currentWindow, iconFile } from "./window";
+import { erinnerungStarten } from "./erinnerung";
+import { setupTray } from "./tray";
+import { auftragSetzen } from "./start";
+import { startSchalter, vorholen } from "./windows-core";
 
 /*
  * Chromium's own profile (localStorage, caches) in a folder of its own inside
@@ -44,6 +49,8 @@ app.setPath("userData", path.join(SETTINGS_DIR, "electron"));
 app.setName(APP_NAME);
 // Windows groups the taskbar button and notifications by this id
 app.setAppUserModelId("de.boro.borometer");
+/* The command line of this start (spec Windows-Einbindung 5.1), read once. */
+const ERSTER_START = startSchalter(process.argv);
 
 /** Where the built page and icons sit: in resources/ once packaged. */
 function resourcesDir(): string {
@@ -103,16 +110,27 @@ async function main(): Promise<void> {
     w.once("show", () => setupTaskbar(w, resourcesDir()));
     w.on("focus", () => setupTaskbar(w, resourcesDir()));
   };
-  const win = createWindow(winUrl, icon);
+  // started with Windows: in the tray, or minimized (spec Windows-Einbindung 4.2)
+  const startArt = ERSTER_START.autostart ? (loadConfig().trayBeimSchliessen === true ? "verborgen" : "minimiert") : "normal";
+  const win = createWindow(winUrl, icon, startArt);
   if (pendingFocus) {
     // a second start already arrived while this one was still here in
     // main(), before the window existed (see the second-instance handler
     // below); bring it forward the moment it actually shows itself, the
-    // same moment reveal() in window.ts does
+    // same moment reveal() in window.ts does. A window started minimized or
+    // hidden (autostart) never shows itself, so there it comes forward now.
     pendingFocus = false;
-    win.once("show", () => win.focus());
+    if (startArt === "normal") win.once("show", () => win.focus());
+    else vorholen(win);
   }
   withTaskbar();
+  // the notification area (tray.ts) and the way out of "close to tray"
+  setupTray(icon, currentWindow);
+  // the weeklies' reminders (erinnerung.ts): the schedule runs only while Borometer runs
+  erinnerungStarten({ win: currentWindow, icon });
+  app.on("before-quit", beendenErlauben);
+  jumpListBauen();
+  auftragSetzen(ERSTER_START);
 
   // one global combination for compact's click-through (hotkey.ts); if
   // another program holds it, the page says so instead of going quiet
@@ -152,15 +170,15 @@ let pendingFocus = false;
 if (!app.requestSingleInstanceLock()) {
   app.quit();
 } else {
-  app.on("second-instance", () => {
+  app.on("second-instance", (_e, argv) => {
+    // a jump-list entry starts the exe again: its order goes to the page
+    auftragSetzen(startSchalter(argv));
     const w = currentWindow();
     if (!w) {
       pendingFocus = true;
       return;
     }
-    if (w.isMinimized()) w.restore();
-    w.show();
-    w.focus();
+    vorholen(w);
   });
   main().catch((err: unknown) => {
     console.error(err);

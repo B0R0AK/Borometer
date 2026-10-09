@@ -194,6 +194,35 @@ function aufLaenge(n) {
   return x;
 }
 
+// --- Erinnerungen und Zu-Zustand (Spezifikation Weeklies neu, 5)
+{
+  const E = (o = {}) => ({ id: "eabcdefghi", an: true, tage: [2], zeit: "18:00", text: "Weeklies pruefen", nurOffen: true, ...o });
+  const chk = (x, alt = leer) => w.checkWeeklies(x, alt);
+  eq(chk({ ...leer, erinnerungen: [E()] })?.erinnerungen, [E()], "eine gueltige Erinnerung wird uebernommen");
+  eq(chk(leer), { v: 1, profile: [] }, "eine alte Datei ohne Felder bleibt gueltig und bekommt keine");
+  for (const [name, bad] of [
+    ["id falsch", E({ id: "x" })], ["keine Tage", E({ tage: [] })], ["Tag 7", E({ tage: [7] })], ["Tag doppelt", E({ tage: [2, 2] })],
+    ["Zeit 24:00", E({ zeit: "24:00" })], ["Zeit ohne Null", E({ zeit: "8:00" })], ["Text leer", E({ text: "" })],
+    ["Text 121 Zeichen", E({ text: "x".repeat(121) })], ["Text mit Steuerzeichen", E({ text: "a\nb" })], ["an kein Boolean", E({ an: 1 })],
+    ["fremdes Feld", { ...E(), extra: 1 }],
+  ]) eq(chk({ ...leer, erinnerungen: [bad] }), null, "Erinnerung abgelehnt: " + name);
+  eq(chk({ ...leer, erinnerungen: [E(), E()] }), null, "dieselbe id zweimal wird abgelehnt");
+  const viele = (n, geloest) => Array.from({ length: n }, (_, i) => E({ id: "e" + String(i).padStart(9, "0"), ...(i < geloest ? { geloest: true } : {}) }));
+  eq(chk({ ...leer, erinnerungen: viele(13, 0) }), null, "mehr als 12 nicht geloeste werden abgelehnt");
+  eq(chk({ ...leer, erinnerungen: viele(14, 2) }) !== null, true, "12 nicht geloeste plus geloeste sind erlaubt");
+  eq(chk({ ...leer, erinnerungen: viele(41, 0) }), null, "mehr als 40 insgesamt werden abgelehnt");
+  const gespeichert = { v: 1, profile: [], erinnerungen: [E()] };
+  eq(chk(leer, gespeichert), null, "eine gespeicherte Erinnerung darf nicht fehlen (nie endgueltig loeschen)");
+  eq(chk({ ...leer, erinnerungen: [E({ geloest: true })] }, gespeichert)?.erinnerungen[0].geloest, true, "Loesen setzt geloest, die Erinnerung bleibt");
+
+  const prof = (zu) => profil("w000000001", "Aurel", zu === undefined ? {} : { zu });
+  eq(chk(stand(prof({ raid: { zu: false, bei: true } })))?.profile[0].zu, { raid: { zu: false, bei: true } }, "zu wird uebernommen");
+  eq(chk(stand(prof({ raid: { zu: 1, bei: true } }))), null, "zu mit falschem Typ wird abgelehnt");
+  eq(chk(stand(prof({ raid: { zu: true, bei: true, x: 1 } }))), null, "zu mit fremdem Feld wird abgelehnt");
+  eq(chk(stand(prof({ "1falsch": { zu: true, bei: true } }))), null, "zu mit falschem Schluessel wird abgelehnt");
+  eq(chk(stand(prof()), stand(prof({ raid: { zu: true, bei: true } }))) !== null, true, "zu darf fehlen (Ansichtszustand)");
+}
+
 // --- die Datei
 try {
   eq(w.loadWeeklies(), leer, "ohne Datei: ein leerer Stand");

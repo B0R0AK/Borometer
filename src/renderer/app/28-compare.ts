@@ -14,7 +14,7 @@ import { partyEinsaetze } from "./42-party";
 import { syncCompareBtn } from "./45-startup";
 import { leerKnopf, leerTauschen } from "./58-felder";
 import {
-  antwortSchluss, bestAntwort, bestBezug, bestInfo, bestLauf, bestNamen, bestZeile, bestZeileBinden, cmpRotation, cmpRotationBinden, gegenBestAktiv,
+  antwortSchluss, bestAntwort, bestBezug, bestInfo, bestLauf, bestNamen, bestZeile, bestZeileBinden, cmpRotation, cmpRotationBinden, gegenBestAktiv, mitLauf,
   type BestInfo,
 } from "./46-best-pull";
 import { cutCasts, groessterAnteil, vergleichZahlen, verteilt } from "../best-pull-core";
@@ -415,7 +415,8 @@ export function renderCompare(){
      fuer diesen Kampf nicht, gilt die andere; von Hand gewaehlte Kaempfe
      (state.cmpPaar null) bleiben, wie sie sind. */
   const biAlle = bestInfo(), li = letztInfo();
-  const hat = {best: !!(biAlle.refId && biAlle.curId), letzt: !!(li.refId && li.curId)};
+  // ein bester Pull ohne Lauf (ohneLauf) ist hier kein Bezug: es gibt nichts anzuhaken
+  const hat = {best: mitLauf(biAlle) && !!biAlle.curId, letzt: !!(li.refId && li.curId)};
   const wunsch = state.cmpPaar;
   const soll: PaarArt | null = !wunsch ? null : hat[wunsch] ? wunsch : hat[wunsch === "best" ? "letzt" : "best"] ? (wunsch === "best" ? "letzt" : "best") : null;
   if(soll){

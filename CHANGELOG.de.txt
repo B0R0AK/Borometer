@@ -1,6 +1,95 @@
 BOROMETER — ÄNDERUNGSPROTOKOLL
 ==============================
 
+v1.10
+-----
+  - Ein viertes Thema, Rauchglas. Unter Windows 11 liegt das große Fenster auf
+    Acrylic: Was dahinter liegt, scheint verwischt durch, während Balken, Listen
+    und Kurven auf einer dunklen Scheibe liegen und jede Schrift lesbar bleibt.
+    Der Kompaktstreifen nutzt dasselbe Glas. Im Browser, vor Windows 11 22H2
+    oder bei abgeschalteten Transparenzeffekten ist es stattdessen ein ruhiges
+    Rauchgrau. Gewählt wird es in den Einstellungen unter Darstellung.
+  - Eine Regel für den besten Pull, in Kampfwahl, Tafel, Rekorden und Verlauf.
+    Ein Pull zählt ab 60 s; bei Bossen, die schneller fallen, reicht die halbe
+    Länge des längsten Pulls. Es gewinnt der mit den meisten DPS, bei
+    Gleichstand der frühere, und einen besten Pull gibt es, sobald ein Boss
+    mindestens zwei Pulls hat. Ein Fehlstart von 14 Sekunden bekommt den
+    Goldpunkt nicht mehr. In der Einordnung heißt die Marke jetzt „höchster“,
+    weil sie die höchste DPS zeigt.
+  - Weeklies neu gebaut: Jeder Charakter ist eine Karte mit einem Ring, der
+    zeigt, wie weit er ist, und einem Satz wie „noch 7 offen · heute 2/2“. Ein
+    fertiger Bereich klappt zu und zeigt einen Haken, man kann ihn wieder
+    aufklappen. Zähler lassen sich eintippen, Umschalt+Klick zählt zehn. Die
+    letzte Woche steht unter dem Band, bis in der neuen etwas gesetzt ist. Über
+    die Glocke stellst du eigene Erinnerungen ein, zum Beispiel Dienstag 18 Uhr
+    als Windows-Meldung, mit eigenem Text und auf Wunsch nur, wenn noch etwas
+    offen ist. Erinnerungen laufen nur, solange Borometer läuft
+  - Neuer Bereich Gilde für Leader: eine Mitgliederliste mit Waffen und Rolle,
+    Termine mit Wiederholung (zum Beispiel jeden Sonntag), Anwesenheit je Termin
+    abhaken (da, nicht da, entschuldigt) und eine Auswertung mit Quote, Strähne
+    und letzter Teilnahme, ohne Farben und ohne Rang. Die Liste lässt sich als
+    Text oder Bild für den Gildenchat kopieren oder als Kalenderdatei (.ics)
+    speichern. Alles bleibt auf deinem PC in boro-gilde.json, die Namen sind nur
+    die, die du selbst einträgst, und nichts wird verschickt. Nichts wird
+    gelöscht: Mitglieder und Reihen werden gelöst und lassen sich zurückholen
+  - Kampfwahl an einem Wipe-Abend: Aufeinanderfolgende Pulls am selben Ort
+    stehen unter einem Kopf, auch wenn die Bosse wechseln, und jede Zeile heißt
+    „Pull 14“ mit ihrer Länge und einem kleinen Balken gegen den längsten Pull.
+    Der Vorleser hört weiter den ganzen Namen. Ohne Log steht dort „Kein Log ·
+    Log öffnen“.
+  - Live bleibt beim älteren Kampf, den du gerade liest. Ein neuer Kampf zieht
+    die Auswahl nicht mehr weg: Die Ungelesen-Pille zählt, und der Vorleser sagt
+    „Neuer Kampf“. Mitgesprungen wird nur, wenn vorher der neueste gewählt war.
+  - Die Kampfwahl ist für den Vorleser ein Baum mit Orten zum Auf- und
+    Zuklappen. Ende und danach Pos1 zeigt den ersten Eintrag, und nach einem
+    Klick daneben steht der Fokus wieder am Knopf.
+  - Rekorde: Das Medaillon ist jetzt ein Knopf und öffnet den Kampf, oder den
+    Verlauf des Bosses, wenn das Log nicht zu öffnen ist. Medaillon und Tafel
+    zeigen dieselbe Zahl.
+  - Windows-Einbindung, ab Werk aus bis auf das Symbol im Infobereich: eine
+    Meldung nach jedem Kampf (auch nur bei neuem Bestwert), ein
+    Infobereich-Symbol mit Menü, eine Sprungliste am Taskleistensymbol mit den
+    drei zuletzt gelesenen Logs, ein Fortschrittsbalken beim Laden eines großen
+    Logs und Start mit Windows. Zu finden unter Einstellungen › Windows.
+  - Kompaktfenster: Strg+Umschalt+D macht den Streifen mindestens 40 %
+    durchsichtig, mit Acrylic wird nur der Grund getönt. Solange der neueste
+    Kampf noch wächst, steht dort „Kampf läuft“, und der Vergleich wartet. Der
+    Vergleich zum letzten Pull hat eine eigene Zeile, ein Punkt zeigt, dass Live
+    läuft, und unter den Top 5 fasst eine Zeile den Rest zusammen. Die Knöpfe
+    oben rechts bleiben sichtbar, wenn die Maus darüberfährt.
+  - Der Builds-Reiter wurde entfernt.
+  - Glutring und Rennen: In der Gruppe lässt „Kampf nachspielen“ die Mitglieder
+    gegeneinander laufen, eine Bahn je Mitglied in seiner Farbe, auf der Uhr des
+    Spiels übereinandergelegt. Bei weniger als 20 Treffern zeichnet der Ring
+    leise, ab der dreizehnten Fähigkeit fasst er den Rest zu einem Bogen
+    zusammen, und die Liste daneben hat ein Menü zum Ordnen statt Spaltenköpfen,
+    die es nicht gab.
+  - Gruppe: Die anderen sehen deine Kurve nach Fähigkeiten und deine Rotation
+    jetzt, sobald der Kampf vorbei ist, nicht erst nach einem erzwungenen
+    Bericht. Über dem Code steht „Code der Gruppe“, und der Satz unter „Gruppe
+    starten“ sagt, was wirklich hinausgeht. Der Gruppenserver begrenzt Anfragen
+    auf 256 kB, schließt stille Verbindungen nach 10 s und nimmt 40 Namen je
+    Raum auf.
+  - Jeder Boss, den Borometer kennt, hat jetzt ein Gesicht, auch im deutschen
+    Client, dazu 17 neue Porträts. Die Halle der Illusionen steht mit allen vier
+    Bossen in der Dungeon-Tabelle (Haylock und Gaudian ab Donnerstag, 08.10.)
+    und hat in den Rekorden eine eigene Gruppe.
+  - Kämpfe werden besser getrennt: Wipes bei Limuny Bercant sind eigene Kämpfe,
+    Fellini auf dem Weg zum Boss ist Trash und kommt nicht mehr in den Verlauf
+    von Fellinex, und Korridor der Pein und Altar der Wiedergeburt bleiben zwei
+    Blöcke.
+  - Die Analyse sagt nur, was stimmt: „Schwächste drei Sekunden“ erscheint nur,
+    wenn die Stelle unter der Hälfte einer gewöhnlichen Sekunde liegt, das
+    Fenster-Urteil rechnet gegen deinen besten Pull, und jede Aussage steht
+    einmal. Vom Urteil führt ein Link zum Beleg oder öffnet die Rotation an
+    dieser Strecke.
+  - Behoben: Eine Datei, die schon nach wenigen Zeilen gelesen wird und
+    weiterwächst, ordnet ihre Spalten neu zu, der Schaden landet also nicht mehr
+    in der falschen Spalte. Kämpfe aus einem Log ohne Datum stehen nicht mehr
+    als 01.01. in Verlauf und Rekorden. Der Kompaktstreifen erfährt den Stand,
+    sobald er offen ist. Vegamor im deutschen Client behält Klaue und Krieger im
+    Kampf
+
 v1.9
 ----
   - Der Kampf zeigt den Schaden jetzt als Glutring. Jede Fähigkeit ist ein Bogen

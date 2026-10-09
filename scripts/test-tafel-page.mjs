@@ -65,11 +65,12 @@ const PULLS = [
    Stand der Datei liefert (wie in test-best-page.mjs {ok, best}), ohne
    Angabe kein bester Pull; eine Funktion wird abgewartet (eine spaete
    Antwort). Was die Seite an /api/best schreibt, steht in bestPosts. */
-async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, hoehe = 860, helfer = null, best = {}, gruppe = null } = {}) {
+async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, hoehe = 860, helfer = null, best = {}, gruppe = null, kurven = null } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
-  const s = { page, fehler: [], posts: [], bestPosts: [] };
+  const s = { page, fehler: [], posts: [], bestPosts: [], kurvenAbrufe: [], kurvenGleichzeitig: 0 };
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
+  let offen = 0;
   await page.route("http://boro.test/**", async (route) => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname;
     const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }).catch(() => {});
@@ -84,12 +85,23 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
        Rundgang. Diese Proben gelten der App danach; den Rundgang selbst prueft
        test-rundgang-page.mjs. Eine eigene config kann es ueberschreiben. */
     // gruppe: der Helfer meldet eine laufende Gruppe (wie /api/party/state im Hauptprozess, test-neu-page.mjs)
+    /* kurven: was POST /api/party/curve je Name antwortet ({curve} oder nichts),
+       wie der Hauptprozess die Frage an den Gruppenserver weitergibt. Gezaehlt
+       wird jeder Abruf und wie viele gleichzeitig offen waren. kurven.warte: ms. */
+    if (path === "/api/party/curve" && kurven) {
+      const name = JSON.parse(req.postData() || "{}").name;
+      s.kurvenAbrufe.push(name);
+      offen++; s.kurvenGleichzeitig = Math.max(s.kurvenGleichzeitig, offen);
+      await new Promise((r) => setTimeout(r, kurven.warte || 30));
+      offen--;
+      const k = kurven[name];
+      return json(k ? { ok: true, name, curve: k } : { ok: false, error: "no curve" });
+    }
     if (path === "/api/party/state" && gruppe) return json(gruppe);
     if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, ...config });
     if (path === "/api/config") { s.posts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
     if (path === "/api/win") return json({ ok: true, max: false, w: 400, h: 28, on_top: true });
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: typeof best === "function" ? await best() : best });
     if (path === "/api/best") { s.bestPosts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
     if (path.startsWith("/api/")) return json({ ok: true });
@@ -240,7 +252,8 @@ try {
       if (zoom === 100) {
         const soll = Math.min(400, Math.max(340, 233 + breite * 0.0834));
         assert(Math.abs(m.liste.width - soll) <= 1.5, `${wo}: die Liste ist 340 bis 400 Punkt breit (hier ${Math.round(soll)})`, { soll, ist: m.liste.width });
-        assert(m.band.height >= 100 && m.band.height <= 130, `${wo}: das Band ist etwa 110 Punkt hoch`, m.band);
+        /* folgt Spezifikation Feinschliff 6: ab 1200 Punkt Hoehe waechst die Kurve um 72 */
+        assert(m.band.height >= (hoehe >= 1200 ? 170 : 100) && m.band.height <= (hoehe >= 1200 ? 210 : 130), `${wo}: das Band ist etwa ${hoehe >= 1200 ? 190 : 110} Punkt hoch`, m.band);
       }
     } else {
       assert(m.ring.bottom <= m.liste.top + 1 && m.liste.bottom <= m.band.top + 1, `${wo}: gestapelt Ringfeld, Liste mit Urteil, Band`, m);
@@ -483,8 +496,9 @@ try {
     assert(/^Your best pull on Vulcanus/.test(u.satz || "") && u.belege === 0 && u.kurve === "1",
       "dieser ist der beste: der Satz ohne Belegzeilen, der Bezug gestrichelt", u);
     /* Ist dieser der beste, ist der Bezug der staerkste andere Pull - der
-       zweitbeste (pickTarget). Satz und Legende sagen das, wie der Vergleich
-       ("Gegen deinen zweitbesten Pull"). */
+       zweitbeste, der zweite der Rangfolge (bestInfo, 46-best-pull.ts).
+       Satz und Legende sagen das, wie der Vergleich ("Gegen deinen
+       zweitbesten Pull"). */
     assert(/^against your second-best pull \u00b7 Vulcanus/.test(u.bezug) && /second best/.test(u.leg) && !/- - - best/.test(u.leg),
       "dieser ist der beste: Bezug und Legende nennen den zweitbesten Pull", u);
     await p.close();
@@ -602,6 +616,8 @@ try {
     await p.close();
   }
   // vom Raster in den Stapel, waehrend die Tafel in sich gerollt ist: gestapelt gilt wieder der Deckel
+  // (folgt Spezifikation Feinschliff 4.4: gestapelt hat die Liste keine eigene Hoehengrenze mehr; gleich streng
+  // gemessen, dass vom Raster nichts haengen bleibt - kein Schnitt von dort, alle Zeilen stehen, die Liste rollt nicht in sich)
   {
     const s = await oeffne({ app: true }); const p = s.page; await beispiel(p);
     // alle Zeilen aufklappen, bis die Tafel im Raster in sich rollt (die erste ist seit der Neugestaltung 28.09., Luecke 2.9, schon offen)
@@ -613,8 +629,10 @@ try {
     await p.setViewportSize({ width: 832, height: 700 });
     await p.waitForTimeout(400);
     const g = await p.evaluate(() => { const b = document.querySelector("#bars");
-      return { max: b.style.maxHeight, h: b.clientHeight, voll: b.scrollHeight, stapel: document.documentElement.matches(".w-max-832") }; });
-    assert(r.rollt && r.top > 0 && g.stapel && g.max !== "none" && g.h < g.voll, "Raster zu Stapel mit gerollter Tafel: der Deckel greift", { r, g });
+      return { max: b.style.maxHeight, css: getComputedStyle(b).maxHeight, h: b.clientHeight, voll: b.scrollHeight, top: b.scrollTop,
+        stapel: document.documentElement.matches(".w-max-832") }; });
+    assert(r.rollt && r.top > 0 && g.stapel && g.max === "" && g.css === "none" && g.voll <= g.h + 1 && g.top === 0,
+      "Raster zu Stapel mit gerollter Tafel: kein Schnitt aus dem Raster bleibt, alle Zeilen stehen, die Liste rollt nicht in sich", { r, g });
     await p.close();
   }
 
@@ -717,11 +735,12 @@ try {
       `${wo}: das Urteil mit seinen Knoepfen und die Knoepfe des Bands stehen ganz im Bild`, m);
     if (m.rollt) assert(m.letzteUnten <= m.barsUnten + 0.5 && m.barsUnten - m.letzteUnten < 1,
       `${wo}: die Liste rollt in sich und endet an einer ganzen Zeile`, m);
-    /* folgt der Entscheidung 03.10. (Aufgabe 10): passt alles, steht das Urteil unten in der Spalte (die Spalte reicht bis zur
-       Unterkante, ihr Grund laeuft durch) statt direkt unter der Liste; die Liste bleibt nicht hoeher als ihr Inhalt */
-    else assert(m.barsHoch <= m.listeInhalt + 2 && Math.abs(m.urteilUnten - m.appUnten) < 2 && m.urteilOben >= m.barsUnten + m.note - 0.5,
-      `${wo}: alles passt \u2013 die Liste nicht hoeher als ihr Inhalt, das Urteil unten in der Spalte`, m);
-    assert(Math.abs(m.kurve - 78) <= 1, `${wo}: die Kurve im Band ist zu 78 Punkt hoch`, m.kurve);
+    /* folgt Spezifikation Feinschliff 6 (Entscheidung 04.10., vorher 03.10.): passt alles, folgt das Urteil direkt der Liste
+       (darunter bleibt der Grund der Spalte); die Liste bleibt nicht hoeher als ihr Inhalt */
+    else assert(m.barsHoch <= m.listeInhalt + 2 && m.urteilOben >= m.barsUnten + m.note - 0.5 && m.urteilOben - (m.barsUnten + m.note) <= 1,
+      `${wo}: alles passt \u2013 die Liste nicht hoeher als ihr Inhalt, das Urteil direkt darunter`, m);
+    /* folgt Spezifikation Feinschliff 6: ab 1200 Punkt Hoehe 150, sonst 78 */
+    assert(Math.abs(m.kurve - (m.win >= 1200 ? 150 : 78)) <= 1, `${wo}: die Kurve im Band ist ${m.win >= 1200 ? 150 : 78} Punkt hoch`, m.kurve);
   };
 
   // --- 6. Das Ringraster bei den Hoehen, an denen die alte Tafel ihre Regeln wechselte
@@ -750,6 +769,40 @@ try {
     await p.setViewportSize({ width: breite, height: hoehe }); await p.waitForTimeout(300);
     ringRegel(`${name} nach 1280x900`, await ringMass(p));
     assert(!s.fehler.length, `${name}: ohne Fehler`, s.fehler);
+    await p.close();
+  }
+
+  // --- 6c. Feinschliff 6 (#102): in hohen Fenstern folgt das Urteil der Liste und das Band waechst auf 150; bei
+  // 1280 x 860 bleibt es beim Alten (Urteil unten in der Spalte, Band 78, Liste rollt)
+  for (const [breite, hoehe] of [[2000, 1480], [1280, 860]]) {
+    const s = await oeffne({ app: true, breite, hoehe }); const p = s.page; await beispiel(p);
+    await p.waitForTimeout(300);
+    const m = await p.evaluate(() => {
+      const r = (q) => document.querySelector(q).getBoundingClientRect();
+      const zeilen = [...document.querySelectorAll("#bars .ringzeile")].filter((z) => z.getClientRects().length > 0);
+      const letzte = zeilen[zeilen.length - 1].getBoundingClientRect();
+      const bars = r("#bars"), spalte = r(".table");
+      return { luecke: r("#urteilFeld").top - Math.min(letzte.bottom, bars.bottom), kurve: r("#kurve").height,
+        zeilen: zeilen.map((z) => z.getBoundingClientRect().height), zuSpalteUnten: spalte.bottom - r("#urteilFeld").bottom,
+        rollt: document.querySelector("#bars").scrollHeight > document.querySelector("#bars").clientHeight + 1 };
+    });
+    if (breite === 2000) {
+      assert(m.luecke <= 1 && Math.abs(m.kurve - 150) <= 1 && m.zeilen.every((h) => Math.abs(h - 44) <= 0.5),
+        "2000x1480 (folgt Spezifikation Feinschliff 6): Urteil unter der letzten Zeile, Band 150, Zeilen 44", m);
+      /* die Liste ist ein Tabstopp (Pfeiltasten wandern darin); Tab von der Zeile fuehrt in das Urteil */
+      await p.evaluate(() => { const z = [...document.querySelectorAll("#bars .row")].find((e) => e.tabIndex === 0); z.focus(); });
+      await p.keyboard.press("Tab");
+      const im = await p.evaluate(() => !!document.activeElement?.closest("#urteilFeld"));
+      assert(im, "2000x1480: Tab von der Liste fuehrt in das Urteil", await p.evaluate(() => document.activeElement?.outerHTML.slice(0, 120)));
+      /* aufgeklappt gewinnt die 200 weiter */
+      const gross = await p.evaluate(() => { document.body.classList.add("kurvegross");
+        const h = document.querySelector("#kurve").getBoundingClientRect().height; document.body.classList.remove("kurvegross"); return h; });
+      assert(Math.abs(gross - 200) <= 1, "2000x1480: aufgeklappt bleibt die Kurve 200 hoch", gross);
+    } else {
+      assert(Math.abs(m.kurve - 78) <= 1 && m.rollt && m.zuSpalteUnten <= 1,
+        "1280x860: Band 78, Liste rollt, Urteil unten in der Spalte", m);
+    }
+    assert(!s.fehler.length, `${breite}x${hoehe}: ohne Fehler`, s.fehler);
     await p.close();
   }
 
@@ -1075,7 +1128,8 @@ try {
     assert(!s.fehler.length, "9b: ohne Fehler", s.fehler);
     await p.close();
   }
-  // --- 10. Die Liste neben dem Ring (Spezifikation Glutring 4): Kopf, Zeilen, Trefferarten mit Zahl der Treffer, Tastatur, Sortieren
+  // --- 10. Die Liste neben dem Ring (Spezifikation Glutring 4): Kopf, Zeilen, Trefferarten mit Zahl der Treffer, Tastatur,
+  // Ordnen ueber das Menue (folgt Spezifikation Feinschliff 4, #100: vorher Sortieren ueber sechs Spaltenkoepfe)
   {
     // Quick Fire trifft reihum normal, kritisch, stark, kritisch stark (je 20), Strafing 80-mal normal
     const z = ["CombatLogVersion,4"], beginn = at(22, 0, 0);
@@ -1095,14 +1149,25 @@ try {
         [r.dataset.cat, r.querySelector('[data-k="hits"]')?.textContent, r.querySelector('[data-k="damage"]')?.textContent]);
       const su = box.querySelector('.row.bdetail[data-detail="Quick Fire"]');
       return { rolle: box.getAttribute("role"), name: box.getAttribute("aria-label"),
-        kopf: [...box.querySelectorAll(".bhead [role=columnheader]")].map((e) => e.dataset.k),
-        dpsSort: box.querySelector('.bhead [data-k="dps"]')?.getAttribute("aria-sort"), zeilen, arten,
+        kopf: { rolle: box.querySelector(".bhead")?.getAttribute("role"),
+          zellen: [...box.querySelectorAll(".bhead > *")].map((e) => (e.getAttribute("role") || "") + ":" + (e.dataset.k || (e.querySelector("#ringOrdnen") ? "knopf" : ""))) },
+        knopf: (() => { const b = document.querySelector("#ringOrdnen");
+          return b ? { popup: b.getAttribute("aria-haspopup"), auf: b.getAttribute("aria-expanded"), steuert: b.getAttribute("aria-controls"), text: b.textContent,
+            name: b.getAttribute("aria-label"), imKopf: !!b.closest("#bars .bhead") } : null; })(),
+        menue: (() => { const mm = document.querySelector("#ringOrdnenMenue");
+          return mm ? { rolle: mm.getAttribute("role"), zu: mm.hidden, ausserhalb: !mm.closest(".bhead") && mm.parentElement === box.parentElement } : null; })(),
+        zeilen, arten,
         summe: su ? { text: su.textContent, vorher: su.previousElementSibling?.dataset.cat, rolle: su.getAttribute("role"),
           span: su.querySelector("[role=gridcell]")?.getAttribute("aria-colspan") } : null };
     });
     assert(m.rolle === "treegrid" && m.name === "Damage table", "Liste: ein Treegrid mit Namen wie bisher", m);
-    assert(JSON.stringify(m.kopf) === JSON.stringify(["name", "dps", "share", "hits", "critRate", "heavyRate"]) && m.dpsSort === "descending",
-      "Liste: Kopf Name, DPS, Anteil, Treffer, Kritisch, Stark; die Vorgabe Schaden steht an DPS", m);
+    // folgt Spezifikation Feinschliff 4: der Kopf ist eine Zeile aus Name und Knopf "Ordnen"; die Vorgabe Schaden steht an DPS
+    // folgt Spezifikation Feinschliff 4 (Name enthaelt den sichtbaren Text): "Sort: DPS, descending" statt "Sort by DPS, descending"
+    assert(m.kopf.rolle === "row" && JSON.stringify(m.kopf.zellen) === JSON.stringify(["columnheader:name", "columnheader:knopf"]) &&
+      !!m.knopf && m.knopf.popup === "menu" && m.knopf.auf === "false" && m.knopf.steuert === "ringOrdnenMenue" && m.knopf.imKopf &&
+      m.knopf.text === "Sort: DPS \u2193" && m.knopf.name === "Sort: DPS, descending" && m.knopf.name.startsWith(m.knopf.text.replace(/ \u2193$/, "")) &&
+      !!m.menue && m.menue.rolle === "menu" && m.menue.zu && m.menue.ausserhalb,
+      "Liste: Kopf eine Zeile aus Name und Knopf \"Sort: DPS \u2193\" (Menue zu, ausserhalb des Kopfs); die Vorgabe Schaden steht an DPS", m);
     assert(m.zeilen.length === 2 && m.zeilen.every((r) => Math.abs(r.hoch - 44) < 0.5 && r.zellen === 6),
       "Liste: eine Zeile je Faehigkeit, 44 Punkt, sechs Zellen", m.zeilen);
     assert(m.zeilen[0]?.ring === "Quick Fire" && m.zeilen[0].offen === "true" && m.zeilen[1]?.offen === "false",
@@ -1131,13 +1196,118 @@ try {
     const stopps = await p.evaluate(() => [...document.querySelectorAll("#bars .row")].filter((r) => r.tabIndex === 0).length);
     assert(k1.auf === "true" && k1.fokus === "Strafing" && k2 === "normal" && k3.auf === "false" && k3.fokus === "Strafing" && !k3.cat &&
       k4 === "true" && stopps === 1, "Tastatur: rechts auf, runter in die Trefferarten, links zur Zeile und zu, Enter um; ein Tabstopp", { k1, k2, k3, k4, stopps });
-    // Sortieren ueber den Kopf wie bisher (der erste Klick ordnet absteigend)
-    await p.click('#bars .bhead [data-k="name"]'); await p.waitForTimeout(120);
-    const so = await p.evaluate(() => ({ erste: document.querySelector("#bars .row.ringzeile").dataset.ring,
-      name: document.querySelector('#bars .bhead [data-k="name"]').getAttribute("aria-sort"), dps: document.querySelector('#bars .bhead [data-k="dps"]').getAttribute("aria-sort"),
-      fokus: document.activeElement?.dataset.k }));
-    assert(so.erste === "Strafing" && so.name === "descending" && so.dps === "none", "Sortieren nach Name ueber den Kopf", so);
+    /* Ordnen ueber das Menue (folgt Spezifikation Feinschliff 4; vorher "Sortieren nach Name ueber den Kopf"):
+       Enter oeffnet, der Fokus steht auf dem gewaehlten Eintrag, Pfeil runter bis Name, Enter waehlt. Name ordnet
+       aufsteigend, noch einmal Name kehrt um - dann steht Strafing oben wie vorher nach Name absteigend. */
+    const ordnenLage = () => p.evaluate(() => { const mm = document.querySelector("#ringOrdnenMenue"), a = document.activeElement;
+      return { zu: mm.hidden, auf: document.querySelector("#ringOrdnen")?.getAttribute("aria-expanded"), text: document.querySelector("#ringOrdnen")?.textContent,
+        fokus: a?.id || (a?.getAttribute("role") || "") + ":" + (a?.dataset.k || ""), gewaehlt: [...mm.querySelectorAll('[aria-checked="true"]')].map((e) => e.dataset.k),
+        eintraege: [...mm.querySelectorAll("[role=menuitemradio]")].map((e) => e.dataset.k + "=" + e.textContent),
+        zeilen: [...document.querySelectorAll("#bars .row.ringzeile")].map((r) => r.dataset.ring) }; });
+    await p.focus("#ringOrdnen"); await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    const o1 = await ordnenLage();
+    assert(!o1.zu && o1.auf === "true" && o1.fokus === "menuitemradio:dps" && JSON.stringify(o1.gewaehlt) === JSON.stringify(["dps"]) &&
+      JSON.stringify(o1.eintraege) === JSON.stringify(["dps=DPS", "max=Biggest Hit", "hits=Hits", "critRate=Crit", "heavyRate=Heavy", "name=Name"]),
+      "Ordnen: Enter oeffnet das Menue, der Fokus steht auf dem gewaehlten Eintrag DPS; DPS, Groesster Treffer, Treffer, Kritisch, Stark, Name", o1);
+    for (let k = 0; k < 5; k++) await p.keyboard.press("ArrowDown");
+    const o1b = await ordnenLage();
+    await p.keyboard.press("Enter"); await p.waitForTimeout(150);
+    const o2 = await ordnenLage();
+    assert(o1b.fokus === "menuitemradio:name" && o2.zu && o2.auf === "false" && o2.fokus === "ringOrdnen" && o2.text === "Sort: Name ↑" &&
+      JSON.stringify(o2.zeilen) === JSON.stringify(["Quick Fire", "Strafing"]),
+      "Ordnen: Pfeil runter bis Name, Enter waehlt; das Menue ist zu, der Fokus auf dem Knopf, Name aufsteigend", { o1b, o2 });
+    await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    const o3a = await ordnenLage();
+    await p.keyboard.press("Enter"); await p.waitForTimeout(150);
+    const o3 = await ordnenLage();
+    assert(o3a.fokus === "menuitemradio:name" && o3.zu && o3.text === "Sort: Name ↓" && o3.zeilen[0] === "Strafing" && o3.fokus === "ringOrdnen",
+      "Ordnen: noch einmal Name kehrt die Richtung um, Strafing steht oben", { o3a, o3 });
+    // Pfeile im Kreis, Pos1/Ende, die Leertaste waehlt
+    await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    await p.keyboard.press("ArrowDown"); const c1 = (await ordnenLage()).fokus;
+    await p.keyboard.press("End"); const c2 = (await ordnenLage()).fokus;
+    await p.keyboard.press("Home"); const c3 = (await ordnenLage()).fokus;
+    await p.keyboard.press("ArrowUp"); const c4 = (await ordnenLage()).fokus;
+    await p.keyboard.press("Home"); await p.keyboard.press("ArrowDown"); await p.keyboard.press("ArrowDown");
+    await p.keyboard.press(" "); await p.waitForTimeout(150);
+    const o4 = await ordnenLage();
+    assert(c1 === "menuitemradio:dps" && c2 === "menuitemradio:name" && c3 === "menuitemradio:dps" && c4 === "menuitemradio:name" &&
+      o4.zu && o4.text === "Sort: Hits ↓" && o4.fokus === "ringOrdnen",
+      "Ordnen: Pfeile laufen im Kreis, Pos1 und Ende, die Leertaste waehlt (Zahlen absteigend)", { c1, c2, c3, c4, o4 });
+    // Esc im Menue schliesst nur das Menue und gibt den Fokus an den Knopf; ein Klick daneben schliesst es auch
+    await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    await p.keyboard.press("Escape"); await p.waitForTimeout(120);
+    const o5 = await ordnenLage();
+    await p.click("#ringOrdnen"); await p.waitForTimeout(120);
+    const o6a = await ordnenLage();
+    await p.click("#tafelTitel"); await p.waitForTimeout(120);
+    const o6 = await ordnenLage();
+    assert(o5.zu && o5.auf === "false" && o5.fokus === "ringOrdnen" && o5.text === "Sort: Hits ↓" && !o6a.zu && o6.zu && o6.auf === "false",
+      "Ordnen: Esc schliesst und gibt den Fokus an den Knopf, ein Klick oeffnet, ein Klick daneben schliesst", { o5, o6a, o6 });
+    // Esc im Menue laesst das Rennen offen (65 lauscht am Dokument)
+    await p.click("#ringNachspielen"); await p.waitForTimeout(300);
+    await p.focus("#ringOrdnen"); await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    const r0 = await p.evaluate(() => ({ rennen: !document.querySelector("#rennen").hidden, menue: !document.querySelector("#ringOrdnenMenue").hidden }));
+    await p.keyboard.press("Escape"); await p.waitForTimeout(150);
+    const r1 = await p.evaluate(() => ({ rennen: !document.querySelector("#rennen").hidden, menue: !document.querySelector("#ringOrdnenMenue").hidden,
+      fokus: document.activeElement?.id }));
+    assert(r0.rennen && r0.menue && r1.rennen && !r1.menue && r1.fokus === "ringOrdnen", "Ordnen: Esc im Menue schliesst das Menue, das Rennen bleibt offen", { r0, r1 });
+    const lum = (rgb) => { const [r, g, b] = rgb.match(/[\d.]+/g).slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    // Feinschliff 4 (#100, so entschieden 04.10.): das Menue Ordnen steht auf der Flaeche der Menues (--surf-menu), wie das Panel "Mehr"
+    for (const thema of ["dark", "light", "tnl"]) {
+      await p.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`).click(), thema); await p.waitForTimeout(150);
+      const f = await p.evaluate(() => {
+        const bg = (e) => { const c = getComputedStyle(e); return c.backgroundColor + "|" + c.backgroundImage; };
+        const mm = document.querySelector("#ringOrdnenMenue"), mp = document.querySelector("#morePanel");
+        const eintrag = mm.querySelector("[role=menuitemradio]"), haken = mm.querySelector('[aria-checked="true"]');
+        const farbe = (e, pseudo) => getComputedStyle(e, pseudo).color;
+        const hov = document.createElement("div"); hov.style.background = "var(--tint-hover-1)"; document.body.appendChild(hov);
+        const hover = getComputedStyle(hov).backgroundColor; hov.remove();
+        const stopps = (getComputedStyle(mm).backgroundImage.match(/#[0-9a-f]{6}|rgb\([^)]*\)/gi) || []);
+        return { menue: bg(mm), mehr: bg(mp), text: farbe(eintrag), haken: farbe(haken, "::after"), hover, stopps, theme: document.documentElement.dataset.theme };
+      });
+      assert(f.theme === thema && f.menue === f.mehr && f.menue !== "rgba(0, 0, 0, 0)|none",
+        `${thema}: die Flaeche des Menues Ordnen ist die des Panels Mehr (--surf-menu)`, f);
+      const grund = f.stopps.length ? f.stopps[f.stopps.length - 1] : f.menue.split("|")[0];
+      const hell = f.stopps.length ? f.stopps[0] : grund;
+      assert(kontrast(f.text, grund) >= 4.5 && kontrast(f.text, hell) >= 4.5 && kontrast(f.haken, grund) >= 4.5 && kontrast(f.haken, hell) >= 4.5,
+        `${thema}: Eintrag und Haken lesbar auf der Flaeche des Menues (4,5:1)`, f);
+      assert(f.hover !== "rgba(0, 0, 0, 0)" && f.hover !== grund, `${thema}: der Ton unter dem Zeiger ist sichtbar`, f);
+    }
+    await p.keyboard.press("Escape"); await p.waitForTimeout(150);
     assert(!s.fehler.length, "Liste: keine Fehler", s.fehler);
+    await p.close();
+  }
+  // --- Feinschliff 4: der Kopf passt bei 1280 x 860 ungekuerzt (auch "Groesster Treffer" auf Deutsch); gestapelt (560 Punkt)
+  // rollt die Liste nicht in sich, alle Zeilen stehen, und "x von y sichtbar" entfaellt (#100)
+  {
+    const s = await oeffne({ app: true, lang: "de" });
+    const p = s.page;
+    await beispiel(p);
+    await p.click("#ringOrdnen"); await p.waitForTimeout(120);
+    await p.click('#ringOrdnenMenue [data-k="max"]'); await p.waitForTimeout(150);
+    const kopf = () => p.evaluate(() => {
+      const k = document.querySelector("#bars .bhead"), n = k.querySelector('[data-k="name"]'), b = document.querySelector("#ringOrdnen");
+      return { text: b.textContent, hoch: k.getBoundingClientRect().height,
+        name: { s: n.scrollWidth, c: n.clientWidth }, knopf: { s: b.scrollWidth, c: b.clientWidth },
+        eineZeile: Math.abs(n.getBoundingClientRect().top - b.getBoundingClientRect().top) < 8 };
+    });
+    const k1 = await kopf();
+    assert(k1.text === "Ordnen: Gr\u00f6\u00dfter Treffer \u2193" && k1.name.s <= k1.name.c && k1.knopf.s <= k1.knopf.c && k1.eineZeile && k1.hoch <= 30.5,
+      "Feinschliff 4: bei 1280 x 860 steht der Kopf ungekuerzt in einer Zeile (DE, Groesster Treffer)", k1);
+    await p.setViewportSize({ width: 560, height: 860 }); await p.waitForTimeout(400);
+    const g = await p.evaluate(() => {
+      const box = document.querySelector("#bars");
+      return { hoch: box.scrollHeight, sicht: box.clientHeight, zahl: box.querySelector(".bhead")?.textContent || "",
+        zeilen: box.querySelectorAll(".row:not(.sub)").length, quer: document.documentElement.scrollWidth > innerWidth };
+    });
+    assert(g.hoch <= g.sicht + 1 && !/ von /.test(g.zahl) && g.zeilen >= 12 && !g.quer,
+      "Feinschliff 4: bei 560 Punkt rollt die Liste nicht in sich, keine Zaehlung \"von\", kein Querrollen", g);
+    const k2 = await kopf();
+    assert(k2.knopf.s <= k2.knopf.c && k2.name.s <= k2.name.c, "Feinschliff 4: auch bei 560 Punkt ist der Kopf nicht gekuerzt", k2);
+    assert(!s.fehler.length, "Feinschliff 4: keine Fehler", s.fehler);
     await p.close();
   }
   // --- 11. Bewegung (Spezifikation Glutring 3): der Ring waechst beim Oeffnen in 0,9 s auf, beim Wechsel zwischen Kaempfen
@@ -1186,6 +1356,28 @@ try {
     assert(r.fertig === "1" && r.gleitet === "0" && w === "0", "bei reduzierter Bewegung steht der Ring sofort, nichts gleitet", { r, w });
     await p.close();
   }
+  // --- Feinschliff 3.1: beim Aufwachsen trifft der Zeiger nur, was schon steht (#82)
+  {
+    const s = await oeffne({ app: true }); const p = s.page;
+    await p.evaluate(() => document.querySelector("#btnSample").click());
+    await p.waitForFunction(() => !document.querySelector("#app").hidden && document.querySelector("#ring").dataset.fertig === "0");
+    // sofort: ein spaeter Bogen liegt am Ziel weit hinten im Ring, waechst aber erst heran
+    const punkt = await p.evaluate(() => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), pk = JSON.parse(cv.dataset.punkte), q = pk[Math.floor(pk.length * 0.75)];   // ein breiter Bogen spaet im Ring (die letzten sind Haarstriche)
+      return { k: q.k, x: r.left + q.x, y: r.top + q.y, fertig: cv.dataset.fertig }; });
+    await p.mouse.move(punkt.x, punkt.y);
+    const frueh = await p.evaluate(() => ({ hervor: document.querySelector("#ring").dataset.hervor, fertig: document.querySelector("#ring").dataset.fertig }));
+    assert(punkt.fertig === "0" && frueh.fertig === "0" && frueh.hervor === "",
+      "Aufwachsen: auf den Punkt, wo ein spaeter Bogen erst entsteht, trifft der Zeiger nichts", { punkt, frueh });
+    await p.waitForFunction(() => document.querySelector("#ring").dataset.fertig === "1");
+    // der Punkt aus der fertigen Lage (die Seite kann sich beim Aufwachsen noch setzen)
+    const fest = await p.evaluate((k) => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), q = JSON.parse(cv.dataset.punkte).find((x) => x.k === k);
+      return { x: r.left + q.x, y: r.top + q.y }; }, punkt.k);
+    await p.mouse.move(fest.x + 3, fest.y + 3); await p.mouse.move(fest.x, fest.y); await p.waitForTimeout(80);
+    const spaet = await p.evaluate(() => document.querySelector("#ring").dataset.hervor);
+    assert(spaet === punkt.k, "gewachsen: derselbe Punkt trifft jetzt den Bogen", { spaet, k: punkt.k, punkt, fest });
+    assert(!s.fehler.length, "Feinschliff 3.1: keine Fehler", s.fehler);
+    await p.close();
+  }
   // --- 12. Gruppe (Spezifikation Glutring 5): innen die Mitglieder, aussen ihre Faehigkeiten; die Liste der Mitglieder;
   // ein Mitglied oeffnet seinen Ring mit Trefferarten, "\u2039 Gruppe" und Esc fuehren zurueck; das Band zeigt den Anteil je Mitglied
   {
@@ -1208,7 +1400,10 @@ try {
       return { glut: document.body.classList.contains("glut"), gruppe: document.body.classList.contains("ringgruppe"),
         innen: +cv.dataset.innen, boegen: +cv.dataset.boegen, name: cv.getAttribute("aria-label"),
         zeilen: [...document.querySelectorAll("#bars .ringzeile[data-member]")].map((z) => [z.dataset.member, z.classList.contains("me")]),
-        kopf: [...document.querySelectorAll("#bars .bhead [role=columnheader]")].map((e) => e.dataset.k),
+        // folgt Spezifikation Feinschliff 4: der Kopf nennt "Member" und den Knopf, die Klasse steht in jeder Zeile
+        kopf: [...document.querySelectorAll("#bars .bhead > *")].map((e) => e.dataset.k ? e.dataset.k + "=" + e.textContent : e.querySelector("#ringOrdnen") ? "knopf=" + e.textContent : "?"),
+        klassen: [...document.querySelectorAll("#bars .ringzeile[data-member]")].map((z) => z.querySelector('[data-k="klasse"]')?.textContent || ""),
+        ordnung: [...document.querySelectorAll("#ringOrdnenMenue [role=menuitemradio]")].map((e) => e.dataset.k + "=" + e.textContent),
         du: document.querySelector("#ringDu").hidden ? "" : document.querySelector("#ringDu").textContent,
         seg: [...document.querySelectorAll("#bandGruppe [data-m]")].map((e) => [e.dataset.m, e.getBoundingClientRect().width]),
         band: document.querySelector("#bandGruppe").getAttribute("aria-label") || "",
@@ -1217,7 +1412,9 @@ try {
     assert(g.glut && g.gruppe && g.innen === 3 && g.boegen === 6 && /^Group ring: /.test(g.name),
       "Gruppe: der Ring zeigt innen drei Mitglieder, aussen ihre sechs Faehigkeiten", g);
     assert(JSON.stringify(g.zeilen) === JSON.stringify([["Mitglied Eins", false], ["Tester", true], ["Mitglied Zwei", false]]) &&
-      JSON.stringify(g.kopf) === JSON.stringify(["name", "dps", "share", "klasse"]), "Gruppe: die Mitglieder nach DPS mit Klasse, die eigene Zeile markiert", g);
+      JSON.stringify(g.kopf) === JSON.stringify(["name=Member", "knopf=Sort: DPS \u2193"]) && g.klassen.length === 3 && g.klassen.every((k) => k.trim().length > 0) &&
+      JSON.stringify(g.ordnung) === JSON.stringify(["dps=DPS", "name=Member"]),
+      "Gruppe: die Mitglieder nach DPS mit Klasse in der Zeile, die eigene Zeile markiert; geordnet nach DPS oder Mitglied", g);
     assert(/^You 7\.3k \u00b7 rank 2 of 3$/.test(g.du), "Gruppe: in der Mitte \"Du ... Platz 2 von 3\"", g.du);
     assert(g.seg.length === 3 && Math.abs(g.seg[0][1] / g.seg[1][1] - 1.5) < 0.05 && /^Share per member: /.test(g.band),
       "Gruppe: das Band zeigt den Anteil je Mitglied als gestapelten Balken", g);
@@ -1260,6 +1457,20 @@ try {
     const be = await bandKopf();
     assert(be.titel === "Damage per second" && be.feld === "Damage per second" && be.spuren === 1,
       "zurueck im eigenen Kampf: wieder \"Damage per second\" und der Weg in die Rotation", be);
+    /* Probe 2.6 wieder aufgenommen (Spezifikation Feinschliff 4.3, #86): nach Groesster Treffer geordnet, dann in die
+       Gruppe - dort gibt es diese Ordnung nicht, also faellt sie auf DPS zurueck, und zurueck im eigenen Kampf bleibt DPS. */
+    const ordnungsLage = () => p.evaluate(() => ({ knopf: document.querySelector("#ringOrdnen")?.textContent || "",
+      an: [...document.querySelectorAll("#ringOrdnenMenue [role=menuitemradio][aria-checked=true]")].map((e) => e.dataset.k) }));
+    await p.click("#ringOrdnen"); await p.waitForTimeout(120);
+    await p.click('#ringOrdnenMenue [data-k="max"]'); await p.waitForTimeout(150);
+    const o1 = await ordnungsLage();
+    await p.click("#segParty"); await p.waitForTimeout(200);
+    const o2 = await ordnungsLage();
+    await p.click('#groupSeg [data-g="skill"]'); await p.waitForTimeout(200);
+    const o3 = await ordnungsLage();
+    assert(o1.knopf === "Sort: Biggest Hit ↓" && o1.an.join() === "max", "Probe 2.6: nach Groesster Treffer geordnet", o1);
+    assert(o2.knopf === "Sort: DPS ↓" && o2.an.join() === "dps", "Probe 2.6: in der Gruppe faellt Groesster Treffer auf DPS zurueck", o2);
+    assert(o3.knopf === "Sort: DPS ↓" && o3.an.join() === "dps", "Probe 2.6: zurueck im eigenen Kampf bleibt DPS (der Rueckfall ist endgueltig)", o3);
     assert(!s.fehler.length, "Gruppe: keine Fehler", s.fehler);
     await p.close();
     // dasselbe auf Deutsch
@@ -1279,6 +1490,110 @@ try {
       "de: in der Gruppe \"Anteil je Mitglied\" ueber dem Band, im eigenen Kampf \"Schaden pro Sekunde\"", { dg, de });
     assert(!sd.fehler.length, "Gruppe de: keine Fehler", sd.fehler);
     await pd.close();
+  }
+  /* --- Feinschliff 2 (#99): der Ring passt zu seinen Daten - wenige Treffer (leiser Ring, Hinweis, Urteil nur Zahlen),
+     ein Bogen (kein Schild, kein "100 %"), mehr als zwoelf Teile (ein Bogen "Uebrige"), unter 0,5 % ("unter 1 %"). */
+  {
+    const kopf = (zeilen, ziel = "Vulcanus") => ({ dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: ["CombatLogVersion,4", ...zeilen].join("\n") + "\n" });
+    const hit = (ms, name, sid, dmg, ziel = "Vulcanus") => `${stamp(at(23, 0, 0) + ms)},DamageDone,${name},${sid},${dmg},0,0,kNormalHit,Tester,${ziel}`;
+    const warte = async (p) => { await p.emulateMedia({ reducedMotion: "reduce" }); await p.waitForFunction(() => document.querySelector("#ring").dataset.fertig === "1"); await p.waitForTimeout(200); };
+    // (a) neun Treffer, vier Faehigkeiten
+    {
+      const z = []; for (let i = 0; i < 9; i++) z.push(hit(i * 700, "Skill " + two(1 + (i % 4)), 910000001 + (i % 4), 3000 + 500 * (i % 4)));
+      // mit Bezug: ein besterPull fuer Vulcanus liegt vor (BEST_STUB, Abschnitt 4), der Kampf mit neun Treffern darf trotzdem nicht verglichen werden
+      const s = await oeffne({ app: true, breite: 1280, hoehe: 860, best: BEST_STUB, helfer: kopf(z) }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" }); await ladeUndWaehle(p, 0, 1); await warte(p);
+      await p.waitForTimeout(800);
+      const v = await p.evaluate(() => ({ besch: document.querySelector("#ring").dataset.beschriftet, hinweis: document.querySelector("#ringMitteHinweis")?.textContent || "",
+        sicht: !!document.querySelector("#ringMitteHinweis") && !document.querySelector("#ringMitteHinweis").hidden, belege: document.querySelectorAll("#urteilFeld .ubeleg").length,
+        fehlt: /missing per second/.test(document.querySelector("#urteilFeld")?.textContent || ""), text: (document.querySelector("#urteilFeld")?.textContent || "").trim().length }));
+      assert(v.besch === "0" && v.sicht && /9/.test(v.hinweis) && v.belege === 0 && !v.fehlt && v.text > 10,
+        "Feinschliff 2: neun Treffer - keine Schilder, Hinweis mit der Zahl in der Mitte, das Urteil auch mit Bezug ohne Vergleich und Belege", v);
+      assert(!s.fehler.length, "Feinschliff 2 (a): keine Fehler", s.fehler);
+      await p.close();
+    }
+    // (b) ein Ziel: ein Bogen
+    {
+      const z = []; for (let i = 0; i < 30; i++) z.push(hit(i * 500, "Skill " + two(1 + (i % 6)), 910000001 + (i % 6), 3000 + 100 * (i % 6)));
+      const s = await oeffne({ app: true, breite: 1280, hoehe: 860, helfer: kopf(z) }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" }); await ladeUndWaehle(p, 0, 1);
+      await p.evaluate(() => document.querySelector('#groupSeg [data-g="target"]').click()); await p.waitForTimeout(300); await warte(p);
+      const v = await p.evaluate(() => ({ besch: document.querySelector("#ring").dataset.beschriftet, boegen: document.querySelector("#ring").dataset.boegen,
+        aria: document.querySelector("#ring").getAttribute("aria-label"), hinweis: document.querySelector("#ringMitteHinweis")?.textContent || "" }));
+      assert(v.boegen === "1" && v.besch === "0" && !/100/.test(v.aria) && /All damage on one target/.test(v.hinweis),
+        "Feinschliff 2: ein Ziel - ein Bogen ohne Schild und ohne \"100\", die Mitte sagt, wohin aller Schaden ging", v);
+      assert(!s.fehler.length, "Feinschliff 2 (b): keine Fehler", s.fehler);
+      await p.close();
+    }
+    // (c) 15 Faehigkeiten: zwoelf und ein Bogen "Uebrige"
+    {
+      const z = []; for (let i = 0; i < 15; i++) for (let j = 0; j < 3; j++) z.push(hit((i * 3 + j) * 300, "Skill " + two(1 + i), 910000001 + i, 1000 * (20 - i)));
+      const s = await oeffne({ app: true, breite: 1280, hoehe: 860, helfer: kopf(z) }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" }); await ladeUndWaehle(p, 0, 1); await warte(p);
+      const n = await p.evaluate(() => document.querySelector("#ring").dataset.boegen);
+      const pk = await p.evaluate(() => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), q = JSON.parse(cv.dataset.punkte).find((x) => x.k === "__rest__");
+        return q ? { x: r.left + q.x, y: r.top + q.y } : null; });
+      let v = null;
+      if (pk) { await p.mouse.move(pk.x + 3, pk.y + 3); await p.mouse.move(pk.x, pk.y); await p.waitForTimeout(150);
+        v = await p.evaluate(() => ({ hervor: document.querySelector("#ring").dataset.hervor, an: document.querySelectorAll("#bars .ringzeile.ringan").length,
+          mitte: document.querySelector("#ringFokus").innerText })); }
+      assert(n === "13" && v && v.hervor === "__rest__" && v.an === 3 && /3 more/.test(v.mitte),
+        "Feinschliff 2: 15 Faehigkeiten - dreizehn Boegen, Zeigen auf den letzten hebt die drei Zeilen der Uebrigen hervor", { n, pk, v });
+      assert(!s.fehler.length, "Feinschliff 2 (c): keine Fehler", s.fehler);
+      await p.close();
+    }
+    // (d) ein Bogen unter 0,5 %
+    {
+      const z = []; for (let i = 0; i < 25; i++) z.push(hit(i * 400, "Skill Gross", 910000001, 4000));
+      z.push(hit(11000, "Skill Winzig", 910000002, 100));
+      const s = await oeffne({ app: true, breite: 1280, hoehe: 860, helfer: kopf(z) }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" }); await ladeUndWaehle(p, 0, 1); await warte(p);
+      const aria = await p.evaluate(() => document.querySelector("#ring").getAttribute("aria-label"));
+      assert(aria.includes("under 1\u00a0%") && !/0\u00a0%/.test(aria.replace("100", "")), "Feinschliff 2: ein Bogen unter 0,5 % heisst \"under 1 %\", nicht \"0 %\"", aria);
+      assert(!s.fehler.length, "Feinschliff 2 (d): keine Fehler", s.fehler);
+      await p.close();
+    }
+  }
+  // --- Feinschliff 5: am Ende des Rennens dieselbe DPS wie im Kopf, Schaden mit Einheit (#98)
+  for (const lang of ["en", "de"]) {
+    const s = await oeffne({ app: true, lang }); const p = s.page; await beispiel(p);
+    await p.emulateMedia({ reducedMotion: "reduce" });
+    await p.click("#ringNachspielen"); await p.waitForTimeout(300);
+    await p.evaluate(() => { const r = document.querySelector("#rennPos"); r.value = r.max; r.dispatchEvent(new Event("input", { bubbles: true })); });
+    await p.waitForTimeout(300);
+    // #hDps zaehlt hoch: warten, bis es zweimal hintereinander gleich lautet
+    for (let i = 0, alt = null; i < 20; i++) { const h = await p.evaluate(() => document.querySelector("#hDps").textContent); if (h === alt) break; alt = h; await p.waitForTimeout(400); }
+    const d = await p.evaluate(() => ({ renn: document.querySelector("#rennDps").textContent, kopf: document.querySelector("#hDps").textContent }));
+    assert(d.renn === d.kopf && d.renn.length > 1, "Rennen (" + lang + "): am Ende steht dieselbe DPS wie im Kopf", d);
+    await p.keyboard.press("Escape"); await p.waitForTimeout(200);
+    await p.waitForFunction(() => document.querySelector("#ring").dataset.fertig === "1");
+    const pk = await p.evaluate(() => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), q = JSON.parse(cv.dataset.punkte)[0]; return { x: r.left + q.x, y: r.top + q.y }; });
+    await p.mouse.move(pk.x + 3, pk.y + 3); await p.mouse.move(pk.x, pk.y); await p.waitForTimeout(150);
+    const erste = await p.evaluate(() => document.querySelector("#ringFokus").innerText.split("\n")[0]);
+    assert(lang === "en" ? / damage/.test(erste) : / Schaden/.test(erste), "Ring (" + lang + "): die Mitte nennt den Schaden mit Einheit", erste);
+    assert(!s.fehler.length, "Feinschliff 5 " + lang + ": keine Fehler", s.fehler);
+    await p.close();
+  }
+  {
+    const arten = (f) => [["normal", 40000 * f, 10], ["crit", 60000 * f, 8]].map(([k, d, h]) => ({ k, d, h, m: d / h }));
+    const faeh = (name, sid, f) => ({ name, sid, damage: 220000 * f, dps: 3667 * f, hits: 28, crit: 14, heavy: 10, max: 16000, cats: arten(f) });
+    const zeile = (name, f) => ({ name, waiting: false, damage: 440000 * f, dps: 7333 * f, hits: 56, crit: 0.5, heavy: 0.36, seconds: 60, max: 16000,
+      skills: [faeh("Quick Fire", "964762401", f), faeh("Strafing", "945674044", f)], hasCurve: false, share: 0, onTarget: true,
+      target: "Vulcanus", lang: "en", weapons: ["Crossbow", "Longbow"], ventius: false, age: 0 });
+    const board = [zeile("Tester", 1), zeile("Mitglied Eins", 1.5), zeile("Mitglied Zwei", 0.5)];
+    const s = await oeffne({ app: true, gruppe: { role: "host", code: "QX7K", name: "Tester", board, target: "Vulcanus", error: "" },
+      helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(PULLS.slice(0, 1)) } });
+    const p = s.page;
+    await p.emulateMedia({ reducedMotion: "reduce" });
+    await ladeUndWaehle(p, 0, 1);
+    await p.waitForFunction(() => !!document.querySelector("#segParty")?.getClientRects().length, null, { timeout: 8000 }).catch(() => {});
+    await p.click("#segParty"); await p.waitForTimeout(200);
+    const pkt = await p.evaluate(() => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), q = JSON.parse(cv.dataset.mitte);
+      const rr = q.r1 * 0.64, w = -Math.PI / 2 + 0.2; return { x: r.left + q.x + Math.cos(w) * rr, y: r.top + q.y + Math.sin(w) * rr }; });
+    await p.mouse.move(pkt.x + 3, pkt.y + 3); await p.mouse.move(pkt.x, pkt.y); await p.waitForTimeout(150);
+    const mitte = await p.evaluate(() => document.querySelector("#ringFokus").innerText.split("\n")[0]);
+    assert(/ per second/.test(mitte), "Gruppe: ein Mitglied in der Mitte nennt \"per second\"", mitte);
+    await p.close();
   }
   // --- 13. Kampf nachspielen (Spezifikation Glutring 6): im Ringfeld, spielt, haelt an, spult, Tempo, Siegerehrung, Esc
   {
@@ -1429,7 +1744,7 @@ try {
     assert(!s.fehler.length, "Rennen schliessen: keine Fehler", s.fehler);
     await p.close();
   }
-  /* In der Gruppe spielt das Rennen den eigenen Kampf (Entscheidung 02.10.): die Bahnen sind Faehigkeiten, keine Mitglieder */
+  /* Rueckfall (Spezifikation 4.1.7): hat kein Mitglied eine Kurve (hasCurve false), spielt das Rennen den eigenen Kampf: die Bahnen sind Faehigkeiten */
   {
     const faeh = (name, sid, f) => ({ name, sid, damage: 220000 * f, dps: 3667 * f, hits: 28, crit: 14, heavy: 10, max: 16000, cats: [] });
     const zeile = (name, f) => ({ name, waiting: false, damage: 440000 * f, dps: 7333 * f, hits: 56, crit: 0.5, heavy: 0.36, seconds: 60, max: 16000,
@@ -1437,7 +1752,7 @@ try {
       target: "Vulcanus", lang: "en", weapons: ["Crossbow", "Longbow"], ventius: false, age: 0 });
     const board = [zeile("Tester", 1), zeile("Mitglied Eins", 1.5), zeile("Mitglied Zwei", 0.5)];
     const s = await oeffne({ app: true, gruppe: { role: "host", code: "QX7K", name: "Tester", board, target: "Vulcanus", error: "" },
-      helfer: { dir: "C:\Logs", file: "TLCombatLog-1.txt", text: logText(PULLS.slice(0, 1)) } });
+      helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(PULLS.slice(0, 1)) } });
     const p = s.page;
     await p.emulateMedia({ reducedMotion: "reduce" });
     await ladeUndWaehle(p, 0, 1);
@@ -1450,6 +1765,142 @@ try {
       "Gruppe: das Rennen spielt den eigenen Kampf, eine Bahn je eigener Faehigkeit, kein Mitglied", g);
     assert(!s.fehler.length, "Rennen in der Gruppe: keine Fehler", s.fehler);
     await p.close();
+  }
+  // --- 14a. Gruppenkurven (Spezifikation 2026-10-04, 4.1): in der Gruppe laufen die Mitglieder, je eine Bahn,
+  // auf der Wanduhr; wer keine passende Kurve hat, fehlt mit "Ohne Verlauf"; eigene Bahn aus dem eigenen Log
+  {
+    const zeile = (name, f, hasCurve) => ({ name, waiting: false, damage: 440000 * f, dps: 7333 * f, hits: 56, crit: 0.5, heavy: 0.36,
+      seconds: 60, max: 16000, skills: [], hasCurve, share: 0, onTarget: true, target: "Vulcanus", lang: "en",
+      weapons: ["Crossbow", "Longbow"], ventius: false, age: 0 });
+    const kurve = (f, ab, lanes) => ({ t0: at(20, 0, 0) + ab * 1000, T: 60, total: new Array(60).fill(440000 * f / 60), lanes });
+    const board = [zeile("Tester", 1, true), zeile("Mitglied Eins", 1.5, true), zeile("Mitglied Zwei", 0.5, false)];
+    const gruppe = { role: "host", code: "QX7K", name: "Tester", board, target: "Vulcanus", error: "" };
+    const helfer = { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(PULLS.slice(0, 1)) };
+    async function gruppeOeffnen(opts) {
+      const s = await oeffne({ app: true, gruppe, helfer, ...opts });
+      const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" });
+      await ladeUndWaehle(p, 0, 1);
+      await p.waitForFunction(() => !!document.querySelector("#segParty")?.getClientRects().length, null, { timeout: 8000 }).catch(() => {});
+      await p.click("#segParty"); await p.waitForTimeout(200);
+      return s;
+    }
+    const rennen = (p) => p.evaluate(() => ({ offen: !document.querySelector("#rennen").hidden,
+      bahnen: [...document.querySelectorAll("#rennBahnen .rbahn")].map((b) => [b.dataset.key, b.dataset.platz]),
+      liste: document.querySelector("#rennBahnen").getAttribute("aria-label"),
+      von: document.querySelector("#rennVon").textContent,
+      luecke: document.querySelector("#rennLuecke").hidden ? "" : document.querySelector("#rennLuecke").textContent,
+      hinweis: document.querySelector("#ringHinweis").textContent }));
+    const bisRennen = (p) => p.waitForFunction(() => !document.querySelector("#rennen").hidden, null, { timeout: 4000 }).catch(() => {});
+
+    // 14a.1 eine Bahn je Mitglied mit passender Kurve, du aus dem Log, Mitglied Zwei ohne Verlauf
+    {
+      const s = await gruppeOeffnen({ kurven: { "Mitglied Eins": kurve(1.5, 5) } }); const p = s.page;
+      await p.click("#ringNachspielen"); await bisRennen(p);
+      const r = await rennen(p);
+      assert(r.offen && JSON.stringify(r.bahnen) === JSON.stringify([["Mitglied Eins", "1"], ["Tester", "2"]]),
+        "Gruppe: eine Bahn je Mitglied mit Kurve, am Ende nach Schaden", r);
+      assert(r.liste === "Members by damage so far" && r.luecke === "No timeline: 1 of 3",
+        "Gruppe: die Liste heisst \"Members by damage so far\", darunter \"No timeline: 1 of 3\"", r);
+      assert(/^of 1:0\d$/.test(r.von) && r.von !== "of 1:00", "gemeinsame Uhr: Mitglied Eins beginnt 5 s spaeter, das Rennen ist laenger als 1:00", r);
+      await p.evaluate(() => { const x = document.querySelector("#rennPos"); x.value = "3"; x.dispatchEvent(new Event("input", { bubbles: true })); });
+      const bei3 = await p.evaluate(() => document.querySelector('#rennBahnen .rbahn[data-key="Mitglied Eins"] .rwert').textContent);
+      assert(parseFloat(bei3) === 0, "bei 0:03 steht Mitglied Eins noch auf null (Versatz ueber t0)", bei3);
+      assert(JSON.stringify(s.kurvenAbrufe) === JSON.stringify(["Mitglied Eins"]),
+        "geholt wird nur, wer eine Kurve hat und nicht du selbst", s.kurvenAbrufe);
+      assert(!s.fehler.length, "14a.1 keine Fehler", s.fehler);
+      // 560 breit: das Waffenpaar vor dem Namen bleibt in einer Zeile
+      const sNarrow = await gruppeOeffnen({ kurven: { "Mitglied Eins": kurve(1.5, 5) }, breite: 560 }); const pNarrow = sNarrow.page;
+      await pNarrow.click("#ringNachspielen"); await bisRennen(pNarrow);
+      const wicBoxes = await pNarrow.evaluate(() => {
+        const wics = document.querySelectorAll('#rennBahnen .rbahn[data-key="Mitglied Eins"] .wpair .wic');
+        return Array.from(wics).map(el => {
+          const rect = el.getBoundingClientRect();
+          return { top: rect.top, left: rect.left };
+        });
+      });
+      assert(wicBoxes.length === 2 && Math.abs(wicBoxes[0].top - wicBoxes[1].top) < 2, "das Waffenpaar steht in der Bahn in einer Zeile", wicBoxes);
+      await pNarrow.close();
+      await p.close();
+    }
+    // 14a.2 eine Kurve, die nicht zur Zeile passt (der Server haelt nur die neueste), zaehlt nicht: Rueckfall auf den eigenen Kampf
+    {
+      const s = await gruppeOeffnen({ kurven: { "Mitglied Eins": kurve(3, 0) } }); const p = s.page;
+      await p.click("#ringNachspielen"); await bisRennen(p);
+      const r = await rennen(p);
+      assert(r.offen && r.bahnen.length >= 2 && !r.bahnen.some(([k]) => k === "Mitglied Eins" || k === "Tester") &&
+        r.liste === "Skills by damage so far" && r.luecke === "No timeline: 2 of 3",
+        "ohne fremde Bahn spielt der Knopf den eigenen Kampf, mit \"No timeline: 2 of 3\"", r);
+      await p.close();
+    }
+    // 14a.3 hoechstens 11 Abrufe je Klick, nacheinander; ein zweiter Klick holt nichts neu, was schon passt
+    {
+      const viele = [zeile("Tester", 1, true)];
+      const kurven = {};
+      for (let i = 1; i <= 12; i++) { const n = "Mitglied " + String(i).padStart(2, "0"); viele.push(zeile(n, 1 + i / 100, true)); kurven[n] = kurve(1 + i / 100, 0); }
+      const s = await gruppeOeffnen({ gruppe: { ...gruppe, board: viele }, kurven }); const p = s.page;
+      await p.click("#ringNachspielen"); await bisRennen(p);
+      const r = await rennen(p);
+      assert(s.kurvenAbrufe.length === 11 && s.kurvenGleichzeitig === 1, "hoechstens 11 Abrufe je Klick, einer nach dem anderen",
+        { n: s.kurvenAbrufe.length, gleichzeitig: s.kurvenGleichzeitig });
+      assert(r.bahnen.length === 12 && r.luecke === "No timeline: 1 of 13", "zwoelf Bahnen, einer ohne Verlauf", r);
+      await p.click("#rennZu"); await p.waitForTimeout(100);
+      await p.click("#ringNachspielen"); await bisRennen(p);
+      assert(s.kurvenAbrufe.length === 12, "der zweite Klick holt nur, was noch fehlt", s.kurvenAbrufe.length);
+      await p.close();
+    }
+    // 14a.4 waehrend des Ladens "Loading timelines ..."; wer vorher die Gruppe verlaesst, bekommt kein Rennen
+    {
+      const s = await gruppeOeffnen({ kurven: { "Mitglied Eins": kurve(1.5, 0), warte: 800 } }); const p = s.page;
+      await p.click("#ringNachspielen"); await p.waitForTimeout(100);
+      const l = await p.evaluate(() => ({ busy: document.querySelector("#ringNachspielen").getAttribute("aria-busy"),
+        text: document.querySelector("#ringNachspielen span").textContent, i18n: document.querySelector("#ringNachspielen span").hasAttribute("data-i18n") }));
+      assert(l.busy === "true" && l.text === "Loading timelines \u2026" && !l.i18n, "waehrend des Ladens steht am Knopf \"Loading timelines ...\", ohne data-i18n (ein Sprachwechsel setzt ihn nicht zurueck)", l);
+      await p.click('#groupSeg [data-g="skill"]'); await p.waitForTimeout(1200);
+      const r = await rennen(p);
+      const k = await p.evaluate(() => ({ busy: document.querySelector("#ringNachspielen").getAttribute("aria-busy"),
+        text: document.querySelector("#ringNachspielen span").textContent }));
+      const i18n = await p.evaluate(() => document.querySelector("#ringNachspielen span").getAttribute("data-i18n"));
+      assert(!r.offen && k.busy !== "true" && k.text === "Replay the fight" && i18n === "ring.nachspielen", "ein spaeter Abruf nach dem Wechsel oeffnet nichts, der Knopf ist wieder frei", { r, k, i18n });
+      await p.close();
+    }
+    // 14a.5 ein geoeffnetes Mitglied: seine Faehigkeiten aus den Spuren; ohne Spuren ein Hinweis statt eines Rennens
+    {
+      const lanes = [{ n: "Quick Fire", sid: "964762401", v: new Array(60).fill(7000) }, { n: "Strafing", sid: "945674044", v: new Array(60).fill(4000) }];
+      const bord = [zeile("Tester", 1, true), zeile("Mitglied Eins", 1.5, true), zeile("Mitglied Zwei", 0.5, true)];
+      const s = await gruppeOeffnen({ gruppe: { ...gruppe, board: bord },
+        kurven: { "Mitglied Eins": { ...kurve(1.5, 0), total: new Array(60).fill(11000), lanes }, "Mitglied Zwei": kurve(0.5, 0) } });
+      const p = s.page;
+      await p.focus('#bars .ringzeile[data-member="Mitglied Eins"]'); await p.keyboard.press("Enter"); await p.waitForTimeout(200);
+      await p.click("#ringNachspielen"); await bisRennen(p);
+      const r = await rennen(p);
+      assert(r.offen && JSON.stringify(r.bahnen) === JSON.stringify([["Quick Fire", "1"], ["Strafing", "2"]]) && r.liste === "Skills by damage so far",
+        "ein geoeffnetes Mitglied: seine Faehigkeiten laufen", r);
+      await p.click("#rennZu"); await p.waitForTimeout(100);
+      await p.click("#ringZurueck"); await p.waitForTimeout(150);
+      await p.focus('#bars .ringzeile[data-member="Mitglied Zwei"]'); await p.keyboard.press("Enter"); await p.waitForTimeout(200);
+      await p.click("#ringNachspielen"); await p.waitForTimeout(400);
+      const r2 = await rennen(p);
+      assert(!r2.offen && r2.hinweis === "No timeline from Mitglied Zwei yet", "ohne Spuren (Kampf laeuft noch): ein Hinweis, kein Rennen", r2);
+      assert(!s.fehler.length, "14a.5 keine Fehler", s.fehler);
+      await p.close();
+    }
+    // 14a.6 ein Mitglied laedt noch, der Bereich wechselt: kein Rennen ausserhalb des Glutrings, der Knopf ist frei
+    {
+      const lanes = [{ n: "Quick Fire", sid: "964762401", v: new Array(60).fill(7000) }];
+      const bord = [zeile("Tester", 1, true), zeile("Mitglied Eins", 1.5, true), zeile("Mitglied Zwei", 0.5, false)];
+      const s = await gruppeOeffnen({ gruppe: { ...gruppe, board: bord },
+        kurven: { "Mitglied Eins": { ...kurve(1.5, 0), total: new Array(60).fill(11000), lanes }, warte: 800 } });
+      const p = s.page;
+      await p.focus('#bars .ringzeile[data-member="Mitglied Eins"]'); await p.keyboard.press("Enter"); await p.waitForTimeout(200);
+      await p.click("#ringNachspielen"); await p.waitForTimeout(100);
+      await p.click('#bereiche [data-tab="analysis"]'); await p.waitForTimeout(1200);
+      const r = await p.evaluate(() => ({ offen: !document.querySelector("#rennen").hidden, rennt: document.body.classList.contains("rennt"),
+        glut: document.body.classList.contains("glut"), busy: document.querySelector("#ringNachspielen").getAttribute("aria-busy") }));
+      assert(!r.offen && !r.rennt && r.busy !== "true", "ein Mitglied laedt, der Bereich wechselt: kein Rennen, der Knopf ist frei", r);
+      assert(!s.fehler.length, "14a.6 keine Fehler", s.fehler);
+      await p.close();
+    }
   }
   // --- 14. Querschnitt (Spezifikation Glutring 1 und 7): drei Themen, 560 Punkt, 2000 x 1480, Vorleser
   {
@@ -1480,6 +1931,33 @@ try {
       assert(!m.quer && !s.fehler.length, `${thema}: kein Querrollen, keine Fehler`, { quer: m.quer, fehler: s.fehler });
       await p.close();
     }
+  }
+  /* Feinschliff 83: die Themenwerte des Rings stehen in der Lage, nicht je Bild. Ein Themenwechsel
+     bei offenem Ring muss sie erneuern: Schein und der Glutschein im Ring (Alpha eines Pixels
+     zwischen Mitte und Bogen) wechseln mit, und die Bogenfarbe unter dem Zeiger folgt dem Thema. */
+  {
+    const s = await oeffne({ app: true, config: { theme: "dark" } }); const p = s.page;
+    await p.emulateMedia({ reducedMotion: "reduce" });
+    await beispiel(p);
+    const lies = async () => {
+      const pk = await p.evaluate(() => { const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect(), q = JSON.parse(cv.dataset.punkte)[0];
+        return { x: r.left + q.x, y: r.top + q.y }; });
+      await p.mouse.move(pk.x + 40, pk.y + 40); await p.mouse.move(pk.x, pk.y); await p.waitForTimeout(150);
+      return p.evaluate(() => {
+        const cv = document.querySelector("#ring"), ds = cv.dataset, m = JSON.parse(ds.mitte), q = JSON.parse(ds.punkte)[0], dpr = devicePixelRatio || 1;
+        const px = (x, y) => [...cv.getContext("2d").getImageData(Math.round(x * dpr), Math.round(y * dpr), 1, 1).data];
+        return { theme: document.documentElement.dataset.theme, schein: ds.schein, hervor: ds.hervor,
+          glut: px(m.x + m.r0 * 0.5, m.y)[3], bogen: px(q.x, q.y).join(",") };
+      });
+    };
+    const d = await lies();
+    await p.evaluate(() => document.querySelector('#themeRow [data-theme="light"]').click());
+    await p.waitForTimeout(300);
+    const l = await lies();
+    assert(d.theme === "dark" && l.theme === "light" && !!d.hervor && !!l.hervor && +d.schein > 0 && l.schein === "0" &&
+      d.glut > 0 && l.glut === 0 && d.bogen !== l.bogen,
+      "Themenwechsel bei offenem Ring: Schein, Glutschein und Bogenfarbe folgen dem neuen Thema (Werte je Lage erneuert)", { d, l });
+    await p.close();
   }
   {
     const s = await oeffne({ app: true, breite: 560, hoehe: 900 }); const p = s.page; await beispiel(p);
@@ -1564,9 +2042,59 @@ try {
       const hervor = await p.evaluate(() => document.querySelector("#ring").dataset.hervor);
       const nah = (m) => !!m && Math.hypot(m.dx, m.dy) <= 2;
       assert(nah(ohne) && nah(mit) && !!hervor, `${wo}: die grosse Zahl steht auf dem Mittelpunkt des Rings, auch beim Hervorheben`, { ohne, mit, hervor });
+      // Feinschliff 5.1 (#101): die Legende des Aussenrands steht im Ringfeld, wo der Rand gezeichnet wird, und verdeckt kein Schild
+      const leg = await p.evaluate(() => {
+        const l = document.querySelector("#ringLegende"), f = document.querySelector("#ringFeld").getBoundingClientRect(), b = l.getBoundingClientRect();
+        const cv = document.querySelector("#ring"), r = cv.getBoundingClientRect();
+        const sch = JSON.parse(cv.dataset.schilder || "[]").map((x) => ({ l: x.l + r.left, t: x.t + r.top, r: x.r + r.left, b: x.b + r.top }));
+        return { sicht: !l.hidden && b.width > 0, eintraege: [...l.querySelectorAll("li")].filter((li) => li.getClientRects().length > 0).length, titel: l.querySelector(".rltitel")?.textContent,
+          drin: b.left >= f.left && b.right <= f.right && b.top >= f.top && b.bottom <= f.bottom + 1,
+          schnitt: sch.filter((a) => a.l < b.right && b.left < a.r && a.t < b.bottom && b.top < a.b).length,
+          quer: document.documentElement.scrollWidth <= document.documentElement.clientWidth };
+      });
+      if (gruppe) assert(!leg.sicht, `${wo}: Feinschliff 5.1: in der Gruppe keine Legende (der Rand zeigt dort keine Arten)`, leg);
+      else assert(leg.sicht && leg.eintraege === 4 && leg.titel === "Outer rim" && leg.drin && leg.schnitt === 0 && leg.quer,
+        `${wo}: Feinschliff 5.1: Legende mit vier Eintraegen im Ringfeld, ohne Schild zu verdecken`, leg);
       assert(!s.fehler.length, `${wo}: Mitte ohne Fehler`, s.fehler);
       await p.close();
     }
+  }
+  // Feinschliff 5.1 (#101): die Legende folgt dem Rand - weg beim Nachspielen und bei "Ziele", zurueck bei Faehigkeiten; genau vier Listeneintraege
+  {
+    const s = await oeffne({ app: true, breite: 1280, hoehe: 860 }); const p = s.page;
+    await p.emulateMedia({ reducedMotion: "reduce" }); await beispiel(p);
+    const sicht = () => p.evaluate(() => document.querySelector("#ringLegende").getClientRects().length > 0);
+    const liste = await p.evaluate(() => ({ items: [...document.querySelectorAll("#ringLegende ul li")].filter((li) => li.getClientRects().length > 0).length,
+      punkte: [...document.querySelectorAll("#ringLegende i")].every((i) => i.getAttribute("aria-hidden") === "true"),
+      titelAusserhalb: !document.querySelector("#ringLegende ul .rltitel") && !!document.querySelector("#ringLegende #ringLegendeTitel") }));
+    assert(liste.items === 4 && liste.punkte && liste.titelAusserhalb, "Feinschliff 5.1 (folgt Spezifikation Feinschliff 5.3, Schild nur mit Schildtreffern): die Liste zeigt ohne Schildtreffer genau vier Eintraege, Titel ausserhalb, Punkte fuer den Vorleser verborgen", liste);
+    assert(await sicht(), "Feinschliff 5.1: Legende vor dem Nachspielen sichtbar");
+    await p.click("#ringNachspielen"); await p.waitForTimeout(400);
+    assert(!(await sicht()), "Feinschliff 5.1: beim Nachspielen ist die Legende verborgen (kein Rand)");
+    await p.keyboard.press("Escape"); await p.waitForTimeout(300);
+    assert(await sicht(), "Feinschliff 5.1: nach dem Nachspielen ist die Legende zurueck");
+    await p.evaluate(() => document.querySelector('#groupSeg [data-g="target"]').click()); await p.waitForTimeout(300);
+    assert(!(await sicht()), "Feinschliff 5.1: bei Gruppierung Ziele ist die Legende verborgen");
+    await p.evaluate(() => document.querySelector('#groupSeg [data-g="skill"]').click()); await p.waitForTimeout(300);
+    assert(await sicht(), "Feinschliff 5.1: zurueck bei Faehigkeiten ist die Legende sichtbar");
+    assert(!s.fehler.length, "Feinschliff 5.1 Legende: keine Fehler", s.fehler);
+    await p.close();
+  }
+  // Feinschliff 5.3 (#101): "Schild" steht in der Legende nur, wenn der gezeigte Ring Schildtreffer hat
+  {
+    const z = ["CombatLogVersion,4"], beginn = at(22, 30, 0);
+    for (let k = 0; k < 40; k++) {
+      z.push(`${stamp(beginn + k * 500)},DamageDone,${QF[0]},${QF[1]},1000,0,0,kNormalHit,Tester,Stone Beetle`);
+      if (k % 4 === 0) z.push(`${stamp(beginn + k * 500 + 250)},DamageDone,${QF[0]},${QF[1]},400,0,0,kDamageShieldHit,Tester,Stone Beetle`);
+    }
+    const s = await oeffne({ app: true, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: z.join("\n") + "\n" } });
+    const p = s.page; await ladeUndWaehle(p, 0, 1);
+    const l = await p.evaluate(() => ({ sicht: document.querySelector("#ringLegende").getClientRects().length > 0,
+      texte: [...document.querySelectorAll("#ringLegende ul li")].filter((li) => li.getClientRects().length > 0).map((li) => li.textContent),
+      punkte: [...document.querySelectorAll("#ringLegende i")].every((i) => i.getAttribute("aria-hidden") === "true") }));
+    assert(l.sicht && l.texte.length === 5 && l.texte[4] === "Shield" && l.punkte, "Feinschliff 5.3: mit Schildtreffern steht Schild als fuenfter Eintrag in der Legende", l);
+    assert(!s.fehler.length, "Feinschliff 5.3 Schild: keine Fehler", s.fehler);
+    await p.close();
   }
   {
     // auch unter 200 % Vergroesserung (zoom auf <html>): die Zahl auf dem Mittelpunkt, die Namen am Ring nicht unter 11 Punkt der Seite
@@ -1578,6 +2106,18 @@ try {
     assert(!!m && Math.hypot(m.dx, m.dy) <= 2 * 2 && sch.length > 0 && sch.every((h) => h >= 2 * 30),
       "200 %: die grosse Zahl auf dem Mittelpunkt, die Beschriftung waechst mit", { m, sch });
     assert(!s.fehler.length, "200 % Mitte: keine Fehler", s.fehler);
+    await p.close();
+  }
+  /* Feinschliff 2 (#81): Abstand und Breite des Arten-Rands wachsen mit der Vergroesserung (Bildschirmpunkte: 9 und 4 mal Faktor),
+     die Trefferzone ausserhalb des Rings und die Zeitachse der Kurve ebenso */
+  for (const [zoom, ab, breit] of [[100, 9, 4], [200, 18, 8]]) {
+    const s = await oeffne({ app: true, breite: 2200, hoehe: 1400, config: { uiZoom: zoom } }); const p = s.page;
+    await p.emulateMedia({ reducedMotion: "reduce" });
+    await beispiel(p);
+    const q = await p.evaluate(() => { const cv = document.querySelector("#ring"); return { achse: +document.querySelector("#kurve").dataset.achseSchrift, rand: JSON.parse(cv.dataset.rand || "null"), mitte: JSON.parse(cv.dataset.mitte) }; });
+    assert(!!q.rand && q.rand.ab === ab && q.rand.breit === breit && q.mitte.z === ab / 9 && q.achse === 11 * ab / 9,
+      `${zoom} %: Rand der Arten steht ${ab} Punkt ausserhalb, ${breit} Punkt breit (folgt Spezifikation Feinschliff 2)`, q);
+    assert(!s.fehler.length, `${zoom} % Rand: keine Fehler`, s.fehler);
     await p.close();
   }
   /* Fixrunde 1 zu Aufgabe 10: unter 200 % bleibt die Zahl im Ringloch (schmaler als 0,7 des Lochs) und die gestapelte
@@ -1604,11 +2144,22 @@ try {
     if (auf) { await p.click("#zeitAuf"); await p.waitForTimeout(200); }
     const m = await p.evaluate(() => ({ urteil: document.querySelector("#urteilFeld").getBoundingClientRect().top,
       band: document.querySelector("#kurveFeld").getBoundingClientRect().top, kurve: document.querySelector("#kurve").getBoundingClientRect().height }));
-    assert(Math.abs(m.urteil - m.band) <= 1, `${breite}x${hoehe}${auf ? " Band offen" : ""}: das Urteil beginnt auf der Hoehe des Bands`, m);
+    /* folgt Spezifikation Feinschliff 6: rollt die Liste, bleibt die Fuge gemeinsam; passt sie ganz, folgt das Urteil der Liste
+       und beginnt nicht tiefer als das Band */
+    const rollt = await p.evaluate(() => document.querySelector("#bars").classList.contains("rollt"));
+    assert(rollt ? Math.abs(m.urteil - m.band) <= 1 : m.urteil <= m.band + 1,
+      `${breite}x${hoehe}${auf ? " Band offen" : ""}: das Urteil beginnt auf der Hoehe des Bands (Liste rollt) oder darueber (Liste passt)`, { ...m, rollt });
+    /* Spezifikation Feinschliff 6.1: die gemeinsame Hoehe gilt nur, wo beide unten stehen (die Liste rollt);
+       passt die Liste, traegt das Urteil keine Mindesthoehe vom Band */
+    const fuss = await p.evaluate(() => ({ urteilMin: document.querySelector("#urteilFeld").style.minHeight,
+      urteilH: document.querySelector("#urteilFeld").getBoundingClientRect().height,
+      bandH: document.querySelector("#kurveFeld").getBoundingClientRect().height }));
+    assert(rollt ? Math.abs(fuss.urteilH - fuss.bandH) <= 1 : fuss.urteilMin === "",
+      `${breite}x${hoehe}${auf ? " Band offen" : ""}: Band und Urteil gleich hoch nur, wenn die Liste rollt`, { ...fuss, rollt });
     if (auf) { await p.click("#zeitAuf"); await p.waitForTimeout(200);
       const z = await p.evaluate(() => ({ urteil: document.querySelector("#urteilFeld").getBoundingClientRect().top,
         band: document.querySelector("#kurveFeld").getBoundingClientRect().top, kurve: document.querySelector("#kurve").getBoundingClientRect().height }));
-      assert(Math.abs(z.urteil - z.band) <= 1 && Math.abs(z.kurve - 78) <= 1 && z.band > m.band, `${breite}x${hoehe} Band wieder zu: Fusszeile schrumpft mit`, { m, z }); }
+      assert((rollt ? Math.abs(z.urteil - z.band) <= 1 : z.urteil <= z.band + 1) && Math.abs(z.kurve - 78) <= 1 && z.band > m.band, `${breite}x${hoehe} Band wieder zu: Fusszeile schrumpft mit`, { m, z }); }
     assert(!s.fehler.length, `${breite}x${hoehe} Fusszeile: keine Fehler`, s.fehler);
     await p.close();
   }
@@ -1620,6 +2171,7 @@ try {
     const nach = getComputedStyle(tab, "::after"), u = document.querySelector("#urteilFeld");
     return { comb: farbe("var(--comb)"), spalteUnten: Math.round(t.bottom), rasterUnten: Math.round(app.bottom),
       urteilUnten: u.getClientRects().length ? Math.round(u.getBoundingClientRect().bottom) : null,
+      urteilLuecke: u.getClientRects().length ? Math.round(u.getBoundingClientRect().top - document.querySelector("#bars").getBoundingClientRect().bottom - document.querySelector("#barsNote").getBoundingClientRect().height) : null,
       nach: nach.content === "none" || nach.content === "normal" || nach.display === "none" ? "" : nach.backgroundColor,
       grund: grundBei(t.left + t.width / 2, t.bottom - 3), ring: getComputedStyle(document.querySelector("#ringFeld")).backgroundColor,
       links: Math.round(app.left), rechts: Math.round(innerWidth - app.right),
@@ -1635,9 +2187,10 @@ try {
       if (!gruppe) { await p.emulateMedia({ reducedMotion: "reduce" }); await beispiel(p); }
       const wo = `2000x1480 ${thema}${gruppe ? " Gruppe" : ""}`;
       const m = await spalteMass(p);
-      assert(Math.abs(m.spalteUnten - m.rasterUnten) <= 2 && (m.urteilUnten === null || Math.abs(m.urteilUnten - m.rasterUnten) <= 2) &&
+      assert(Math.abs(m.spalteUnten - m.rasterUnten) <= 2 && /* folgt Spezifikation Feinschliff 6: das Urteil folgt der Liste, darunter bleibt der Grund der Spalte */
+        (m.urteilUnten === null || (m.urteilLuecke <= 1 && m.urteilUnten <= m.rasterUnten)) &&
         m.grund === m.comb && (!m.nach || m.nach === m.comb) && m.zeilen.every((h) => h <= 44.5),
-        `${wo}: die rechte Spalte reicht bis zur Unterkante, ihr Grund laeuft durch, das Urteil steht unten, Zeilen hoechstens 44`, m);
+        `${wo}: die rechte Spalte reicht bis zur Unterkante, ihr Grund laeuft durch, das Urteil unter der Liste, Zeilen hoechstens 44`, m);
       assert(m.links > 40 && m.randL === m.ring && m.randR === m.ring,
         `${wo}: neben dem 1680-Punkt-Raster passt der Grund zum Ringfeld`, m);
       assert(!s.fehler.length, `${wo}: Spalte ohne Fehler`, s.fehler);
@@ -1717,7 +2270,7 @@ try {
         }
       return trefferLog(tr);
     };
-    const s = await oeffne({ app: true, helfer: { dir: "C:\Logs", file: "TLCombatLog-1.txt", text: zweiKaempfe() } });
+    const s = await oeffne({ app: true, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: zweiKaempfe() } });
     const p = s.page;
     await p.emulateMedia({ reducedMotion: "reduce" });
     await ladeUndWaehle(p, 0, 2);
@@ -1756,7 +2309,7 @@ try {
     await p.close();
   }
   /* --- 16. Nacharbeit der Gesamtpruefung Glutring (M1, M2, M5, M6, M8, M9) */
-  // M9 und M1 in der Gruppe: die Kopfzelle "Klasse" ist kein Knopf; Esc bei offener Kampfwahl schliesst nur die Kampfwahl
+  // M9 und M1 in der Gruppe: eine Kopfzelle ohne Handlung ist kein Knopf; Esc bei offener Kampfwahl schliesst nur die Kampfwahl
   {
     const faeh = (name, sid, f) => ({ name, sid, damage: 220000 * f, dps: 3667 * f, hits: 28, crit: 14, heavy: 10, max: 16000, cats: [] });
     const zeile = (name, f) => ({ name, waiting: false, damage: 440000 * f, dps: 7333 * f, hits: 56, crit: 0.5, heavy: 0.36, seconds: 60, max: 16000,
@@ -1770,13 +2323,24 @@ try {
     await ladeUndWaehle(p, 0, 1);
     await p.waitForFunction(() => !!document.querySelector("#segParty")?.getClientRects().length, null, { timeout: 8000 }).catch(() => {});
     await p.click("#segParty"); await p.waitForTimeout(200);
-    const tinte = await p.evaluate(() => getComputedStyle(document.querySelector('#bars .bhead [data-k="klasse"]')).color);
-    await p.hover('#bars .bhead [data-k="klasse"]'); await p.waitForTimeout(150);
-    const kl = await p.evaluate(() => { const k = document.querySelector('#bars .bhead [data-k="klasse"]'), d = document.querySelector('#bars .bhead [data-k="dps"]');
+    /* folgt Spezifikation Feinschliff 4: die Kopfzelle "Klasse" entfiel (die Klasse steht in der Zeile); dieselbe
+       Zusage gilt jetzt fuer die Zelle "Member" - kein Handzeiger, kein Hover -, der Knopf "Ordnen" behaelt den Zeiger */
+    const tinte = await p.evaluate(() => getComputedStyle(document.querySelector('#bars .bhead [data-k="name"]')).color);
+    await p.hover('#bars .bhead [data-k="name"]'); await p.waitForTimeout(150);
+    const kl = await p.evaluate(() => { const k = document.querySelector('#bars .bhead [data-k="name"]'), d = document.querySelector("#ringOrdnen");
       return { zeiger: getComputedStyle(k).cursor, grund: getComputedStyle(k).backgroundColor, tinte: getComputedStyle(k).color, dpsZeiger: getComputedStyle(d).cursor }; });
     assert(kl.zeiger !== "pointer" && /^(transparent|rgba\(0, 0, 0, 0\))$/.test(kl.grund) && kl.tinte === tinte && kl.dpsZeiger === "pointer",
-      "Gruppe: die Kopfzelle Klasse hat weder Handzeiger noch Hover, die sortierbaren behalten den Zeiger (M9)", kl);
+      "Gruppe: die Kopfzelle Member hat weder Handzeiger noch Hover, der Knopf Ordnen behaelt den Zeiger (M9)", kl);
     await p.focus('#bars .ringzeile[data-member="Mitglied Eins"]'); await p.keyboard.press("Enter"); await p.waitForTimeout(200);
+    // folgt Spezifikation Feinschliff 4.2: Esc im Menue "Ordnen" schliesst nur das Menue, der Ring des Mitglieds bleibt
+    await p.focus("#ringOrdnen"); await p.keyboard.press("Enter"); await p.waitForTimeout(120);
+    const mm0 = await p.evaluate(() => ({ menue: !document.querySelector("#ringOrdnenMenue").hidden, mitglied: document.body.classList.contains("ringmitglied"),
+      eintraege: [...document.querySelectorAll("#ringOrdnenMenue [role=menuitemradio]")].map((e) => e.dataset.k) }));
+    await p.keyboard.press("Escape"); await p.waitForTimeout(150);
+    const mm1 = await p.evaluate(() => ({ menue: !document.querySelector("#ringOrdnenMenue").hidden, mitglied: document.body.classList.contains("ringmitglied"),
+      fokus: document.activeElement?.id }));
+    assert(mm0.menue && mm0.mitglied && mm0.eintraege.length === 6 && !mm1.menue && mm1.mitglied && mm1.fokus === "ringOrdnen",
+      "Ring eines Mitglieds: Esc im Menue Ordnen schliesst das Menue, der Ring des Mitglieds bleibt offen", { mm0, mm1 });
     await p.evaluate(() => document.querySelector("#kwKnopf").click()); await p.waitForTimeout(150);
     await p.evaluate(() => document.activeElement && document.activeElement.blur());
     const vor = await p.evaluate(() => ({ kw: !document.querySelector("#kampfwahl").hidden, mitglied: document.body.classList.contains("ringmitglied") }));
@@ -1864,7 +2428,7 @@ try {
     let stelle = -1;
     for (let x = 1; x <= max && stelle < 0; x += 1) {
       const anders = await p.evaluate((v) => { const r = document.querySelector("#rennPos"); r.value = String(v); r.dispatchEvent(new Event("input", { bubbles: true }));
-        const pl = [...document.querySelectorAll("#rennBahnen .rbahn")].map((e) => +e.dataset.platz); return pl.some((q, i) => i && q < pl[i - 1]); }, x);
+        const pl = [...document.querySelectorAll("#rennBahnen .rbahn")].map((e) => +e.dataset.platz).filter((q) => q > 0); return pl.some((q, i) => i && q < pl[i - 1]); }, x);
       if (anders) stelle = x;
     }
     const cdp = await p.context().newCDPSession(p);
@@ -1877,13 +2441,120 @@ try {
       if (!k || k.role?.value !== "listitem") continue;
       const { node } = await cdp.send("DOM.describeNode", { backendNodeId: k.backendDOMNodeId });
       const a = node.attributes || [];
-      reihe.push(+a[a.indexOf("data-platz") + 1]);
+      const q = +a[a.indexOf("data-platz") + 1];
+      if (q > 0) reihe.push(q);   // folgt Spezifikation Feinschliff 1.1: die Uebrigen haben keinen Platz
     }
     await cdp.detach();
     assert(stelle > 0 && reihe.length >= 2 && reihe.every((q, i) => q === i + 1),
       "der Vorleser liest die Bahnen in der Reihenfolge der Plaetze, auch wenn sie anders geoeffnet wurden (M6)", { stelle, reihe });
     assert(!s.fehler.length, "Leiste und Bahnen: keine Fehler", s.fehler);
     await p.close();
+  }
+  /* --- Feinschliff 1 (#97): das Ende des Rennens. 24 Faehigkeiten (Skill 01 bis 24, erfundene IDs): die zwoelf kleinen
+     fasst das Rennen als "Uebrige" zusammen, und diese Summe ist groesser als jede einzelne Bahn. */
+  {
+    const z = ["CombatLogVersion,4"], beginn = at(22, 0, 0);
+    for (let i = 1; i <= 24; i++)
+      for (let j = 0; j < 6; j++) {
+        const dmg = i <= 12 ? 5000 : 6000 + 100 * (i - 13);
+        z.push(`${stamp(beginn + j * 10000 + i * 300)},DamageDone,Skill ${two(i)},${900000000 + i},${dmg},0,0,kNormalHit,Tester,Vulcanus`);
+      }
+    for (let k = 0; k < 40; k++) z.push(`${stamp(beginn + 600000 + k * 500)},DamageDone,Skill 01,900000001,1000,0,0,kNormalHit,Tester,Stone Beetle`);
+    const helfer = { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: z.join("\n") + "\n" };
+    for (const [breite, hoehe] of [[1280, 860], [560, 860]]) {
+      const s = await oeffne({ app: true, breite, hoehe, helfer }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" });
+      await ladeUndWaehle(p, 1, 2);
+      await p.click("#ringNachspielen"); await p.waitForTimeout(200);
+      const max = await p.evaluate(() => +document.querySelector("#rennPos").max);
+      const zeitpunkte = Array.from({ length: 10 }, (_, k) => (max * (k + 1)) / 10);
+      let rest = 0, mitRest = 0;
+      for (const x of zeitpunkte) {
+        const v = await p.evaluate((x) => { const r = document.querySelector("#rennPos"); r.value = String(x); r.dispatchEvent(new Event("input", { bubbles: true }));
+          return { eins: document.querySelector('.rbahn[data-platz="1"]')?.dataset.key, rest: !!document.querySelector('.rbahn[data-key="__other__"]'),
+            medaille: document.querySelector('.rbahn[data-key="__other__"] .medaille') !== null }; }, x);
+        if (v.eins === "__other__" || v.medaille) rest++;
+        if (v.rest) mitRest++;
+      }
+      assert(mitRest === 10 && rest === 0, `${breite}x${hoehe}: bei 24 Faehigkeiten ist Platz 1 an zehn Stellen nie "Uebrige", und sie traegt kein Abzeichen`, { mitRest, rest });
+      const e = await p.evaluate(() => {
+        const r = (el) => el.getBoundingClientRect();
+        const bahnen = [...document.querySelectorAll("#rennBahnen .rbahn")], box = r(document.querySelector("#rennBahnen"));
+        const letzte = Math.max(...bahnen.map((b) => r(b).bottom)), fin = r(document.querySelector("#rennFinale"));
+        const rw = [...document.querySelectorAll("#rennBahnen .rwert")].map((w) => r(w).right);
+        const nameOhne = [...document.querySelectorAll("#rennBahnen .rname")].filter((n) => !n.getAttribute("title")).length;
+        return { finale: document.querySelector("#rennFinale").textContent, letzte, finTop: fin.top, boxRight: box.right,
+          wertRaus: Math.max(...rw) - box.right, nameOhne, rest: document.querySelector('.rbahn[data-key="__other__"]').dataset.platz };
+      });
+      assert(!/Other skills/.test(e.finale) && e.finale.length > 10 && e.rest === "", `${breite}x${hoehe}: der Schlusssatz nennt "Other skills" nicht`, e);
+      if (breite === 1280) assert(e.letzte <= e.finTop + 0.5, "1280x860: die letzte Bahn liegt ganz ueber dem Schlusssatz", e);
+      else assert(e.wertRaus <= 0.5, "560x860: jeder Wert liegt innerhalb der Bahnen", e);
+      assert(e.nameOhne === 0, `${breite}x${hoehe}: jeder Bahnname hat einen title`, e);
+      assert(!s.fehler.length, `${breite}x${hoehe} Ende des Rennens: keine Fehler`, s.fehler);
+      await p.close();
+    }
+  }
+  /* Feinschliff 1 (#97), unter Vergroesserung: bei uiZoom 80 rechnet bahnLage in Punkten der Seite, nicht in
+     Bildschirmpunkten. Die Bahnen nutzen die freie Hoehe - die letzte endet weniger als eine Bahnhoehe ueber der
+     Unterkante von #rennBahnen (darunter stehen Leiste und Schlusssatz) und liegt ganz ueber dem Schlusssatz.
+     Vorher endete sie dort 93 Punkt hoeher. Dieselben 24 erfundenen Faehigkeiten wie oben. */
+  {
+    const z = ["CombatLogVersion,4"], beginn = at(22, 0, 0);
+    for (let i = 1; i <= 24; i++)
+      for (let j = 0; j < 6; j++) {
+        const dmg = i <= 12 ? 5000 : 6000 + 100 * (i - 13);
+        z.push(`${stamp(beginn + j * 10000 + i * 300)},DamageDone,Skill ${two(i)},${900000000 + i},${dmg},0,0,kNormalHit,Tester,Vulcanus`);
+      }
+    for (let k = 0; k < 40; k++) z.push(`${stamp(beginn + 600000 + k * 500)},DamageDone,Skill 01,900000001,1000,0,0,kNormalHit,Tester,Stone Beetle`);
+    const helfer = { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: z.join("\n") + "\n" };
+    const s = await oeffne({ app: true, breite: 1280, hoehe: 860, helfer, config: { uiZoom: 80 } }); const p = s.page;
+    await p.emulateMedia({ reducedMotion: "reduce" });
+    await ladeUndWaehle(p, 1, 2);
+    await p.click("#ringNachspielen"); await p.waitForTimeout(200);
+    await p.evaluate(() => { const r = document.querySelector("#rennPos"); r.value = r.max; r.dispatchEvent(new Event("input", { bubbles: true })); });
+    await p.waitForTimeout(100);
+    const e = await p.evaluate(() => {
+      const r = (el) => el.getBoundingClientRect();
+      const bahnen = [...document.querySelectorAll("#rennBahnen .rbahn")].map(r);
+      return { zoom: document.documentElement.style.zoom, n: bahnen.length, hoch: Math.max(...bahnen.map((b) => b.height)),
+        letzte: Math.max(...bahnen.map((b) => b.bottom)), finTop: r(document.querySelector("#rennFinale")).top,
+        boxUnten: r(document.querySelector("#rennBahnen")).bottom,
+        gestapelt: document.documentElement.matches(".w-max-899,.h-max-699") };
+    });
+    assert(e.zoom === "0.8" && !e.gestapelt && e.n >= 13 && e.letzte <= e.finTop + 0.5 && e.boxUnten - e.letzte < e.hoch,
+      "uiZoom 80 bei 1280x860: die Bahnen nutzen die freie Hoehe und enden ueber dem Schlusssatz", e);
+    assert(!s.fehler.length, "uiZoom 80 Rennen: keine Fehler", s.fehler);
+    await p.close();
+  }
+  /* Spezifikation Feinschliff 7 (#84), Belegprobe: ausserhalb von Kompakt zeichnet die alte Kampftabelle (21) nicht
+     sichtbar. Im Bereich Kampf steht die Liste neben dem Ring (64); in jedem anderen Bereich, in den Einstellungen
+     und auf der Startseite hat #bars keine Flaeche. Darauf beruht, dass 21 nur noch traegt, was Kompakt braucht. */
+  {
+    const helfer = { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(PULLS) };
+    for (const [breite, hoehe] of [[1280, 860], [560, 860]]) {
+      const s = await oeffne({ app: true, breite, hoehe, helfer }); const p = s.page;
+      await p.emulateMedia({ reducedMotion: "reduce" });
+      await ladeUndWaehle(p, 1, 4);
+      const flaeche = () => p.evaluate(() => { const b = document.querySelector("#bars");
+        return { rects: b.getClientRects().length, ring: b.classList.contains("ring"), zeilen: b.querySelectorAll(".row").length,
+          an: document.querySelector("#bereiche .tab.on")?.dataset.tab || "" }; });
+      const kampf = await flaeche();
+      assert(kampf.rects > 0 && kampf.ring && kampf.zeilen > 0, `${breite}x${hoehe} Kampf: #bars steht, als Liste neben dem Ring`, kampf);
+      const ohne = [];
+      for (const bereich of ["rotation", "analysis", "compare", "history", "party", "weapons", "setup", "weeklies", "rekorde", "settings", "start"]) {
+        await p.evaluate((n) => document.querySelector(`#bereiche [data-tab="${n}"]`).click(), bereich);
+        await p.waitForTimeout(200);
+        const f = await flaeche();
+        if (f.rects !== 0 || f.an !== bereich) ohne.push({ bereich, ...f });
+      }
+      assert(!ohne.length, `${breite}x${hoehe}: ausser im Bereich Kampf hat #bars in keinem Bereich, den Einstellungen und der Startseite eine Flaeche, jeder Bereich ist der gewaehlte (Feinschliff 7)`, ohne);
+      await p.evaluate(() => document.querySelector('#bereiche [data-tab="timeline"]').click()); await p.waitForTimeout(200);
+      await p.click("#btnCompact"); await p.waitForFunction(() => document.body.classList.contains("compact"));
+      const kom = await flaeche();
+      assert(kom.rects > 0 && !kom.ring && kom.zeilen > 0, `${breite}x${hoehe} Kompakt: #bars steht als alte Tabelle (21)`, kom);
+      assert(!s.fehler.length, `${breite}x${hoehe} Belegprobe: keine Fehler`, s.fehler);
+      await p.close();
+    }
   }
 } finally {
   await browser.close();

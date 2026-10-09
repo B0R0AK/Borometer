@@ -6,13 +6,16 @@ import { stats } from "./06-blocks-and-places";
 import { t } from "./08-translation";
 import { skillMark } from "./11-skill-icons";
 import { skillLabel } from "./14-questlog-weapons";
-import { markiereRest, numN, paintMech, pctMin, perSecond } from "./16-fight-analysis";
+import { LIEST_AB_TREFFER, markiereRest, numN, paintMech, pctMin, perSecond } from "./16-fight-analysis";
 import { $, clock, esc } from "./18-interface-basics";
 import { glaetten, rundeSchritte } from "./22-timeline-smoothing";
 import { urteilHtml } from "./26-analysis-tab";
+import { uiZoomFactor } from "./37-window-size-and-overlay";
+import { logOrdnerKennt, oeffneDateien, waehleKampf } from "./23-kampfwahl";
 import { cmpKey, cmpLauf } from "./28-compare";
 import { switchTab } from "./34-menus-drop-and-tabs";
-import { bestInfo, type BestInfo } from "./46-best-pull";
+import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
+import { bestInfo, mitLauf, type BestInfo } from "./46-best-pull";
 import { mechanikStempel, mechanikStrecken } from "./61-mechanik";
 import { syncGlutring } from "./64-glutring";
 
@@ -118,7 +121,9 @@ export function renderKurve(){
   /* Oben ist Luft ueber der hoechsten geglaetteten Linie (wie im Entwurf);
      die rohe Reihe darf darueber hinaus und wird am Rand gekappt. */
   const top = Math.max(1, ...dies, ...(best || [])) * 1.12;
-  const pad = {l: 2, r: 8, t: 8, b: 20}, W = r.width - pad.l - pad.r, H = r.height - pad.t - pad.b;
+  /* Die Leinwand misst in Bildschirmpunkten: unter der Vergroesserung waechst die Zeitachse mit (#81). */
+  const uz = (typeof uiZoomFactor === "function" ? uiZoomFactor() : 1) || 1;
+  const pad = {l: 2, r: 8, t: 8, b: 20 * uz}, W = r.width - pad.l - pad.r, H = r.height - pad.t - pad.b;
   const X = (i: number) => pad.l + W * i / Math.max(1, T - 1), Y = (v: number) => pad.t + H * (1 - Math.min(v, top) / top);
   const farbe = (n: string) => getComputedStyle(document.documentElement).getPropertyValue(n).trim();
   const linie = (v: number[], stil: string, breite: number, strich: number[], alpha = 1) => {
@@ -140,9 +145,9 @@ export function renderKurve(){
     for(const s of reihen) linie(s.values, s.color, 1.4, [], 0.9);
     linie(dies, gold, 2, []);
     if(spur) linie(glaetten(spur.values, f), spur.color, 1.6, []);
-    ctx.fillStyle = farbe("--dim"); ctx.font = "11px " + farbe("--sans");
+    ctx.fillStyle = farbe("--dim"); ctx.font = 11 * uz + "px " + farbe("--sans"); cv.dataset.achseSchrift = String(11 * uz);
     const schritt = [15, 30, 60, 120, 300].find(s => s * W / T >= 60) || 600;
-    for(let s = 0; s <= T; s += schritt) ctx.fillText(clock(s), Math.min(X(s), r.width - 30), r.height - 4);
+    for(let s = 0; s <= T; s += schritt) ctx.fillText(clock(s), Math.min(X(s), r.width - 30 * uz), r.height - 4 * uz);
   }
   cv.dataset.bezug = best ? "1" : "0";
   cv.dataset.spur = spur ? state.kurveSkill : "";
@@ -189,7 +194,7 @@ const bezugSig = (info: BestInfo) => [info.refId || "", info.refDps ?? "", info.
 // die Gesamtkurve des Bezugs wie in 53-fenster.ts (startStand); cmpLauf
 // schneidet einen Pull an der Uebungspuppe (segN@60) auf seine Klasse
 function bezugKurve(info: BestInfo): number[] | null {
-  if(!info.refId || info.why) return null;
+  if(!mitLauf(info) || info.why) return null;
   const lauf = cmpLauf(info.refId);
   return lauf && lauf.perSecond && lauf.perSecond.length ? lauf.perSecond : null;
 }
@@ -238,22 +243,24 @@ export function renderTafelUrteil(){
   if(state.group === "party") return;
   const seg = state.encounters[state.sel]; if(!seg) return;
   const info = bestInfo();
-  const mitBezug = !!info.curId && !!info.refId && !info.why;
+  const mitBezug = !!info.curId && mitLauf(info) && !info.why;
   const schluessel = mitBezug ? [state.sel, kampfNr(seg), state.encounters.length, seg.start, seg.end, seg.events.length, bezugSig(info),
                                  info.curId, info.label || "", state.lang, state.noTime ? 1 : 0].join("|") : "";
   if(mitBezug && schluessel === urteilSchluessel) return;
   if(!seg.stats) seg.stats = stats(seg);
   const box = $("#urteilInhalt");
-  const cur = mitBezug ? cmpLauf(info.curId!) : null, ref = mitBezug ? cmpLauf(info.refId!) : null;
+  // unter der Schwelle kein Vergleich (zu wenige Treffer fuer Anteile): es bleibt der Satz mit der Zaehlung, wie in der Analyse
+  const duenn = seg.stats.hits < LIEST_AB_TREFFER;
+  const cur = mitBezug && !duenn ? cmpLauf(info.curId!) : null, ref = mitBezug && !duenn ? cmpLauf(info.refId!) : null;
   let html: string;
   if(!cur || !ref){
     const u = urteilHtml(seg);
-    html = '<div class="' + esc(u.klasse) + '">' + u.html + "</div>";
+    html = '<div class="' + esc(u.klasse) + '">' + u.html + "</div>" + ohneLaufHtml(info);
   } else {
     const z = urteilZahlen(ref, cur, cmpKey);
     const tag = info.refAt != null ? pullWhen(info.refAt, state.lang) : "";
-    /* Ist dieser der beste, ist der Bezug der staerkste andere Pull, also
-       der zweitbeste (pickTarget) - so heisst er auch, wie im Vergleich. */
+    /* Ist dieser der beste, ist der Bezug der zweite der Rangfolge, also
+       der zweitbeste (bestInfo) - so heisst er auch, wie im Vergleich. */
     const bezug = '<p class="ubezug">' + esc(t(info.isBest ? "tafel.gegenZweit" : "tafel.gegen",
       {boss: info.label, when: tag, dps: fmt(ref.dps)})) + "</p>";
     if(info.isBest){
@@ -295,6 +302,42 @@ export function renderTafelUrteil(){
   // nur ein Urteil mit beiden Laeufen darf den naechsten Aufruf abkuerzen
   urteilSchluessel = cur && ref ? schluessel : "";
 }
+/* Ein bester Pull ohne gespeicherten Lauf (Spezifikation Bester Pull 5.2):
+   Urteil und Kurve bleiben wie ohne Bezug (es gibt nichts zu vergleichen),
+   darunter die Zeile des Bezugs wie bei jedem Bezug - Boss, Datum, DPS aus
+   dem Verlauf - und der Satz, wie Treffer und Rotation dazukommen: das Log
+   oeffnen. Den Knopf gibt es nur am Helfer (SERVED), nicht im
+   Kompaktfenster, und nicht, wenn die letzte Auflistung des Log-Ordners die
+   Datei nicht kennt; dann sagt der Satz, dass sie fehlen. */
+function ohneLaufHtml(info: BestInfo): string {
+  if(!info.ohneLauf || info.why) return "";
+  const tag = info.refAt != null ? pullWhen(info.refAt, state.lang) : "";
+  const bezug = '<p class="ubezug">' + esc(t(info.isBest ? "tafel.gegenZweit" : "tafel.gegen",
+    {boss: info.label, when: tag, dps: fmt(info.refDps)})) + "</p>";
+  const knopf = SERVED && !KOMPAKT_FENSTER && !!tag && logOrdnerKennt(info.ohneLauf.split(" + ")) !== false;
+  const satz = knopf
+    ? "<span>" + esc(t("best.ohneLauf", {when: tag})) + '</span><button type="button" class="leise" id="btnOhneLauf">' +
+      esc(t("best.ohneLaufKnopf")) + "</button>"
+    : "<span>" + esc(t("best.ohneLaufWeg")) + "</span>";
+  return bezug + '<p class="ohnelauf">' + satz + "</p>";
+}
+/* "Log oeffnen": die Datei des Bezugs ueber dieselbe Route wie "Zuletzt
+   geoeffnet" (oeffneDateien, 23), dann der Kampf des Bezugs. bestRecord
+   haelt dabei seinen Lauf fest - aus dem Bezug wird ein gewoehnlicher. Der
+   Fokus geht danach auf die Kampfwahl, wie nach jedem Wechsel des Kampfes;
+   der Knopf selbst ist dann weg. Kommt die Datei nicht (Toast "Datei
+   fehlt"), bleibt alles, wie es war. */
+async function ohneLaufOeffnen(){
+  const info = bestInfo();
+  if(!info.ohneLauf) return;
+  const namen = info.ohneLauf.split(" + "), at = info.refAt;
+  await oeffneDateien(namen);
+  const da = (state.fileNames || []).join(" + ") === namen.join(" + ");
+  if(!da) return;
+  const i = at != null ? state.encounters.findIndex(e => e.start === at) : -1;
+  if(i >= 0) waehleKampf(i);
+  $("#kwKnopf").focus({preventScroll: true});
+}
 /* Eine Belegzeile: Symbol und Name der Faehigkeit mit dem Mass darunter,
    eine Bahn (dieser Pull als Balken in der Reihenfarbe der Faehigkeit wie
    in der Tafel, der beste als Strich) und die zwei Zahlen. */
@@ -311,6 +354,10 @@ function beleg(seg: Fight, a: Abstand, was: string, [dieser, bester]: [number, n
 
 export function tafelBinden(){
   $("#urteilAnalyse").addEventListener("click", () => switchTab("analysis"));
+  // der Knopf "Log oeffnen" steht im neu geschriebenen Inhalt: am festen Kasten gefangen
+  $("#urteilInhalt").addEventListener("click", e => {
+    if((e.target as Element).closest("#btnOhneLauf")) void ohneLaufOeffnen();
+  });
   $("#zeitAuf").addEventListener("click", () => { state.zeitAuf = !state.zeitAuf; syncTafel(); });
   /* "Zeitverlauf und Rotation" (Aufgabe 10): ein Weg, kein Aufklappen. Der
      Fokus geht auf die Zeitleiste, unter der der Zeitverlauf steht - er

@@ -108,7 +108,7 @@ export interface ZeitBild {
   /** "datum": x ist die Zeit; "pull": x ist die Reihenfolge (der Abend zuerst) */
   art: "datum" | "pull";
   punkte: PunktLage[];
-  /** Index des Kampfs mit der hoechsten DPS (der erste bei Gleichstand), -1 ohne Kaempfe */
+  /** Index des besten Pulls (von aussen, Bester Pull 5.4); ohne Angabe der hoechste, -1 ohne */
   bester: number;
   /** mitte() der DPS, erst ab MIN_MEDIAN Kaempfen, sonst null */
   median: number | null;
@@ -131,15 +131,17 @@ export interface ZeitBild {
 }
 
 /* y, bester und Median, gleich fuer beide Achsen. */
-function yTeil(kaempfe: readonly PunktKampf[], flaeche: PunktFlaeche) {
+function yTeil(kaempfe: readonly PunktKampf[], flaeche: PunktFlaeche, gold?: number) {
   const r = flaeche.rand;
   const rand: Rand = typeof r === "number" ? {links: r, rechts: r, oben: r, unten: r} : r;
   const innenB = Math.max(0, flaeche.breite - rand.links - rand.rechts);
   const innenH = Math.max(0, flaeche.hoehe - rand.oben - rand.unten);
   const dps = kaempfe.map(k => Math.max(0, k.dps || 0));
-  let bester = -1;
-  dps.forEach((d, i) => { if(bester < 0 || d > dps[bester]!) bester = i; });
-  const {max, striche} = achse(bester < 0 ? 0 : dps[bester]!);
+  let hoch = -1;
+  dps.forEach((d, i) => { if(hoch < 0 || d > dps[hoch]!) hoch = i; });
+  // die Achse richtet sich immer nach dem hoechsten Punkt, Gold nach "gold"
+  const {max, striche} = achse(hoch < 0 ? 0 : dps[hoch]!);
+  const bester = gold ?? hoch;
   const unten = flaeche.hoehe - rand.unten;
   const y = (d: number) => unten - innenH * Math.max(0, d) / max;
   const median = kaempfe.length >= MIN_MEDIAN ? mitte(dps) : null;
@@ -149,8 +151,8 @@ function yTeil(kaempfe: readonly PunktKampf[], flaeche: PunktFlaeche) {
 /* Die Lagen der Punkte: x nach dem Beginn des Kampfs in der Spanne, y nach
    der DPS. maxStriche begrenzt die Beschriftungen der Datumsachse (die
    Seite gibt sie nach der Breite vor). */
-export function zeitLagen(kaempfe: readonly ZeitKampf[], flaeche: PunktFlaeche, s: Spanne, maxStriche: number): ZeitBild {
-  const {rand, innenB, dps, bester, max, striche, y, median, medianY} = yTeil(kaempfe, flaeche);
+export function zeitLagen(kaempfe: readonly ZeitKampf[], flaeche: PunktFlaeche, s: Spanne, maxStriche: number, gold?: number): ZeitBild {
+  const {rand, innenB, dps, bester, max, striche, y, median, medianY} = yTeil(kaempfe, flaeche, gold);
   const lang = Math.max(1, s.bis - s.von);
   const x = (ms: number) => rand.links + innenB * (ms - s.von) / lang;
   const punkte = kaempfe.map((k, i) => ({x: x(k.at), y: y(dps[i]!), r: punktRadius(k.dur)}));
@@ -178,8 +180,8 @@ export function abendAchse(ats: readonly number[]): boolean {
    Der Tag eines Pulls ist als Band das Feld vom ersten bis zum letzten
    Pull dieses Tages. Die Kaempfe kommen nach der Zeit sortiert. */
 const PULL_SCHRITTE = [1, 2, 5, 10, 20, 50, 100, 200, 500, 1000];
-export function pullLagen(kaempfe: readonly ZeitKampf[], flaeche: PunktFlaeche, maxStriche: number): ZeitBild {
-  const {rand, innenB, dps, bester, max, striche, y, median, medianY} = yTeil(kaempfe, flaeche);
+export function pullLagen(kaempfe: readonly ZeitKampf[], flaeche: PunktFlaeche, maxStriche: number, gold?: number): ZeitBild {
+  const {rand, innenB, dps, bester, max, striche, y, median, medianY} = yTeil(kaempfe, flaeche, gold);
   const n = kaempfe.length, feld = n ? innenB / n : innenB;
   const xi = (i: number) => rand.links + feld * (i + 0.5);
   const index = (ms: number) => {
@@ -219,6 +221,10 @@ export function pullLagen(kaempfe: readonly ZeitKampf[], flaeche: PunktFlaeche, 
 export interface ZuletztKampf { at: number; dur: number }
 export interface ZuletztZeile { datei: string; tag: string; von: string; bis: string; n: number; ende: number }
 const JAHR_MS = 366 * TAG_MS;
+/* Ein Kampf mit Datum (Fix verlauf-ohne-datum): ein Log, das nur die Uhrzeit
+   traegt, gibt als Beginn die Zeit seit Mitternacht. Unter einem Jahr ab 1970
+   ist das kein Tag - Verlauf, Rekorde und Builds lassen solche Kaempfe aus. */
+export const mitDatum = (at: number): boolean => at >= JAHR_MS;
 const zwei = (n: number) => String(n).padStart(2, "0");
 const uhr = (ms: number) => { const d = new Date(ms); return zwei(d.getUTCHours()) + ":" + zwei(d.getUTCMinutes()); };
 export function zuletztGeoeffnet(dateien: Readonly<Record<string, { fights?: readonly ZuletztKampf[]; nach?: unknown } | undefined>> | undefined, anzahl = 3): ZuletztZeile[] {

@@ -16,47 +16,18 @@ import { renderGlutring } from "./64-glutring";
 import type { BarFigures, BarSubRow, SkillCoreInfo } from "../types";
 
 /* ---------- the bars ---------- */
-/* Der Name einer Spalte, so wie er in ihrer Ueberschrift steht - fuer
-   Saetze, die auf eine Spalte zeigen. */
-function sortLabel(key: string){
-  const c = barCols(state.group, tafelBreit()).find(x => x.k === key);
-  return c ? c.t : key;
-}
-function barCols(mode: string, breit: boolean){
+/* Sichtbar zeichnet diese Tabelle nur noch im Kompaktmodus: im Bereich
+   Kampf der vollen Ansicht steht die Liste neben dem Glutring (64), in jedem
+   anderen Bereich hat #bars keine Flaeche (Spezifikation Feinschliff 7,
+   Belegprobe in test-tafel-page). Die breite Form der Vollansicht (#53,
+   Neugestaltung 28.09.) ist damit entfallen; es bleibt die Tafel mit Rang. */
+function barCols(mode: string){
   return [
     {k:"rank", t:"#"}, {k:"name", t: mode === "party" ? t("party.colPlayer") : t("bars.name")},
     {k:"damage", t:t("bars.damage")}, {k:"dps", t:t("bars.dps")},
     {k:"share", t:t("bars.share")}, {k:"hits", t:t("bars.hits")}, {k:"max", t:t("bars.biggest")},
     {k:"critRate", t:t("bars.crit")}, {k:"heavyRate", t:t("bars.heavy")}
-  ].filter(c => !breit || (!NUR_SCHMAL.has(c.k) && c.k !== "rank"));
-}
-/* Issue #53: in der breiten Tafel steht der Balken in einer eigenen Spalte,
-   und dafuer gehen zwei Zahlenspalten in die aufgeklappte Zeile - Anteil
-   sortiert ohnehin wie Schaden, und der groesste Treffer des Kampfes steht
-   oben in der Werteleiste. Schmal (bis 640) und im Kompaktmodus bleibt die
-   Tafel, wie sie war: dort blendet das Stylesheet Spalten nach Sprossen aus,
-   und Anteil ist eine davon, die stehen bleibt.
-   Gebaut wird je nach Breite, nicht versteckt: Kopf und Zeilen tragen so
-   immer dieselbe Zahl Zellen, und ein Vorleser hoert keine Spalte, die es
-   auf dem Schirm nicht gibt. syncWidthStops() zeichnet neu, wenn die
-   Sprosse wechselt (tafelNachBreite). */
-const NUR_SCHMAL = new Set(["share", "max"]);
-/* Neugestaltung 28.09. (Luecke 2.8): breit steht keine Rangspalte mehr -
-   die Ordnung sagt die sortierte Spalte, und der Balken ist eine Spur unter
-   dem Namen statt einer eigenen Spalte (styles.css, #bars.breit). Schmal und
-   im Kompakt bleibt die Tafel mit Rang, wie sie war. */
-export function tafelBreit(){
-  return !document.documentElement.classList.contains("w-max-640") &&
-         !document.body.classList.contains("compact");
-}
-/* Die Tafel steht in der anderen Form, als die Breite verlangt: neu
-   zeichnen. Nur wenn sie ueberhaupt steht - geleert (32-history) bleibt
-   sie leer. */
-export function tafelNachBreite(){
-  const box = document.querySelector<HTMLElement>("#bars");
-  // die Liste neben dem Ring (64) hat keine breite und keine schmale Form
-  if(!box || !box.querySelector(".bhead") || box.classList.contains("ring")) return;
-  if(box.classList.contains("breit") !== tafelBreit()) renderBars();
+  ];
 }
 /* Only the multiplier is left. A "Crit" badge beside a row named "Critical
    Hit" restated the row's own name — the same redundancy as the crit and
@@ -279,8 +250,11 @@ export function loadSwatches(){
    aus der Schiene genommen wird; der Kampf bleibt derselbe. */
 let letzterKampf: number | null | undefined;
 /* Ab 1100 Punkt Breite steht die erste Faehigkeit eines neuen Kampfes offen
-   (Neugestaltung 28.09., Luecke 2.9, wie im Entwurf) - bis jemand selbst
-   eine Zeile auf- oder zuklappt; ab da gilt nur noch, was er geklappt hat. */
+   (Neugestaltung 28.09., Luecke 2.9) - bis jemand selbst eine Zeile auf-
+   oder zuklappt; ab da gilt nur noch, was er geklappt hat.
+   Bleibt beim Aufraeumen (Feinschliff 7, so entschieden): die Vorgabe
+   bestimmt, was diese Tabelle nach einem Kampfwechsel in der Vollansicht
+   offen zeigt, wenn sie danach zeichnet (Probe I1 in test-tafel-page). */
 let aufSelbst = false;
 const ersteOffen = () => !document.documentElement.classList.contains("w-max-1099") &&
   !document.body.classList.contains("compact");
@@ -316,11 +290,6 @@ export function renderBars(){
   if(tafelGilt()){ renderGlutring(); return; }
   $("#bars").classList.remove("ring");
   const rows = inParty ? partyGroupRows() : groupRows(seg, state.group);
-  const breit = tafelBreit();
-  /* Breit gibt es Anteil und Groesster Treffer nicht als Spalte, also auch
-     nicht als Sortierung: eine Ordnung, fuer die nichts auf dem Schirm
-     einsteht, faellt auf die Vorgabe zurueck. */
-  if(breit && NUR_SCHMAL.has(state.sortBars.key)) state.sortBars = {key:"damage", dir:-1};
   /* Der Streifen im Kompakt zeigt Top 5 nach Schaden, was immer die
      Vollansicht gewaehlt hat (Pruefung Aufgabe 9, W2): eine eigene Ordnung,
      state.sortBars bleibt unangetastet und gilt zurueck in der Vollansicht.
@@ -383,8 +352,8 @@ export function renderBars(){
   const cell = (r: BarFigures, cls?: string) =>
     '<span data-k="damage" role="gridcell" class="v '+(cls||"")+'">'+fmt(r.damage, kurzAb)+"</span>"+
     '<span data-k="dps" role="gridcell" class="v dps">'+(state.noTime?"—":fmt(r.dps, kurzAb))+"</span>"+
-    (breit ? "" : '<span data-k="share" role="gridcell" class="v'+(showSort&&st.key==="share"?" showsort":"")+'">'+pct(r.share, 1)+"</span>")+
-    '<span data-k="hits" role="gridcell" class="v soft'+(showSort&&st.key==="hits"?" showsort":"")+'">'+full(r.hits)+"</span>"+
+    '<span data-k="share" role="gridcell" class="v">'+pct(r.share, 1)+"</span>"+
+    '<span data-k="hits" role="gridcell" class="v soft">'+full(r.hits)+"</span>"+
     // the same em dash the dps column uses when there is no clock: a figure
     // that was never reported is not a zero
     /* Mit derselben Schwelle wie Schaden und DPS. Sie hat hier beim ersten
@@ -392,7 +361,7 @@ export function renderBars(){
        Punktes untereinander: 15.7k, 138.8k, 11.5k, 5.195, 21.9k, 5.021 -
        oben ein Komma, unten ein Tausenderpunkt. In einer Zeile stand
        "Schaden 7.5k" (7500) neben "Groesster Treffer 7.543" (7543). */
-    (breit ? "" : '<span data-k="max" role="gridcell" class="v soft'+(showSort&&st.key==="max"?" showsort":"")+'">'+(r.max==null?"\u2014":fmt(r.max, kurzAb))+"</span>")+
+    '<span data-k="max" role="gridcell" class="v soft">'+(r.max==null?"\u2014":fmt(r.max, kurzAb))+"</span>"+
     /* Die Quote traegt ihren Nenner im title. "100 %" sagt ohne ihn nichts:
        nach Kritisch sortiert stand ein Skill mit zwei Treffern auf Platz
        eins, waehrend der mit 649 Treffern und 65 Prozent auf Platz sechs
@@ -400,10 +369,10 @@ export function renderBars(){
        Fensterbreite, und wer die Zahl vorliest, bekommt sie so mit.
        Der Grundsatz dazu: eine Zahl aus einem einzigen Einsatz ist
        nichts wert. */
-    '<span data-k="critRate" role="gridcell" class="v soft'+(showSort&&st.key==="critRate"?" showsort":"")+'"'+
+    '<span data-k="critRate" role="gridcell" class="v soft"'+
       (r.critRate==null?"":' title="'+esc(t("bars.rateBase",{n:r.hits}))+'"')+
       '>'+(r.critRate==null?"\u2014":pct(r.critRate))+"</span>"+
-    '<span data-k="heavyRate" role="gridcell" class="v soft'+(showSort&&st.key==="heavyRate"?" showsort":"")+'"'+
+    '<span data-k="heavyRate" role="gridcell" class="v soft"'+
       (r.heavyRate==null?"":' title="'+esc(t("bars.rateBase",{n:r.hits}))+'"')+
       '>'+(r.heavyRate==null?"\u2014":pct(r.heavyRate))+"</span>";
   /* The bar leaves here as a bare fraction, not a percentage, so the
@@ -431,63 +400,16 @@ export function renderBars(){
       w.toFixed(4)+';--c:'+colour+'"></span>';
   };
 
-  /* The rank column is the one header that does not sort, so it is the one
-     that stays out of the tab order. aria-sort says which way the sorted
-     column is pointing, which the arrow only shows visually. */
-  /* Im schmalen Fenster (w-max-640/560) blendet die Tafel Spalten nach
-     Sprossen aus. Wonach sortiert ist, kommt zurueck (.showsort in
-     styles.css) - sonst stuende eine Ordnung ohne Spalte da, die sie
-     erklaert. Nur in der Vollansicht: der Streifen im Kompakt ordnet
-     ohnehin nach Schaden. */
-  const WIRD_AUSGEBLENDET = new Set(["hits","max","critRate","heavyRate"]);
-  const showSort = !kompakt && WIRD_AUSGEBLENDET.has(st.key);
-  const spalten = barCols(state.group, breit);
-  /* Die Detailzeile unter einer aufgeklappten Zeile (nur breit): was aus den
-     Spalten gewandert ist, als Satz ueber den Unterzeilen. Eine Zelle ueber
-     alle Spalten; der Vorleser bekommt den Satz in der Reihenfolge
-     "Anteil am Schaden 80,7 %", die Zahlen stehen fuers Auge vorn. Der
-     groesste Treffer fehlt, wo ein Bericht ihn nicht mitbrachte (Gruppe). */
-  const detail = (r: BarFigures, name: string, katMode: boolean) => {
-    const anteil = pct(r.share, 1);
-    const max = r.max ? fmt(r.max, kurzAb) : "";
-    // data-detail: focusKeeper findet die Zeile nach dem Neuzeichnen wieder
-    return '<div class="row sub bdetail" role="row" aria-level="2" tabindex="-1" data-detail="'+esc(name)+'">'+
-      '<span class="dz" role="gridcell" aria-colspan="'+spalten.length+'" aria-label="'+
-        esc(t("bars.detailLabel", {share: anteil, max}))+'">'+
-        '<b>'+esc(anteil)+"</b> "+esc(t("bars.shareOf"))+
-        (max ? ' <span class="dzsep" aria-hidden="true">\u00b7</span> <b>'+esc(max)+"</b> "+esc(t("bars.biggest")) : "")+
-        (katMode ? ' <span class="dzsep" aria-hidden="true">\u00b7</span> <span class="dzkat">'+esc(t("bars.byHitType"))+"</span>" : "")+
-      "</span></div>";
-  };
-  $("#bars").classList.toggle("breit", breit);
-  let html = '<div class="bhead" role="row">' + spalten.map(c => {
-    // im Kompakt sortiert der Kopf nicht und bekommt keinen Tabstopp (W3): er ist unsichtbar
-    const sortable = c.k !== "rank" && !kompakt;
-    const dir = st.key===c.k ? (st.dir<0?"descending":"ascending") : "none";
-    /* columnheader statt button. aria-sort gilt nach ARIA 1.2 nur auf
-       columnheader und rowheader - auf role="button" wurde es verworfen, die
-       Sortierrichtung stand also im Markup und kam nie bei einem Vorleser an.
-       Die Kopfzelle sagt jetzt "Spaltenkopf, absteigend sortiert" statt
-       "Schalter"; tabindex bleibt, an der Tastatur aendert sich nichts. Die
-       Rangspalte sortiert nicht und bleibt ohne tabindex - ein Spaltenkopf
-       ist sie trotzdem. */
-    /* Die Rangspalte sagt, wonach sie gerade ordnet. "#" heisst in einem
-       Schadensmesser fuer jeden Leser "Platz nach Schaden" - nach einem
-       Klick auf Kritisch heisst es etwas anderes, und nichts ausser einem
-       Pfeil in 10,5 Punkt sagte das. Der Platz selbst bleibt, was er ist:
-       die Stelle in der Liste. */
-    const rangTitel = c.k === "rank" && st.key !== "damage"
-      ? ' title="'+esc(t("bars.rankOrder", {col: sortLabel(st.key)}))+'"' : "";
-    return '<span data-k="'+c.k+'" role="columnheader" class="'+(st.key===c.k?"sorted":"")+'"'+
-      /* Ein Tabstopp fuer den ganzen Kopf, auf der sortierten Spalte - wie
-         bei den Zeilen darunter. Acht Kopfzellen waren acht Tabstopps
-         zwischen der Leiste und der ersten Zeile; die Pfeiltasten gehen
-         jetzt quer (24-table-keyboard-and-timeline.ts). */
-      rangTitel+(sortable?' tabindex="'+(st.key===c.k?0:-1)+'" aria-sort="'+dir+'"':"")+">"+esc(c.t)+
-      /* Der Pfeil ist fuers Auge; die Richtung sagt aria-sort. Im Namen
-         las ein Vorleser sonst "Schaden Pfeil nach unten, absteigend". */
-      (st.key===c.k ? '<span aria-hidden="true">'+(st.dir<0?" ↓":" ↑")+"</span>" : "")+"</span>";
-  }).join("") + "</div>";
+  /* Der Kopf: Spaltenkoepfe fuer den Vorleser. Im Kompakt sortiert er nicht
+     und bekommt keinen Tabstopp (W3); das Sortieren per Klick, aria-sort und
+     der Titel der Rangspalte ("geordnet nach ...") gehoerten der
+     Vollansicht und entfielen mit ihr (Feinschliff 7). Der Pfeil bleibt
+     fuers Auge, aria-hidden. */
+  const spalten = barCols(state.group);
+  let html = '<div class="bhead" role="row">' + spalten.map(c =>
+    '<span data-k="'+c.k+'" role="columnheader" class="'+(st.key===c.k?"sorted":"")+'">'+esc(c.t)+
+      (st.key===c.k ? '<span aria-hidden="true">'+(st.dir<0?" ↓":" ↑")+"</span>" : "")+"</span>"
+  ).join("") + "</div>";
 
   sorted.forEach((r,i) => {
     const open = state.expanded.has(r.name);
@@ -504,12 +426,14 @@ export function renderBars(){
          Vorlage ein treegrid, und der Weg durch die Anwendung wird um
          elf Stationen kuerzer. barsRoving() gibt einer Zeile die 0. */
       (r.rest?" rest":"")+'" role="row" aria-level="1" tabindex="-1"'+
+      /* der rohe Schaden, fuer die Restzeile im Streifen (#160, 16) */
+      ' data-dmg="'+Math.round(r.damage || 0)+'"'+
       /* Der rohe Name, damit Zeigen und Fokus die Spur in der Kurve finden
          (56-tafel.ts) - nur, wo eine Zeile eine Faehigkeit ist. */
       (state.group === "skill" ? ' data-skill="'+esc(r.name)+'"' : "")+
         (can?' data-open="'+esc(r.name)+'" aria-expanded="'+
              (open?"true":"false")+'"':"")+">"+
-      bar(r, r.color) + (breit ? "" : '<span class="rank" role="gridcell">'+(i+1)+"</span>")+
+      bar(r, r.color) + '<span class="rank" role="gridcell">'+(i+1)+"</span>"+
       /* Der Pfeil und der Farbtupfer sind Zeichen, keine Auskunft: ohne
          aria-hidden liest ein Vorleser vor jedem Namen ein Zeichen vor, das
          nichts bedeutet. Der Aufklappzustand steht auf der Zeile selbst. */
@@ -530,7 +454,6 @@ export function renderBars(){
                 {dmg: full(r.shieldDmg ?? 0)}))+'">'+esc(t("hitcat.shield"))+"</i>" : "")+
           "</span>"+
       cell(r, "strong") + "</div>";
-    if(can && open && breit) html += detail(r, r.name, catMode);
     if(can && open) subSort(r.subs).forEach(s => {
       const swatch = catMode ? CAT_SWATCH[s.key] : r.color;
       /* Eine dritte Ebene, und nur dort, wo sie etwas zu sagen hat: in der
@@ -550,7 +473,7 @@ export function renderBars(){
         (tiefer?' data-opensub="'+esc(s.key)+'" data-subof="'+esc(r.name)+
                 '" aria-expanded="'+
                 (tiefOffen?"true":"false")+'"':"")+">"+
-        bar(s, swatch) + (breit ? "" : '<span class="rank" role="gridcell"></span>')+
+        bar(s, swatch) + '<span class="rank" role="gridcell"></span>'+
         '<span class="nm" role="gridcell"><span class="twist" aria-hidden="true"'+
           (tiefer ? ' title="'+esc(t(tiefOffen ? "bars.twistClose" : "bars.twistHits"))+'"' : "")+">"+
           (tiefer?"\u203a":"")+"</span>"+
@@ -564,7 +487,7 @@ export function renderBars(){
       if(tiefOffen) (s.subs || []).forEach(c => {
         html += '<div class="row sub catrow lvl3" role="row" aria-level="3"'+
           ' tabindex="-1" data-cat="'+esc(c.key)+'">'+
-          bar(c, CAT_SWATCH[c.key]) + (breit ? "" : '<span class="rank" role="gridcell"></span>')+
+          bar(c, CAT_SWATCH[c.key]) + '<span class="rank" role="gridcell"></span>'+
           '<span class="nm" role="gridcell"><span class="twist" aria-hidden="true"></span>'+
             skillMark(c.key, null, CAT_SWATCH[c.key], false)+
             '<span class="nmt" title="'+esc(c.label)+'">'+esc(c.label)+"</span>"+catBadges(c.key)+"</span>"+
@@ -592,18 +515,6 @@ export function renderBars(){
       run();
     };
   };
-  const kopf = [...$("#bars").querySelectorAll<HTMLElement>(".bhead [tabindex]")];
-  // the sorted column is always one of them, but a group switch could leave
-  // none marked - then the first sortable one carries the stop
-  if(kopf.length && !kopf.some(sp => sp.tabIndex === 0)) kopf[0]!.tabIndex = 0;
-  $("#bars").querySelectorAll<HTMLElement>(".bhead span").forEach(sp => onActivate(sp, () => {
-    const k = sp.dataset.k!; if(k === "rank" || kompakt) return;   // every head cell carries data-k
-    if(st.key === k) st.dir *= -1; else { st.key = k; st.dir = -1; }
-    const hatteFokus = document.activeElement === sp;
-    renderBars();
-    // renderBars baut den Kopf neu; der Fokus fiel sonst auf <body>
-    if(hatteFokus) $("#bars").querySelector<HTMLElement>('.bhead [data-k="'+k+'"]')?.focus();
-  }));
   $("#bars").querySelectorAll<HTMLElement>("[data-open]").forEach(row => onActivate(row, () => {
     const name = row.dataset.open!;
     aufSelbst = true;

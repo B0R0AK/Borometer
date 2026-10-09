@@ -115,7 +115,7 @@ export const askConfirm = (title: string, msg: string, opts?: ModalOptions) =>
 /* Top 5 wie im Entwurf (Neugestaltung 28.09., Luecke 11.2, DECISION 11.6):
    so viele Zeilen stehen im gebauten Streifen; wer das Fenster groesser
    zieht, bekommt die ganze Tafel (die Liste fuellt die Hoehe und rollt). */
-const COMPACT_ROWS = 5;      // rows visible before the list scrolls
+export const COMPACT_ROWS = 5;      // rows visible before the list scrolls
 /* Der Verlauf am unteren Rand von #bars. Er bekommt eigenen Platz, statt
    auf der letzten Zeile zu liegen - sonst zaehlt die Ueberschrift sieben
    Zeilen und die siebte ist halb ausradiert. */
@@ -157,6 +157,10 @@ function compactWindowSize(){
   const rows = document.querySelectorAll("#bars .row").length ||
                (state.encounters[state.sel] ? state.encounters[state.sel]!.stats.skills.length : COMPACT_ROWS);
   const shown = Math.min(rows, COMPACT_ROWS);
+  /* Die Restzeile (#160) zaehlt als eine Zeile mehr, wenn es mehr gibt als
+     gezeigt wird - sonst schnitte sie die fuenfte ab. */
+  const haupt = document.querySelectorAll("#bars .row:not(.sub)").length;
+  const restZeilen = haupt > COMPACT_ROWS ? 1 : 0;
   /* Ohne Kampf ist nur das Chrom da - der Streifen. Ohne diesen Fall rechnet
      die Formel mit sieben erfundenen Zeilen (ohne Zeilen faellt die Zahl auf
      COMPACT_ROWS zurueck) und baut ein leeres Fenster in voller Hoehe.
@@ -168,8 +172,8 @@ function compactWindowSize(){
      ausserhalb des 28-Punkte-Fensters (Gutachten H1). Mit Kampf schneidet
      die Tafel stattdessen eine Zeile ab (markiereRest). */
   const h = ruht ? (chrome || 26 * zRow) + hOf("#toast.on")
-                 : (chrome || 60) + shown * rowH +
-                   Math.max(0, shown - 1) * COMPACT_GAP * zRow +
+                 : (chrome || 60) + (shown + restZeilen) * rowH +
+                   Math.max(0, shown + restZeilen - 1) * COMPACT_GAP * zRow +
                    COMPACT_FADE * zRow;
   // Width is set by the longest name the list can print, not by a round
   // number. The name column takes whatever is left after 13 + 55 + 44 for
@@ -341,6 +345,7 @@ function raum(bedarf: () => Bedarf | null, auf: boolean){
   } else if(menueOffen){
     menueOffen = false;
     menueKette = menueKette.then(() => winPost({do:"resize", w: innerWidth, h: innerHeight, art:"zurueck"}))
+      .then(d => fensterAngekommen(d))
       .then(() => {
         if(menueOffen) return;   // schon wieder offen
         menueGross = false;
@@ -348,6 +353,27 @@ function raum(bedarf: () => Bedarf | null, auf: boolean){
         applyWindowSize();
       });
   }
+}
+/* Die Antwort auf "zurueck" kommt, sobald der Hauptprozess die Groesse
+   gesetzt hat - die Seite hat sie dann oft noch nicht (ihr resize kommt
+   spaeter). Gemessen wurde sonst der Streifen in der Hoehe des Menues
+   (244 statt 235 mit Kampf), das Fenster sprang darauf und erst die zweite
+   Messung holte es zurueck. Also warten, bis die Seite die gemeldete
+   Groesse hat - hoechstens 500 ms, dann wird trotzdem gemessen. Dieselbe
+   Ursache fand der Glutring-Feinschliff (#98) von der anderen Seite: im
+   560 Punkt hohen Menue-Fenster gaben die Zeilen der Liste nach (26.8
+   statt 25), dort hiess die Wartestelle fensterIst; beim Zusammenfuehren
+   blieb diese eine. */
+function fensterAngekommen(d: {w?: unknown; h?: unknown} | null){
+  const w = Number(d && d.w), h = Number(d && d.h);
+  const da = () => !(w > 0 && h > 0) || (Math.abs(innerWidth - w) <= 1 && Math.abs(innerHeight - h) <= 1);
+  if(da()) return Promise.resolve();
+  return new Promise<void>(fertig => {
+    const fort = () => { clearTimeout(ende); removeEventListener("resize", sieh); fertig(); };
+    const sieh = () => { if(da()) fort(); };
+    const ende = setTimeout(fort, 500);
+    addEventListener("resize", sieh);
+  });
 }
 /** Das Menue hinter den drei Punkten geht auf oder zu (43, toggleMore). */
 export function menueRaum(auf: boolean){ raum(menueBedarf, auf); }

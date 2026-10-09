@@ -6,11 +6,12 @@ import { t, tt } from "./08-translation";
 import { bossMark } from "./12-boss-images";
 import { $, el, esc, wallTime } from "./18-interface-basics";
 import { darfEntfernen, inGruppenLog, partyForFight } from "./19-grouping-and-party-fights";
-import { kampfwahlSchliessen, kwNachRender, kwSucheAktiv, kwZeigen, syncKwLaeufe, syncTage, tagAnsichtLabel, waehleKampf } from "./23-kampfwahl";
+import { baumZaehlen, kampfwahlSchliessen, kwNachRender, kwSucheAktiv, kwZeigen, syncKwLaeufe, syncTage, tagAnsichtLabel, waehleKampf } from "./23-kampfwahl";
 import { persistConfig } from "./27-weapons-tab";
 import { renderCompare, vonHand } from "./28-compare";
 import { renderAll } from "./32-history";
 import { runNoteSync, syncCompareBtn } from "./45-startup";
+import { besterVon, schluesselVon } from "./46-best-pull";
 import { anzahlText } from "./55-statusleiste";
 import type { Fight, FightBlock, SavedRun } from "../types";
 
@@ -26,6 +27,8 @@ export function focusKeeper(el: HTMLElement | null, root: HTMLElement){
   const ersatz = el && el.dataset.detail ? '.row[data-open="' + CSS.escape(el.dataset.detail) + '"]' : null;
   const sel = el && root && root.contains(el) && el !== root
     ? el.dataset.k     ? '.bhead span[data-k="'   + CSS.escape(el.dataset.k)    + '"]'
+    /* Der Knopf "Ordnen" im Kopf der Liste neben dem Glutring (64). */
+    : el.id === "ringOrdnen" ? "#ringOrdnen"
     : el.dataset.open  ? '.row[data-open="'       + CSS.escape(el.dataset.open) + '"]'
     : el.dataset.detail ? '.row[data-detail="'    + CSS.escape(el.dataset.detail) + '"]'
     /* Liste neben dem Glutring (64): ein Mitglied traegt seinen Namen, eine
@@ -71,20 +74,20 @@ export function focusKeeper(el: HTMLElement | null, root: HTMLElement){
    Ein Lauf bleibt, was er ist (blockPass, 06); nur die Liste fasst zusammen.
    Der Schluessel des Kopfes ist der Beginn des aeltesten Laufs darin: kommt
    im Live ein neuer Pull dazu, behaelt der Kopf seinen Schluessel, und was
-   zugeklappt war, bleibt zu. Zusammen stehen nur Laeufe mit einem Ort (ein
-   Dungeon, ein offener Boss oder ein benanntes Ziel) und denselben Bossen. */
+   zugeklappt war, bleibt zu. Zusammen stehen Laeufe mit demselben Ort (ein
+   Dungeon, ein offener Boss oder ein benanntes Ziel), auch wenn die Bosse
+   wechseln (#155); der Boss steht dann in der Zeile. */
 function kopfGruppen(){
-  const bosse = new Map<number, Set<string>>(), folge: FightBlock[] = [];
+  const folge: FightBlock[] = [], gesehen = new Set<number>();
   state.encounters.forEach(seg => {
     const b = seg.block;
-    if(!b) return;
-    if(!bosse.has(b.start)){ bosse.set(b.start, new Set()); folge.push(b); }
-    if(knownBoss(seg.stats.name)) bosse.get(b.start)!.add(seg.stats.name);
+    if(!b || gesehen.has(b.start)) return;
+    gesehen.add(b.start); folge.push(b);
   });
   const ort = (b: FightBlock) => {
     if(b.only) return "";
     const name = dungeonName(b.dungeon) || dungeonName(b.open) || (b.top && b.top !== "\u2014" ? b.top : "");
-    return name ? name + "|" + [...bosse.get(b.start)!].sort().join("|") : "";
+    return name;
   };
   const kopf = new Map<number, number>();
   let zuletzt = "", lauf: number[] = [];
@@ -263,29 +266,45 @@ export function renderFights(){
   let gruppeOffen = false;
   const kopf = kopfGruppen();
   const {reihe, geteilt, trashN} = railOrder(kopf);
-  /* Der Goldpunkt (0.11): der Kampf mit den meisten DPS je bekanntem Boss
-     unter den geladenen - nur Bosse, kein Trash, und nur mit Uhr (ohne Zeit
-     gibt es keine DPS). */
-  const bester = new Map<string, number>();
-  if(!state.noTime) state.encounters.forEach((seg, i) => {
-    if(!knownBoss(seg.stats.name)) return;
-    const j = bester.get(seg.stats.name);
-    if(j === undefined || seg.stats.dps > state.encounters[j]!.stats.dps) bester.set(seg.stats.name, i);
-  });
+  /* Der Goldpunkt (0.11; Spezifikation Bester Pull 5.1): der Kampf, der der
+     beste Pull an seinem Boss ist - ueber den ganzen Verlauf, nach der Regel
+     aus best-pull-core.ts (Mindestlaenge, erst ab zwei Pulls). Liegt der
+     beste in einem anderen Log, traegt dieses Log an dem Boss kein Gold.
+     Verglichen wird der Index im Log, nicht `at`: ohne Datum ist `at` nur
+     die Zeit seit Mitternacht. Nur Bosse, die Puppe hatte nie Gold. */
+  const goldIdx = new Set<number>();
+  if(!state.noTime){
+    const keys = new Set<string>();
+    for(const seg of state.encounters){
+      const k = schluesselVon(seg.stats.name, seg.stats.seconds);
+      if(k && k.startsWith("boss:")) keys.add(k);
+    }
+    for(const k of keys){ const b = besterVon(k); if(b && b.seg != null) goldIdx.add(b.seg); }
+  }
   /* Der Kopf rechts (Feinschliff 02.10., Abschnitt 5; vorher "ab 21:14 \u00b7 9
      Kaempfe"): "6 Kaempfe \u00b7 19:04\u201319:20" - die Zahl der Kaempfe an
      den Bossen des Kopfes (sechs Wipes sind sechs Kaempfe, die Trashmobs
      dazwischen zaehlt ihre eigene Gruppe); ein Kopf ohne Boss zaehlt alle
      gelisteten Kaempfe seiner Laeufe. Die Spanne reicht vom Beginn des ersten
      gelisteten Kampfes bis zum Ende des letzten. Gesammelt je Kopf. */
-  const jeKopf = new Map<number, { n: number; boss: number; hidden: number; von: number; bis: number; laeufe: Set<number> }>();
+  const jeKopf = new Map<number, { n: number; boss: number; hidden: number; von: number; bis: number; laeufe: Set<number>;
+    bosse: Set<string>; laengst: number; nr?: number }>();
   state.encounters.forEach(seg => { const b = seg.block; if(!b) return;
     const k = kopf.get(b.start) ?? b.start;
     let g = jeKopf.get(k);
-    if(!g){ g = {n: 0, boss: 0, hidden: 0, von: Infinity, bis: -Infinity, laeufe: new Set()}; jeKopf.set(k, g); }
+    if(!g){ g = {n: 0, boss: 0, hidden: 0, von: Infinity, bis: -Infinity, laeufe: new Set(), bosse: new Set(), laengst: 0}; jeKopf.set(k, g); }
     if(!g.laeufe.has(b.start)){ g.laeufe.add(b.start); g.n += b.fights; g.hidden += b.hidden || 0; }
-    if(knownBoss(seg.stats.name)) g.boss++;
+    if(knownBoss(seg.stats.name)){ g.boss++; g.bosse.add(seg.stats.name); g.laengst = Math.max(g.laengst, seg.stats.seconds); }
     g.von = Math.min(g.von, seg.start); g.bis = Math.max(g.bis, seg.end); });
+  /* #152: unter einem Kopf mit genau einem Boss heisst jede Bosszeile
+     "Pull N" - gezaehlt von alt nach neu, der aelteste ist 1. */
+  const pullNr = new Map<number, number>();
+  [...state.encounters].sort((a, b) => a.start - b.start).forEach(seg => {
+    const b = seg.block; if(!b || !knownBoss(seg.stats.name)) return;
+    const g = jeKopf.get(kopf.get(b.start) ?? b.start);
+    if(!g || g.bosse.size !== 1) return;
+    g.nr = (g.nr || 0) + 1; pullNr.set(seg.start, g.nr);
+  });
   const kopfGezeigt = new Set();
   /* Welche Regeln in dieser Liste schon einmal ausgeschrieben wurden.
      Steht ausserhalb der Schleife, weil sie fuer die ganze Liste gilt. */
@@ -311,6 +330,10 @@ export function renderFights(){
       const dung = dungeonName(b.dungeon) || dungeonName(b.open) || (named ? b.top
         : state.wall ? t("rail.blockAt", {t: wallTime(b.start)})
         : t("rail.blockNth", {n: state.blocks!.length - b.index}));
+      /* #152: ein Boss unter dem Kopf - sein Name steht hier einmal, die
+         Zeilen sagen "Pull N". Ist der Ort schon der Boss (Feldboss), nur einmal. */
+      const einBoss = g.bosse.size === 1 ? [...g.bosse][0]! : "";
+      const kname = einBoss && einBoss.toLocaleLowerCase() !== String(dung).toLocaleLowerCase() ? dung + " \u00b7 " + einBoss : dung;
       /* Die Rubrik gehoert dem Block - Feldboss, Erzboss, Koloss, und der
          Gegner heisst in beiden Client-Sprachen gleich. Die Regel darunter
          gehoert der Liste, nicht dem Block. Zwei verschiedene Dinge, die
@@ -325,75 +348,80 @@ export function renderFights(){
       const regelZeigen = !!regel && !regelGezeigt.has(regel);
       if(regelZeigen) regelGezeigt.add(regel);
       gruppeOffen = true;
+      /* Fassung B aus dem Entwurf: bei genau einem Kampf druckt die
+         Ueberschrift dieselbe Laenge und dieselbe Summe wie die Zeile
+         direkt darunter. Eine Zeile tiefer steht es nochmal - das ist
+         keine Auskunft, das ist ein Echo.
+
+         Drei Ausnahmen, in denen die Faktenzeile mehr sagt als die Zeile
+         darunter: ein Block mit einem von der Mindestlaenge verschluckten
+         Kampf (die Zahlen darueber enthalten ihn, die Zeilen nicht), ein
+         Block ohne Uhr (dann druckt die Zeile gar keine Laenge), und bei
+         einem Dungeon Sterne, Stufe und Solo, die keine Zeile kennt.
+         Der Dungeon behielt frueher die ganze Faktenzeile und damit auch
+         das Echo: "1 Kampf | 1m 26s gesamt | 21.44M" direkt ueber einer
+         Zeile mit 1m 26s und 21.44M. Jetzt behaelt er nur, was nur er
+         sagt; ohne Sterne und Stufe steht keine Faktenzeile da. */
+      const fakten = (function(){
+        /* Seit der Neugestaltung (0.9) sagt der Kopf "ab 21:14 \u00b7 9
+           Kaempfe" in einer Zeile; darunter steht nur noch, was nur der
+           Lauf sagt: Sterne, Stufe, Solo und die verschluckten Kaempfe.
+           Summe und Uhren hat die Zeile jedes Kampfes. */
+        const teile = [
+        // the game's own difficulty, where the game has one to give. Drawn as
+        // stars because that is how the game shows it, with the words on the
+        // element so a reader who cannot count four glyphs at 10px still gets
+        // told which tier this was.
+        b.dungeon && b.dungeon.stars
+          ? {html: '<span class="stars" role="img" aria-label="'+
+              esc(t("rail.blockStars", {n: b.dungeon.stars}))+'">'+
+              "★".repeat(b.dungeon.stars)+"</span>"+
+              '<span class="starword">'+esc(t("rail.dungeonWord"))+"</span>"}
+          : null,
+        b.dungeon && b.dungeon.lvl ? t("rail.blockLvl", {n: b.dungeon.lvl}) : null,
+        b.dungeon && b.dungeon.solo ? t("rail.blockSolo") : null,
+        /* The fights the minimum length hid are in this block's clock and
+           in its sum - they happened - but not in the list under it, so
+           the rows will not add up to the figure beside them unless this
+           says why. */
+        g.hidden ? t("rail.blockHidden", {n: g.hidden}) : null,
+        /* Feinschliff 02.10. (Abschnitt 5): der Kopf ist einzeilig. Was
+           frueher eine eigene Zeile darunter hatte - der Raid, zu dem ein
+           Teil gehoert, die Rubrik des offenen Bosses -, steht jetzt in
+           derselben Faktenzeile. */
+        // a raid part is a block and the raid is its context; a block that ran
+        // two parts together names them instead, so neither goes unsaid
+        b.dungeon && b.dungeon.parts ? b.dungeon.parts.map(dungeonName).join(" \u00b7 ")
+          : b.dungeon && b.dungeon.of ? (b.dungeon.of[state.lang] || b.dungeon.of.en) : null,
+        rubrik ? t(rubrik) : null
+        ];
+        return teile.some(Boolean) ? '<span class="num factline" id="kwi-'+kk+'" aria-hidden="true">'+factLine(teile)+"</span>" : "";
+      })();
       /* role="heading" sass am ganzen Kasten, also rechnete die
          Namensberechnung Faktenzeile und Erklaersatz mit hinein: die
          Ueberschriftennavigation las Saetze aus fuenfundzwanzig Woertern
          vor. Die Ueberschrift ist der Name; was darunter steht, ist ihr
-         Inhalt, nicht ihr Name. In der Kampfwahl (listbox) gibt es keine
-         Ueberschriften mehr: der Block ist eine Gruppe, benannt nach
-         demselben Namen (aria-labelledby auf das b im Klappkopf). */
-      head = (gruppeOffen ? "</div>" : "")+'<div class="blockgroup" role="group" aria-labelledby="kwg-'+kk+'">'+
+         Inhalt, nicht ihr Name. In der Kampfwahl (tree) gibt es keine
+         Ueberschriften mehr: der Ortskopf ist ein Eintrag der Ebene 1, benannt
+         nach seinem b; Faktenzeile, Spanne und Regel haengen als Beschreibung
+         daran (aria-describedby), stehen sonst verborgen im Baum (#154). */
+      const besch = [fakten ? "kwi-"+kk : "", "kwz-"+kk, regelZeigen ? "kwr-"+kk : ""].filter(Boolean).join(" ");
+      head = (gruppeOffen ? "</div>" : "")+'<div class="blockgroup" role="none">'+
         '<div class="blockhead">'+
         '<span class="bkname">'+
-        '<button class="blockfold" type="button" data-fold="'+kk+'" id="kwb-'+kk+'" role="option" aria-selected="false" tabindex="-1"'+
+        '<button class="blockfold" type="button" data-fold="'+kk+'" id="kwb-'+kk+'" role="treeitem" aria-level="1" tabindex="-1"'+
+          ' aria-describedby="'+besch+'"'+
           ' aria-expanded="'+(folded ? "false" : "true")+'"'+
           ' title="'+esc(t(folded ? "rail.blockUnfold" : "rail.blockFold"))+'">'+
           // the chevron is the character, the way the skill rows draw theirs:
           // an empty .twist is a 10px box with nothing in it
           '<span class="twist" aria-hidden="true">›</span>'+
-          '<b id="kwg-'+kk+'" title="'+esc(dung + (regel && !regelZeigen ? " \u2014 " + t(regel) : ""))+
-            '">'+esc(dung)+"</b></button></span>"+
-        /* Fassung B aus dem Entwurf: bei genau einem Kampf druckt die
-           Ueberschrift dieselbe Laenge und dieselbe Summe wie die Zeile
-           direkt darunter. Eine Zeile tiefer steht es nochmal - das ist
-           keine Auskunft, das ist ein Echo.
-
-           Drei Ausnahmen, in denen die Faktenzeile mehr sagt als die Zeile
-           darunter: ein Block mit einem von der Mindestlaenge verschluckten
-           Kampf (die Zahlen darueber enthalten ihn, die Zeilen nicht), ein
-           Block ohne Uhr (dann druckt die Zeile gar keine Laenge), und bei
-           einem Dungeon Sterne, Stufe und Solo, die keine Zeile kennt.
-           Der Dungeon behielt frueher die ganze Faktenzeile und damit auch
-           das Echo: "1 Kampf | 1m 26s gesamt | 21.44M" direkt ueber einer
-           Zeile mit 1m 26s und 21.44M. Jetzt behaelt er nur, was nur er
-           sagt; ohne Sterne und Stufe steht keine Faktenzeile da. */
-        (function(){
-          /* Seit der Neugestaltung (0.9) sagt der Kopf "ab 21:14 \u00b7 9
-             Kaempfe" in einer Zeile; darunter steht nur noch, was nur der
-             Lauf sagt: Sterne, Stufe, Solo und die verschluckten Kaempfe.
-             Summe und Uhren hat die Zeile jedes Kampfes. */
-          const teile = [
-          // the game's own difficulty, where the game has one to give. Drawn as
-          // stars because that is how the game shows it, with the words on the
-          // element so a reader who cannot count four glyphs at 10px still gets
-          // told which tier this was.
-          b.dungeon && b.dungeon.stars
-            ? {html: '<span class="stars" role="img" aria-label="'+
-                esc(t("rail.blockStars", {n: b.dungeon.stars}))+'">'+
-                "★".repeat(b.dungeon.stars)+"</span>"+
-                '<span class="starword">'+esc(t("rail.dungeonWord"))+"</span>"}
-            : null,
-          b.dungeon && b.dungeon.lvl ? t("rail.blockLvl", {n: b.dungeon.lvl}) : null,
-          b.dungeon && b.dungeon.solo ? t("rail.blockSolo") : null,
-          /* The fights the minimum length hid are in this block's clock and
-             in its sum - they happened - but not in the list under it, so
-             the rows will not add up to the figure beside them unless this
-             says why. */
-          g.hidden ? t("rail.blockHidden", {n: g.hidden}) : null,
-          /* Feinschliff 02.10. (Abschnitt 5): der Kopf ist einzeilig. Was
-             frueher eine eigene Zeile darunter hatte - der Raid, zu dem ein
-             Teil gehoert, die Rubrik des offenen Bosses -, steht jetzt in
-             derselben Faktenzeile. */
-          // a raid part is a block and the raid is its context; a block that ran
-          // two parts together names them instead, so neither goes unsaid
-          b.dungeon && b.dungeon.parts ? b.dungeon.parts.map(dungeonName).join(" \u00b7 ")
-            : b.dungeon && b.dungeon.of ? (b.dungeon.of[state.lang] || b.dungeon.of.en) : null,
-          rubrik ? t(rubrik) : null
-          ];
-          return teile.some(Boolean) ? '<span class="num factline">'+factLine(teile)+"</span>" : "";
-        })()+
-        '<span class="gz num">'+esc(t("kw.spanne", {n: g.boss || g.n,
-          von: state.wall ? wallTime(g.von).slice(0, 5) : "", bis: state.wall ? wallTime(g.bis).slice(0, 5) : ""}))+"</span>"+
+          '<b id="kwg-'+kk+'" title="'+esc(kname + (regel && !regelZeigen ? " \u2014 " + t(regel) : ""))+
+            '">'+esc(dung)+(kname !== dung ? '<span class="kboss"> \u00b7 '+esc(einBoss)+"</span>" : "")+"</b></button></span>"+
+        fakten+
+        '<span class="gz num" id="kwz-'+kk+'" aria-hidden="true">'+esc(t("kw.spanne", {n: g.boss || g.n,
+          von: state.wall && (g.boss || g.n) > 1 ? wallTime(g.von).slice(0, 5) : "",
+          bis: state.wall && (g.boss || g.n) > 1 ? wallTime(g.bis).slice(0, 5) : ""}))+"</span>"+
         /* Hier stand einmal "Nach 39m 37s Pause getrennt" - die Laenge
            der Stille vor diesem Block. Sie ist auf Wunsch
            gestrichen: dass eine Blockgrenze ein anderer Kampf ist,
@@ -409,7 +437,7 @@ export function renderFights(){
            seinen vollen Namen behaelt. Seit dem Feinschliff (02.10.,
            Abschnitt 5) steht er unter dem einzeiligen Kopf, nicht in ihm. */
         "</div>"+
-        (regelZeigen ? '<p class="blockwho blockregel">'+esc(t(regel))+"</p>" : "");
+        (regelZeigen ? '<p class="blockwho blockregel" id="kwr-'+kk+'" aria-hidden="true">'+esc(t(regel))+"</p>" : "");
     }
     /* The selected fight is never folded away. Hiding the row the rest of the
        screen is about would leave the reader looking for a fight the app is
@@ -425,7 +453,7 @@ export function renderFights(){
     if(geteilt.has(bk) && !istBoss && !kopfGezeigt.has(bk)){
       kopfGezeigt.add(bk);
       const auf = suche || state.trashOpen.has(bk);
-      vorsatz = '<button class="trashhead'+(auf ? " open" : "")+'" type="button" id="kwt-'+(kk ?? "x")+'" role="option" aria-selected="false" tabindex="-1"'+
+      vorsatz = '<button class="trashhead'+(auf ? " open" : "")+'" type="button" id="kwt-'+(kk ?? "x")+'" role="treeitem" aria-level="'+(b && !b.only ? 2 : 1)+'" tabindex="-1"'+
         ' data-trash="'+esc(bk)+'" aria-expanded="'+(auf ? "true" : "false")+'">'+
         '<span class="twist" aria-hidden="true">\u203a</span>'+
         "<span>"+esc(t("rail.trashGroup"))+"</span>"+
@@ -437,41 +465,56 @@ export function renderFights(){
       return head+vorsatz;
 
     const bmark = bossMark(s.name);
-    const istBester = bester.get(s.name) === i;
+    const istBester = goldIdx.has(i);
     /* Die Huelle steht um jede Zeile, auch um die, die nicht darf - sonst
        saessen zwei Sorten Zeilen verschieden tief in der Liste, je nachdem,
        ob die Gruppe etwas gemeldet hat. */
     const kann = darfEntfernen(seg);
+    // Ebene im Baum (#154): unter einem Kopf 2, ohne Kopf 1; ein Trash-Kampf unter "Trashmobs" eine tiefer
+    const ebene = (b && !b.only ? 2 : 1) + (geteilt.has(bk) && !istBoss ? 1 : 0);
+    const pull = pullNr.get(seg.start);
+    const gk = kk !== null ? jeKopf.get(kk) : undefined;
+    /* Der Balken: die Laenge gegen den laengsten Pull des Kopfes (#152),
+       gedaempft, ohne Urteil. Ohne Uhr keine Laenge, kein Balken. */
+    const lbar = pull && !state.noTime && gk && gk.laengst > 0
+      ? '<i class="lbar" aria-hidden="true" style="--l:'+(Math.round(s.seconds / gk.laengst * 100) / 100)+'"></i>' : "";
     /* data-lauf: der Lauf der Zeile (blockPass) - unter einem Kopf koennen
        mehrere stehen. */
     return head+vorsatz+'<div class="fightrow"'+(b ? ' data-lauf="'+b.start+'"' : "")+'>'+
       '<button class="fight'+(i===state.sel?" on":"")+
-      (bmark ? " hasboss" : "")+
+      (bmark ? " hasboss" : " ohnebild")+
       (geteilt.has(bk) && !istBoss ? " trash" : "")+
       /* Die id haengt am Beginn des Kampfes, nicht am Platz in der Liste:
          kommt im Live ein neuer Kampf dazu, verschieben sich die Plaetze,
          und die Anwahl der Kampfwahl (aria-activedescendant) sprang sonst
          stumm auf einen anderen Kampf. */
-      (folded?" lone":"")+'" data-i="'+i+'" id="kwf-'+seg.start+'" role="option" tabindex="-1"'+
+      (folded?" lone":"")+'" data-i="'+i+'" id="kwf-'+seg.start+'" role="treeitem" aria-level="'+ebene+'" tabindex="-1"'+
       /* Ohne aria-label kommt der Inhalt der Zeile am Stueck an:
          "Dryvern-Raufbold41.5k00:21:392m 55s4.41M1m 46s gekaempft3 Teile".
          Die Zahlen stehen nebeneinander, weil sie nebeneinander STEHEN -
          fuers Auge ist das eine Zeile mit Spalten, fuers Ohr ein Wort.
          Dieselben Werte, mit Komma getrennt und mit ihren Woertern. */
-      ' aria-label="'+esc([s.name,
+      ' aria-label="'+esc((pull ? [s.name, t("kw.pull", {n: pull}),
+        state.noTime ? null : dur(s.seconds),
+        state.wall ? wallTime(seg.start) : null,
+        state.noTime ? null : fmt(s.dps)+" "+t("bars.dps"),
+        fmt(s.total)+" "+t("head.damage"),
+        (seg.parts || 1) > 1 ? t("rail.parts", {n: seg.parts}) : null,
+        istBester ? t("kw.bester") : null]
+      : [s.name,
         state.noTime ? null : fmt(s.dps)+" "+t("bars.dps"),
         state.wall ? wallTime(seg.start) : null,
         state.noTime ? null : dur(s.seconds),
         fmt(s.total)+" "+t("head.damage"),
         (seg.parts || 1) > 1 ? t("rail.parts", {n: seg.parts}) : null,
         istBester ? t("kw.bester") : null
-      ].filter(Boolean).join(", "))+'"'+
+      ]).filter(Boolean).join(", "))+'"'+
       ' aria-selected="'+(i===state.sel ? "true" : "false")+'">'+
       // A 252px rail cannot hold every boss name — "Gramaut Barrier Shaman"
       // already measures 151px of the 162 a row has for a name, and the
       // longer ones lose their tail. The full name is one hover away rather
       // than gone, the same way the status and party pills carry theirs.
-      bmark+'<span class="a"><b title="'+esc(s.name)+'">'+esc(s.name)+"</b>"+
+      bmark+'<span class="a"><b title="'+esc(s.name)+'">'+esc(pull ? t("kw.pull", {n: pull}) : s.name)+"</b>"+
       /* Ein kleiner Anhaenger, wo die Gruppe etwas zu diesem Kampf gemeldet
          hat - sonst klickt man die Liste durch und sieht erst hinterher, wo
          etwas drinsteht. Zweimal gesucht waere zweimal dieselbe Schleife, also
@@ -489,10 +532,11 @@ export function renderFights(){
          Namen fuer den Vorleser und im Kopf des Kampfes. */
       '<span class="kd num">'+(istBester ? '<i class="best" aria-hidden="true"></i>' : "")+
         (state.noTime?"\u2014":esc(fmt(s.dps)))+"</span>"+
-      '<span class="b num">'+esc([
-        state.wall ? wallTime(seg.start).slice(0, 5) : null,
+      '<span class="b num">'+lbar+esc((pull
+        ? [state.noTime ? null : dur(s.seconds), state.wall ? wallTime(seg.start).slice(0, 5) : null]
+        : [state.wall ? wallTime(seg.start).slice(0, 5) : null,
         // no clock, no length - the dps chip beside it already says so
-        state.noTime ? null : dur(s.seconds),
+        state.noTime ? null : dur(s.seconds)]).concat([
         /* Both lengths whenever they differ, the way the block heading above
            says them. Without the second one the rate beside the name looks
            wrong: 46.75M over 4m 57s does not give the 207k/s in the chip,
@@ -503,7 +547,7 @@ export function renderFights(){
           ? t("rail.blockFought", {t: dur(s.fought)}) : null,
         // a merged fight used to look exactly like a single one
         (seg.parts || 1) > 1 ? t("rail.parts", {n: seg.parts}) : null
-      ].filter(Boolean).join(" \u00b7 "))+"</span></button>"+
+      ]).filter(Boolean).join(" \u00b7 "))+"</span></button>"+
       /* Kein Zeichen an einer Zeile, die nicht darf. Der Anhaenger "Gruppe"
          steht daneben und sagt warum; der Satz ueber der Liste sagt es in
          Worten. Ein abgeschaltetes Zeichen an jeder dritten Zeile waere
@@ -532,6 +576,7 @@ export function renderFights(){
   listeZuletzt = html;
   const keepFocus = focusKeeper(document.activeElement as HTMLElement | null, panel);
   panel.innerHTML = html;
+  baumZaehlen(panel);
   panel.querySelectorAll<HTMLElement>(".fight").forEach(b => {
     /* Ein Kampf aus der Kampfwahl: waehlen, zeichnen, das Feld schliessen
        und den Fokus an den Knopf geben. Ist das Feld zu (ein Test klickt die
@@ -566,7 +611,10 @@ export function renderFights(){
      Neubau (Spezifikation Live-Leistung 4). Waechst im Live nur der laufende
      Kampf, steht seine Zeile, wo sie stand, und das Messen zwaenge bei jedem
      Takt die ganze Seite in ein neues Layout. */
-  const gewaehlt = state.sel + "|" + (state.encounters[state.sel]?.start ?? "");
+  /* Nur der Beginn des Kampfes, nicht sein Platz: haelt das Live die
+     Auswahl beim aelteren Kampf (#153), rueckt sein Platz mit jedem neuen
+     Kampf weiter, und die offene Liste rollte sonst zu ihm zurueck. */
+  const gewaehlt = String(state.encounters[state.sel]?.start ?? "");
   if(gewaehlt === gewaehltZuletzt) return;
   gewaehltZuletzt = gewaehlt;
   /* kwZeigen (23): ganz im Blick heisst auch nicht hinter dem klebenden Kopf

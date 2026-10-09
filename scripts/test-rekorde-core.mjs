@@ -54,6 +54,7 @@ const DUNGEONS = [
   { solo: true, en: "Tumgir Hollow", de: "Tumgir Kessel",
     boss: ["Silent Gatekeeper Vahelon", "Stiller Torwächter Vahelon", "Quente, Executor of the Seal", "Quente, Vollstrecker des Siegels"],
     bosses: [["Silent Gatekeeper Vahelon", "Stiller Torwächter Vahelon"], ["Quente, Executor of the Seal", "Quente, Vollstrecker des Siegels"]] },
+  { separat: true, en: "Halls of Illusion", de: "Halle der Illusionen", boss: ["Verence", "Marta"], bosses: [["Verence"], ["Marta"]] },
   { of: ALTAR, en: "The Forgotten Citadel", de: "Die vergessene Zitadelle", boss: ["Dragaryle"] },
   { of: ALTAR, en: "The Corridor of Anguish", de: "Der Korridor der Pein", boss: ["Zairos", "Vulkan", "Radeth"], bosses: [["Zairos"], ["Vulkan"], ["Radeth"]] },
   { of: ALTAR, en: "The Altar of Rebirth", de: "Der Altar der Wiedergeburt", boss: ["Calanthia"],
@@ -86,8 +87,8 @@ eq(T[2].gruppen.map((g) => [g.key, g.orte.map((o) => o.de)]),
   "Feldbosse: offene Welt, dann Erzbosse, dann Kolosse");
 eq(T[3].gruppen.map((g) => [g.key, g.orte.map((o) => o.en)]),
   [["s4", ["Vulcanus", "Fellinex"]], ["s3", ["Lucien"]], ["s2", ["Grayeye"]], ["s1", ["Lequirus", "Heliber"]],
-   ["solo", ["Silent Gatekeeper Vahelon", "Quente, Executor of the Seal"]]],
-  "Dungeons nach Sternen; ein Stern und die Einstiegsdungeons zusammen; Solo mit beiden Bossen");
+   ["solo", ["Silent Gatekeeper Vahelon", "Quente, Executor of the Seal"]], ["separat", ["Verence", "Marta"]]],
+  "Dungeons nach Sternen; ein Stern und die Einstiegsdungeons zusammen; Solo mit beiden Bossen; Halle der Illusionen (ohne Sterne) eigens");
 const grau = orte(T[3]).find((o) => o.en === "Grayeye");
 eq([grau.de, grau.en], ["Grauauge", "Grayeye"], "zwei Schreibweisen: die erste englisch, die zweite deutsch");
 eq(orte(T[2]).find((o) => o.de === "Manticus").teile, ["Akman", "Deckman"], "Manticus: Akman und Deckman sind seine Teile");
@@ -108,22 +109,34 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
     k("Morokai", 100000, 0, { top: 300000 }), k("Morokai", 150000, 2, { top: 280000 }), k("Morokai", 120000, 4, { top: 320000, skill: "951234567" }),
   ], T, false);
   const w = platz(a, "Morokai").wert;
-  eq([w.n, w.dps, w.vorher, w.plus, w.dpsAt], [3, 150000, 100000, 50, T0 + 2 * TAG], "bester DPS mit dem Wert davor und +50 %");
+  eq([w.n, w.bester, w.dps, w.vorher, w.plus, w.dpsAt], [3, true, 150000, 100000, 50, T0 + 2 * TAG], "bester DPS mit dem Wert davor und +50 %");
   eq([w.top, w.topSid, w.topAt], [320000, "951234567", T0 + 4 * TAG], "staerkster Treffer: immer die Faehigkeit des staerksten");
   eq([w.erster, w.zuletzt], [T0, T0 + 4 * TAG], "erster Kill und letzter Kampf");
 }
 {
   const a = core.rekorde([k("Morokai", 150000, 0, { top: 1 }), k("Morokai", 120000, 1, { top: 1 })], T, false);
   const w = platz(a, "Morokai").wert;
-  eq([w.dps, w.vorher, w.plus, w.n], [150000, null, null, 2], "der beste ist der erste: kein vorher (der erste von N)");
+  eq([w.bester, w.dps, w.vorher, w.plus, w.n], [true, 150000, null, null, 2], "der beste ist der erste: kein vorher (der erste von N)");
   const e = core.rekorde([k("Morokai", 99000, 0)], T, false);
-  eq([platz(e, "Morokai").wert.n, platz(e, "Morokai").wert.vorher], [1, null], "ein Kampf: kein vorher");
+  eq([platz(e, "Morokai").wert.n, platz(e, "Morokai").wert.bester, platz(e, "Morokai").wert.vorher], [1, false, null],
+     "ein Kampf: kein bester Pull und kein vorher (Bester Pull 3, #151 Punkt 2)");
+}
+{
+  // #127/#151: ein kurzer Fehlstart mit hoher DPS ist kein Rekord
+  const kurz = (name, dps, tag, dur) => ({ ...k(name, dps, tag), dur });
+  const a = core.rekorde([kurz("Morokai", 31800, 0, 14.4), kurz("Morokai", 8582, 1, 284), kurz("Morokai", 7000, 2, 200)], T, false);
+  const w = platz(a, "Morokai").wert;
+  eq([w.n, w.bester, w.dps, w.dpsAt], [3, true, 8582, T0 + TAG], "bester DPS: erst die Mindestlaenge, dann DPS");
+  eq([w.vorher, w.plus], [null, null], "vorher: der kurze davor zaehlt nicht");
+  const b = core.rekorde([kurz("Morokai", 5000, 0, 100), kurz("Morokai", 31800, 1, 14.4), kurz("Morokai", 6000, 2, 200)], T, false);
+  eq([platz(b, "Morokai").wert.dps, platz(b, "Morokai").wert.vorher, platz(b, "Morokai").wert.plus], [6000, 5000, 20],
+     "vorher: mit der Schwelle der ganzen Menge");
 }
 {
   // gleiche Werte: der fruehere zaehlt, beim DPS und beim Treffer
   const a = core.rekorde([k("Aridus", 200000, 0, { top: 500000, skill: "A" }), k("Aridus", 200000, 3, { top: 500000, skill: "B" })], T, false);
   const w = platz(a, "Aridus").wert;
-  eq([w.dpsAt, w.vorher, w.topSid, w.topAt], [T0, null, "A", T0], "gleiche Werte: der fruehere zaehlt");
+  eq([w.bester, w.dpsAt, w.vorher, w.topSid, w.topAt], [true, T0, null, "A", T0], "gleiche Werte: der fruehere zaehlt");
   eq(a.held.topSid, "A", "auch im Held: der fruehere bei gleichem Treffer");
 }
 {
@@ -133,7 +146,7 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
     k("Vegarus", 90000, 2, { top: 200000 }), k("Vagamont", 95000, 2, { min: 5, top: 260000 }), k("Vegamor's Claw", 80000, 2, { min: 9, top: 250000 }),
   ], T, false);
   const m = platz(a, "Manticus").wert, v = platz(a, "Vegamor").wert;
-  eq([m.n, m.dps, m.vorher, m.top, m.topTeil], [2, 210000, 180000, 700000, "Deckman"], "Manticus: ein Boss ueber beide Haelften, der Treffer nennt Deckman");
+  eq([m.n, m.bester, m.dps, m.vorher, m.top, m.topTeil], [2, true, 210000, 180000, 700000, "Deckman"], "Manticus: ein Boss ueber beide Haelften, der Treffer nennt Deckman");
   eq([v.n, v.top, v.topTeil], [3, 260000, null], "Vegamor: drei Teile ein Boss; der Treffer an Vagamont (seiner Form) nennt keinen Teil");
   const v2 = core.rekorde([k("Vegarion", 90000, 2, { top: 300000 })], T, false);
   eq(platz(v2, "Vegamor").wert.topTeil, "Vegarion", "ein Treffer an Vegarion nennt Vegarion");
@@ -157,7 +170,7 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
   // fehlendes top: der Kampf zaehlt fuer DPS und Kill, der Treffer bleibt offen
   const a = core.rekorde([k("Morokai", 100000, 0), k("Morokai", 120000, 1)], T, false);
   const w = platz(a, "Morokai").wert;
-  eq([w.dps, w.top, w.topSid, a.ohneTop, a.held], [120000, null, null, 2, null], "ohne top: DPS ja, Treffer noch nicht gelesen, kein Held");
+  eq([w.bester, w.dps, w.top, w.topSid, a.ohneTop, a.held], [true, 120000, null, null, 2, null], "ohne top: DPS ja, Treffer noch nicht gelesen, kein Held");
   const b = core.rekorde([k("Morokai", 100000, 0, { top: 90000 }), k("Morokai", 120000, 1)], T, false);
   eq([platz(b, "Morokai").wert.top, b.ohneTop], [90000, 1], "ein Kampf mit top reicht fuer den Treffer");
   // eine Kennung ausserhalb des Musters speichert histRecord als "": der Treffer zaehlt trotzdem, ohne Faehigkeit
@@ -181,7 +194,7 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
   eq([feld.besiegt, feld.gesamt], [2, 7], "Feldbosse: 2 von 7 besiegt");
   eq(feld.gruppen[0].plaetze.map((p) => p.ort.de + (p.wert ? "+" : "")), ["Minezerok+", "Aridus+", "Morokai", "Talus", "Manticus"],
     "in der Gruppe erst die besiegten, dann die leeren, je in Tabellenreihenfolge");
-  eq(a.seiten.map((s) => s.besiegt + "/" + s.gesamt), ["0/4", "0/3", "2/7", "0/8"], "jede Seite zaehlt fuer sich");
+  eq(a.seiten.map((s) => s.besiegt + "/" + s.gesamt), ["0/4", "0/3", "2/7", "0/10"], "jede Seite zaehlt fuer sich");
 }
 {
   // erster Kill ehrlich: "ab" nur, wenn aeltere Logs ungelesen sind, und nur am Anfang des Zeitraums
@@ -238,10 +251,18 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
     const o = t.flatMap(orte);
     eq(orte(t[0]).map((x) => x.de), ["Dragaryle", "Zairos \u00b7 Vulkan", "Radeth", "Calanthia"], "echte Tabelle: der Raid wie im Entwurf");
     eq(t[2].gruppen.map((g) => g.key), [null, "erz", "koloss"], "echte Tabelle: Feldbosse, Erzbosse, Kolosse");
-    eq(t[3].gruppen.map((g) => g.key), ["s4", "s3", "s2", "s1", "solo"], "echte Tabelle: Dungeons nach Sternen");
+    eq(t[3].gruppen.map((g) => g.key), ["s4", "s3", "s2", "s1", "solo", "separat"], "echte Tabelle: Dungeons nach Sternen, dann Halle der Illusionen");
     ok(o.length === new Set(o.map((x) => x.id)).size && o.length > 60, "echte Tabelle: jeder Boss einmal", o.length);
     const a = core.rekorde([k("Deluzhnoa", 1, 0), k("Ascended Aridus [Undead]", 1, 0), k("King Khanzaizin", 1, 0), k("Vegamor's Claw", 1, 0)], t, false);
     eq(a.ohneOrt, 0, "echte Tabelle: Erzboss, Feldboss mit Zustand, Dungeonboss und Kolossteil finden ihren Platz");
+    /* Bester Pull 5.3: ein Pull aus boro-best.json kann als Namen nur seinen
+       Schluessel "boss:<histKey>" haben - der histKey jeder Schreibweise
+       muss denselben Platz finden wie die Schreibweise selbst */
+    const hk = await bundle('export { histKey } from "./src/renderer/app/06-blocks-and-places";', "node");
+    const platz = (n) => core.rekorde([k(n, 1, 0)], t, false).seiten.flatMap((s) => s.gruppen.flatMap((g) => g.plaetze)).find((p) => p.wert)?.ort.id ?? null;
+    const falsch = o.filter((x) => x.klasse == null).flatMap((x) => x.namen.map((n) => [x.id, n, hk.histKey(n)]))
+      .filter(([id, , key]) => platz(key) !== id);
+    eq(falsch, [], "echte Tabelle: der histKey jeder Schreibweise findet ihren Platz (Schluessel aus boro-best.json)");
   }
 }
 

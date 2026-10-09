@@ -25,6 +25,17 @@ function assert(cond, name, detail) {
   else { failed++; console.log("  FAIL  " + name + (detail === undefined ? "" : "  " + JSON.stringify(detail).slice(0, 400))); }
 }
 const html = readFileSync(join(root, "dist", "renderer", "index.html"), "utf8");
+
+/* Jede id steht in der Seite nur einmal: eine doppelte id laesst querySelector
+   und aria-Bezuege still das erste Element treffen (#ringHinweis stand im
+   Ringfeld und in der Ringmitte). Gezaehlt wird das Markup; die eingebetteten
+   Skripte bauen ids in Zweigen, die sich ausschliessen. */
+{
+  const zahl = new Map(), markup = html.replace(/<(script|style)\b[\s\S]*?<\/\1>/g, "");
+  for (const m of markup.matchAll(/\sid="([^"]+)"/g)) zahl.set(m[1], (zahl.get(m[1]) || 0) + 1);
+  const doppelt = [...zahl].filter(([, n]) => n > 1).map(([id, n]) => id + " x" + n);
+  assert(zahl.size > 50 && !doppelt.length, "Seite: jede id steht nur einmal", doppelt);
+}
 const browser = await chromium.launch(process.env.PARITY_CHROMIUM ? { executablePath: process.env.PARITY_CHROMIUM } : {});
 
 /* Ein Log in der Form, die das Spiel schreibt (wie test-best-page.mjs): alle
@@ -108,7 +119,6 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
       return json({ ok: true, max: false, w: 400, h: 28, on_top: b.do === "pin" ? !!b.on : true });
     }
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
-    if (path === "/api/builds" && req.method() === "GET") return json({ ok: true, builds: {} });
     if (path === "/api/best" && req.method() === "GET") return json({ ok: true, best: {} });
     if (path.startsWith("/api/")) return json({ ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
@@ -118,6 +128,22 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
   await page.waitForFunction((h) => document.body.dataset.bereit === (h ? "ordner" : "ohne"), !!helfer);
   await page.waitForTimeout(400);
   return s;
+}
+/* Wartet, bis die Liste der Kampfwahl ruht (#212): nach einem Groessenwechsel rechnet die Seite erst im naechsten
+   Bild (ResizeObserver setzt --kwreste), und der Browser rastet die Liste nach jeder Layoutaenderung neu ein - aus
+   Lage 0 wird die Raste der ersten Zeile (22). Wer davor End und Pos1 drueckt, misst gegen dieses Nachrasten.
+   Ruhe heisst: Rollstelle, Rollhoehe, Feldhoehe und --kwreste bleiben ueber 8 Bilder und mindestens 120 ms gleich
+   (monotone Uhr der Seite). Eine feste Pause gaebe unter Last das falsche Bild. */
+async function ruhe(p) {
+  await p.waitForFunction(() => {
+    const l = document.querySelector("#kwListe");
+    const jetzt = [l.scrollTop, l.scrollHeight, l.clientHeight, l.style.getPropertyValue("--kwreste")].join("/"), t = performance.now();
+    const w = (window.__kwRuhe ??= { stand: "", seit: t, n: 0 });
+    if (w.stand !== jetzt) { w.stand = jetzt; w.seit = t; w.n = 0; return false; }
+    w.n++;
+    return w.n >= 8 && t - w.seit >= 120;
+  }, null, { polling: "raf", timeout: 15000 });
+  await p.evaluate(() => { delete window.__kwRuhe; });
 }
 /* Mit Log: die Lage der Knoepfe in der Leiste wird mit geladenem Log
    gemessen. (Seit der Kritik vom 28.09. stehen Live und Oeffnen auch auf
@@ -274,7 +300,14 @@ try {
     });
     // ohne Log
     let z = await zustand();
-    assert(z.knopf.startsWith("Choose a fight \u00b7 Ctrl+K") && z.expanded === "false", "ohne Kampf: der Knopf sagt Choose a fight \u00b7 Ctrl+K", z.knopf);
+    // #155: ohne Log sagt die Pille, was fehlt, und oeffnet das Log
+    const ohneLog = await p.evaluate(() => ({ name: document.querySelector("#kwKnopf").getAttribute("aria-label") }));
+    assert(z.knopf === "No log \u00b7 Open log" && z.expanded === "false" && ohneLog.name === "No log loaded, open a log",
+      "ohne Log: die Pille sagt No log \u00b7 Open log, der Name fuer den Vorleser ebenso", { knopf: z.knopf, ohneLog });
+    await p.evaluate(() => { window.__offen = 0; document.querySelector("#miOpenCombat").addEventListener("click", () => window.__offen++); });
+    await p.click("#kwKnopf");
+    assert(await p.evaluate(() => window.__offen) === 1 && (await zustand()).offen === false,
+      "ohne Log: ein Klick auf die Pille oeffnet das Log, nicht die Kampfwahl");
     await p.keyboard.press("Control+K");
     z = await zustand();
     const leer = await p.evaluate(() => ({ an: !document.querySelector("#kwLeer").hidden, text: document.querySelector("#kwLeer").innerText,
@@ -282,6 +315,10 @@ try {
     assert(z.offen && z.fokus === "kwSuche" && z.expanded === "true", "Strg+K oeffnet das Feld, der Fokus steht in der Suche", z);
     assert(leer.an && leer.text.includes("No fight \u2013 open a log") && leer.text.includes("Open logs") && !leer.hint,
       "ohne Log: Kein Kampf - Log oeffnen, mit dem Oeffnen-Knopf", leer);
+    const fuss = await p.evaluate(() => ({ tasten: document.querySelector("#kwTasten").hidden, laeufe: document.querySelector("#kwLaeufe").hidden,
+      filter: document.querySelector("#filterBtn").hidden, zahl: document.querySelector("#fightCount").dataset.i18n }));
+    assert(fuss.tasten && fuss.laeufe && fuss.filter && fuss.zahl === "rail.noneLoaded",
+      "ohne Log: Tastenhinweise, Gespeichert und Filter sind verborgen; die Zahl traegt ihren Schluessel", fuss);
     await p.keyboard.press("Escape");
     z = await zustand();
     assert(!z.offen && z.fokus === "kwKnopf" && z.expanded === "false", "Esc schliesst, der Fokus ist wieder am Knopf", z);
@@ -291,6 +328,9 @@ try {
     await p.waitForFunction(() => !document.querySelector("#app").hidden);
     await p.waitForTimeout(200);
     z = await zustand();
+    const fussMit = await p.evaluate(() => ({ tasten: document.querySelector("#kwTasten").hidden, laeufe: document.querySelector("#kwLaeufe").hidden,
+      filter: document.querySelector("#filterBtn").hidden }));
+    assert(!fussMit.tasten && !fussMit.laeufe && !fussMit.filter, "mit Log: Tastenhinweise, Gespeichert und Filter sind wieder da", fussMit);
     const neueste = await p.evaluate(() => document.querySelector("#hName").textContent);
     assert(z.knopf.includes(neueste) && z.knopf.includes("21:30") && z.label.includes("21:30:40") && !z.knopf.includes("Choose a fight"),
       "mit Log: der Knopf nennt Boss und Uhrzeit des Kampfes, den man ansieht", { knopf: z.knopf, neueste });
@@ -301,21 +341,30 @@ try {
 
     // Rollen: combobox steuert listbox, Gruppen je Lauf, Kaempfe sind Optionen
     await p.keyboard.press("Control+K");
-    const gruppen = await p.evaluate(() => [...document.querySelectorAll("#fightList [role=group]")].map((g) => {
-      const l = document.getElementById(g.getAttribute("aria-labelledby")); return l ? l.textContent.trim() : ""; }));
-    const rollen = await p.evaluate(() => ({ liste: document.querySelector("#fightList").getAttribute("role"),
-      feld: document.querySelector("#kwSuche").getAttribute("role"), steuert: document.querySelector("#kwSuche").getAttribute("aria-controls"),
-      optionen: [...document.querySelectorAll("#fightList .fight, #fightList .blockfold, #fightList .trashhead")]
-        .every((f) => f.getAttribute("role") === "option" && f.id && f.tabIndex === -1),
-      gewaehlt: [...document.querySelectorAll("#fightList .fight")].filter((f) => f.getAttribute("aria-selected") === "true").length,
-      ueberschriften: document.querySelectorAll('#fightList [role="heading"]').length,
-      // Loesen ist keine Option: fuer den Vorleser verborgen, der Weg ist Entf
-      fxVerborgen: [...document.querySelectorAll("#fightList .fx")].every((x) => x.getAttribute("aria-hidden") === "true"),
-      // der Rollbereich ist kein eigener, namenloser Tabstopp
-      listeTab: document.querySelector("#kwListe").getAttribute("tabindex") }));
-    assert(gruppen.length >= 2 && gruppen.every(Boolean), "die Liste ist nach Lauf gruppiert, jede Gruppe traegt ihren Namen", gruppen);
-    assert(rollen.liste === "listbox" && rollen.feld === "combobox" && rollen.steuert === "fightList" && rollen.optionen
-      && rollen.gewaehlt === 1 && rollen.ueberschriften === 0 && rollen.fxVerborgen && rollen.listeTab === "-1", "combobox steuert die listbox, Eintraege sind Optionen, genau einer gewaehlt", rollen);
+    // Rollen (#154): combobox steuert einen Baum; Koepfe sind Eintraege der Ebene 1 mit aria-expanded,
+    // Kaempfe darunter Ebene 2 (Trash-Kaempfe 3); jede Ebene zaehlt ihre Geschwister
+    const gruppen = await p.evaluate(() => [...document.querySelectorAll('#fightList .blockfold')].map((k) => k.textContent.trim()));
+    const rollen = await p.evaluate(() => {
+      const alle = [...document.querySelectorAll("#fightList .fight, #fightList .blockfold, #fightList .trashhead")];
+      return { liste: document.querySelector("#fightList").getAttribute("role"),
+        feld: document.querySelector("#kwSuche").getAttribute("role"), steuert: document.querySelector("#kwSuche").getAttribute("aria-controls"),
+        eintraege: alle.every((f) => f.getAttribute("role") === "treeitem" && f.id && f.tabIndex === -1 && +f.getAttribute("aria-level") >= 1
+          && +f.getAttribute("aria-posinset") >= 1 && +f.getAttribute("aria-posinset") <= +f.getAttribute("aria-setsize")),
+        koepfe: [...document.querySelectorAll("#fightList .blockfold")].every((k) => k.getAttribute("aria-level") === "1"
+          && ["true", "false"].includes(k.getAttribute("aria-expanded")) && !k.hasAttribute("aria-selected")
+          && (k.getAttribute("aria-describedby") || "").split(" ").every((i) => !!document.getElementById(i))),
+        unterKopf: [...document.querySelectorAll("#fightList .blockgroup .fight:not(.trash)")].every((f) => f.getAttribute("aria-level") === "2"),
+        gewaehlt: [...document.querySelectorAll("#fightList .fight")].filter((f) => f.getAttribute("aria-selected") === "true").length,
+        // Faktenzeile, Spanne und Regelsatz stehen nicht als lose Texte im Baum
+        lose: [...document.querySelectorAll("#fightList .factline, #fightList .gz, #fightList .blockregel")].filter((e) => !e.closest('[aria-hidden="true"]')).length,
+        ueberschriften: document.querySelectorAll('#fightList [role="heading"], #fightList [role="group"]').length,
+        fxVerborgen: [...document.querySelectorAll("#fightList .fx")].every((x) => x.getAttribute("aria-hidden") === "true"),
+        listeTab: document.querySelector("#kwListe").getAttribute("tabindex") };
+    });
+    assert(gruppen.length >= 2 && gruppen.every(Boolean), "die Liste ist nach Lauf gruppiert, jeder Kopf traegt seinen Namen", gruppen);
+    assert(rollen.liste === "tree" && rollen.feld === "combobox" && rollen.steuert === "fightList" && rollen.eintraege && rollen.koepfe
+      && rollen.unterKopf && rollen.gewaehlt === 1 && rollen.lose === 0 && rollen.ueberschriften === 0 && rollen.fxVerborgen && rollen.listeTab === "-1",
+      "combobox steuert den Baum, Eintraege mit Ebene und Platz, Koepfe klappen, genau ein Kampf gewaehlt", rollen);
     z = await zustand();
     assert(z.aktivDa && z.aktiv === await p.evaluate(() => document.querySelector("#fightList .fight.on").id),
       "beim Oeffnen ist der gewaehlte Kampf angewaehlt", z);
@@ -341,6 +390,18 @@ try {
     const gewaehlt = await p.evaluate(() => document.querySelector("#hName").textContent);
     assert(!z.offen && z.fokus === "kwKnopf" && gewaehlt === "Vulcanus" && z.knopf.includes("Vulcanus"),
       "Enter oeffnet den Kampf, schliesst das Feld, der Fokus steht am Knopf", { z, gewaehlt });
+    // #154: Pos1 nach Ende zeigt den ersten Kopf, die Liste steht oben
+    await p.keyboard.press("Control+K");
+    await ruhe(p);
+    await p.keyboard.press("End");
+    await p.keyboard.press("Home");
+    const pos1 = await p.evaluate(() => {
+      const l = document.querySelector("#kwListe"), id = document.querySelector("#kwSuche").getAttribute("aria-activedescendant");
+      const e = document.getElementById(id), lr = l.getBoundingClientRect(), r = e.getBoundingClientRect();
+      return { top: l.scrollTop, kopf: e.classList.contains("blockfold"), sichtbar: r.top >= lr.top - 0.5 && r.bottom <= lr.bottom + 0.5 };
+    });
+    assert(pos1.top === 0 && pos1.kopf && pos1.sichtbar, "#154 Pos1 nach Ende: die Liste rollt ganz nach oben, der erste Kopf ist zu sehen", pos1);
+    await p.keyboard.press("Escape");
     await p.keyboard.press("Control+K");
     z = await zustand();
     assert(z.wert === "" && z.sicht.length > 2, "wieder geoeffnet: die Suche ist leer, alle Laeufe stehen da", z);
@@ -388,8 +449,30 @@ try {
     z = await zustand();
     assert(!z.offen && z.fokus === "kwKnopf", "Esc mit Fokus auf der Seite: das Feld schliesst, der Fokus geht an den Knopf", z);
     await p.keyboard.press("Control+K");
-    await p.evaluate(() => document.querySelector("#stage").click());
+    // ein echter Mausklick auf eine leere Stelle der Buehne, damit der Browser den Fokus setzt wie beim Menschen
+    const st = await p.evaluate(() => document.querySelector("#stage").getBoundingClientRect().toJSON());
+    await p.mouse.click(st.x + st.width - 20, st.y + st.height - 20);
     assert(await p.evaluate(() => document.querySelector("#kampfwahl").hidden), "ein Klick daneben schliesst das Feld");
+    assert(await p.evaluate(() => document.activeElement?.id) === "kwKnopf", "#154 nach dem Klick daneben steht der Fokus am Knopf, nicht auf der Seite");
+    // ein Klick auf ein anderes Bedienelement behaelt dessen Fokus
+    await p.keyboard.press("Control+K");
+    // (nicht #btnWatch: der Klick startet Live und stoert die folgenden Proben; der Knopf des gerade offenen Bereichs aendert nichts)
+    const bereich = await p.evaluate(() => document.querySelector('#bereiche .tab[aria-current="page"]').dataset.tab);
+    await p.click(`#bereiche [data-tab="${bereich}"]`);
+    assert(await p.evaluate((t) => document.activeElement?.dataset.tab === t, bereich), "#154 Klick auf einen anderen Knopf: der Fokus bleibt dort", bereich);
+    assert(await p.evaluate(() => document.querySelector("#kampfwahl").hidden), "#154 der Klick auf den anderen Knopf schliesst das Feld");
+    // #154: eine Zeile mit rollendem tabindex (Schadenstafel) behaelt den Fokus nach dem Klick - er geht nicht an den Knopf
+    await p.keyboard.press("Control+K");
+    const zeile = await p.evaluate(() => {
+      const z = [...document.querySelectorAll('#bars [role="row"][tabindex="-1"]')].find((r) => r.getClientRects().length);
+      if (!z) return null; z.dataset.probe = "1"; const r = z.getBoundingClientRect(); return { x: r.x + 6, y: r.y + r.height / 2 };
+    });
+    assert(zeile, "#154 die Schadenstafel hat eine Zeile mit tabindex -1 zum Anklicken", zeile);
+    if (zeile) {
+      await p.mouse.click(zeile.x, zeile.y);
+      assert(await p.evaluate(() => document.activeElement?.id !== "kwKnopf" && !!document.activeElement?.closest("#bars")),
+        "#154 Klick auf eine Zeile der Schadenstafel: der Fokus bleibt auf der Seite, nicht am Knopf", await p.evaluate(() => document.activeElement?.tagName + "#" + document.activeElement?.id));
+    }
 
     // Strg+K aus einem Eingabefeld, mit preventDefault
     await p.evaluate(() => { window.__kdp = null; addEventListener("keydown", (e) => { if (e.key.toLowerCase() === "k") window.__kdp = e.defaultPrevented; }); });
@@ -487,6 +570,25 @@ try {
     await p.close();
   }
   {
+    /* #155 mit Log-Ordner (Entscheidung 06.10.): ohne geladenes Log gibt es in der App trotzdem etwas
+       zu waehlen - fruehere Tage aus dem Ordner. Die Pille bleibt "Choose a fight" und oeffnet die
+       Kampfwahl, nicht den Datei-Dialog. */
+    const s = await oeffne({ helfer: { dir: "C:\\Logs", file: "", text: "" } });
+    const p = s.page;
+    const vor = await p.evaluate(() => ({ knopf: document.querySelector("#kwKnopf").textContent.replace(/\s+/g, " ").trim(),
+      name: document.querySelector("#kwKnopf").getAttribute("aria-label") }));
+    await p.evaluate(() => { window.__offen = 0; document.querySelector("#miOpenCombat").addEventListener("click", () => window.__offen++); });
+    await p.click("#kwKnopf");
+    const nach = await p.evaluate(() => ({ offen: !document.querySelector("#kampfwahl").hidden, dialog: window.__offen,
+      expanded: document.querySelector("#kwKnopf").getAttribute("aria-expanded"), fokus: document.activeElement?.id }));
+    assert(vor.knopf.startsWith("Choose a fight \u00b7 Ctrl+K") && !/No log/.test(vor.name || ""),
+      "#155 ohne Log mit Log-Ordner: die Pille sagt Choose a fight \u00b7 Ctrl+K", vor);
+    assert(nach.offen && nach.dialog === 0 && nach.expanded === "true" && nach.fokus === "kwSuche",
+      "#155 ohne Log mit Log-Ordner: ein Klick oeffnet die Kampfwahl (fruehere Tage), nicht den Datei-Dialog", nach);
+    assert(!s.fehler.length, "#155 mit Log-Ordner: keine Fehler", s.fehler);
+    await p.close();
+  }
+  {
     // Kampfwahl bei 150 %: direkt unter der Leiste, nicht mit den Massen von 100 %
     const s = await oeffne({ config: { uiZoom: 150 } });
     await s.page.setInputFiles("#fileInput", LOG);
@@ -497,6 +599,116 @@ try {
     assert(Math.abs(r.feld.top - (r.top + 6)) < 2 && r.feld.width <= 840 + 1 && r.feld.height <= r.innen * 0.7 + 1 && !r.quer,
       "150 %: das Feld haengt unter der Leiste, hoechstens 560 Punkt breit und 70 % hoch", r);
     await s.page.close();
+  }
+
+  // --- 2c. #152/#155: ein Kopf je Ort, Pull-Zeilen unter einem Boss, keine Spanne bei einem Kampf
+  {
+    /* Wipe-Abend: drei Pulls an Vulcanus (je 60 s Ruhe dazwischen, also drei Laeufe), dann der
+       Korridor der Pein mit Zairos und danach Radeth (zwei Laeufe, zwei Bosse, ein Ort), zuletzt
+       ein einzelner Trash-Lauf. */
+    const W = [
+      { target: "Vulcanus", start: at(19, 0, 0), secs: 60, scale: 1.0 },
+      { target: "Vulcanus", start: at(19, 5, 0), secs: 120, scale: 1.0 },
+      { target: "Vulcanus", start: at(19, 10, 0), secs: 90, scale: 1.0 },
+      { target: "Zairos", start: at(19, 30, 0), secs: 60, scale: 1.0 },
+      { target: "Radeth", start: at(19, 35, 0), secs: 60, scale: 1.0 },
+      { target: "Stone Beetle", start: at(20, 0, 0), secs: 20, scale: 1.0 },
+    ];
+    const WLOG = join(work, "TLCombatLog-wipe.txt");
+    writeFileSync(WLOG, logText(W));
+    const s = await oeffne();
+    const p = s.page;
+    await mitLog(s, WLOG);
+    await p.keyboard.press("Control+K");
+    const bild = await p.evaluate(() => [...document.querySelectorAll("#fightList .blockgroup")].map((g) => ({
+      kopf: g.querySelector(".blockfold b")?.textContent || "",
+      gz: g.querySelector(".gz")?.textContent || "",
+      zeilen: [...g.querySelectorAll(".fight")].map((f) => ({ name: f.querySelector(".a b")?.textContent, b: f.querySelector(".b")?.textContent,
+        label: f.getAttribute("aria-label"), balken: !!f.querySelector(".lbar"), l: f.querySelector(".lbar")?.style.getPropertyValue("--l"),
+        bild: !!f.querySelector(".bic"), ohnebild: f.classList.contains("ohnebild") })) })));
+    const vul = bild.find((g) => g.kopf.endsWith("Vulcanus"));
+    const kor = bild.find((g) => /Corridor of Anguish/.test(g.kopf));
+    const tr = bild.find((g) => g.zeilen.some((z) => z.name === "Stone Beetle"));
+    assert(vul && vul.kopf === "Frostbreath Cave · Vulcanus" && vul.zeilen.map((z) => z.name).join() === "Pull 3,Pull 2,Pull 1",
+      "#152 ein Boss unter dem Kopf: Ort · Boss einmal im Kopf (Vulcanus steht in der Frostatemhoehle), die Zeilen heissen Pull 3, 2, 1 (neueste oben)", vul);
+    assert(vul && vul.zeilen.every((z) => z.balken && /^\d+m|^\d+\u00a0?s/.test(z.b)) && vul.zeilen.find((z) => z.name === "Pull 2").l === "1",
+      "#152 die Laenge steht vorn, mit Balken; der laengste Pull fuellt ihn ganz", vul?.zeilen);
+    assert(vul && vul.zeilen.every((z) => /^Vulcanus, Pull \d, /.test(z.label)), "#152 der Vorleser hoert den ganzen Namen: Vulcanus, Pull N, …", vul?.zeilen.map((z) => z.label));
+    assert(kor && kor.zeilen.map((z) => z.name).join() === "Radeth,Zairos" && kor.zeilen.every((z) => !z.balken),
+      "#155 ein Ort, zwei Bosse: ein Kopf, die Zeilen tragen den Boss, kein Balken", kor);
+    assert(tr && !/\d\d:\d\d/.test(tr.gz) && /^1 fight$/.test(tr.gz.trim()), "#155 ein Kampf unter dem Kopf: keine Zeitspanne", tr);
+    assert(bild.every((g) => g.zeilen.every((z) => z.bild !== z.ohnebild)), "#152 ohne Bild keine leere Bildspalte", bild.map((g) => g.zeilen));
+    const groesse = await p.evaluate(() => {
+      const k = document.querySelector("#fightList .blockfold b"), t = document.querySelector("#fightList .trashhead");
+      return { kopf: parseFloat(getComputedStyle(k).fontSize), trash: t ? parseFloat(getComputedStyle(t).fontSize) : 0 };
+    });
+    // der Trash-Kopf steht nur, wo ein Lauf Boss und Trash hat: dafuer das erste LOG
+    await mitLog(s, LOG);
+    await p.keyboard.press("Control+K");
+    const g2 = await p.evaluate(() => {
+      const k = document.querySelector("#fightList .blockfold b"), t = document.querySelector("#fightList .trashhead");
+      return { kopf: parseFloat(getComputedStyle(k).fontSize), trash: t ? parseFloat(getComputedStyle(t).fontSize) : 0 };
+    });
+    assert(g2.trash > 0 && g2.trash <= g2.kopf, "#155 der Trash-Kopf ist nicht groesser als der Ortskopf", { groesse, g2 });
+    // #154: von Hand gerollt liegt keine Zeile halb unter dem klebenden Kopf - in einer kurzen Liste (das
+    // Standard-LOG, 5 Zeilen) und einer langen (14 Pulls), an jeder Rollstelle bis ganz ans Ende.
+    const LANG = join(work, "TLCombatLog-lang.txt");
+    writeFileSync(LANG, logText(Array.from({ length: 14 }, (_, k) => ({ target: "Vulcanus", start: at(18, k * 5, 0), secs: 30 + 7 * k, scale: 1.0 }))));
+    for (const [name, datei] of [["kurze Liste", LOG], ["lange Liste", LANG]]) {
+      await mitLog(s, datei);
+      await p.keyboard.press("Control+K");
+      await p.setViewportSize({ width: 1280, height: 520 });
+      await ruhe(p);
+      // Pos1 nach Ende: der erste Kopf klebt oben, die Gruppe darunter beginnt ganz oben - auch, wenn der Kopf beim
+      // Rollen nie aus dem Blick war (der klebende Kopf taeuscht "sichtbar"; die Liste blieb weit unten)
+      await p.keyboard.press("End");
+      await p.keyboard.press("Home");
+      const p1 = await p.evaluate(() => { const l = document.querySelector("#kwListe"); return { top: l.scrollTop, kopf: document.getElementById(document.querySelector("#kwSuche").getAttribute("aria-activedescendant"))?.classList.contains("blockfold") }; });
+      assert(p1.top === 0 && p1.kopf, `#154 ${name}: Pos1 nach Ende rollt die Liste ganz nach oben`, p1);
+      // Rollen von Hand: an jeder Stelle (auch am Ende) liegt keine Zeile halb unter dem klebenden Kopf; ab scrollTop > 0
+      // muss der Kopf oben wirklich gefunden werden, sonst verglich die Probe nur gegen den Listenrand
+      const rollen = async (beschr) => {
+        await p.mouse.move(640, 300);
+        for (const d of [37, 61, 23, 90, 11, 41, 700, -53, 700]) {
+          await p.mouse.wheel(0, d);
+          await ruhe(p);
+          const halb = await p.evaluate(() => {
+            const l = document.querySelector("#kwListe"), lr = l.getBoundingClientRect();
+            const koepfe = [...document.querySelectorAll("#fightList .blockhead")].map((h) => h.getBoundingClientRect())
+              .filter((r) => r.top <= lr.top + 1 && r.bottom > lr.top).map((r) => r.bottom);
+            const kopf = koepfe[0] ?? lr.top;
+            return { n: [...document.querySelectorAll("#fightList .fight")].filter((f) => f.getClientRects().length).map((f) => f.getBoundingClientRect())
+              .filter((r) => r.top < kopf - 0.5 && r.bottom > kopf + 0.5).length, kopfDa: koepfe.length > 0, st: l.scrollTop, max: l.scrollHeight - l.clientHeight };
+          });
+          assert(halb.n === 0 && (halb.st === 0 || halb.kopfDa), `#154 ${beschr}, nach ${d} Punkt Rollen von Hand: keine Zeile halb unter dem Kopf (der Kopf oben gefunden)`, halb);
+        }
+      };
+      await rollen(name);
+      if (datei === LANG) {
+        // #154: der Platz unter der letzten Zeile folgt dem Inhalt: Suche auf ein, zwei Zeilen - die Liste rollt nicht mehr;
+        // Suche leeren - sie rollt wieder, bis ganz ans Ende ohne halbe Zeile
+        await p.keyboard.type("19:05");
+        await ruhe(p);
+        const eng = await p.evaluate(() => { const l = document.querySelector("#kwListe");
+          return { zeilen: [...document.querySelectorAll("#fightList .fight")].filter((f) => f.getClientRects().length).length, sh: l.scrollHeight, ch: l.clientHeight }; });
+        assert(eng.zeilen >= 1 && eng.zeilen <= 2 && eng.sh <= eng.ch + 1, "#154 gefiltert auf wenige Zeilen: kein leerer Rollbereich", eng);
+        await p.keyboard.press("Control+A");
+        await p.keyboard.press("Backspace");
+        await ruhe(p);
+        const weit = await p.evaluate(() => { const l = document.querySelector("#kwListe"); return { sh: l.scrollHeight, ch: l.clientHeight }; });
+        assert(weit.sh > weit.ch + 100, "#154 Suche geleert: die Liste rollt wieder", weit);
+        await rollen("nach geleerter Suche");
+      }
+      await p.setViewportSize({ width: 1280, height: 860 });
+      await p.keyboard.press("Escape");
+    }
+    // 560 Punkt: kein Querlauf
+    await p.setViewportSize({ width: 560, height: 860 });
+    await p.waitForTimeout(200);
+    assert(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth && document.querySelector("#kwListe").scrollWidth <= document.querySelector("#kwListe").clientWidth),
+      "#152 bei 560 Punkt kein waagerechtes Rollen in der Kampfwahl");
+    assert(!s.fehler.length, "#152/#155: keine Fehler", s.fehler);
+    await p.close();
   }
 
   // --- 3. Bereichsleiste (3.3): Reihenfolge, Symbole, aria-current, Tastatur, Start
@@ -523,14 +735,15 @@ try {
     let l = await leiste();
     assert(l.tag === "NAV" && l.name === "Areas" && Math.round(l.breit) === 64, "eine nav mit Namen, 64 Punkt breit (Neugestaltung 28.09.)", l);
     // Stufe 3: unter Start das Zahnrad der Einstellungen (57-einstellungen.ts); seit der
-    // Neugestaltung 28.09. (0.17) Builds nach Gruppe und Weeklies ueber Start
+    // Neugestaltung 28.09. (0.17) Weeklies ueber Start; der Builds-Reiter ist entfallen (#207)
     // folgt Spezifikation Rekorde 2a (02.10.2026): der Pokal steht unten nach den Weeklies, gleich streng
-    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "builds", "weeklies", "rekorde", "start", "settings"]),
-      "Reihenfolge: Kampf, Rotation, Analyse, Vergleich, Verlauf, Gruppe, Builds, unten Weeklies, Rekorde, Start und Einstellungen", l.folge);
+    // folgt Spezifikation Gilde 5 (06.10.2026): die Gilde zwischen Weeklies und Rekorden, gleich streng
+    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "start", "settings"]),
+      "Reihenfolge: Kampf, Rotation, Analyse, Vergleich, Verlauf, Gruppe, unten Weeklies, Gilde, Rekorde, Start und Einstellungen", l.folge);
     assert(l.symbole && l.namen.every(([tip, vh, versteckt]) => tip && tip === vh && versteckt), "gezeichnete Symbole (22 Punkt, aria-hidden), der Name als Blase und fuer den Vorleser", l.namen);
     assert(l.reiterRollen === 0, "keine Reiterrollen und keine Reiterleiste mehr", l.reiterRollen);
     assert(l.land && eins(l.aktuell) === '["start"]' && eins(l.stopps) === '["start"]', "ohne Log: Start ist gewaehlt und der eine Tabstopp", l);
-    assert(eins(l.aus) === eins(["timeline", "rotation", "analysis", "compare", "history", "builds"]), "ohne Log: Bereiche ohne Kampf gesperrt, Gruppe, Weeklies und Start nicht", l.aus);
+    assert(eins(l.aus) === eins(["timeline", "rotation", "analysis", "compare", "history"]), "ohne Log: Bereiche ohne Kampf gesperrt, Gruppe, Weeklies und Start nicht", l.aus);
 
     await beispielLaden(p);
     await p.waitForFunction(() => !document.querySelector("#app").hidden);
@@ -588,13 +801,13 @@ try {
     await entwickler(p);
     await p.waitForTimeout(150);
     l = await leiste();
-    // DECISION 0.18: Waffen und Log-Einrichtung nach Builds
-    // folgt Spezifikation Rekorde 2a: Rekorde unten nach den Weeklies
-    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "builds", "weapons", "setup", "weeklies", "rekorde", "start", "settings"]) && l.symbole,
-      "Entwicklermodus: Waffen und Log-Einrichtung nach Builds, Weeklies, Rekorde, Start und Einstellungen bleiben unten", l.folge);
-    await p.focus('#bereiche [data-tab="builds"]');
+    // DECISION 0.18: Waffen und Log-Einrichtung nach der Gruppe (vorher nach Builds)
+    // folgt Spezifikation Rekorde 2a: Rekorde unten nach den Weeklies; Spezifikation Gilde 5: die Gilde dazwischen
+    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weapons", "setup", "weeklies", "gilde", "rekorde", "start", "settings"]) && l.symbole,
+      "Entwicklermodus: Waffen und Log-Einrichtung nach der Gruppe, Weeklies, Gilde, Rekorde, Start und Einstellungen bleiben unten", l.folge);
+    await p.focus('#bereiche [data-tab="party"]');
     await p.keyboard.press("ArrowDown");
-    assert(eins((await leiste()).aktuell) === '["weapons"]', "Pfeil ab von Builds: Waffen");
+    assert(eins((await leiste()).aktuell) === '["weapons"]', "Pfeil ab von der Gruppe: Waffen");
     await p.keyboard.press("ArrowDown");
     l = await leiste();
     assert(eins(l.aktuell) === '["setup"]' && l.panel === "p-setup", "Pfeil ab: Log-Einrichtung", l);
@@ -637,7 +850,7 @@ try {
 
     const s = await oeffne();
     let z = await zustand(s.page);
-    assert(z.gedimmt.length === 6 && z.gedimmt.every((o) => o === "0.35"), "ohne Log: gesperrte Knoepfe (mit Builds) schon im ersten Bild gedimmt", z);
+    assert(z.gedimmt.length === 5 && z.gedimmt.every((o) => o === "0.35"), "ohne Log: gesperrte Knoepfe schon im ersten Bild gedimmt", z);
 
     // Leeren auf Verlauf: der Bereich bleibt nutzbar, der Fokus in der Leiste
     await mitLog(s);
@@ -1040,7 +1253,8 @@ try {
       return { unten: r.bottom, sbOben: sb.top, trifft: !!oben && st.contains(oben), sicht: [...leiste.querySelectorAll(".tab")].filter((b) => !b.hidden).length,
         untenZ: rz.bottom, trifftZ: !!obenZ && zr.contains(obenZ), quer: document.documentElement.scrollWidth > innerWidth };
     });
-    // zwoelf Knoepfe seit der Neugestaltung 28.09.: dazu Builds und Weeklies; dreizehn seit den Rekorden (Spezifikation 2a)
+    // zwoelf Knoepfe seit der Neugestaltung 28.09.: dazu Builds und Weeklies; dreizehn seit den Rekorden (Spezifikation 2a); zwoelf ohne Builds (#207);
+    // dreizehn mit der Gilde (Spezifikation Gilde 5)
     assert(z.sicht === 13 && z.unten <= z.sbOben + 0.5 && z.trifft && !z.quer, `${breite}x${hoehe} bei 150 %: Start ueber der Statusleiste und klickbar`, z);
     assert(z.untenZ <= z.sbOben + 0.5 && z.trifftZ, `${breite}x${hoehe} bei 150 %: das Zahnrad ueber der Statusleiste und klickbar`, z);
     await p.close();
@@ -1051,7 +1265,7 @@ try {
     const p = s.page;
     await beispielLaden(p);
     await p.waitForFunction(() => !document.querySelector("#app").hidden);
-    const z = await p.evaluate(() => { const i = [...document.querySelectorAll("#fightList .fight")].findIndex((f) => f.textContent.includes("Ramux"));
+    const z = await p.evaluate(() => { const i = [...document.querySelectorAll("#fightList .fight")].findIndex((f) => f.getAttribute("aria-label").includes("Ramux"));   // folgt #152/#155: unter dem Kopf heisst die Zeile "Pull N", der Vorleser-Name traegt den Boss
       document.querySelectorAll("#fightList .fight")[i].click();
       // der Lauf steht seit der Neugestaltung 28.09. (0.4) nur noch im Namen der Pille
       return { text: document.querySelector("#kwWas").textContent, lauf: document.querySelector("#kwKnopf").getAttribute("aria-label").split(", ").length - 3,
@@ -1060,9 +1274,11 @@ try {
       "Kampfwahl-Knopf: \"Ramux\" nur einmal, auch im Namen", z);
     assert(/Ramux/.test(z.liste), "die Liste bleibt, wie sie ist", z.liste.slice(0, 80));
     // ein anderer Lauf bleibt stehen
-    const d = await p.evaluate(() => { const i = [...document.querySelectorAll("#fightList .fight")].findIndex((f) => f.textContent.includes("Dragaryle"));
+    const d = await p.evaluate(() => { const i = [...document.querySelectorAll("#fightList .fight")].findIndex((f) => f.getAttribute("aria-label").includes("Dragaryle"));   // folgt #152/#155: Zeilenname kann "Pull N" sein
       const f = document.querySelectorAll("#fightList .fight")[i];
-      const lauf = document.getElementById(f.closest(".blockgroup").getAttribute("aria-labelledby")).textContent.trim();
+      // folgt #152/#155: der Kopf heisst "Ort · Boss"; der Lauf im Namen des Knopfes ist der Ort
+      const kb = f.closest(".blockgroup").querySelector(".blockfold b");
+      const lauf = [...kb.childNodes].filter((n) => !(n.classList && n.classList.contains("kboss"))).map((n) => n.textContent).join("").trim();
       f.click();
       return { lauf, name: document.querySelector("#kwKnopf").getAttribute("aria-label") }; });
     assert(d.lauf && d.name.includes(", " + d.lauf + ", "), "ein Lauf mit anderem Namen bleibt im Namen des Knopfes", d);
@@ -1116,16 +1332,24 @@ try {
        beim Aufklappen nicht; gemessen wird wie vorher mit zugeklappten Zeilen. */
     await p.evaluate(() => document.querySelectorAll('#bars .row[aria-expanded="true"]').forEach((z) => z.click()));
     await p.waitForTimeout(200);
-    const z = await p.evaluate(() => {
+    /* folgt Spezifikation Feinschliff 4.4: bei 600 Punkt Hoehe ist der Glutring gestapelt, dort hat die Liste
+       keinen Deckel mehr - alle Zeilen stehen, die Seite rollt. Gleich streng gemessen, dass die Statusleiste
+       mitzaehlt: dahin gerollt steht die letzte Zeile ganz und frei ueber der Statusleiste. */
+    const z = await p.evaluate(async () => {
       const box = document.querySelector("#bars"), b = box.getBoundingClientRect();
       const zeilen = [...box.querySelectorAll(".row:not(.sub)")];
-      const zh = zeilen[0].getBoundingClientRect().height;
       const w = getComputedStyle(document.documentElement);
-      const frei = innerHeight - parseFloat(w.getPropertyValue("--chrome")) - parseFloat(w.getPropertyValue("--sb-h"));
-      return { ganz: zeilen.filter((r) => r.getBoundingClientRect().bottom <= b.bottom + 0.5).length,
-        soll: Math.max(6, Math.min(12, Math.floor(frei * .5 / zh))), alle: zeilen.length };
+      const letzte = zeilen[zeilen.length - 1];
+      const ganz = zeilen.filter((r) => r.getBoundingClientRect().bottom <= b.bottom + 0.5).length;
+      letzte.scrollIntoView({ block: "center" });
+      await new Promise((r) => setTimeout(r, 100));
+      const unten = innerHeight - parseFloat(w.getPropertyValue("--sb-h"));
+      const r = letzte.getBoundingClientRect(), oben = document.elementFromPoint(r.left + 20, r.bottom - 4);
+      return { ganz, alle: zeilen.length,
+        rollt: box.scrollHeight > box.clientHeight + 1, letzteUnten: r.bottom, unten, frei: !!oben && letzte.contains(oben) };
     });
-    assert(z.alle > z.soll && z.ganz === z.soll, "Deckel rechnet die Statusleiste mit", z);
+    assert(z.alle >= 12 && z.ganz === z.alle && !z.rollt && z.letzteUnten <= z.unten + 0.5 && z.frei,
+      "Deckel rechnet die Statusleiste mit (gestapelt: kein Deckel, die letzte Zeile steht ueber der Statusleiste)", z);
     await p.close();
   }
 } finally {

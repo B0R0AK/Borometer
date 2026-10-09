@@ -31,36 +31,19 @@ const map = (m) => [...m.entries()].sort((a, b) => (a[0] < b[0] ? -1 : 1));
 
 // ---------- automatisch (Spezifikation 6.1) ----------
 const sk = (k, grund = null) => ({ k, grund });
-const skills = [sk("viper", "passiv"), sk("mark", "markiert"), sk("liste", "liste"), sk("anders", "anderer"), sk("ventius"), sk("basic")];
+const skills = [sk("viper", "passiv"), sk("mark", "markiert"), sk("liste", "liste"), sk("ventius"), sk("basic")];
 eq(map(core.automatisch(skills, {})), [
-  ["anders", { grund: "anderer", fest: false }], ["liste", { grund: "liste", fest: false }],
+  ["liste", { grund: "liste", fest: false }],
   ["mark", { grund: "markiert", fest: false }], ["viper", { grund: "passiv", fest: false }],
 ], "automatisch: jeder Grund schlaegt vorlaeufig vor, ohne Grund bleibt drin (Ventius)");
 eq(map(core.automatisch(skills, { viper: 1, mark: 2, liste: 0 })), [
-  ["anders", { grund: "anderer", fest: false }], ["liste", { grund: "liste", fest: false }],
+  ["liste", { grund: "liste", fest: false }],
   ["viper", { grund: "passiv", fest: true }],
 ], "automatisch: 1 macht fest, 2 holt zurueck, 0 ist wie ohne Wahl");
 eq(map(core.automatisch(skills, { basic: 1, ventius: 2 })).filter(([k]) => k === "basic" || k === "ventius"),
    [["basic", { grund: "hand", fest: true }]], "automatisch: von Hand weggelassen ohne Grund heisst hand");
 eq(map(core.automatisch(skills, { fremd: 1 })).some(([k]) => k === "fremd"), false,
    "automatisch: eine Wahl fuer eine Faehigkeit, die im Kampf fehlt, zeigt nichts");
-
-// ---------- anderer Build (Spezifikation 4.1) ----------
-const builds = {
-  aaaaaaaaaa: { weapons: ["Longbow", "Crossbow"], rot: { vortex: 1, basic: 2 } },
-  bbbbbbbbbb: { weapons: ["Crossbow", "Longbow"], rot: { storm: 1 } },
-  cccccccccc: { weapons: ["Dagger", "Crossbow"], rot: { dagger: 1 } },
-  dddddddddd: { weapons: ["Longbow", "Crossbow"] },
-};
-const hier = { id: "dddddddddd", weapons: ["Longbow", "Crossbow"] };
-eq(core.andererBau("vortex", hier, builds), "aaaaaaaaaa", "andererBau: gleiches Paar, dort bestaetigt");
-eq(core.andererBau("storm", hier, builds), "bbbbbbbbbb", "andererBau: das Paar gilt in jeder Reihenfolge");
-eq(core.andererBau("dagger", hier, builds), null, "andererBau: ein anderes Paar zaehlt nicht");
-eq(core.andererBau("basic", hier, builds), null, "andererBau: nur rot === 1, nicht 2");
-eq(core.andererBau("vortex", { id: "aaaaaaaaaa", weapons: ["Longbow", "Crossbow"] }, builds), null,
-   "andererBau: nie der eigene Build");
-eq(core.andererBau("vortex", { id: null, weapons: ["Crossbow", "Longbow"] }, builds), "aaaaaaaaaa",
-   "andererBau: auch ohne bekannten eigenen Build, am Paar des Kampfes");
 
 // ---------- folge (Spezifikation 6.1, 5.3) ----------
 const e = (k, t, ende = t) => ({ k, t, ende });
@@ -74,27 +57,8 @@ const lang = core.folge([e("a", 0, 4000), e("b", 1000), e("c", 5500)], new Set()
 eq(lang.stille, [], "folge: ein Einsatz, der noch trifft, laesst keine Stille zu (Ende 4,0 s, naechster 5,5 s)");
 eq(core.folge([], new Set()).stille, [], "folge: ohne Einsatz keine Stille");
 
-// ---------- wahlSetzen, sitzungUebernehmen (Spezifikation 7) ----------
-const voll = Object.fromEntries(Array.from({ length: 24 }, (_, i) => ["s" + i, 1]));
-eq(core.wahlSetzen(voll, "neu", 1, 24), null, "wahlSetzen: ein neuer Schluessel ueber der Grenze wird nicht gesetzt");
-const ueber = core.wahlSetzen(voll, "s3", 0, 24);
-eq([ueber.s3, Object.keys(ueber).length, voll.s3], [0, 24, 1], "wahlSetzen: ein vorhandener wird ueberschrieben, die Eingabe bleibt");
-const klein = { a: 1 };
-const neu = core.wahlSetzen(klein, "b", 2, 24);
-eq([neu, klein], [{ a: 1, b: 2 }, { a: 1 }], "wahlSetzen: ein neues Objekt, nichts entfernt");
-eq(core.sitzungUebernehmen({ a: 0, b: 2 }, { a: 1, c: 1, d: 2 }, 24), { a: 0, b: 2, c: 1, d: 2 },
-   "sitzungUebernehmen: nur Schluessel, zu denen der Build noch nichts sagt");
-eq(core.sitzungUebernehmen({ a: 1 }, { a: 2 }, 24), null, "sitzungUebernehmen: nichts zu tun");
-eq(Object.keys(core.sitzungUebernehmen({ ...voll, x: 1 }, { neu: 1 }, 26) || {}).length, 26, "sitzungUebernehmen: bis zur Grenze");
-eq(core.sitzungUebernehmen(voll, { neu: 1 }, 24), null, "sitzungUebernehmen: voll, nichts uebernommen");
-
-// Schluessel, die ein Objekt schon von Object.prototype kennt, sind keine Wahl (Review #44)
-eq(core.wahlSetzen(voll, "toString", 1, 24), null, "wahlSetzen: toString ist ein neuer Schluessel, keiner, der schon da ist");
-eq(core.sitzungUebernehmen({}, { constructor: 1, toString: 2 }, 24), { constructor: 1, toString: 2 },
-   "sitzungUebernehmen: constructor und toString werden uebernommen, nicht fuer vorhanden gehalten");
 eq(map(core.automatisch([sk("toString"), sk("constructor", "passiv")], {})), [["constructor", { grund: "passiv", fest: false }]],
    "automatisch: toString ohne Wahl bleibt drin, constructor mit Grund vorlaeufig draussen");
-eq(core.andererBau("toString", hier, builds), null, "andererBau: toString ist in keinem Build bestaetigt");
 eq([core.wahlVon({ a: 2 }, "a"), core.wahlVon({}, "toString"), core.wahlVon({}, "constructor")], [2, undefined, undefined],
    "wahlVon: nur eigene Schluessel");
 

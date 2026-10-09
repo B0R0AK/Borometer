@@ -82,11 +82,12 @@ each other. If the fights are different lengths, it says so and offers to cut
 both to the shorter one. Without the cut you would be comparing totals that
 are only bigger because the fight ran longer.
 
-## Three themes
+## Four themes
 
-Dark, light, and a third in the game's own colours. All three are measured:
-the worst contrast on a bar is 4.5:1. Borometer takes the setting from
-Windows, or you pick one.
+Dark, light, a third in the game's own colours, and smoked glass, which on
+Windows 11 lets what is behind the window show through, blurred. Contrast is
+measured in all four. Borometer takes the setting from Windows, or you pick
+one.
 
 [![Borometer, light theme](docs/bilder/meter-hell.png)](docs/bilder/meter-hell.png)
 
@@ -311,11 +312,12 @@ click-through. Windows tells Borometer when that combination is pressed and
 about no other key. Borometer does not read the keyboard.
 
 Network only happens when you switch it on. In normal use the local helper
-binds to 127.0.0.1 and calls nothing. Three things change that, each only on
+binds to 127.0.0.1 and calls nothing. Two things change that, each only on
 your word. A party: hosting opens a second port to the outside, and joining
-sends your figures to the host or to your party server. What travels are the
-values on the board, never a log file. Questlog, when you click to fetch a
-build plan. And the update notice, off by default: switched on, it asks this
+sends your figures to the host or to your party server. What travels is your
+character name with weapons, role and game language, and your newest fight:
+its figures per skill, the damage per second and when you used what. Never a
+log file. And the update notice, off by default: switched on, it asks this
 repository once per start for its latest release.
 
 `npm run audit:safety` checks these rules mechanically, against the source, on
@@ -338,12 +340,12 @@ more than read the combat log. Among its rules:
   no overlay; the game's folder is only ever read;
 - the page has no network: it speaks HTTP to `127.0.0.1` only, and every request
   starts at `/api/`;
-- the main process goes outside in three places only, and only when you ask for it:
-  Questlog on a click and the update notice (off by default, one request to this
-  repository's latest release), each fixed to one address; and the party server,
+- the main process goes outside in two places only, and only when you ask for it:
+  the update notice (off by default, one request to this repository's latest
+  release), fixed to one address; and the party server,
   at the address you enter yourself (for it, the audit checks that no file content
   goes out and that only POST routes reach it);
-- the main process never deletes a file, and builds, plans, best pulls and weeklies
+- the main process never deletes a file, and best pulls and weeklies
   are only ever detached, never removed; files are only
   written where Borometer keeps its own;
 - the source carries no game images (they come into the release build from a private

@@ -4,18 +4,22 @@ import { t, tt } from "./08-translation";
 import { markiereRest } from "./16-fight-analysis";
 import { $, esc } from "./18-interface-basics";
 import { catOf, HIT_CATS } from "./19-grouping-and-party-fights";
-import { CAT_SWATCH, tafelNachBreite } from "./21-damage-table";
+import { CAT_SWATCH } from "./21-damage-table";
 import { istLivePausiert, kampfwahlOffen, kampfwahlSchliessen, streifenFolgt } from "./23-kampfwahl";
 import { renderRotation } from "./25-rotation";
 import { renderAnalysis } from "./26-analysis-tab";
 import { persistPref } from "./27-weapons-tab";
 import { renderAll } from "./32-history";
+import { switchTab } from "./34-menus-drop-and-tabs";
 import { applyWindowSize } from "./36-dialog";
 import { FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
 import { isWatching } from "./45-startup";
 import { syncPartySwitch } from "./42-party";
 import { einstNachfuehren } from "./57-einstellungen";
+import { startAuftragHolen } from "./66-windows";
+import { erinnerungAnfragenPruefen } from "./67-weeklies-erinnerung";
 import type { Fight, ViewOptions } from "../types";
+import { durchsichtWirksam } from "../kompakt-core";
 
 /* Was das Kompaktfenster (Nachtraege N4) den Hauptprozess fragen darf -
    dieselbe Liste wie KOMPAKT_AKTIONEN in window.ts. Rahmenknoepfe, Material,
@@ -86,9 +90,9 @@ export function syncWidthStops(){
      Hoehe), damit das Urteil mit Bezug samt Knoepfen ohne Rollen passt
      (Pruefung 29.09., styles.css). */
   cl.toggle("h-max-899", innerHeight / (clampUiZoom(state.zoom) / 100) <= 899);
-  /* Die Schadenstafel baut breit andere Spalten als schmal (Issue #53);
-     wechselt die Sprosse bei 640, steht sie sonst in der alten Form. */
-  tafelNachBreite();
+  /* Ab 1200 Punkt waechst das Band der Kampf-Tafel auf 150 (Spezifikation
+     Feinschliff 6, #102); Zeilen werden nie hoeher, nur mehr. */
+  cl.toggle("h-min-1200", innerHeight / (clampUiZoom(state.zoom) / 100) >= 1200);
   syncWindowVars();
   /* Eine Meldung, die gerade steht, zieht mit: ihre Lage war beim Erscheinen
      gemessen, und nach Strg+Plus auf 200 % stand sie mit den Massen von
@@ -310,7 +314,11 @@ export function materialGemeldet(){
 export function applySeeThrough(opts?: ViewOptions){
   const on = document.body.classList.contains("compact");
   const geist = on && document.body.classList.contains("ghost");
-  const see = clampSee(state.seeThrough);
+  /* Der Regler, wie er steht, und was gilt: im Durchklick mindestens 40
+     (Spezifikation Kompakt-Fenster 2). Der Regler und compactAlpha behalten
+     seinen Wert; angezeigt und ans Fenster geht, was gilt. */
+  const regler = clampSee(state.seeThrough);
+  const see = durchsichtWirksam(regler, on && durchklick);
   /* Gesagt, nicht still getan: wenn der Geist den Regler deckelt, steht es
      unter ihm. */
   const gedeckelt = Math.round((1 - GEIST_BODEN) * 100);
@@ -326,9 +334,9 @@ export function applySeeThrough(opts?: ViewOptions){
     if(greift) zettel.textContent = t("top.seeCapped", {n: gedeckelt});
   }
   syncSeePille(on ? (greift ? gedeckelt : see) : 0);
-  $<HTMLInputElement>("#seeSlide").value = String(see);
-  $<HTMLButtonElement>("#seeLess").disabled = see <= 0;
-  $<HTMLButtonElement>("#seeMore").disabled = see >= 55;
+  $<HTMLInputElement>("#seeSlide").value = String(regler);
+  $<HTMLButtonElement>("#seeLess").disabled = regler <= 0;
+  $<HTMLButtonElement>("#seeMore").disabled = regler >= 55;
   einstNachfuehren();   // derselbe Stand im Regler der Einstellungen
   if(!SERVED) return;
   const acrylic = document.documentElement.classList.contains("acrylic");
@@ -352,7 +360,7 @@ export function applySeeThrough(opts?: ViewOptions){
     alpha: !on ? 1
          : acrylic ? (geist ? geistAlpha : 1)
          : (geist ? geistAlpha : 1 - see/100)});
-  if(!(opts && opts.quiet)) persistPref("compactAlpha", 1 - see/100);
+  if(!(opts && opts.quiet)) persistPref("compactAlpha", 1 - regler/100);
 }
 /* Overlay-Look (Neugestaltung 28.09., Luecke 11.5): die Pille mit dem Auge
    rechts im Streifen nennt die Durchsicht, die gerade gilt - nur im Kompakt
@@ -427,7 +435,11 @@ export function placeWindowChrome(){
   // browser chrome is there and fake window buttons would be a lie. Folding
   // them into the header would put them on screen after all.
   if(bar.hidden) return;
-  if(drag.parentNode !== strip) strip.appendChild(drag);
+  // Der Griff vorn, die Fensterknoepfe hinten (#188): Electron baut den
+  // Ziehbereich in der Reihenfolge des Dokuments, und was spaeter kommt,
+  // gilt. Stuende der Griff hinter den Knoepfen der Leiste, zoege er auch
+  // unter ihnen. Wo er erscheint, sagt order in styles.css.
+  if(drag.parentNode !== strip) strip.prepend(drag);
   if(btns.parentNode !== strip) strip.appendChild(btns);
 }
 
@@ -462,6 +474,11 @@ let kompaktSchalten: (on: boolean) => void = () => {};
 export function setKompaktOffen(offen: boolean){
   state.kompaktOffen = offen;
   $("#btnCompact").setAttribute("aria-pressed", offen ? "true" : "false");
+  /* Wettlauf N4 (Fix 04.10.): was sich am Stand aenderte, waehrend die
+     Antwort auf "kompakt" unterwegs war, oder ein abgelehnter Stand geht
+     jetzt hinaus - nicht erst beim naechsten Zeichnen, das vielleicht nie
+     kommt. */
+  if(offen) standFolgen();
 }
 /* ---------- Der Stand der Vollansicht fuer den Streifen (Kompakt-Fix 01.10.) ----------
    Befund: die Vollansicht zeigte einen Kampf, der Streifen "Kein
@@ -582,6 +599,8 @@ function setDurchklick(on: boolean){
       if(!d.ok){ toastFail(tt("compact.throughFailed", {why: d.error || "?"}), 6000); return; }
       durchklick = !!d.clickthrough;
       syncThroughHint();
+      // die Durchsicht folgt dem Durchklick (40 %), still: nichts wird gespeichert
+      applySeeThrough({quiet:true});
       toast(tt(durchklick ? "compact.throughToastOn" : "compact.throughToastOff", {key: kuerzelText()}), 2600);
     })
     .catch(() => toastFail(tt("party.helperNoAnswer")));
@@ -621,7 +640,7 @@ function aufKuerzel(){
    an, weil die erste Frage scheiterte, hielt sie jeden alten Tastendruck
    und Knopfklick fuer neu und spielte sie alle noch einmal ab. */
 async function horcheAufEreignisse(){
-  let gesehen: Record<string, number> = {hotkey:0, compact:0, live:0, handsize:0, material:0, kompakt:0, kompakthand:0, kompaktstand:0};
+  let gesehen: Record<string, number> = {hotkey:0, compact:0, live:0, handsize:0, material:0, kompakt:0, kompakthand:0, kompaktstand:0, pin:0, start:0, erinnerung:0, weeklies:0};
   for(;;){
     try {
       const d = await (await fetch("/api/events?now=1")).json();
@@ -641,6 +660,10 @@ async function horcheAufEreignisse(){
       const neu = (k: string) => (c[k] || 0) - (gesehen[k] || 0);
       // zwei schnelle Druecke heben sich auf, wie bei einem Lichtschalter
       if(neu("hotkey") > 0 && neu("hotkey") % 2 === 1) aufKuerzel();
+      /* Eine Erinnerung der Weeklies ist faellig: die Seite sagt dem Hauptprozess, wie viele Charaktere noch offen haben (67).
+         Und ihre Meldung will die Weeklies sehen (Klick auf "Ansehen"). Beides nur im grossen Fenster. */
+      if(!KOMPAKT_FENSTER && neu("erinnerung") > 0) erinnerungAnfragenPruefen();
+      if(!KOMPAKT_FENSTER && neu("weeklies") > 0) switchTab("weeklies");
       /* Die beiden Knoepfe der Taskleisten-Vorschau sind Umschalter wie die
          eigenen Knoepfe, fuer die sie stehen: jeder Klick dort ist ein Klick
          hier. Zwischen zwei Abfragen koennen mehrere zusammenkommen; eine
@@ -670,6 +693,11 @@ async function horcheAufEreignisse(){
       /* Windows hat "Transparenzeffekte" umgeschaltet (transparencyChanged in
          window.ts): ob Kompakt jetzt auf Acrylic liegt, sagt /api/state. */
       if(neu("material") > 0) await materialNachfragen();
+      /* Das Infobereich-Menue (tray.ts): "Ueber dem Spiel anheften" ist ein
+         Klick auf den eigenen Knopf; ein Auftrag aus der Sprungliste wird
+         geholt, getan und quittiert (66) - ohne die Schleife aufzuhalten. */
+      if(!KOMPAKT_FENSTER && neu("pin") > 0 && neu("pin") % 2 === 1) $("#btnPin").click();
+      if(!KOMPAKT_FENSTER && neu("start") > 0) void startAuftragHolen();
       gesehen = {...gesehen, ...c};
     } catch(err) {
       await new Promise(r => setTimeout(r, 3000));
@@ -684,10 +712,25 @@ async function materialNachfragen(){
   try {
     const s = await (await fetch("/api/state")).json();
     document.documentElement.classList.toggle("acrylic", !!s.material);
+    if(OWN_WINDOW) micaMerken(s);
     applySeeThrough({quiet:true});
   } catch(err) {
     // der Helfer ist gerade weg: beim naechsten Ereignis wieder
   }
+}
+
+/* Rauchglas (Spezifikation 4.2): ob das grosse Fenster auf Mica liegt und,
+   wenn nicht, warum - beides sagt /api/state. html.mica schaltet die
+   durchsichtige Schicht in styles.css, data-mica-grund den Satz unter der
+   Kachel (57). Nur das eigene Fenster ruft das. Das Kompaktfenster
+   (?win=1&kompakt=1) ist auch ein eigenes Fenster, liegt aber nie auf Mica -
+   /api/state meldet dort, was fuer das grosse gilt; es bekommt beides nie. */
+export function micaMerken(s: { mica?: unknown; micaGrund?: unknown }){
+  const root = document.documentElement;
+  root.classList.toggle("mica", s.mica === true && !KOMPAKT_FENSTER);
+  if(!KOMPAKT_FENSTER && (s.micaGrund === "system" || s.micaGrund === "aus")) root.dataset.micaGrund = s.micaGrund;
+  else delete root.dataset.micaGrund;
+  einstNachfuehren();
 }
 
 /* Der Randlos-Hinweis (Fenster-Extras 3.5): beim ersten Kompakt im eigenen
@@ -866,6 +909,8 @@ export function setup(): void {
     if(box) box.addEventListener("scroll", markiereRest, {passive:true});
     addEventListener("resize", markiereRest);
   })();
+  /* Die Restzeile fuehrt zur Vollansicht, wie der Knopf im Streifen (#160). */
+  $("#kRest").addEventListener("click", () => $("#btnCompact").click());
   $("#btnDurch").onclick = aufDurchKnopf;
   /* Der Knopf (Nachtraege N4): im Kompaktfenster heisst er "Vollansicht"
      und bittet den Hauptprozess, den Streifen zu schliessen und das grosse

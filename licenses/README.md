@@ -47,8 +47,9 @@ halber, weil sie in der ausgelieferten `.exe` stecken:
 > privaten Asset-Repo, beim Bauen eingesetzt). Ohne sie zeichnet die App eigene Marken.
 >
 > Was die Release-Downloads einbetten: 275 Fähigkeitssymbole aus dem Feed `getSkillSets` von questlog.gg (dazu „Fallende Blume“, WM_Common_SKILL_009, aus einem Bildschirmfoto von B0R0AK vom 01.10.2026),
-> 34 Skillkern-Symbole von cdn.questlog.gg (28. und 30.09.2026) und 38 Gegnerbilder,
-> zehn davon verkleinerte Bildschirmfotos, eines (Vegamor als Ganzes, Bild `PT_NPC_M_Vagamont_Sprite` des NPC
+> 34 Skillkern-Symbole von cdn.questlog.gg (28. und 30.09.2026) und 55 Gegnerbilder,
+> 27 davon verkleinerte Bildschirmfotos (17 davon aus Bildschirmfotos von B0R0AK aus dem Spiel
+> vom 03.10.2026, Kopf quadratisch ausgeschnitten, 96 × 96 WebP, zusammen 63,3 kB, rund 84 kB als Base64), eines (Vegamor als Ganzes, Bild `PT_NPC_M_Vagamont_Sprite` des NPC
 > `FD_L13_AB_M_SpiritTree_Vagamont_001`) am 01.10.2026 von cdn.questlog.gg; zusammen mit den übrigen Symbolen
 > rund 1,3 MB als Base64 (gezählt am 30.09.2026).
 > Dazu seit dem 01.10.2026 für die Weeklies (ebenfalls in `assets/spielbilder.ts`;
@@ -57,7 +58,7 @@ halber, weil sie in der ausgelieferten `.exe` stecken:
 > (48 × 48 WebP, je mit ID und Pfad unter `throne-and-liberty/assets/` als Herkunft)
 > und **4 Bossbilder** des Raids (Dragaryle, Zairos und Calanthia aus Bildschirmfotos
 > von B0R0AK aus dem Spiel vom 01.10.2026, Radeth aus einem Bildschirmfoto von B0R0AK
-> vom 02.10.2026, gezeigt in den Rekorden), ausgeschnitten und verkleinert
+> vom 02.10.2026, gezeigt in den Rekorden und im Meter), ausgeschnitten und verkleinert
 > (96 × 96 WebP); zusammen 56,6 kB, rund 77 kB als Base64. Halle der Illusionen, Portal der
 > Unendlichkeit, das Regionszertifikat und die Dungeons der Dimensionsprüfung tragen
 > eigene gezeichnete Marken, kein Spielbild.
