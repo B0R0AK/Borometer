@@ -1,3 +1,5 @@
+Hey,this app is completely AI generated. The only thing what i did was telling him what to create and to fix because AI is dumb as me. It works fine. I did tell him exactly what it should do, like your mum telling you to clean finally your room. Have fun! :-)
+
 # Borometer
 
 A DPS meter for **Throne and Liberty**. It reads the combat log file that the
