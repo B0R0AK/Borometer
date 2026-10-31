@@ -29,7 +29,7 @@ permissions:
 
 jobs:
   check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
@@ -116,7 +116,7 @@ jobs:
   bilder:
     # the same checks with the game images, before anything is released
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     env:
       BORO_BILDER: pflicht
@@ -249,7 +249,7 @@ jobs:
     # no npm ci here: this job runs no package code, it attests and publishes the built files
     needs: [windows]
     if: startsWith(github.ref, 'refs/tags/v')
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     environment: release
     permissions:
       contents: write
