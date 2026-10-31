@@ -140,15 +140,6 @@ export function mitgliedIndex(name: string): number {
   mitgliederMerken([name]);
   return mitgliedNr.get(name)! % SERIES_N;
 }
-/** Die Namen, die diese Sitzung aus der Gruppe kennt - dieselbe Liste wie die Farben (mitgliedNr), dazu die Tafel,
-    die gerade steht; ohne die Beispielgruppe. Nur fuer "Aus der Gruppe uebernehmen" der Gilde (68): Die Gilde fragt
-    bei jedem Zeichnen der Mitglieder, ob es Namen gibt (sonst ist der Knopf aus), und uebernimmt erst auf Klick,
-    jeden Namen einzeln angehakt. Nebenbei merkt sich mitgliedNr die Namen der Tafel (wie bei mitgliedIndex);
-    eine Farbe kann dadurch frueher vergeben sein, sonst aendert sich nichts. */
-export function gruppenNamen(): string[] {
-  mitgliederMerken(((state.party && state.party.board) || []).map(r => r.name));
-  return [...mitgliedNr.keys()].filter(n => !/^Beispiel [A-C]$/.test(n));
-}
 
 /* Die Zeilen, aus denen die Gruppe gebaut wird: die Meldungen zum gewaehlten
    Kampf oder, gibt es keine, die lebende Tafel ohne Wartende. Auch das Rennen

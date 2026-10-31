@@ -10,6 +10,7 @@
 // Run:  npm run test:lage-core
 
 import * as esbuild from "esbuild";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -59,6 +60,14 @@ eq(k.teilAus({ gross: G }, "kompakt"), undefined, "teilAus: fehlt");
 eq(k.teilAus("kaputt", "gross"), undefined, "teilAus: kein Objekt");
 eq(k.teilAus(Object.create({ gross: G }), "gross"), undefined, "teilAus: nur eigene Schluessel");
 
+// --- Teil 2: das Fenster zum Abreissen hat einen eigenen Platz "abriss"
+eq(k.teilAus({ abriss: G }, "abriss"), G, "teilAus: abriss");
+eq(k.teilAus({ gross: G }, "abriss"), undefined, "teilAus: abriss fehlt");
+eq(k.fensterNeu({ gross: G }, "abriss", G), { gross: G, abriss: G }, "fensterNeu: abriss kommt dazu, gross bleibt");
+eq(k.fensterNeu(undefined, "abriss", { ...G, w: 5 }), null, "fensterNeu: ungueltiger Platz wird nicht geschrieben");
+eq(k.platzAbriss(G, [HAUPT], HAUPT), k.platzGross(G, [HAUPT], HAUPT), "platzAbriss: wie platzGross, auf dem Monitor");
+eq(k.platzAbriss({ ...G, x: 90000 }, [HAUPT], HAUPT), null, "platzAbriss: ausserhalb der Grenzen kein Platz");
+
 // --- 2. sichtbar: 64 x 64 der Titelleiste auf einem Monitor
 eq(k.sichtbar(G, [HAUPT]), true, "ganz auf dem Hauptmonitor");
 const aufRechts = { x: 2200, y: 100, w: 1600, h: 900 };
@@ -99,6 +108,29 @@ eq(k.platzKompakt(undefined, [HAUPT], HAUPT), null, "kompakt ohne Lage: bleibt, 
 eq(k.platzKompakt({ x: 1500, y: 40 }, [HAUPT], HAUPT), { x: 1500, y: 40 }, "kompakt: die gemerkte Ecke");
 eq(k.platzKompakt({ x: 2500, y: 40 }, [HAUPT], HAUPT), { x: 870, y: 508 }, "kompakt, Monitor abgezogen: Mitte");
 eq(k.platzKompakt({ x: 1800, y: 40 }, [HAUPT], HAUPT), { x: 1800, y: 40 }, "kompakt am rechten Rand, 120 px sichtbar");
+
+// --- 4b. Vollansicht fest (#364): nur die Position kommt aus dem gemerkten Platz
+eq([k.VOLL_W, k.VOLL_H], [1280, 860], "feste Groesse der Vollansicht: 1280 x 860");
+eq(k.vollGroesse(HAUPT), { w: 1280, h: 860 }, "vollGroesse: passt auf den Arbeitsbereich");
+eq(k.vollGroesse(null), { w: 1280, h: 860 }, "vollGroesse: kein Monitor bekannt, die Standardgroesse");
+eq(k.vollGroesse({ x: 0, y: 0, width: 1024, height: 700 }), { w: 1024, h: 700 }, "vollGroesse: kleiner Bildschirm, auf den Arbeitsbereich begrenzt");
+eq(k.platzVoll(G, [HAUPT], HAUPT), { x: 120, y: 80, w: 1280, h: 860, max: false }, "platzVoll: die gemerkte Position, die feste Groesse");
+eq(k.platzVoll({ x: 40, y: 30, w: 1900, h: 1000, max: true }, [HAUPT], HAUPT), { x: 40, y: 30, w: 1280, h: 860, max: false },
+  "platzVoll: alte Datei mit anderer Groesse und maximiert kippt die feste Groesse nicht");
+eq(k.platzVoll(maxRechts, [HAUPT, RECHTS], HAUPT), { x: 2000, y: 50, w: 1280, h: 860, max: false },
+  "platzVoll: maximiert auf dem anderen Monitor: dort, nicht maximiert");
+eq(k.platzVoll({ x: 1000, y: 400, w: 400, h: 300, max: false }, [HAUPT], HAUPT), { x: 640, y: 180, w: 1280, h: 860, max: false },
+  "platzVoll: ragt die feste Groesse ueber den Arbeitsbereich, rueckt sie hinein");
+eq(k.platzVoll({ x: 2200, y: 100, w: 2560, h: 1400, max: true }, [HAUPT], HAUPT), { x: 320, y: 90, w: 1280, h: 860, max: false },
+  "platzVoll: Monitor abgezogen: Mitte des Hauptmonitors, feste Groesse");
+const KLEIN = { x: 0, y: 0, width: 1024, height: 700 };
+eq(k.platzVoll({ x: 50, y: 50, w: 1280, h: 860, max: false }, [KLEIN], KLEIN), { x: 0, y: 0, w: 1024, h: 700, max: false },
+  "platzVoll: kleiner Bildschirm: auf den Arbeitsbereich begrenzt");
+eq(k.platzVoll({ x: 5000, y: 50, w: 1280, h: 860, max: false }, [KLEIN], KLEIN), { x: 0, y: 0, w: 1024, h: 700, max: false },
+  "platzVoll: kleiner Hauptmonitor, Platz verschwunden: Mitte, begrenzt");
+eq(k.platzVoll(G, [], null), null, "platzVoll: kein Monitor meldet sich: Standard");
+eq(k.platzVoll(undefined, [HAUPT], HAUPT), null, "platzVoll: nichts gemerkt: Standard");
+eq(k.platzVoll({ ...G, w: 100 }, [HAUPT], HAUPT), null, "platzVoll: ungueltig: Standard");
 
 // --- 5. fensterNeu: was geschrieben wird
 eq(k.fensterNeu(undefined, "gross", G), { gross: G }, "erste Lage");
@@ -208,6 +240,26 @@ const ERST = [
   ["Update: Durchsicht 0", { compactAlpha: 0 }, false],
 ];
 for (const [name, cfg, soll] of ERST) eq(k.isFirstStart(cfg, PERSON), soll, "erster Start - " + name);
+
+// Die Liste, wie server.ts sie wirklich baut (#264): CONFIG_KEYS und der Filter
+// von FIRST_START aus dem Quelltext gelesen, nicht abgeschrieben. Den
+// Archiv-Hinweis bestaetigen (archivHinweis, auch in der Karte der
+// Rundgang-Frage) ist keine Wahl: der naechste Start bleibt ein erster Start,
+// sonst kaeme die Frage nach dem Rundgang nie wieder. Das Archiv einschalten
+// (archivAn) ist eine Wahl.
+const serverSrc = readFileSync(join(root, "src/main/server.ts"), "utf8");
+const keysSrc = serverSrc.match(/^const CONFIG_KEYS = (\[[\s\S]*?\n\]);$/m);
+const listSrc = serverSrc.match(/^const FIRST_START = isFirstStart\(loadConfig\(\),\n  (\[\.\.\.CONFIG_KEYS\.filter\([^\n]*\])\);$/m);
+eq(Boolean(keysSrc && listSrc), true, "server.ts: CONFIG_KEYS und FIRST_START gefunden");
+const ECHT = keysSrc && listSrc ? new Function("const CONFIG_KEYS = " + keysSrc[1] + ";\nreturn " + listSrc[1] + ";")() : [];
+eq(PERSON.every((p) => ECHT.includes(p)), true, "server.ts: alle Schluessel aus PERSON zaehlen");
+const ERST_ECHT = [
+  ["neue Installation: nur den Archiv-Hinweis bestaetigt", { archivHinweis: 1 }, true],
+  ["neue Installation: Archiv-Hinweis, Rundgang-Frage offen, Thema aufgeloest", { archivHinweis: 2, themeResolved: "dark", rundgangGesehen: false, rundgangSpaeter: 0 }, true],
+  ["Update: das Archiv eingeschaltet", { archivAn: true }, false],
+  ["Update: das Archiv ausgeschaltet", { archivAn: false, archivHinweis: 1 }, false],
+];
+for (const [name, cfg, soll] of ERST_ECHT) eq(k.isFirstStart(cfg, ECHT), soll, "erster Start (server.ts) - " + name);
 
 if (failed) { console.log(`LAGE CORE FAILED - ${failed}`); process.exit(1); }
 console.log("LAGE CORE PASSED");

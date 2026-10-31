@@ -1,12 +1,17 @@
-Hallo ihr Lümmel da draussen! Die App ist vollständig KI generiert. Das einzige was ich gemacht habe ist ihm lediglich zu sagen was er basteln soll und fixxen soll. Denn KI ist genauso blöd wie der Nutzer.
-Viel Spaß damit. :-)
-
 # Borometer
 
-Ein DPS-Meter für **Throne and Liberty**. Es liest die Kampflog-Datei, die das
-Spiel selbst auf die Festplatte schreibt, und sonst nichts. Es greift nicht auf
-den Spielprozess zu, braucht kein Konto, sendet keine Telemetrie und ruft von
-sich aus nichts im Netz auf.
+**Ich wollte wissen, was ich nach einem Pull ändern soll, ohne etwas ins Spiel
+zu hängen.** Darum liest Borometer nur die Kampflog-Datei, die **Throne and
+Liberty** selbst schreibt, und sagt dir in Sätzen, was deinen Schaden getragen
+hat und wo Sekunden fehlten. Dazu zeigt es dir den Verlauf gegen deinen besten
+Pull. Kein Eingriff ins Spiel, kein Konto, keine Werbung, kein Geld. Es läuft
+auch ohne Internet, und der Quelltext ist offen.
+
+Es sendet keine Telemetrie und ruft von sich aus nichts im Netz auf. Gruppe,
+Gilde online und der Update-Hinweis laufen nur, wenn du sie selbst einschaltest.
+
+Hallo ihr Lümmel da draussen! Die App ist vollständig KI generiert. Das einzige was ich gemacht habe ist ihm lediglich zu sagen was er basteln soll und fixxen soll. Denn KI ist genauso blöd wie der Nutzer.
+Viel Spaß damit. :-)
 
 > **Fanprojekt.** Nicht verbunden mit NCSOFT oder Amazon Games (not affiliated with
 > NCSOFT or Amazon Games), von ihnen weder unterstützt noch geprüft. Throne and Liberty
@@ -67,6 +72,18 @@ deiner Salven so viele Nachbeben getragen haben wie deine beste. Wie viele
 Nachbeben ein Ziel überhaupt hergibt, hängt an seiner Größe; deshalb steht die
 Obergrenze je Boss in einer Tabelle, statt festgeschrieben zu sein.
 
+Unter den Sätzen läuft der Kampf als ein Streifen über die ganze Breite, mit
+einem Fach je Fähigkeit, so groß wie ihr Gewicht. Die Befunde hängen als Fahnen
+über dem Streifen: jede Lücke, die schwächste Stelle, der Start, die stärksten
+fünf Sekunden. Drückst du eine Fahne, erscheint ihr Satz, und die Fächer, die
+dort nichts beigetragen haben, treten zurück. Jeder Einsatz ist ein Strich in
+einer von vier Hitzestufen (normal, stark, kritisch, kritisch stark), dein
+bester Pull läuft als gestrichelte Kurve mit, und jede Zeile sagt in einem Satz,
+was an ihrer Fähigkeit auffällt: eine Pause im eigenen Takt, weniger Einsätze
+als im besten Pull oder nur Zahl und Takt. Die Quote für kritisch und stark
+zählt nur direkte Treffer, ohne Laufzeit und Passiv, und die Seite nennt, wie
+viele Treffer das waren.
+
 [![Die Analyse mit ihren Befunden](docs/bilder/analyse.png)](docs/bilder/analyse.png)
 
 ## Wann du was eingesetzt hast
@@ -91,7 +108,10 @@ die nur deshalb größer sind, weil länger gekämpft wurde.
 Dunkel, hell, ein drittes in den Farben des Spiels und Rauchglas, das unter
 Windows 11 verwischt durchscheinen lässt, was hinter dem Fenster liegt. Der
 Kontrast ist bei allen vieren durchgemessen. Borometer übernimmt die
-Einstellung von Windows, oder du wählst sie fest.
+Einstellung von Windows, oder du wählst sie fest. Alle Fenster nutzen dieselben
+zwei Schriften: Anton für Titel und Zahlen, Source Sans 3 für Text, Namen, Pfade
+und Zeiten. Beide sind frei (SIL Open Font License) und eingebaut, es wird also
+nichts aus dem Internet nachgeladen.
 
 [![Borometer, helles Thema](docs/bilder/meter-hell.png)](docs/bilder/meter-hell.png)
 
@@ -103,7 +123,7 @@ Ein Reiter je Charakter: der Raid als Raster aus Flügeln und Schwierigkeiten,
 das Geheimdungeon, Events, die Dimensionsprüfung und die Händler, jeweils mit
 Zähler. Ein Band zeigt, wo die Woche steht und wann der nächste Wochen- und
 Tages-Reset kommt. Nichts davon wird aus dem Spiel gelesen; du hakst es selbst
-ab.
+ab. Ein Charakter, den du als Main markiert hast, steht vorn und öffnet zuerst.
 
 [![Die Weeklies eines Charakters](docs/bilder/weeklies.png)](docs/bilder/weeklies.png)
 
@@ -116,11 +136,90 @@ als leere Umrisse da.
 
 [![Das Album der Rekorde](docs/bilder/rekorde.png)](docs/bilder/rekorde.png)
 
+## Mehrere Charaktere
+
+In den Einstellungen unter Charaktere stehen die Charaktere aus den Weeklies,
+und zu jedem trägst du den Lognamen ein, den Angreifernamen genau so, wie das
+Log ihn schreibt. Einen davon kannst du als Main markieren. Borometer weiß dann,
+welcher Charakter welchen Kampf bestritten hat, und die Rekorde sagen, wer
+welchen hält: eine Leiste über dem Album zählt sie als Gesamt, Main, Twinks und,
+wo Kämpfe keinen bekannten Charakter haben, Unbekannt. Der Verlauf merkt sich
+nur eine Kennung des Charakters, nie den Namen. Ohne Lognamen bleiben die
+Rekorde, wie sie waren.
+
+## Archiv der Bosskämpfe
+
+Borometer legt von jedem Bosskampf, den es liest, eine Kopie im Ordner `archiv`
+neben den Einstellungen ab, nur auf deinem PC. Dazu zählen Feldbosse,
+Raidbosse, Dungeons, die Halle der Illusionen und die Übungspuppe; Trash und
+Gruppensummen nicht. Löscht das Spiel später seine Logs, bleiben die Kopien. Beim
+ersten Mal sagt ein Hinweis auf der Startseite, was das Archiv tut, und vor
+deiner Bestätigung wird nichts aufgenommen. Einstellungen › Archiv schaltet es
+aus, öffnet den Ordner, und **Alte Logs einlesen** nimmt die Kämpfe aus den Logs,
+die noch im Ordner des Spiels liegen, ins Archiv auf.
+
+Der Bereich *Archiv* in der linken Leiste listet jeden bekannten Boss als Karte
+mit bestem DPS und Zahl der Kämpfe, gegliedert wie die Rekorde und durchsuchbar
+nach deutschem und englischem Namen. Ein Klick öffnet den Boss: die Punkte aller
+seiner Kämpfe über die Zeit, den Median, den besten markiert, und darunter die
+Kämpfe selbst, neueste zuerst. Ein Kampf öffnet sich aus dem Archiv, auch wenn
+sein Log nicht mehr da ist, und **Log öffnen** in den Rekorden tut dasselbe.
+
+Kämpfe, die du nicht mehr willst, lassen sich lösen, einzeln oder mehrere, mit
+Rückgängig. Endgültig löschen kannst du sie nur aus der Liste der gelösten
+Kämpfe: Du tippst Boss und Datum ein (bei mehreren deren Anzahl), und Borometer
+legt vorher die Kampfdateien und das Verzeichnis im Ordner `sicherungen` ab und
+prüft die Kopie. Ist sie unvollständig, wird nichts gelöscht. Die Sicherung
+löscht Borometer nie, und von sich aus löscht es nichts.
+
+## Gilde
+
+Für Gildenleitungen: eine Mitgliederliste mit Waffen und Rolle, Termine, die
+sich wiederholen, Anwesenheit je Termin (da, nicht da, entschuldigt) und eine
+Übersicht mit Quote und Serie, ohne Farben und ohne Ränge. Ein Reiter Punkte,
+ab Werk aus, führt je Mitglied ein Konto aus aktiven Monaten, Bossen und Raids,
+Ansehen in der Gilde und Zusatzpunkten von Hand; die Regeln lassen sich ändern.
+Solange du nichts anderes einstellst, liegt die Gilde in `boro-gilde.json` auf
+deinem PC, und nichts wird gesendet.
+
+Eine Gildenleitung kann **Gilde online** einschalten. Die Liste liegt dann auf
+einem Server unter einer `https://`-Adresse, die die Leitung selbst einträgt,
+und Mitglieder treten mit Code oder Link bei und sehen die Liste, ohne sie ändern
+zu können. Der Betreiber dieses Servers kann alles lesen, was dort liegt; das
+sagt die Einrichtung, bevor die Gilde angelegt wird. Eine Gilde, die niemand
+mehr braucht, wird gelöst, nicht gelöscht. Aus der Liste der gelösten Gilden,
+Mitglieder und Arten kannst du sie endgültig löschen, nachdem du den Namen
+getippt hast und Borometer eine Sicherungsdatei in `sicherungen` angelegt hat.
+
 ## Kompakt
 
-Für den zweiten Monitor oder über das Spiel gelegt: nur Ablesewert und Balken.
-Das Fenster lässt sich durchsichtig stellen, in ganzen Schritten von 0 bis
-55 %, und über allen anderen halten. **Esc** führt zurück.
+Für den zweiten Monitor oder über das Spiel gelegt: ein flaches Panel mit
+Ablesewert und Balken, mehr nicht. Links steht die große DPS-Zahl, darunter der
+Vergleich zum letzten Pull, rechts Boss, Uhrzeit und Dauer. Eine Kante links
+steht voll, solange Live läuft. Zwei Reiter, *Kampf* und *Weeklies*, wechseln
+die Ansicht (Strg+Umschalt+W auch). Die Fähigkeiten zeigen fünf Zeilen und
+rollen mit dem Mausrad; der Knopf darunter öffnet die ganze Liste, und das
+Fenster wächst mit. Anfassen lässt sich das Fenster an der ganzen Kopfzeile.
+Kleiner als die Leiste und die erste Zeile lässt es sich nicht ziehen. Das
+Fenster lässt sich durchsichtig stellen, in ganzen Schritten von 0 bis 55 %, und
+über allen anderen halten. **Esc** führt zurück.
+
+## Windows
+
+Rechtsklick, Umschalt+F10 oder die Menütaste auf einer Zeile der Schadenstafel
+öffnet das Windows-Menü am Mauszeiger, auf Deutsch oder Englisch, je nach
+Spracheinstellung. *Kopieren* legt Fähigkeit und Wert in die Zwischenablage
+(Strg+C auf der fokussierten Zeile tut dasselbe), *In Rotation zeigen* springt in
+die Rotation und hebt die Fähigkeit hervor. Im Kopf von Kampf, Rotation, Analyse
+und Vergleich legt ein Knopf den Bereich in ein eigenes Fenster, zum Beispiel
+für den zweiten Monitor. Es gibt höchstens ein solches Fenster; es folgt dem
+Kampf der Vollansicht, schreibt nichts und schließt mit ihr. Im Kompaktfenster
+und im Browser gibt es weder Menü noch Knopf.
+
+Mehr von Windows steht in den Einstellungen unter Windows, alles ab Werk aus bis
+auf das Tray-Symbol: ein Hinweis nach jedem Kampf (auch nur bei einem neuen
+Bestwert), eine Sprungliste am Taskleistensymbol mit den zuletzt gelesenen Logs,
+ein Fortschrittsbalken beim Laden eines großen Logs und der Start mit Windows.
 
 ---
 
@@ -211,6 +310,8 @@ Reiter *Gruppe*.
 nur einmal seine Adresse ein: unter *Gruppen-Server* ins Feld **Server-Adresse**,
 dann **Speichern**. Danach reicht der Vier-Zeichen-Code, den jemand herumgibt.
 Bleibt das Feld leer, hostet Borometer stattdessen über deinen eigenen PC.
+Hat dein Clan keinen Server, steht allen der [Gästeserver](#gästeserver) weiter
+unten offen.
 
 **Vom eigenen PC gehostet.** Charakternamen eintippen und **Gruppe hosten**
 drücken. Du bekommst einen Code aus vier Zeichen samt Adresse, etwa
@@ -239,6 +340,52 @@ und den größten Treffer; dazu für bis zu zwölf Fähigkeiten ihre Namen mit
 denselben Werten, aufgeteilt nach Trefferart, eine Schadenskurve je Sekunde und
 die Zeiten ihrer Einsätze. Er liest nie ein Kampflog und redet mit nichts außer
 den Borometern, die ihm etwas schicken.
+
+Die Gruppe schreibt nichts auf die Platte und bewahrt nichts auf: Ein Raum
+verschwindet 30 Minuten, nachdem das letzte Mitglied gegangen ist, und ein
+Server, der für alle gedacht ist (mit `BORO_ROOM_MAX_AGE`), verwirft jeden Raum
+spätestens nach 12 Stunden. (Der Gilde-Speicher, ein eigener Teil desselben
+Servers, legt seine Dateien dagegen auf der Platte ab.) Es gibt keine
+Konten und keine Telemetrie. Ein Server für Fremde setzt Grenzen für Räume,
+Namen und Anfragen; sie stehen in
+[`SELF-HOSTING.md`](BoroPartyServer/SELF-HOSTING.md) (englisch).
+
+---
+
+## Gästeserver
+
+Hat dein Clan keinen Server, kannst du den nutzen, den das Projekt betreibt:
+`https://guest.borometer.de`. Er steht allen offen, zum Ausprobieren des
+Gruppen-Boards und zum Benutzen. Ist zu viel los, kann er deaktiviert werden. Die
+Adresse antwortet dann mit einem kurzen Hinweis, und Borometer zeigt, dass nichts
+antwortet. Dass er immer läuft, ist nicht zugesagt; eine Gruppe, auf die es
+ankommt, gehört auf einen eigenen Server oder den PC des Hosts.
+
+**So nutzt du ihn.** Im Reiter *Gruppe* wählst du unter *Wo die Gruppe läuft*
+den *Öffentlichen Server*. Adresse und ein Hinweis erscheinen, und **Diesen
+Server verwenden** speichert die Adresse. Erst dieser Klick speichert sie; davor
+fragt Borometer nichts an. Du kannst `https://guest.borometer.de` auch selbst
+unter *Gruppen-Server* ins Feld **Server-Adresse** eintragen und **Speichern**
+drücken. Danach gilt der Vier-Zeichen-Code wie bei jedem Gruppen-Server. Trägst
+du die Adresse nie ein, geht nichts dorthin.
+
+**Was er ist.** Dieselbe Datei wie der Gruppen-Server in
+[`BoroPartyServer/`](BoroPartyServer/), gestartet mit den Grenzen für Fremde und
+ohne Gilde-Speicher. Er schreibt nichts auf die Platte. Ein Raum ist 30 Minuten
+nach dem Weggang des letzten Mitglieds weg, spätestens nach 12 Stunden oder wenn
+der Server neu startet. Es gibt keine Konten und keine Telemetrie. Er kennt, was
+jeder Gruppen-Server kennt (beschrieben unter *Gruppen-Board*), und nicht mehr.
+
+**Grenzen.** Höchstens 500 Räume gleichzeitig, 3000 Namen in allen Räumen
+zusammen und 40 Namen in einem Raum. Ein Absender darf 180 Anfragen in der Minute
+stellen und 10 neue Räume in der Stunde anlegen. Zwanzig verschiedene falsche
+Codes in einer Minute lösen eine Pause von fünf Minuten aus; Codes zu raten führt
+also zu nichts. Ist der Server voll, wird ein neuer Raum mit einem kurzen Hinweis
+abgelehnt. Die Zähler liegen im Arbeitsspeicher und verfallen nach ihrem
+Zeitfenster. Die Werte stehen in der Dienstdatei
+[`boro-party-public.service`](BoroPartyServer/boro-party-public.service) und
+sind in [`SELF-HOSTING.md`](BoroPartyServer/SELF-HOSTING.md) (englisch)
+erklärt.
 
 ---
 
@@ -271,7 +418,8 @@ neue Version zu starten.
 Was Borometer selbst schreibt (`Logs`, `Party-Logs` und `Bug-Reports`),
 entsteht erst, wenn du zum ersten Mal so eine Datei speicherst: bei der
 installierten Fassung unter `Dokumente\Borometer`, bei den portablen neben der
-Exe.
+Exe. Das Archiv der Bosskämpfe (`archiv`) und die Sicherungen, die vor jedem
+endgültigen Löschen entstehen (`sicherungen`), liegen neben der Einstellungsdatei.
 
 ---
 
@@ -317,8 +465,8 @@ Steam. Die Durchsichtigkeit des Kompaktmodus gibt es unter Linux nicht.
 Borometer liest das ausführliche Kampflog, das Throne and Liberty schreibt,
 wenn man die spieleigene Protokollierung einschaltet. Es schleust keinen Code
 ein, liest keinen Spielspeicher, hängt sich nicht in den Renderer und schickt
-dem Spiel keine Eingaben. Es wird nichts hochgeladen, es gibt kein Konto und
-keine Telemetrie.
+dem Spiel keine Eingaben. Es wird nichts hochgeladen, außer du schaltest eine
+Gruppe oder Gilde online ein, es gibt kein Konto und keine Telemetrie.
 
 Ein einziges Tastenkürzel meldet Borometer bei Windows an: **Strg+Umschalt+D**
 für den Durchklick. Windows sagt Borometer, wenn genau diese Kombination
@@ -326,10 +474,13 @@ gedrückt wird, und über keine andere Taste etwas. Borometer liest die Tastatur
 nicht mit.
 
 Netz gibt es nur, wenn du es einschaltest. Im Normalbetrieb lauscht der lokale
-Helfer auf 127.0.0.1 und ruft nichts auf. Zwei Dinge ändern das, jedes nur auf
+Helfer auf 127.0.0.1 und ruft nichts auf. Drei Dinge ändern das, jedes nur auf
 dein Wort. Eine Gruppe: Hosten öffnet einen zweiten Port nach außen, Beitreten
 schickt deine Zahlen an den Host oder euren Gruppen-Server. Was dabei geht, sind
-die Werte, die auf dem Board stehen, nie eine Logdatei. Und der Update-Hinweis, ab Werk aus: eingeschaltet
+die Werte, die auf dem Board stehen, nie eine Logdatei. Gilde online, ab Werk
+aus: Hat eine Gildenleitung es eingeschaltet und eine Serveradresse eingetragen,
+gehen Mitgliederliste, Punkte und Anwesenheit an genau diese `https://`-Adresse
+und an keine andere. Und der Update-Hinweis, ab Werk aus: eingeschaltet
 fragt er einmal je Start dieses Repository nach dem neuesten Release.
 
 `npm run audit:safety` prüft diese Regeln mechanisch, an der Quelle, bei jeder
@@ -353,14 +504,21 @@ Borometer mehr könnte, als das Kampflog zu lesen. Unter seinen Regeln:
   keine DLL, kein Hook, kein Overlay; den Ordner des Spiels liest es nur;
 - die Seite hat kein Netz: sie spricht HTTP nur mit `127.0.0.1`, und jede Anfrage
   beginnt mit `/api/`;
-- der Hauptprozess geht nur an zwei Stellen nach außen, und nur, wenn du es willst:
+- der Hauptprozess geht nur an drei Stellen nach außen, und nur, wenn du es willst:
   für den Update-Hinweis (ab Werk aus, eine Anfrage nach dem neuesten Release
   dieses Repositorys), an genau eine feste Adresse;
-  und zum Gruppen-Server, dessen Adresse du selbst einträgst (für ihn prüft das
+  zum Gruppen-Server, dessen Adresse du selbst einträgst (für ihn prüft das
   Audit, dass kein Dateiinhalt hinausgeht und dass ihn nur POST-Routen erreichen);
-- der Hauptprozess löscht keine Datei, beste Pulls und Weeklies
-  werden nur gelöst, nie entfernt; Dateien
-  schreibt es nur dorthin, wo Borometer seine eigenen ablegt;
+  und für Gilde online, erst nachdem eine Gildenleitung es eingeschaltet hat, nur
+  an die `https://`-Adresse, die sie selbst eingetragen hat;
+- der Hauptprozess löscht von sich aus nichts. Endgültig löschen kannst du nur,
+  was du vorher gelöst hast, nur aus der Liste der Gelösten, nur nach dem
+  Eintippen eines Namens (bei einem Kampf Boss und Datum) und nur, nachdem
+  Borometer eine Sicherung in `sicherungen` angelegt hat: gelöste Bosskämpfe im
+  Archiv sowie gelöste Einträge in den Weeklies und der Gilde. Die Sicherung
+  löscht Borometer nie. Aktive Einträge, beste Pulls, Verlauf und Logs werden
+  nie entfernt; Dateien schreibt es nur dorthin, wo Borometer seine eigenen
+  ablegt;
 - der Quelltext enthält keine Spielbilder (sie kommen aus einem privaten Repository
   in den Release-Build, siehe „Aus dem Quelltext bauen“).
 

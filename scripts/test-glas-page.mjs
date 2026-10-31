@@ -170,7 +170,11 @@ async function kopfKontrast(page, unten) {
       if (deck <= 0) continue;
       const kette = [];
       for (let a = e; a; a = a.parentElement) { const bg = farbe(getComputedStyle(a).backgroundColor); if (bg[3] > 0) kette.push(bg); if (bg[3] >= 1) break; }
-      aus.push({ text: e.innerText.trim().slice(0, 30), fg: farbe(getComputedStyle(e).color), deck, kette });
+      /* Kompakt neu, Panel (#287): die Schrift liegt auf ihrer Kontur (Schatten mit Versatz, --kn-schatten), nicht auf einer Insel; gemessen
+         wird gegen den Grund an der Glyphenkante: die Kontur (alle Schatten uebereinander) ueber dem Grund. */
+      let ha = 0, hc = null;
+      for (const m of getComputedStyle(e).textShadow.matchAll(/rgba?\([^)]+\)/g)) { const c = farbe(m[0]); hc = hc || c; ha = 1 - (1 - ha) * (1 - c[3]); }
+      aus.push({ text: e.innerText.trim().slice(0, 30), fg: farbe(getComputedStyle(e).color), deck, kette, halo: hc ? [hc[0], hc[1], hc[2], ha] : null });
     }
     return aus;
   });
@@ -178,6 +182,7 @@ async function kopfKontrast(page, unten) {
   for (const x of roh) {
     let g = unten.slice(0, 3);
     for (const b of [...x.kette].reverse()) g = ueber(b, g);
+    if (x.halo) g = ueber(x.halo, g);
     const k = kontrast(ueber([...ueber(x.fg, g), x.deck], g), g);
     if (k < min.wert) min = { wert: Math.round(k * 100) / 100, text: x.text, deck: x.deck };
   }
@@ -258,7 +263,12 @@ const ORTE = ["timeline", "rotation", "analysis", "compare", "history", "party",
 async function gehe(page, ort) {
   const da = await page.evaluate((o) => { const b = document.querySelector(`#bereiche [data-tab="${o}"]`);
     if (!b || b.disabled || !b.getClientRects().length) return false; b.click(); return true; }, ort);
-  if (da) await page.waitForTimeout(250);
+  /* Gewartet wird auf den Zustand, nicht auf eine Zeit (#224): zwei Bilder, dann sind alle endlichen Animationen durch
+     (die Medaillen der Rekorde laufen bis rund 1 s mit Staffelung; mitten im Einblenden waere ihr Grund durchscheinend). */
+  if (da) {
+    await page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    await page.waitForFunction(() => document.getAnimations().every((a) => a.effect?.getComputedTiming().iterations === Infinity || a.playState !== "running"));
+  }
   return da;
 }
 
@@ -384,7 +394,8 @@ try {
     console.log("  info  Kompakt-Kopf: glas " + glas.wert + " (" + glas.text + ", Deckung " + glas.deck + "), dunkel " + dunkel.wert + " (Deckung " + dunkel.deck + ")");
     assert(glas.acr === "glas" && dunkel.acr === "dark" && glas.n > 0 && dunkel.n > 0 && Number.isFinite(glas.wert) && Number.isFinite(dunkel.wert),
       "Kompakt-Kopf: auf Acrylic, Schrift gefunden", { glas, dunkel });
-    assert(glas.deck < 1 && dunkel.deck < 1, "Kompakt-Kopf: gemessen in Ruhe (halb durchsichtig)", { glas, dunkel });
+    /* Kompakt neu (14.10.2026): die Reiter stehen in Ruhe voll da (Deckung 1, nicht gedimmt) - sie sind zum Lesen da, nicht Werkzeug; gemessen wird weiter in Ruhe (der Zeiger draussen) */
+    assert(glas.deck <= 1 && dunkel.deck <= 1, "Kompakt-Kopf: gemessen in Ruhe (Zeiger draussen)", { glas, dunkel });
     assert(glas.wert >= 4.04 && glas.wert >= dunkel.wert, "Kompakt-Kopf in Ruhe: glas mindestens 4,04:1 und nicht leiser als dunkel", { glas, dunkel });
     assert(!glas.fehler.length && !dunkel.fehler.length, "Kompakt: keine Fehler", [glas.fehler, dunkel.fehler]);
   }
@@ -409,7 +420,7 @@ try {
      und die Buehne deckend; und in jedem Ort liegt jede grosse
      halbdurchsichtige Flaeche auf einem deckenden Grund. Halbdurchsichtig
      sind in jedem Thema nur die Haarlinien-Gruende der Behaelter mit Fugen
-     (--hair-rule) und die Toenungen auf Feldern (.vkasten, .cmppick,
+     (--hair-rule) und die Toenungen auf Feldern (.cmppick,
      .ablage, .rkseite, .rkleer); beide liegen immer auf Deckendem. */
   {
     const s = await oeffne({ app: true, mica: false, micaGrund: "aus", config: { theme: "glas" } });

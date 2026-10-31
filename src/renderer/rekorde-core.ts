@@ -28,6 +28,7 @@
    Die Uhr ist die des Logs (UTC-Felder, wie im Verlauf). */
 
 import { besterPull, mindestLaenge, rangfolge } from "./best-pull-core";
+import { halterVon, kaempfeVon, UNBEKANNT } from "./charaktere-core";
 
 /** Ein Kampf des Verlaufs, so weit die Rekorde ihn brauchen (HistFight). */
 export interface RkKampf {
@@ -41,6 +42,8 @@ export interface RkKampf {
   /** der hoechste Einzeltreffer und die Kennung seiner Faehigkeit ("" ohne Kennung); fehlt in alten Eintraegen */
   top?: number;
   topSid?: string;
+  /** der Charakter (Spezifikation Twinks 3): eine Kennung, nur durchgereicht */
+  ch?: string;
 }
 
 /** Ein Dungeon oder Raid-Teil, wie 06-blocks-and-places.ts ihn fuehrt. */
@@ -179,10 +182,15 @@ export interface RkWert {
   erster: number;
   ab: boolean;
   zuletzt: number;
+  /** Twinks (Spezifikation 4): der DPS des ersten Kampfs und die Kennungen (ch) des besten, des ersten und des Treffers; null ohne ch */
+  ersterDps: number;
+  ersterCh: string | null;
+  dpsCh: string | null;
+  topCh: string | null;
 }
 export interface RkPlatz { ort: RkOrt; wert: RkWert | null }
 export interface RkSeiteWert { id: RkSeite["id"]; unter: RkName | null; besiegt: number; gesamt: number; gruppen: { key: string | null; plaetze: RkPlatz[] }[] }
-export interface RkHeld { ort: RkOrt; top: number; topSid: string; topTeil: string | null; at: number }
+export interface RkHeld { ort: RkOrt; top: number; topSid: string; topTeil: string | null; at: number; ch: string | null }
 export interface RkAlbum {
   seiten: RkSeiteWert[];
   held: RkHeld | null;
@@ -253,6 +261,7 @@ export function rekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten
       topTeil: teil && o.teile.includes(teil) ? teil : null, topAt: top ? top.at : null,
       erster: l[0]!.at, ab: aelterUngelesen && ersterTag != null && tagVon(l[0]!.at) === ersterTag,
       zuletzt: l[l.length - 1]!.at,
+      ersterDps: l[0]!.dps, ersterCh: l[0]!.ch ?? null, dpsCh: best ? best.ch ?? null : null, topCh: top ? top.ch ?? null : null,
     });
   }
   /* In jeder Gruppe erst die bekaempften, dann die leeren - je in der
@@ -271,7 +280,7 @@ export function rekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten
     const w = p.wert;
     if(!w || w.top == null) continue;
     if(!held || w.top > held.top || (w.top === held.top && w.topAt! < held.at))
-      held = {ort: p.ort, top: w.top, topSid: w.topSid!, topTeil: w.topTeil, at: w.topAt!};
+      held = {ort: p.ort, top: w.top, topSid: w.topSid!, topTeil: w.topTeil, at: w.topAt!, ch: w.topCh};
   }
   return {seiten: seitenWert, held, kaempfe: alle.length, dateien: new Set(alle.map(k => k.file || "")).size,
     ohneTop: alle.filter(k => !hatTop(k)).length, ohneOrt, von, bis};
@@ -290,17 +299,96 @@ export function rekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten
    alle (Rekorde neu einlesen): jede Datei der Liste ganz. */
 export const NACH_MAX = 60;
 export interface LogEintrag { name: string; size: number }
-export interface IndexEintrag { fights?: readonly { top?: unknown }[]; bytes?: unknown; [mehr: string]: unknown }
-export function lesebedarf(liste: readonly LogEintrag[], index: Readonly<Record<string, IndexEintrag | undefined>>, alle: boolean): { name: string; ab: number }[] {
+export interface IndexEintrag { fights?: readonly { top?: unknown; g?: unknown }[]; bytes?: unknown; zv?: unknown; [mehr: string]: unknown }
+/* zuordnen: der Zuordnungsstand der Charaktere (charaktere-core.ts: zuordnungsStand), "" ohne Charaktere.
+   Traegt der Eintrag einer Datei einen anderen Stand (zv) und hat sie Kaempfe eines Spielers (nicht nur
+   Gruppensummen), wird sie ganz noch einmal gelesen: der Kampf bekommt dabei seinen Charakter (ch). */
+export function lesebedarf(liste: readonly LogEintrag[], index: Readonly<Record<string, IndexEintrag | undefined>>, alle: boolean, zuordnen = ""): { name: string; ab: number }[] {
   const raus: { name: string; ab: number }[] = [];
   for(const f of liste.slice(0, NACH_MAX)){
     if(!f || typeof f.name !== "string" || !Number.isFinite(f.size)) continue;
     const e = Object.hasOwn(index, f.name) ? index[f.name] : undefined;
     if(alle || !e){ raus.push({name: f.name, ab: 0}); continue; }
+    if(zuordnen && e.zv !== zuordnen && (e.fights || []).some(k => !k.g)){ raus.push({name: f.name, ab: 0}); continue; }
     const b = e.bytes, bekannt = typeof b === "number" && Number.isSafeInteger(b) && b >= 0;
     if(bekannt && f.size === b) continue;
     if((e.fights || []).some(k => typeof k.top !== "number")){ raus.push({name: f.name, ab: 0}); continue; }
     if(bekannt) raus.push({name: f.name, ab: f.size > b ? b : 0});
   }
   return raus;
+}
+
+/* ---------- Twinks (Spezifikation 2026-10-15-twinks-design.md, 4 und 8) ----------
+   Dieselbe Rechnung je Halter: Gesamt ueber alle Kaempfe, die einem aktiven
+   Charakter oder keinem bekannten gehoeren (charaktere-core.ts, halterVon),
+   und je Halter allein seine. In Gesamt traegt jeder Kampf die Kennung seines
+   Halters (ch), so nennt der Platz, wer den besten und den ersten Kampf hat.
+   Nur Kennungen, nie Namen: die Namen kennt allein die Seite. */
+export interface TwAlbum {
+  /** die aktiven Charaktere in ihrer Reihenfolge, dann "?", wenn es Kaempfe ohne bekannten Charakter gibt */
+  halter: string[];
+  gesamt: RkAlbum;
+  je: Record<string, RkAlbum>;
+  /** je Halter: wie viele Plaetze mit bestem Pull er in Gesamt haelt */
+  zaehler: Record<string, number>;
+}
+export function twinkRekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten: readonly RkSeite[], aelterUngelesen: boolean,
+  aktiv: readonly string[], geloest: readonly string[]): TwAlbum {
+  const a = new Set(aktiv), g = new Set(geloest);
+  const echt = kaempfe.filter(istKampf);
+  const mitHalter = kaempfeVon(echt, null, a, g).map(k => ({...k, ch: halterVon(k.ch, a, g)!}));
+  const halter = [...aktiv, ...(mitHalter.some(k => k.ch === UNBEKANNT) ? [UNBEKANNT] : [])];
+  const gesamt = rekorde(mitHalter, seiten, aelterUngelesen);
+  const je: Record<string, RkAlbum> = {};
+  for(const h of halter) je[h] = rekorde(mitHalter.filter(k => k.ch === h), seiten, aelterUngelesen);
+  const zaehler: Record<string, number> = Object.fromEntries(halter.map(h => [h, 0]));
+  for(const s of gesamt.seiten) for(const gr of s.gruppen) for(const p of gr.plaetze)
+    if(p.wert && p.wert.bester && p.wert.dpsCh != null && Object.hasOwn(zaehler, p.wert.dpsCh)) zaehler[p.wert.dpsCh]!++;
+  return {halter, gesamt, je, zaehler};
+}
+
+/** Der Zuwachs vom ersten zum besten Kampf in ganzen Prozent; null ohne besten Pull oder wenn der erste der beste ist. */
+export function zuwachs(w: Pick<RkWert, "bester" | "dps" | "dpsAt" | "ersterDps" | "erster"> | null): number | null {
+  if(!w || !w.bester || w.dpsAt === w.erster || !(w.ersterDps > 0)) return null;
+  return Math.round((w.dps / w.ersterDps - 1) * 100);
+}
+
+/* Die fuenf Teile (Spezifikation Twinks 4, 15.10.2026): Raids in der
+   Reihenfolge der Tafel (Zitadelle, Korridor, Altar), Feldbosse der offenen
+   Welt, Erzbosse mit den Kolossen (Vegamor), Dungeons nach Sternen und die
+   Halle der Illusionen. Uebungspuppe und Ventius bleiben eigene Seiten. In
+   jeder Gruppe erst die bekaempften, dann die leeren - nur die Raids stehen
+   immer in der Reihenfolge der Tafel (tafel), auch die leeren. */
+export interface TwTeil { id: "raid" | "feld" | "erz" | "dungeon" | "halle"; besiegt: number; gesamt: number; gruppen: { key: string | null; plaetze: RkPlatz[] }[] }
+export function twinkTeile(seiten: readonly RkSeiteWert[], tafel: readonly RkSeite[]): TwTeil[] {
+  const von = (id: RkSeite["id"]) => seiten.find(s => s.id === id)?.gruppen ?? [];
+  const spiel = (tafel.find(s => s.id === "raid")?.gruppen ?? []).flatMap(g => g.orte.map(o => o.id));
+  const imSpiel = (p: RkPlatz[]) => p.slice().sort((a, b) => spiel.indexOf(a.ort.id) - spiel.indexOf(b.ort.id));
+  const vorn = (p: RkPlatz[]) => [...p.filter(x => x.wert), ...p.filter(x => !x.wert)];
+  const eine = (gs: readonly { plaetze: RkPlatz[] }[]) => gs.length ? [{key: null, plaetze: vorn(gs.flatMap(x => x.plaetze))}] : [];
+  const feld = von("feld"), dung = von("dungeon");
+  const roh: { id: TwTeil["id"]; gruppen: { key: string | null; plaetze: RkPlatz[] }[] }[] = [
+    {id: "raid", gruppen: von("raid").map(x => ({key: null, plaetze: imSpiel(x.plaetze)}))},
+    {id: "feld", gruppen: feld.filter(x => x.key == null)},
+    {id: "erz", gruppen: eine(feld.filter(x => x.key === "erz" || x.key === "koloss"))},
+    {id: "dungeon", gruppen: dung.filter(x => x.key !== "separat")},
+    {id: "halle", gruppen: dung.filter(x => x.key === "separat").map(x => ({key: null, plaetze: x.plaetze}))},
+  ];
+  return roh.filter(t => t.gruppen.some(x => x.plaetze.length)).map(t => {
+    const alle = t.gruppen.flatMap(x => x.plaetze);
+    return {id: t.id, besiegt: alle.filter(x => x.wert).length, gesamt: alle.length, gruppen: t.gruppen.map(x => ({key: x.key, plaetze: x.plaetze}))};
+  });
+}
+
+/** Eine Gruppe nach der Wahl: Bester DPS, Zuletzt oder Groesster Zuwachs; ohne Wert hinten, bei Gleichstand die Reihenfolge der Tafel. */
+export type TwSort = "best" | "neu" | "plus";
+export function twinkSortiert<P extends { wert: Pick<RkWert, "bester" | "dps" | "dpsAt" | "ersterDps" | "erster" | "zuletzt"> | null }>(plaetze: readonly P[], sort: TwSort): P[] {
+  const wert = (p: P): number => {
+    const w = p.wert;
+    if(!w) return -Infinity;
+    if(sort === "neu") return w.zuletzt;
+    if(sort === "plus") return zuwachs(w) ?? -1;
+    return w.bester ? w.dps : 0;
+  };
+  return plaetze.map((p, i) => ({p, i, w: wert(p)})).sort((x, y) => (y.w - x.w) || (x.i - y.i)).map(x => x.p);
 }

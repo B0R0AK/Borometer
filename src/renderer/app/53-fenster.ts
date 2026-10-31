@@ -129,6 +129,15 @@ const suchMerk = new Map<string, { fe: Fenster | null; pool: FPull[] }>();
 function bestStempel(){
   return Object.keys(state.best).sort().map(k => { const e = state.best[k]!; return k + ":" + e.best.at + ":" + (e.second?.at ?? ""); }).join(",");
 }
+/** Die Kaempfe desselben Builds wie seg (ohne gespeicherte Laeufe), fuer
+    Rand und Takt der Werkbank; ohne bekannten Build nur seg. Dieselbe
+    Schleife wie in gesucht. */
+export function poolFights(seg: Fight): Fight[] {
+  const hier = bezugVon(seg);
+  if(!hier) return [seg];
+  const live = isWatching();
+  return state.encounters.filter((x, i) => !(live && i === 0) && gleicherBezug(hier, x === seg ? hier : bezugVon(x)));
+}
 function gesucht(seg: Fight): { fe: Fenster | null; pool: FPull[] } {
   const hier = bezugVon(seg);
   const bekannt = !!hier;
@@ -317,15 +326,17 @@ export function inRotationKnopf(von: number, bis: number, label: string): string
   return '<dd class="w"><button type="button" class="inrot" data-weg="rot" data-von="'+von+'" data-bis="'+bis+'" aria-label="'+
     esc(t(label, {z: clock(von)+"\u2013"+clock(bis)}))+'">'+esc(t("analysis.inRotation"))+"</button></dd>";
 }
-/** Der Eintrag unter "Weitere Befunde" (Neugestaltung 28.09., DECISION 4.14:
-    der Rhythmus verdichtet): Wert, Vergleichswert und ein Satz - nur mit
-    Vergleichspull. Begriff und Werte fuer die Liste #weitereListe. */
+/** Der Eintrag in der Befundliste des Kampfstreifens (seit #218; vorher
+    unter "Weitere Befunde", DECISION 4.14: der Rhythmus verdichtet): Wert,
+    Vergleichswert und ein Satz - nur mit Vergleichspull. Begriff und Werte
+    fuer die Liste #weitereListe. */
 export function startZeile(seg: Fight | undefined): string {
   const st = startStand(seg);
   if(!st) return "";
   const bp = t(st.zweit ? "analysis.ref.second" : "analysis.ref.best");
   // ein deutlich schwaecherer Start fuehrt in die Rotation, auf die ersten 10 s (Issue #107)
-  return '<div class="find" data-k="start"><dt class="k">' + esc(t("analysis.start.label")) + '</dt><dd class="v">' + esc(fmt(st.dps)) +
+  // data-von/data-bis: die Zeit fuer die Fahne im Kampfstreifen (70)
+  return '<div class="find" data-k="start" data-von="0" data-bis="' + START_S + '"><dt class="k">' + esc(t("analysis.start.label")) + '</dt><dd class="v">' + esc(fmt(st.dps)) +
     '</dd><dd class="n">' + esc(t("analysis.start.ref", {bp, x: fmt(st.bezug)}) + " \u00b7 " + startSatz(st)) + "</dd>" +
     (st.art === "schwaecher" ? inRotationKnopf(0, START_S, "analysis.inRotation.start") : "") + "</div>";
 }

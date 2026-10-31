@@ -5,12 +5,14 @@ import { WK_BOSS_BILD as BOSS, WK_GEGENSTAND_BILD as GEGENSTAND } from "../spiel
    setzt sie ueber Klassen (wkb-<schluessel>), damit das Zeichnen kleine
    Zeichenketten vergleicht.
 
-   Bossbilder der Raid-Fluegel (96 x 96 WebP, rund gezeigt mit 36 bis 48 Punkt):
+   Bossbilder der Raid-Fluegel (192 x 192 WebP seit 29.10.2026, vorher 96 x 96, rund gezeigt mit 36 bis 48 Punkt):
    eigene Bildschirmfotos aus dem Spiel vom 01.10.2026 - Dragaryle
    (Die vergessene Zitadelle), Zairos (Der Korridor der Pein), Calanthia
    (Der Altar der Wiedergeburt); quadratisch ausgeschnitten und verkleinert.
    Dazu Radeth aus einem eigenen Bildschirmfoto vom 02.10.2026, ebenso
    geschnitten; er ist kein Fluegel, nur die Rekorde (62-rekorde.ts) zeigen ihn.
+   Seit 29.10.2026 (#258) alle vier mit 192 x 192, neu aus eigenen Bosskarten
+   vom 27.10.2026 ausgeschnitten, gleicher Zuschnitt wie vorher.
 
    Gegenstandssymbole der Haendler-Punkte (48 x 48 WebP, gezeigt mit 26
    Punkt): einmal von cdn.questlog.gg geladen (01.10.2026), Pfad unter

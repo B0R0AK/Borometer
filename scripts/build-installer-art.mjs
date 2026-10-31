@@ -3,7 +3,7 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // The installer's pictures, drawn from the app's own material: the tokens and
-// the embedded Archivo Black out of src/renderer/styles.css. NSIS wants 24-bit
+// the embedded Anton out of src/renderer/styles.css. NSIS wants 24-bit
 // BMPs at fixed sizes, so a Chromium canvas draws them and this script writes
 // the pixels out as BMP.
 //
@@ -48,12 +48,12 @@ const need = ["--comb", "--pitch", "--gold", "--lite", "--amber", "--deep", "--d
 for (const k of need) if (!/^#[0-9a-f]{6}$/i.test(T[k] || "")) throw new Error(`token ${k} is not a plain hex colour: ${T[k]}`);
 
 // the display face, exactly as the app embeds it
-const face = css.match(/@font-face\{\s*font-family:"Archivo Black";[\s\S]*?\}/);
-if (!face) throw new Error("Archivo Black @font-face not found in styles.css");
+const face = css.match(/@font-face\{\s*font-family:"Anton";[\s\S]*?\}/);
+if (!face) throw new Error("Anton @font-face not found in styles.css");
 
 const PAGE = `<!doctype html><meta charset="utf-8"><style>${face[0]}</style>
 <body style="margin:0;background:#000">
-<span style="font-family:'Archivo Black'">BOROMETER</span>
+<span style="font-family:'Anton'">BOROMETER</span>
 <canvas id="c"></canvas>
 <script>
 const T = ${JSON.stringify(T)};
@@ -63,7 +63,7 @@ const hex = (h, a) => { const n = parseInt(h.slice(1), 16);
 /* The wordmark: the gold ramp the app's own mark wears (--grad-mark), light
    at the top, into the deep bronze at the foot. */
 function wordmark(ctx, text, x, y, size, align) {
-  ctx.font = size + "px 'Archivo Black'";
+  ctx.font = size + "px 'Anton'";
   ctx.textAlign = align; ctx.textBaseline = "alphabetic";
   const g = ctx.createLinearGradient(0, y - size * 0.8, 0, y);
   g.addColorStop(0.08, "#f7d9a4"); g.addColorStop(0.55, T["--gold"]); g.addColorStop(1, T["--deep"]);
@@ -171,9 +171,9 @@ const browser = await chromium.launch({
 try {
   const page = await browser.newPage();
   await page.setContent(PAGE);
-  await page.evaluate(() => document.fonts.load("17px 'Archivo Black'"));
-  const loaded = await page.evaluate(() => document.fonts.check("17px 'Archivo Black'"));
-  if (!loaded) throw new Error("Archivo Black did not load - the pictures would fall back to a system face");
+  await page.evaluate(() => document.fonts.load("17px 'Anton'"));
+  const loaded = await page.evaluate(() => document.fonts.check("17px 'Anton'"));
+  if (!loaded) throw new Error("Anton did not load - the pictures would fall back to a system face");
   for (const [kind, file] of [["install", "installerSidebar.bmp"], ["uninstall", "uninstallerSidebar.bmp"],
                               ["header", "installerHeader.bmp"], ["splash", "portableSplash.bmp"]]) {
     const img = await page.evaluate((k) => window.draw(k), kind);

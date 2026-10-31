@@ -57,18 +57,23 @@ const TEXT = {
    reduzierte Bewegung schon beim Laden (die grosse Zahl zaehlt nicht hoch). */
 async function oeffne({ app = true, lang = "en", config = {}, zwei = false, kfenster = false, kompakt = {}, helfer = null,
                         gruppe = false, breite = 1280, hoehe = 860, dateien = null, folgt = false, acrylic = true, stateVerzug = 0,
-                        kompaktVerzug = 0, bewegung = undefined } = {}) {
+                        kompaktVerzug = 0, bewegung = undefined, logVerzug = 0 } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe }, ...(bewegung ? { reducedMotion: bewegung } : {}) });
+  page.setDefaultTimeout(FRIST * 3);   // auch ein Klick wartet auf ein Element, das unter Last spaeter kommt
   const s = { page, fehler: [], posts: [], win: [], schreibt: [], material: acrylic, logs: [], standNein: 0,
               kompakt: { offen: kfenster, live: false, durch: false, ...kompakt },
               groesseOffen: 0, horcht: 0, zustaende: 0,
               zaehler: { hotkey: 0, compact: 0, live: 0, handsize: 0, material: 0, kompakt: 0, kompakthand: 0, kompaktstand: 0 } };
   let vorMenue = null;
+  aktuell = s;
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
   await page.addInitScript(anfragenZaehlen);
   await page.route("http://boro.test/**", async (route) => {
     const req = route.request(), url = new URL(req.url()), path = url.pathname;
+    // BORO_TEST_VERZUG: Antworten kommen zufaellig spaeter (Last auf dem Runner nachgestellt)
+    // (nicht /api/win und /api/events: der Hauptprozess ordnet die Fensterbefehle, und /api/events wartet ohnehin)
+    if (VERZUG && path !== "/api/win" && path !== "/api/events") await new Promise((r) => setTimeout(r, Math.random() * VERZUG));
     const json = (body) => route.fulfill({ status: 200, contentType: "application/json", body: JSON.stringify(body) }).catch(() => {});
     // stateVerzug: /api/state antwortet spaeter als /api/config (Kompakt-Fix 4)
     if (path === "/api/state" && stateVerzug) await new Promise((r) => setTimeout(r, stateVerzug));
@@ -83,6 +88,8 @@ async function oeffne({ app = true, lang = "en", config = {}, zwei = false, kfen
     if (path === "/api/log" && dateien) {
       const name = url.searchParams.get("name") || "";
       s.logs.push(name);
+      // logVerzug: der Helfer antwortet erst nach so vielen Millisekunden (langsame Platte, Last)
+      if (logVerzug) await new Promise((r) => setTimeout(r, logVerzug));
       if (!Object.hasOwn(dateien, name)) return route.fulfill({ status: 404, contentType: "application/json", body: "{}" }).catch(() => {});
       // 500: der Helfer konnte die Datei gerade nicht lesen (Gutachten N3)
       if (dateien[name] === 500) return route.fulfill({ status: 500, contentType: "text/plain", body: "" }).catch(() => {});
@@ -131,7 +138,9 @@ async function oeffne({ app = true, lang = "en", config = {}, zwei = false, kfen
         } finally { s.groesseOffen--; }
         return;
       }
-      return json({ ok: true, max: false, w: 400, h: 28, on_top: b.do === "pin" ? !!b.on : true,
+      // ein Fenster, das die bestellte Hoehe annimmt (#328: die Leiste ist 34 statt 26 Punkt hoch, und die feste Antwort 28 lag mit dem Hinweis
+      // ueber der Toleranz von 40 der Seite); sonst wie bisher
+      return json({ ok: true, max: false, w: 400, h: b.do === "resize" && b.h ? b.h : 28, on_top: b.do === "pin" ? !!b.on : true,
                     ...(b.do === "clickthrough" ? { clickthrough: !!b.on } : {}) });
     }
     if (path === "/api/events") {
@@ -140,7 +149,7 @@ async function oeffne({ app = true, lang = "en", config = {}, zwei = false, kfen
         s.horcht++;   // die Seite kennt den Stand und horcht: was jetzt hochzaehlt, sieht sie als neu
         const gesehen = JSON.parse(url.searchParams.get("seen") || "{}");
         const neu = () => Object.keys(s.zaehler).some((k) => s.zaehler[k] > (gesehen[k] || 0));
-        for (const ende = Date.now() + 1000; Date.now() < ende && !neu(); ) await new Promise((r) => setTimeout(r, 50));
+        for (const ende = performance.now() + 1000; performance.now() < ende && !neu(); ) await new Promise((r) => setTimeout(r, 50));
       }
       return json({ ok: true, registered: true, counts: s.zaehler });
     }
@@ -162,21 +171,41 @@ async function oeffne({ app = true, lang = "en", config = {}, zwei = false, kfen
    Frist ab, steht eine FAIL-Zeile mit dem, worauf gewartet wurde (ohne
    worauf: die Bedingung selbst), und es geht weiter - die Pruefungen danach
    sagen, was fehlt. */
-async function warte(page, fn, arg, ms = 5000, worauf = String(fn).replace(/\s+/g, " ")) {
-  try { await page.waitForFunction(fn, arg, { timeout: ms }); return true; }
-  catch (e) { assert(false, "Zeitablauf (" + ms + " ms) beim Warten auf: " + worauf, String(e).split("\n")[0]); return false; }
+/* Frist (#224): jedes Warten ist eine Frist, keine Pause - bei Erfolg ist es
+   sofort vorbei. Auf den CI-Runnern laufen bis zu zehn Jobs auf sechs Kernen,
+   und ein Ereignis entsteht dort ueber eine Kette von Anfragen und Antworten
+   des gestellten Helfers; fuenf Sekunden reichten nicht. Die Frist ist darum
+   mindestens FRIST, auch wo eine kuerzere steht. Nur die Wartezeit ist so
+   lang, keine Pruefung ist lockerer. BORO_TEST_VERZUG (nur zur Nachstellung
+   des Fehlers): so viele ms antwortet der gestellte Helfer auf jede Anfrage
+   hoechstens spaeter, zufaellig zwischen 0 und dem Wert. */
+const FRIST = 20000;
+const VERZUG = Number(process.env.BORO_TEST_VERZUG || 0);
+/* die zuletzt geoeffnete Seite: bei Zeitablauf nennt die FAIL-Zeile ihren Stand */
+let aktuell = null;
+const stand = (seit) => ({ nach_ms: Math.round(performance.now() - seit),
+  letzte_an_den_helfer: aktuell ? aktuell.win.slice(-3) : null, dateien_geholt: aktuell ? aktuell.logs.length : null });
+/* streng: die Zeit IST die Anforderung ("sofort", "im naechsten Takt"); dann
+   gilt ms genau, ohne Aufschlag auf FRIST. Zwei Stellen: Live beenden (1 s,
+   vor dem Wecker der Kampftrennung) und der erste Kampf eines leeren Logs
+   (4,5 s, ein Takt). Wackeln sie unter Last, braucht ein anderer Wert die Freigabe des Eigentuemers. */
+async function warte(page, fn, arg, ms = FRIST, worauf = String(fn).replace(/\s+/g, " "), streng = false) {
+  const seit = performance.now(), frist = streng ? ms : Math.max(ms, FRIST);
+  try { await page.waitForFunction(fn, arg, { timeout: frist }); return true; }
+  catch (e) { assert(false, "Zeitablauf (" + frist + " ms) beim Warten auf: " + worauf, { fehler: String(e).split("\n")[0], ...stand(seit) }); return false; }
 }
 /* Wartet, bis fn() im Test wahr ist (die Anfragen der Seite liegen hier,
    nicht in der Seite), hoechstens ms; true, wenn es so kam. Mit worauf
    steht bei Zeitablauf eine FAIL-Zeile da; ohne nicht (fuer assert(await bis(...))). */
-const bis = async (fn, worauf, ms = 5000) => {
-  for (const ende = Date.now() + ms; Date.now() < ende; ) { if (fn()) return true; await new Promise((r) => setTimeout(r, 50)); }
+const bis = async (fn, worauf, ms = FRIST) => {
+  const seit = performance.now(), frist = Math.max(ms, FRIST);
+  for (const ende = seit + frist; performance.now() < ende; ) { if (fn()) return true; await new Promise((r) => setTimeout(r, 50)); }
   if (fn()) return true;
-  if (worauf) assert(false, "Zeitablauf (" + ms + " ms) beim Warten auf: " + (typeof worauf === "function" ? worauf() : worauf));
+  if (worauf) assert(false, "Zeitablauf (" + frist + " ms) beim Warten auf: " + (typeof worauf === "function" ? worauf() : worauf), stand(seit));
   return false;
 };
 // dasselbe als eigener Schritt: bei Zeitablauf die Bedingung selbst als FAIL-Zeile
-const bisDa = (fn, ms = 5000) => bis(fn, String(fn).replace(/\s+/g, " "), ms);
+const bisDa = (fn, ms = FRIST) => bis(fn, String(fn).replace(/\s+/g, " "), ms);
 /* In der Seite (addInitScript): __offen zaehlt die Anfragen an den Helfer,
    die noch nicht fertig sind - unterwegs, oder beantwortet, aber der Text der
    Antwort ist noch nicht gelesen. Fertig ist eine erst eine Aufgabe nach dem
@@ -210,6 +239,24 @@ function anfragenZaehlen() {
    an den Helfer schicken wollte, liegt jetzt in s.win, s.posts, s.schreibt. */
 const stille = (s, wann) => warte(s.page, () => window.__offen === 0, undefined, 5000,
   "Ruhe, alle Anfragen der Seite beantwortet (" + wann + ")");
+/* Eine hineingezogene Datei ist ganz geladen: ein Kampf steht in der Tafel
+   (noFight allein reicht nicht, die Klasse faellt vor dem Zeichnen der Zeilen)
+   und alles, was die Seite dabei an den Helfer schicken wollte, ist dort.
+   Wer danach den Streifen oeffnet, schickt den Stand der Datei, nicht den
+   davor (#224, Wettlauf N4: unter Last ging zuerst "leer" hinaus). */
+async function dateiDa(s, wann) {
+  await warte(s.page, () => !document.body.classList.contains("noFight") && document.querySelectorAll("#bars .row").length > 0,
+    undefined, FRIST, "ein Kampf steht in der Tafel (" + wann + ")");
+  await stille(s, wann);
+}
+/* Die Seite hat die Ereignisse gelesen, die der Test bis jetzt gezaehlt hat:
+   die naechste Frage an /api/events beginnt (hoechstens 1 s, solange der
+   Helfer wartet). Wer vorher eine Datei neu bestellt, riskiert, dass ein
+   frueherer Zaehler die Seite ein zweites Mal holen laesst (#224, M3). */
+async function ereignisseGelesen(s, wann) {
+  const n = s.horcht;
+  await bis(() => s.horcht > n, "die Seite fragt /api/events neu (" + wann + ")");
+}
 /* Die Seite steht: kein CSS-Uebergang laeuft mehr (nach
    einem Themenwechsel, bevor Farben gelesen werden); Keyframe-Animationen
    wie der atmende Live-Punkt zaehlen nicht. */
@@ -220,9 +267,9 @@ const steht = (page, wann) => warte(page, () => document.getAnimations().every((
 async function bilder(page, wann) {
   const gezeichnet = await Promise.race([
     page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r(true))))),
-    new Promise((r) => setTimeout(() => r(false), 5000)),   // Frist, keine Pause: ohne Bild nach 5 s eine FAIL-Zeile
+    new Promise((r) => setTimeout(() => r(false), FRIST)),   // Frist, keine Pause: ohne Bild nach FRIST eine FAIL-Zeile
   ]);
-  if (!gezeichnet) assert(false, "Zeitablauf (5000 ms) beim Warten auf zwei gezeichnete Bilder (" + wann + ")");
+  if (!gezeichnet) assert(false, "Zeitablauf (" + FRIST + " ms) beim Warten auf zwei gezeichnete Bilder (" + wann + ")");
 }
 /* Live: ein weiterer Takt hat /api/state gefragt, und alles, was er geholt
    hat, ist verarbeitet (stille). */
@@ -247,7 +294,7 @@ const gefolgt = async (s) => {
     await new Promise((r) => setTimeout(r, 500));
     if (s.win.length === n && !s.groesseOffen) return;
   }
-  assert(false, "Zeitablauf beim Warten darauf, dass der Streifen seiner Groesse gefolgt ist", s.win.slice(-4));
+  assert(false, "Zeitablauf beim Warten darauf, dass der Streifen seiner Groesse gefolgt ist", { offen: s.groesseOffen, letzte: s.win.slice(-4) });
 };
 /* Kompakt im selben Fenster umschalten: bis die Seite umgeschaltet hat und
    alles, was sie dabei an den Helfer schickt, dort ist. */
@@ -306,14 +353,23 @@ try {
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await s.page.close();
   }
-  // --- 2. gemerkte Lage (3.4): beim Start setzt die Seite das Fenster nicht vom Standard aus neu
+  // --- 2. feste Groesse der Vollansicht (#364, ersetzt 3.4 "gemerkte Lage"): die Groessen-Einstellung
+  //        skaliert die Seite, nie das Fenster - weder beim Start (mit und ohne gemerkte Lage) noch beim Stellen
   {
-    const s = await oeffne({ config: { uiZoom: 150, windowPlaced: true } });
-    assert(!s.win.some((b) => b.do === "size"), "gemerkte Lage und 150 %: keine Groesse vom Standard aus", s.win);
-    await s.page.close();
-    const t = await oeffne({ config: { uiZoom: 150, windowPlaced: false } });
-    assert(t.win.some((b) => b.do === "size"), "ohne gemerkte Lage: wie bisher 150 % vom Standard aus", t.win);
-    await t.page.close();
+    for (const windowPlaced of [true, false]) {
+      const s = await oeffne({ config: { uiZoom: 150, windowPlaced } });
+      await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "150%", undefined, 5000, "150 % steht");
+      await stille(s, "Start bei 150 %");
+      assert(!s.win.some((b) => b.do === "size"), "Start bei 150 % (gemerkte Lage " + windowPlaced + "): die Seite bittet nie um eine Fenstergroesse", s.win);
+      await s.page.evaluate(() => document.querySelector("#zoomIn").click());
+      await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "175%", undefined, 5000, "175 % steht");
+      await s.page.evaluate(() => document.querySelector("#zoomOut").click());
+      await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "150%", undefined, 5000, "wieder 150 %");
+      await stille(s, "Stufen der Groesse");
+      assert(!s.win.some((b) => ["size", "maximize"].includes(b.do)), "Groesse stellen: die Seite bewegt das Fenster nicht (kein size, kein maximize)", s.win.map((b) => b.do));
+      assert(!(await s.page.evaluate(() => !!document.querySelector("#winMax"))), "die Seite kennt keinen Maximieren-Knopf mehr");
+      await s.page.close();
+    }
   }
   // --- 3. der Randlos-Hinweis (3.5), Englisch: beim ersten Kompakt, ruhig, mit "Got it"
   {
@@ -338,7 +394,7 @@ try {
       const p = document.createElement("span"); p.style.color = "var(--text)"; document.body.append(p);
       const c = getComputedStyle(p).color; p.remove(); return c; })), "die Taste in der Textfarbe, nicht in Gold", m);
     assert(!randlosPosts(s).length, "vor dem Klick wird nichts geschrieben", s.posts);
-    await s.page.click("#toast .tact", { timeout: 3000 });
+    await s.page.click("#toast .tact", { timeout: FRIST });
     await warte(s.page, () => !document.querySelector("#toast").classList.contains("on"), undefined, 5000, "der Hinweis geht nach Got it weg");
     await stille(s, "Got it");
     assert(JSON.stringify(randlosPosts(s)) === JSON.stringify([{ randlosGesehen: true }]), "Got it schreibt randlosGesehen: true", s.posts);
@@ -583,13 +639,13 @@ try {
     await warte(p, () => document.body.classList.contains("compact"), undefined, 5000);
     await warte(p, () => document.querySelector("#btnPin").getAttribute("aria-pressed") === "true", undefined, 5000);
     const k = await p.evaluate(() => ({
-      weg: ["#kwKnopf", "#kampfwahl", "#bereiche", "#statusleiste", "#winMin", "#winMax"].map((q) => document.querySelector(q).getClientRects().length),
+      weg: ["#kwKnopf", "#kampfwahl", "#bereiche", "#statusleiste", "#winMin"].map((q) => document.querySelector(q).getClientRects().length),
       top: document.querySelector(".top").getBoundingClientRect().height,
       klasse: document.documentElement.classList.contains("kfenster"),
       zu: document.querySelector("#winClose").getClientRects().length,
       quer: document.documentElement.scrollWidth > innerWidth }));
-    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 26) < 0.5 && k.klasse && k.zu === 1,
-      "Kompaktfenster: der Streifen (26 Punkt) ohne Kampfwahl, Leisten und Minimieren, mit Schliessen", k);
+    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 34) < 0.5 && k.klasse && k.zu === 1,
+      "Kompaktfenster: der Streifen (34 Punkt, #328) ohne Kampfwahl, Leisten und Minimieren, mit Schliessen", k);
     await warte(p, () => document.querySelector("#toast").classList.contains("on"), undefined, 5000);
     const m = await meldung(s);
     assert(m.an && m.text === TEXT.en.kurz, "Kompaktfenster: der Randlos-Hinweis beim ersten Mal", m);
@@ -603,7 +659,7 @@ try {
     assert(!s.win.some((b) => b.do === "pin"), "Anheften steht an, ohne dass die Seite es erst setzt", s.win);
     // Anheften loesen gilt dem Kompaktfenster, und gemerkt wird es nicht
     await p.hover(".top");
-    await p.click("#btnPin", { timeout: 5000 }).catch((e) => assert(false, "Zeitablauf beim Klick auf #btnPin", String(e).split("\n")[0]));
+    await p.click("#btnPin", { timeout: FRIST }).catch((e) => assert(false, "Zeitablauf beim Klick auf #btnPin", String(e).split("\n")[0]));
     await warte(p, () => document.querySelector("#btnPin").getAttribute("aria-pressed") === "false", undefined, 5000);
     const pin = s.win.filter((b) => b.do === "pin");
     assert(pin.length === 1 && pin[0].on === false && pin[0].win === "kompakt" && pin[0].remember === false,
@@ -655,7 +711,7 @@ try {
       await warte(p, () => document.querySelector("#btnPin").getAttribute("aria-pressed") === "true", undefined, 5000);
       const an = await zieht(p);
       await p.hover(".top");
-      await p.click("#btnPin", { timeout: 5000 }).catch((e) => assert(false, "Zeitablauf beim Klick auf #btnPin", String(e).split("\n")[0]));
+      await p.click("#btnPin", { timeout: FRIST }).catch((e) => assert(false, "Zeitablauf beim Klick auf #btnPin", String(e).split("\n")[0]));
       await warte(p, () => document.querySelector("#btnPin").getAttribute("aria-pressed") === "false", undefined, 5000);
       const aus = await zieht(p);
       assert(an.zahl >= 5 && !an.ziehen.length && an.griff && aus.zahl >= 5 && !aus.ziehen.length && aus.griff,
@@ -693,11 +749,13 @@ try {
     const durch = s.win.filter((b) => b.do === "clickthrough");
     assert(durch.length === 1 && durch[0].on === true && durch[0].win === "kompakt" && await p.evaluate(() => !document.querySelector("#throughHint").hidden),
       "Kuerzel im Kompaktfenster: durchklickbar, die Pille mit dem Schloss", durch);
+    // erst wenn der Streifen nach dem Kuerzel fertig gemessen hat (die Pille bittet noch um Groesse, #224)
+    await gefolgt(s);
     const vorher = s.win.length;
     s.zaehler.compact++; s.zaehler.live++;
     await ruhig();
     assert(s.win.length === vorher && !(await p.evaluate(() => document.body.classList.contains("watching"))),
-      "Taskleiste und Live-Knopf der Vorschau schalten im Kompaktfenster nichts", s.win.slice(vorher));
+      "Taskleiste und Live-Knopf der Vorschau schalten im Kompaktfenster nichts", s.win);
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await p.close();
   }
@@ -739,14 +797,15 @@ try {
     const hoeher = (px, thema) => p.evaluate(([x, th]) => {
       let st = document.querySelector("#probe-zeilen");
       if (!st) { st = document.createElement("style"); st.id = "probe-zeilen"; document.head.appendChild(st); }
-      st.textContent = "body.compact #bars .row{min-height:" + x + "px !important}";
+      // #328: die Zeilen sind fest 26 Punkt und die Liste zeigt fuenf; mehr Hoehe verlangt hier der Kopf (headwrap)
+      st.textContent = "body.compact .headwrap{min-height:" + (x + 100) + "px !important}";
       document.querySelector('#themeRow button[data-theme="' + th + '"]').click();
     }, [px, thema]);
     const letzte = () => s.win.filter((b) => b.do === "resize").at(-1);
     // Gegenprobe: ohne Hand bittet der Streifen um die neue, hoehere Groesse
     let n = s.win.filter((b) => b.do === "resize").length;
     const h0 = letzte().h;
-    await hoeher(30, "light");
+    await hoeher(90, "light");   // Platten (Kompakt neu): 62 Punkt hoch, 90 sind deutlich mehr
     assert(await bis(() => s.win.filter((b) => b.do === "resize").length > n && letzte().h > h0),
       "ohne Hand: hoehere Zeilen, der Streifen bittet um eine groessere Hoehe (Gegenprobe)", s.win.slice(n));
     await ruhig();
@@ -757,7 +816,7 @@ try {
        gezaehlt werden die Bitten, das Fenster zu setzen, gleich streng. */
     const setzt = () => s.win.filter((b) => b.do === "resize" && b.art !== "hand");
     n = setzt().length;
-    await hoeher(38, "dark");
+    await hoeher(110, "dark");
     await ruhig();
     assert(setzt().length === n, "von Hand gezogen: keine gerechnete Groesse mehr darueber", setzt().slice(n));
     await p.close();
@@ -849,33 +908,27 @@ try {
       "Gegenprobe: das grosse Fenster schreibt dieselben Handgriffe und meldet der Gruppe", { schluessel, schreibt: g.schreibt });
     await g.page.close();
   }
-  /* --- 19. die Meldung im Streifen geht: die Tafel schneidet neu, keine
-     Zeile Leere darunter (Pruefung N4, M3). Die Probe laeuft auf einer Hoehe
-     auf ganzer Zeile, damit "luecke <= 2" genau misst. Wie im Nachbau der
-     Pruefung: der Randlos-Hinweis steht beim ersten Zeichnen und geht nach 12 s.
-     folgt Entscheidung 04.10. (Kompaktzeilen fest): 317 ist eine Hoehe auf
-     ganzer Zeile: Kopf 85 + 2 + 8 Zeilen a 27 mit 2 Luft (Raster 29); 330 lag
-     13 Punkt daneben. */
+  /* --- 19. die Meldung im Streifen geht: das Fenster misst sich neu und ist um die Meldung niedriger, der Knopf steht ganz darin
+     (Pruefung N4, M3). Kompakt neu, Panel (21.10.2026): die Hoehe folgt dem Inhalt (compactWindowSize misst die letzte Zeile und
+     den Knopf), die Probe laeuft darum mit folgt und vergleicht die Hoehen mit und ohne Meldung; vorher schnitt die Tafel auf ganze
+     Platten und die Probe zaehlte die Reihen. Der Randlos-Hinweis steht beim ersten Zeichnen und geht nach 12 s. */
   {
-    const s = await oeffne({ zwei: true, kfenster: true, lang: "de", breite: 300, hoehe: 317, config: { randlosGesehen: false } });
+    const s = await oeffne({ zwei: true, kfenster: true, folgt: true, lang: "de", breite: 300, hoehe: 28, config: { randlosGesehen: false } });
     const p = s.page;
     await p.evaluate(() => { document.querySelector("#btnMore").click(); document.querySelector("#btnSample").click(); });
     await warte(p, () => !document.body.classList.contains("noFight"), undefined, 5000);
     const mass = () => p.evaluate(() => {
-      const tafelEnde = () => { const k = document.querySelector("#kRest"); return !k.hidden && k.getClientRects().length ? k.getBoundingClientRect().bottom : document.querySelector("#bars").getBoundingClientRect().bottom; };
-      const b = document.querySelector("#bars"), r = b.getBoundingClientRect();
-      const ganz = [...b.querySelectorAll(".row:not(.sub)")].filter((z) => z.getBoundingClientRect().bottom <= r.bottom + 1).length;
-      /* +1 Zeile: die Restzeile (#160) steht unter der Tafel; die Leere darunter beginnt erst unter ihr */
-      return { meldung: document.querySelector("#toast").classList.contains("on"), luecke: Math.round(innerHeight - tafelEnde()), ganz };
+      const k = document.querySelector("#kRest"), ende = !k.hidden && k.getClientRects().length ? k.getBoundingClientRect().bottom : document.querySelector("#bars").getBoundingClientRect().bottom;
+      return { meldung: document.querySelector("#toast").classList.contains("on"), luecke: Math.round(innerHeight - ende), h: innerHeight };
     });
     await warte(p, () => document.querySelector("#toast").classList.contains("on"), undefined, 3000);
+    await gefolgt(s);
     const mit = await mass();
     await warte(p, () => !document.querySelector("#toast").classList.contains("on"), undefined, 16000);
-    await warte(p, () => { const k = document.querySelector("#kRest"), b = !k.hidden && k.getClientRects().length ? k : document.querySelector("#bars"); return innerHeight - b.getBoundingClientRect().bottom <= 2; },
-      undefined, 2000, "die Tafel (mit Restzeile) reicht nach der Meldung bis unten (Luecke <= 2)");
+    await gefolgt(s);
     const ohne = await mass();
-    assert(mit.meldung && !ohne.meldung && ohne.luecke <= 2 && ohne.ganz > mit.ganz,
-      "Meldung weg: die Tafel reicht wieder bis unten, mit einer Zeile mehr", { mit, ohne });
+    assert(mit.meldung && !ohne.meldung && ohne.h < mit.h && mit.luecke >= 0 && mit.luecke <= 10 && ohne.luecke >= 0 && ohne.luecke <= 10,
+      "Meldung weg: das Fenster misst sich neu, ist niedriger als mit ihr, und der Knopf steht jedes Mal ganz darin (Luft unten hoechstens 10)", { mit, ohne });
     await p.close();
   }
   /* --- 20. das Kompaktfenster hat einen eigenen Titel (Pruefung N4, K6),
@@ -1053,12 +1106,14 @@ try {
      "No log", DE und EN, ganz zu lesen; ohne Grund bleibt "No log" */
   {
     const SATZ = {
-      en: { fremd: "File not in the log folder", beispiel: "Sample: full view only", mehrere: "Several files: full view only", leer: "No log" },
-      de: { fremd: "Datei nicht im Log-Ordner", beispiel: "Beispiel: nur in der Vollansicht", mehrere: "Mehrere Dateien: nur in der Vollansicht", leer: "Kein Log" },
+      en: { fremd: "File not in the log folder", beispiel: "Sample: full view only", mehrere: "Several files: full view only", leer: "No log", archiv: "Archive: full view only" },
+      de: { fremd: "Datei nicht im Log-Ordner", beispiel: "Beispiel: nur in der Vollansicht", mehrere: "Mehrere Dateien: nur in der Vollansicht", leer: "Kein Log", archiv: "Archiv: nur in der Vollansicht" },
     };
     for (const lang of ["en", "de"]) {
       for (const [grund, kompakt] of [["fremd", { grund: "datei", datei: "Mitschnitt.txt", kampf: 1 }], ["beispiel", { grund: "beispiel", datei: "", kampf: null }],
-                                       ["mehrere", { grund: "mehrere", datei: "", kampf: null }], ["leer", { grund: "leer", datei: "", kampf: null }]]) {
+                                       ["mehrere", { grund: "mehrere", datei: "", kampf: null }], ["leer", { grund: "leer", datei: "", kampf: null }],
+                                       // ein Kampf aus dem Archiv (#264): nur in der Vollansicht, der Streifen holt keine Datei
+                                       ["archiv", { grund: "archiv", datei: "", kampf: null }]]) {
         const s = await oeffne({ zwei: true, kfenster: true, lang, dateien: {}, folgt: true, breite: 300, hoehe: 28, config: { randlosGesehen: true }, kompakt });
         const p = s.page;
         await warte(p, (t) => document.querySelector("#compactIdle").textContent === t, SATZ[lang][grund], 5000);
@@ -1080,9 +1135,34 @@ try {
           { mass: z.mass, fenster: p.viewportSize(), bitten: s.win.filter((b) => b.do === "resize").slice(-3).map((b) => [b.art || "", b.w, b.h]),
             offen: s.groesseOffen, ganz: z.ganz, quer: z.quer, ruht: z.ruht, sichtbar: z.sichtbar, text: z.text, title: z.title.length });
         assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
+        if (grund === "archiv") assert(!s.logs.length, `${lang}, archiv: der Streifen fragt keine Datei (kein GET /api/log)`, s.logs);
         await p.close();
       }
     }
+  }
+  /* --- 24a. (#224) Der Satz kommt spaet: antwortet der Helfer auf /api/log erst nach der
+     Nachmessung des Streifens (260 ms nach dem Umschalten), stand der Satz in einem Fenster,
+     das nur fuer "Kein Log" gerechnet war ("File not in the log f..."). Ohne Kampf kehrt
+     renderAll vor applyWindowSize um; der Satz muss das Fenster selbst neu messen lassen.
+     Auf dem Runner kam das unter Last zufaellig (en/de, fremd, 3 von 30 Laeufen), hier ist
+     die Antwort fest auf 900 ms gestellt. */
+  for (const lang of ["en", "de"]) {
+    const s = await oeffne({ zwei: true, kfenster: true, lang, dateien: {}, folgt: true, breite: 300, hoehe: 28, logVerzug: 900,
+                             config: { randlosGesehen: true }, kompakt: { grund: "datei", datei: "Mitschnitt.txt", kampf: 1 } });
+    const p = s.page;
+    const satz = lang === "en" ? "File not in the log folder" : "Datei nicht im Log-Ordner";
+    await warte(p, (t) => document.querySelector("#compactIdle").textContent === t, satz, 8000);
+    await gefolgt(s);
+    const ganz = () => p.evaluate(() => { const e = document.querySelector("#compactIdle"), r = e.getBoundingClientRect();
+      const t = document.createRange(); t.selectNodeContents(e);
+      return { satz: +t.getBoundingClientRect().width.toFixed(2), kasten: +r.width.toFixed(2), iw: innerWidth }; });
+    let z = await ganz();
+    /* auf den Zustand warten, nicht auf eine Zeit: das Fenster folgt, sobald der Streifen darum bittet */
+    for (let i = 0; i < 60 && z.satz > z.kasten + 0.5; i++) { await new Promise((r) => setTimeout(r, 100)); z = await ganz(); }
+    assert(z.satz <= z.kasten + 0.5, `${lang}, fremd, Antwort nach 900 ms: der spaete Satz steht ganz im Streifen, das Fenster hat nachgemessen (#224)`,
+      { z, bitten: s.win.filter((b) => b.do === "resize").map((b) => [b.w, b.h]) });
+    assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
+    await p.close();
   }
   /* --- 25. Hoechstgroesse (Kompakt-Fix 2): auch von Hand gezogen meldet der
      Streifen seine gerechnete Groesse - nur als Grenze (art "hand"), aus
@@ -1123,7 +1203,11 @@ try {
       if (mitKampf) {
         await p.evaluate(() => { document.querySelector("#btnMore").click(); document.querySelector("#btnSample").click(); });
         await warte(p, () => !document.body.classList.contains("noFight"), undefined, 5000);
-        await warte(p, () => innerHeight > 100, undefined, 5000);
+        /* Das Fenster waechst mit dem Menue (innerHeight > 100 stimmt schon dann), geht beim Schliessen
+           auf 28 zurueck und waechst erst danach mit dem Kampf (#224): auf das Ende der Groessen warten,
+           dann auf die Hoehe, ehe gemessen wird. */
+        await gefolgt(s);
+        await bis(() => p.viewportSize().height > 100, "das Fenster hat die Hoehe des Streifens mit Kampf, Hoehe jetzt " + p.viewportSize().height);
         // das Beispiel kam aus dem Menue: es ging zu, waehrend der Kampf kam - danach der Streifen mit Kampf, nicht der leere
         assert(p.viewportSize().height > 100, "Beispiel aus dem Menue: danach hat das Fenster die Hoehe des Streifens mit Kampf", p.viewportSize());
       }
@@ -1162,7 +1246,8 @@ try {
       // das Fenster verliert den Fokus (ein Klick ins Spiel): das Menue geht zu, das Fenster zurueck
       const mn = s.win.filter((b) => b.art === "menue").length;
       await p.click("#btnMore");
-      await bisDa(() => s.win.filter((b) => b.art === "menue").length === mn + 1);
+      // mindestens eine Bitte: unter Last misst der Streifen das Menue ein zweites Mal nach, bevor die Probe nachsieht (#224)
+      await bisDa(() => s.win.filter((b) => b.art === "menue").length >= mn + 1);
       const j = s.win.length;
       await p.evaluate(() => window.dispatchEvent(new Event("blur")));
       await bisDa(() => s.win.slice(j).some((b) => b.art === "zurueck"));
@@ -1220,9 +1305,9 @@ try {
     await ruhig();
     const d = await deckung(p);
     const alphas = s.win.filter((b) => b.do === "seethrough").map((b) => b.alpha);
-    assert(d.acrylic && d.glass === "0.650" && /rgba\(.*0\.65\)/.test(d.grund), "Acrylic, Durchsicht 55: nur der Grund ist getoent (--glass-a .65)", d);
-    assert(alphas.length > 0 && alphas.every((a) => a === 1),
-      "Acrylic, Durchsicht 55: das Fenster selbst bleibt deckend (seethrough alpha 1, auch beim Start)", alphas);
+    assert(d.acrylic && d.glass === "0.100" && /rgba\(.*0\.1\)/.test(d.grund), "Acrylic, Durchsicht 55: nur der Grund ist getoent (--glass-a .10, #328)", d);
+    assert(alphas.length > 0 && Math.abs(alphas.at(-1) - 0.7) < 1e-9 && alphas.every((a) => a >= 0.7 - 1e-9),
+      "Acrylic, Durchsicht 55: das Fenster blendet zusaetzlich auf .70 ab (#348), nie darunter, auch beim Start", alphas);
     assert(d.teile >= 3 && d.min === 1 && d.dps === 1, "Acrylic, Durchsicht 55: Zeilen, Namen, Symbole und die Zahl haben Deckkraft 1", d);
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await p.close();
@@ -1262,7 +1347,7 @@ try {
     const m = await trifft(p, "#morePanel > *");
     assert(m.da && m.trifft && m.unten <= m.ih, "Menue per Klick: der unterste Eintrag ist zu sehen und zu treffen (elementFromPoint)", m);
     await p.keyboard.press("Escape");
-    await warte(p, () => innerHeight === 28, undefined, 5000);
+    await warte(p, () => innerHeight === 36, undefined, 5000);
     // der Dialog: Live ohne Log-Ordner fragt nach dem Ordner
     /* Live ist im Streifen ausgeblendet, kein Knopf dort oeffnet heute
        einen Dialog. Ausgeloest wird er hier ueber den verborgenen Knopf, um
@@ -1274,8 +1359,8 @@ try {
     const ok = await trifft(p, "#modalOk"), ab = await trifft(p, "#modalCancel"), feld = await trifft(p, "#modalInput");
     assert(ok.trifft && ab.trifft && feld.trifft && ok.unten <= ok.ih, "Dialog im Streifen: Feld, OK und Abbrechen sind zu sehen und zu treffen", { ok, ab, feld });
     await p.click("#modalCancel");
-    await warte(p, () => innerHeight === 28, undefined, 5000);
-    assert(p.viewportSize().height === 28 && s.win.filter((b) => b.art === "zurueck").length === 2,
+    await warte(p, () => innerHeight === 36, undefined, 5000);
+    assert(p.viewportSize().height === 36 && s.win.filter((b) => b.art === "zurueck").length === 2,
       "Dialog zu: das Fenster ist wieder der Streifen", { v: p.viewportSize(), arten: s.win.map((b) => b.art || b.do) });
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await p.close();
@@ -1287,8 +1372,8 @@ try {
     const k = await trifft(t.page, "#toast .tact");
     assert(k.trifft && k.unten <= k.ih, "Meldung im leeren Streifen: ganz zu sehen, ihr Knopf zu treffen", k);
     await t.page.click("#toast .tact").catch((e) => assert(false, "Zeitablauf beim Klick auf #toast .tact", String(e).split("\n")[0]));
-    await warte(t.page, () => innerHeight === 28, undefined, 5000);
-    assert(t.page.viewportSize().height === 28, "Meldung weg: das Fenster ist wieder der Streifen", t.page.viewportSize());
+    await warte(t.page, () => innerHeight === 36, undefined, 5000);
+    assert(t.page.viewportSize().height === 36, "Meldung weg: das Fenster ist wieder der Streifen", t.page.viewportSize());
     await t.page.close();
   }
   /* --- 29. Gutachten M1, M3, N3, N4, N6: der Streifen sagt, wenn er der
@@ -1328,11 +1413,15 @@ try {
     // M3: die Datei ist gewachsen, der neue Kampf steht erst in der frischen - einmal neu geholt
     await stand({ grund: "datei", datei: LOGNAME, kampf: START[0] });
     await mitKampf();
+    // erst wenn die Seite den vorigen Zaehler gelesen hat und ruht: sonst holt sie auch dafuer noch einmal (#224)
+    await ereignisseGelesen(s, "vor M3");
+    await stille(s, "vor M3");
     const geholt = s.logs.filter((x) => x === LOGNAME).length;
     dateien[LOGNAME] = LOG3;
     await stand({ grund: "datei", datei: LOGNAME, kampf: START[2] });
     await bisDa(() => s.logs.filter((x) => x === LOGNAME).length > geholt);
     await mitKampf();
+    await stille(s, "M3: Datei geholt");
     const g = await p.evaluate(() => ({ ruht: document.body.classList.contains("noFight"), name: document.querySelector("#hName")?.textContent || "" }));
     assert(s.logs.filter((x) => x === LOGNAME).length === geholt + 1 && !g.ruht, "M3: Datei gewachsen - einmal frisch geholt, der neue Kampf steht da", { g, logs: s.logs.length });
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
@@ -1352,7 +1441,7 @@ try {
       const v = await oeffne({ zwei: true, config: { randlosGesehen: true } });
       const staende = () => v.win.filter((b) => b.do === "stand");
       await v.page.setInputFiles("#fileInput", log);
-      await warte(v.page, () => !document.body.classList.contains("noFight"), undefined, 5000);
+      await dateiDa(v, "Datei geladen");
       v.standNein = 1;
       await v.page.click("#btnCompact");
       await bisDa(() => v.win.some((b) => b.do === "kompakt"));
@@ -1393,12 +1482,12 @@ try {
       const vorher = await glas(s.page);
       await kuerzel(s, true);
       const an = { glas: await glas(s.page), pille: await pille(s.page), alpha: s.win.filter((b) => b.do === "seethrough").at(-1)?.alpha };
-      assert(vorher === "0.920" && an.glas === "0.724" && an.pille.da && an.pille.text === "40\u00a0%" && an.pille.regler === "0" && an.alpha === 1,
-        "30 Acrylic: Durchklick toent den Grund auf 0,724, die Pille sagt 40 %, der Regler bleibt 0, das Fenster deckend", { vorher, an });
+      assert(vorher === "0.500" && an.glas === "0.209" && an.pille.da && an.pille.text === "40\u00a0%" && an.pille.regler === "0" && Math.abs(an.alpha - 0.782) < 1e-9,
+        "30 Acrylic: Durchklick toent den Grund auf 0,209 (Regler 40, #328), die Pille sagt 40 %, der Regler bleibt 0, das Fenster blendet auf .782 ab (#348)", { vorher, an });
       assert(!s.posts.some((p) => "compactAlpha" in p), "30: der Durchklick schreibt compactAlpha nicht", s.posts);
       await kuerzel(s, false);
       const aus = { glas: await glas(s.page), pille: await pille(s.page) };
-      assert(aus.glas === "0.920" && !aus.pille.da, "30: Durchklick aus, wieder der Regler (0,920, keine Pille)", aus);
+      assert(aus.glas === "0.500" && !aus.pille.da, "30: Durchklick aus, wieder der Regler (0,500, keine Pille)", aus);
       await s.page.close();
     }
     // Regler 50: der Regler gilt
@@ -1408,7 +1497,7 @@ try {
       await stille(s, "Streifen offen"); await steht(s.page, "Streifen offen");
       await kuerzel(s, true);
       const g = await glas(s.page), pl = await pille(s.page);
-      assert(g === "0.675" && pl.text === "50\u00a0%", "30: Regler 50 bleibt 50 im Durchklick (0,675)", { g, pl });
+      assert(g === "0.136" && pl.text === "50\u00a0%", "30: Regler 50 bleibt 50 im Durchklick (0,136)", { g, pl });
       await s.page.close();
     }
     // ohne Acrylic: das Fenster blendet auf 0,6
@@ -1473,7 +1562,7 @@ try {
       const lief = await zeile();
       await p.evaluate(() => document.querySelector("#btnWatch").click());
       // "sofort": vor dem Wecker der Kampftrennung (3 s) - die Frist ist Teil der Pruefung, wie vorher die Pause
-      await warte(p, () => !document.body.classList.contains("kampf-laeuft"), undefined, 1000, "kampf-laeuft geht mit dem Beenden");
+      await warte(p, () => !document.body.classList.contains("kampf-laeuft"), undefined, 1000, "kampf-laeuft geht mit dem Beenden", true);
       const aus = await zeile();
       assert(lief.laeuft && !aus.laeuft && aus.lese !== "Fight in progress",
         "31: Live beenden mitten im Kampf - \"Fight in progress\" geht sofort", { lief, aus });
@@ -1510,8 +1599,8 @@ try {
     assert(aus.inhalt === "none" || aus.breite === "auto" || aus.breite === "0px", "32: ohne Live kein Punkt", aus);
     await p.close();
   }
-  /* --- 33. die Restzeile (#160): im Kompaktfenster fuehrt ein Klick zur
-     Vollansicht; groesser gezogen mit allen Zeilen gibt es keine. */
+  /* --- 33. Mausrad statt "+N weitere" (#160, #287, #328): im Kompaktfenster rollt das Rad die Liste, das Fenster behaelt seine Hoehe;
+     die Vollansicht oeffnet es nicht. */
   {
     const s = await oeffne({ zwei: true, kfenster: true, folgt: true, config: { randlosGesehen: true } });
     const p = s.page;
@@ -1519,19 +1608,22 @@ try {
     await p.evaluate(() => { document.querySelector("#btnMore").click(); document.querySelector("#btnSample").click(); });
     await warte(p, () => { const b = document.querySelector("#kRest"); return b && !b.hidden; }, undefined, 6000);
     await p.keyboard.press("Escape");
-    /* erst warten, bis die Seite ihre Groesse gemeldet hat (zweiter Wurf nach 260 ms): sonst
-       setzt der Rahmen des Tests die gemeldete Groesse nach dem Vergroessern wieder ein */
+    // die Meldung "Escape noch einmal" steht zwei Sekunden im Fluss; die Hoehe ohne sie ist die Messlatte
+    await warte(p, () => !document.querySelector("#toast").classList.contains("on"), undefined, 6000);
     await gefolgt(s);
-    const hoehe = (await p.evaluate(() => document.querySelector("#bars").scrollHeight)) + 400;
-    await p.setViewportSize({ width: 320, height: hoehe });
-    await warte(p, (h) => innerHeight === h, hoehe, 5000, "Fensterhoehe " + hoehe); await bilder(p, "groesser gezogen");
-    const gross = await p.evaluate(() => document.querySelector("#kRest").hidden);
-    assert(gross, "33: alles zu sehen - keine Restzeile", gross);
-    await p.setViewportSize({ width: 300, height: 260 });
-    await warte(p, () => !document.querySelector("#kRest").hidden, undefined, 4000);
-    await p.click("#kRest");
-    await bisDa(() => s.win.some((b) => b.do === "kompakt" && b.on === false));
-    assert(s.win.some((b) => b.do === "kompakt" && b.on === false && b.win === "kompakt"), "33: ein Klick auf die Restzeile fuehrt zur Vollansicht", s.win.filter((b) => b.do === "kompakt"));
+    const zeilen = () => p.evaluate(() => [...document.querySelectorAll("#bars .row:not(.sub)")].filter((z) => z.getClientRects().length).length);
+    const h0 = p.viewportSize().height;
+    const ganz = () => p.evaluate(() => { const b = document.querySelector("#bars").getBoundingClientRect();
+      return [...document.querySelectorAll("#bars .row:not(.sub)")].filter((z) => { const q = z.getBoundingClientRect(); return q.top >= b.top - 1 && q.bottom <= b.bottom + 1; }).length; });
+    assert(await zeilen() >= 12 && await ganz() === 5, "33: fuenf ganze Zeilen und der Hinweis, die uebrigen liegen zum Rollen darunter", { zeilen: await zeilen(), ganz: await ganz() });
+    const n0 = s.win.length;
+    await p.mouse.move(150, 200);
+    await p.mouse.wheel(0, 9000);
+    await warte(p, () => { const b = document.querySelector("#bars"); return b.scrollTop > 0 && b.scrollTop >= b.scrollHeight - b.clientHeight - 1; });
+    await gefolgt(s);
+    assert(await ganz() === 5 && p.viewportSize().height === h0 && s.win.slice(n0).every((b) => b.h === undefined || b.h === h0),
+      "33: das Mausrad rollt die Liste bis zur letzten Zeile, das Fenster bleibt so hoch wie vorher", { ganz: await ganz(), h0, h: p.viewportSize().height });
+    assert(!s.win.some((b) => b.do === "kompakt" && b.on === false), "33: Rollen oeffnet nicht die Vollansicht", s.win.filter((b) => b.do === "kompakt"));
     await p.close();
   }
   /* --- 34. der erste Kampf eines frischen Logs (Abschlusspruefung, Minor 2):
@@ -1545,16 +1637,15 @@ try {
     await nachTakt(s, "der Takt nach dem leeren Log");
     const davor = await p.evaluate(() => document.body.classList.contains("kampf-laeuft"));
     helfer.text = vulcanusLog([{ start: START[0], scale: 6.0 }]).split("\n").slice(0, 40).join("\n") + "\n";
-    await warte(p, () => document.body.classList.contains("kampf-laeuft"), undefined, 4500);
+    await warte(p, () => document.body.classList.contains("kampf-laeuft"), undefined, 4500, "kampf-laeuft im naechsten Takt", true);
     const erst = await p.evaluate(() => ({ laeuft: document.body.classList.contains("kampf-laeuft"), lese: document.querySelector("#hCompact")?.textContent || "" }));
     assert(!davor && erst.laeuft && erst.lese === "Fight in progress",
       "34: der erste Kampf eines frischen, leeren Logs gilt gleich als laufend (kein Takt Verzug)", { davor, erst });
     assert(!s.fehler.length, "34: keine Fehler auf der Seite", s.fehler);
     await p.close();
   }
-  /* --- 35. die Restzeile im Einzelfenster (Minor 9): ohne zweites Fenster
-     ist Kompakt derselbe Streifen im Hauptfenster; ein Klick auf die
-     Restzeile fuehrt zur Vollansicht zurueck. */
+  /* --- 35. der Hinweis "+N weitere" im Einzelfenster (Minor 9, #287, #328): ohne zweites Fenster ist Kompakt derselbe Streifen im Hauptfenster;
+     das Mausrad rollt die Liste und verlaesst Kompakt nicht. */
   {
     const s = await oeffne({ zwei: false, folgt: true, config: { randlosGesehen: true } });
     const p = s.page;
@@ -1562,14 +1653,15 @@ try {
     await warte(p, () => document.body.classList.contains("compact"), undefined, 5000);
     await p.evaluate(() => { document.querySelector("#btnMore").click(); document.querySelector("#btnSample").click(); });
     await gefolgt(s);
-    await p.setViewportSize({ width: 300, height: 260 });
+    await p.setViewportSize({ width: 300, height: 700 });
     await warte(p, () => { const b = document.querySelector("#kRest"); return b && !b.hidden; }, undefined, 6000);
     const da = await p.evaluate(() => ({ kompakt: document.body.classList.contains("compact"), rest: !document.querySelector("#kRest").hidden }));
-    assert(da.kompakt && da.rest, "35: im Einzelfenster-Kompakt steht die Restzeile bei mehr als fuenf Zeilen", da);
-    await p.click("#kRest");
-    await warte(p, () => !document.body.classList.contains("compact"), undefined, 5000);
+    assert(da.kompakt && da.rest, "35: im Einzelfenster-Kompakt steht der Hinweis bei mehr als sechs Zeilen", da);
+    await p.mouse.move(150, 200);
+    await p.mouse.wheel(0, 9000);
+    await warte(p, () => { const b = document.querySelector("#bars"); return b.scrollTop > 0 && b.scrollTop >= b.scrollHeight - b.clientHeight - 1; }, undefined, 5000);
     const weg = await p.evaluate(() => document.body.classList.contains("compact"));
-    assert(!weg, "35: ein Klick auf die Restzeile im Einzelfenster verlaesst Kompakt", weg);
+    assert(weg, "35: das Mausrad rollt die Liste und verlaesst Kompakt nicht", weg);
     assert(!s.fehler.length, "35: keine Fehler auf der Seite", s.fehler);
     await p.close();
   }
@@ -1586,7 +1678,7 @@ try {
         const v = await oeffne({ zwei: true, kompaktVerzug: 600, config: { randlosGesehen: true } });
         const staende = () => v.win.filter((b) => b.do === "stand");
         await v.page.setInputFiles("#fileInput", log);
-        await warte(v.page, () => !document.body.classList.contains("noFight"), undefined, 5000);
+        await dateiDa(v, "Datei geladen");
         if (fall === "abgelehnt") v.standNein = 1;
         await v.page.click("#btnCompact");
         await bisDa(() => v.win.some((b) => b.do === "kompakt"));

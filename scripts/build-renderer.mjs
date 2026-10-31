@@ -33,7 +33,10 @@ const parts = readdirSync(join(src, "app")).filter((f) => f.endsWith(".ts")).sor
 // audit 13b.15 names the file); 48 (rotation trainer) went too and is
 // taken again by 48-einsaetze.ts. Renaming the parts after them would have
 // moved every reference to them. A free number may be taken again by a new
-// part; any other gap stops the build.
+// part; any other gap stops the build. 75 was held for a part on another
+// branch while the log archive took 76 (76-archiv.ts, #264; audit 13d names
+// the file); 74 is taken by 74-bereichs-hinweise.ts (#265), 75 by
+// 75-alte-logs.ts ("Alte Logs einlesen", #264; audit 13d.P4 names the file).
 const FREE = new Set(["49", "51", "52"]);
 let nr = 0;
 parts.forEach((f) => {

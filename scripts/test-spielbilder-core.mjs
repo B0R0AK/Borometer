@@ -203,16 +203,45 @@ const FOTO = { Vulcanus: "vulcanus", Fellinex: "fellinex", "Deus Chimaerus": "de
   "Kaiser Crimson": "kaiser-crimson", Kayser: "kaiser-crimson", "Norn Bercant": "norn-bercant", "Limuny Bercant": "limuny-bercant",
   "Duke Magna": "duke-magna", "Magna-F\u00fcrst": "duke-magna", "King Chimaerus": "king-chimaerus", "K\u00f6nig Chim\u00e4rus": "king-chimaerus",
   Kaligras: "kaligras", Gaitan: "gaitan", Turka: "turka", Shakarux: "shakarux", Lequirus: "lequirus", Shaikal: "shaikal",
-  Minezerok: "minezerok", Minezrok: "minezerok", Exodus: "exodus",
-  Verence: "verence", Marta: "marta", Haylock: "haylock", Gaudian: "gaudian" };
+  Verence: "verence", Marta: "marta", Haylock: "haylock", Gaudian: "gaudian", Molgras: "molgras", Murdock: "murdock" };
 ok(new Set(Object.values(FOTO)).size === 21, "21 Fotos benannt");
 if (modus === "voll") {
   const fotoFalsch = Object.entries(FOTO).filter(([n, k]) => !T.BOSS_ICON_BILD.has("foto:" + k) || bi.bossIcon(n) !== "data:image/webp;base64," + T.BOSS_ICON_BILD.get("foto:" + k));
   ok(!fotoFalsch.length, "voll: die 21 Bosse tragen ihr Foto, unter jedem Namen", fotoFalsch.map(([n]) => n));
   const mitMarke = bossNamen.filter((n) => bi.bossIcon(n) === MARKE);
   ok(!mitMarke.length, "voll: kein Boss aus 06 traegt mehr die gezeichnete Marke", mitMarke);
-  const schief = [...T.BOSS_ICON_BILD, ...T.WK_BOSS_BILD].filter(([, v]) => String(masse(v)) !== "96,96").map(([k, v]) => [k, masse(v)]);
-  ok(!schief.length, "voll: jedes Boss-Bild ist 96 x 96", schief);
+  /* Hochaufloesung (#258): Boss-Bilder sind quadratisch, 96 bis 192 Pixel. Die neu aus den Originalfotos
+     ausgeschnittenen tragen genau 192, seit 29.10.2026 auch Verence, Marta und die vier Raid-Bilder (Bosskarten
+     vom 27.10.2026), und seit 29.10.2026 (#344) auch Haylock und Gaudian. */
+  const quer = [...T.BOSS_ICON_BILD, ...T.WK_BOSS_BILD].map(([k, v]) => [k, masse(v)]).filter(([, m]) => m[0] !== m[1] || m[0] < 96 || m[0] > 192);
+  ok(!quer.length, "voll: jedes Boss-Bild ist quadratisch, 96 bis 192 Pixel", quer);
+  const wk = [...T.WK_BOSS_BILD].filter(([, v]) => String(masse(v)) !== "192,192").map(([k]) => k);
+  ok(!wk.length && T.WK_BOSS_BILD.size === 4, "voll: die vier Raid-Bilder sind 192 x 192", wk);
+  /* Obergrenze der ganzen Datei (#258: 4,5 MB); steigt nur auf Wort von B0R0AK. */
+  const GROESSE = Buffer.byteLength(text, "utf8");
+  ok(GROESSE <= 4.5 * 1024 * 1024, "voll: assets/spielbilder.ts ist hoechstens 4,5 MB gross (" + Math.round(GROESSE / 1024) + " kB)");
+  const SCHARF = ["vulcanus", "fellinex", "deus-chimaerus", "nerzatum", "kaiser-crimson", "norn-bercant", "limuny-bercant", "duke-magna",
+    "king-chimaerus", "kaligras", "gaitan", "turka", "shakarux", "shaikal", "lequirus", "molgras", "murdock",
+    "verence", "marta", "haylock", "gaudian"];
+  const unscharf = SCHARF.filter((k) => String(masse(T.BOSS_ICON_BILD.get("foto:" + k))) !== "192,192");
+  ok(!unscharf.length && SCHARF.length === 21, "voll: die 21 neu ausgeschnittenen Fotos haben 192 x 192", unscharf);
+  /* Hochaufloesung der Questlog-Bilder (#258): Symbole 128, Boss-Porträts 192. */
+  const gross = (tab, m, ausser = () => false) => [...tab].filter(([k]) => !ausser(k)).filter(([, v]) => String(masse(v)) !== m + "," + m).map(([k]) => k);
+  const eigene = (k) => k.startsWith("boro:") || k === "WM_Common_SKILL_009";
+  const s128 = gross(T.SKILL_ICON_BILD, 128, eigene);
+  ok(!s128.length && [...T.SKILL_ICON_BILD.keys()].filter((k) => !eigene(k)).length === 275, "voll: die 275 questlog-Symbole der Faehigkeiten sind 128 x 128", s128.slice(0, 5));
+  const k128 = gross(T.KERN_BILD, 128);
+  ok(!k128.length && T.KERN_BILD.size === 35, "voll: die 35 Kernsymbole sind 128 x 128", k128.slice(0, 5));
+  const g128 = gross(T.WK_GEGENSTAND_BILD, 128);
+  ok(!g128.length && T.WK_GEGENSTAND_BILD.size === 19, "voll: die 19 Gegenstaende der Weeklies sind 128 x 128", g128.slice(0, 5));
+  const p192 = gross(T.BOSS_ICON_BILD, 192, (k) => !k.startsWith("PT_NPC_"));
+  ok(!p192.length && [...T.BOSS_ICON_BILD.keys()].filter((k) => k.startsWith("PT_NPC_")).length === 39, "voll: die 39 questlog-Porträts der Bosse sind 192 x 192", p192.slice(0, 5));
+  ok(bi.bossIcon("Minezerok") === "data:image/webp;base64," + T.BOSS_ICON_BILD.get("PT_NPC_M_Lich_MaenZerokA"), "voll: Minezerok traegt das questlog-Porträt");
+  ok(bi.bossIcon("Exodus") === "data:image/webp;base64," + T.BOSS_ICON_BILD.get("PT_NPC_L06_M_EvilEye_Exavis_001"), "voll: Exodus traegt das questlog-Porträt");
+  /* Uebungspuppe (#258): das 512-px-Original auf 192 x 192 verkleinert, WebP mit Alpha (VP8X, Alphabit gesetzt). */
+  const puppe = T.BOSS_ICON_BILD.get("fremd:target-practice");
+  ok(!!puppe && String(masse(puppe)) === "192,192", "voll: die Uebungspuppe ist 192 x 192", puppe && masse(puppe));
+  ok(!!puppe && Buffer.from(puppe, "base64").toString("latin1", 12, 16) === "VP8X" && (Buffer.from(puppe, "base64")[20] & 0x10) !== 0, "voll: die Uebungspuppe traegt Alpha");
 }
 if (modus === "leer")
   ok(bossNamen.every((n) => bi.bossIcon(n) === MARKE), "leer: jeder Boss traegt die eigene Marke");

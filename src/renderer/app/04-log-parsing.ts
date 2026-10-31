@@ -184,6 +184,16 @@ export function parseGrid(text: string){
   return {delim, headers, rows:body, hasHeader, prof, counts, widths, stable, version};
 }
 
+/* Die Zeit einer einzelnen Zeile des Logs, wie parseGrid und ereignisseAus sie
+   lesen: getrimmt, mit dem Trennzeichen des Logs geteilt, die Zeitspalte durch
+   parseTime. Fuer den Schnitt eines Kampfs im Archiv (76-archiv.ts,
+   kampfZeilen in archiv-core.ts); null, wenn die Zeile keine Zeit traegt.
+   Ohne Uebertrag ueber Mitternacht: das Archiv nimmt nur Logs mit Datum. */
+export function zeileZeit(zeile: string, delim: string, spalte: number): number | null {
+  const p = parseTime(splitLine(zeile.trim(), delim)[spalte]);
+  return p ? p.ms : null;
+}
+
 /* Die haeufigste Zeilenbreite; bei Gleichstand die kleinere (for...in geht
    ganze Zahlen aufsteigend durch, und nur ein groesserer Zaehler gewinnt). */
 export function modeWidth(c: Record<string, number>){

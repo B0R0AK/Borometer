@@ -7,12 +7,13 @@ import { applyStaticI18n, setLang } from "./31-static-translation";
 import { renderRotation } from "./25-rotation";
 import { histRecord } from "./32-history";
 import { switchTab } from "./34-menus-drop-and-tabs";
-import { kompaktFensterAuf, syncWidthStops, syncZoomRow, winPost } from "./37-window-size-and-overlay";
-import { chooseServerDir, FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";
+import { kompaktFensterAuf, standNachLive, syncWidthStops, syncZoomRow, winPost } from "./37-window-size-and-overlay";
+import { ABRISS_FENSTER, chooseServerDir, FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";
 import { syncPartyPill } from "./42-party";
 import { toggleMore } from "./43-more-menu-and-dev-mode";
 import { renderTafelUrteil } from "./56-tafel";
-import { einstNachfuehren } from "./57-einstellungen";
+import { einstNachfuehren, einstSpringen } from "./57-einstellungen";
+import { archivHinweisQuittieren, archivHinweisZeigen } from "./76-archiv";
 import { zuletztGeoeffnet } from "../verlauf-core";
 
 /* ---------- Filter dropdown ----------
@@ -99,7 +100,8 @@ export const isWatching = () => document.body.classList.contains("watching");
 export function setWatching(on: boolean, file?: string, pause = false){
   const was = isWatching();
   document.body.classList.toggle("watching", !!on);
-  if(on && !was) showWatchPop(file);
+  // das abgerissene Fenster liest nur mit: die Meldung gehoert der Vollansicht (#347)
+  if(on && !was && !ABRISS_FENSTER) showWatchPop(file);
   // beendet, waehrend das Band noch stand: es sagte weiter "Live-Aufzeichnung"
   if(!on && was){
     clearTimeout(watchPopTimer ?? undefined); $("#watchPop").classList.remove("on");
@@ -118,6 +120,8 @@ export function setWatching(on: boolean, file?: string, pause = false){
   }
   // der goldene Punkt auf dem Symbol in der Taskleiste folgt (taskbar.ts)
   if(!!on !== was) void winPost({do:"live", on: !!on});
+  // ein abgerissenes Fenster (Windows Teil 2) folgt: Live ist Teil des Stands der Vollansicht (37)
+  if(!!on !== was) standNachLive();
   syncLiveBtn();
 }
 /* Der Satz zum Zustand: Dateiname, "wartet auf einen Kampf", Stoerung.
@@ -213,6 +217,34 @@ export function syncLiveBtn(){
    in der Kampfwahl (oeffneDateien in 23; Nachtraege N3, Luecken 1.9).
    Ohne gelesene Datei steht ein Satz statt erfundener Zeilen. Schreibt nur,
    was sich aendert; fragt nichts ab. */
+/* Der Satz des Archivs in der Frage nach dem Rundgang (#rgFrageZusatz, 63
+   baut die Stelle leer und versteckt): ein Satz und "Verstanden". Steht er
+   nicht, ist die Stelle wieder leer. "Verstanden" quittiert wie auf Start
+   (archivHinweis 1, 76); der Fokus geht dann auf den ersten Knopf der Frage. */
+function archivImBand(zeigen: boolean): void {
+  const z = document.querySelector<HTMLElement>("#rgFrageZusatz");
+  if(!z) return;
+  if(!zeigen){
+    if(!z.hidden) z.hidden = true;
+    if(z.firstChild) z.textContent = "";
+    return;
+  }
+  if(!z.querySelector("#rgFrageArchivOk")){
+    z.innerHTML = '<span id="rgFrageArchivSatz" data-i18n="frage.archiv"></span> ' +
+      '<button class="btn sm" type="button" id="rgFrageArchivOk" aria-describedby="rgFrageArchivSatz" data-i18n="land.archivOk"></button>';
+    $("#rgFrageArchivOk").onclick = () => {
+      const hielt = z.contains(document.activeElement);
+      archivHinweisQuittieren();
+      renderStart();
+      if(hielt) document.querySelector<HTMLElement>("#rgFrageNein")?.focus({preventScroll: true});
+    };
+  }
+  const satz = t("frage.archiv"), ok = t("land.archivOk");
+  if($("#rgFrageArchivSatz").textContent !== satz) $("#rgFrageArchivSatz").textContent = satz;
+  if($("#rgFrageArchivOk").textContent !== ok) $("#rgFrageArchivOk").textContent = ok;
+  if(z.hidden) z.hidden = false;
+}
+
 export function renderStart(): void {
   if(!document.getElementById("land")) return;
   const wort = t(SERVED ? "land.pickFolder" : "land.dateiOeffnen");
@@ -224,6 +256,22 @@ export function renderStart(): void {
   if($("#landZuletzt").hidden === ordner) $("#landZuletzt").hidden = !ordner;
   const fehlt = SERVED && !ordner && !!document.body.dataset.bereit;
   if($("#landFehlt").hidden === fehlt) $("#landFehlt").hidden = !fehlt;
+  /* Der Erststart-Hinweis des Log-Archivs (Spezifikation Log-Archiv 6): nur
+     mit dem Helfer, eingeschaltet und noch nicht quittiert (76). */
+  /* Beim ersten Start steht oben die Frage nach dem Rundgang (63, #rgFrage).
+     Dann gibt es eine Karte, nicht zwei: der Satz des Archivs dockt mit
+     eigenem "Verstanden" an ihrer festen Stelle an (#rgFrageZusatz), und der
+     Hinweis hier wartet. Die Knoepfe der Frage quittieren das Archiv nicht:
+     geht die Frage ohne "Verstanden" zu, steht der Hinweis danach hier. Im
+     eigenen Fenster wartet er auch, bis entschieden ist, ob die Frage kommt
+     (#rundgang[data-von-selbst]) - sonst stuende er kurz hier und sprange dann. */
+  const archiv = archivHinweisZeigen();
+  const band = document.querySelector<HTMLElement>("#rgFrage"), rg = document.querySelector<HTMLElement>("#rundgang");
+  const imBand = archiv && !!band && !band.hidden;
+  const wartet = archiv && OWN_WINDOW && !KOMPAKT_FENSTER && !!rg && !rg.dataset.vonSelbst;
+  const aufStart = archiv && !imBand && !wartet;
+  if($("#landArchiv").hidden === aufStart) $("#landArchiv").hidden = !aufStart;
+  archivImBand(imBand);
   if(!ordner) return;
   const zeilen = zuletztGeoeffnet(state.hist.files);
   const html = zeilen.map(z => '<li><button class="zr" type="button" data-datei="' + esc(z.datei) + '" title="' + esc(t("land.zeileTitle")) + '">' +
@@ -244,6 +292,23 @@ export function setup(): void {
     const b = (e.target as HTMLElement).closest<HTMLElement>("button.zr[data-datei]");
     if(b) void oeffneDateien((b.dataset.datei || "").split(" + ").filter(Boolean));
   });
+  /* Der Hinweis des Log-Archivs: "Verstanden" quittiert ihn (archivHinweis 1),
+     danach nimmt das Archiv auf. Der Fokus bleibt auf Start, auf dem Ablagefeld
+     daneben, statt mit dem Knopf zu verschwinden. "Einstellungen" springt zum
+     Abschnitt Archiv und quittiert nichts. */
+  $("#landArchivOk").onclick = () => {
+    const hielt = $("#landArchiv").contains(document.activeElement);
+    archivHinweisQuittieren();
+    renderStart();
+    if(hielt) $("#btnOpen2").focus();
+  };
+  $("#landArchivEinst").onclick = () => einstSpringen("archiv");
+  /* Kommt oder geht die Frage nach dem Rundgang (63 baut sie spaeter als
+     dieser Teil), wandert der Satz des Archivs mit: in die Frage oder als
+     Hinweis zurueck auf Start. Nur diese zwei Stellen loesen es aus. */
+  new MutationObserver(recs => {
+    if(recs.some(r => (r.target as HTMLElement).id === "rgFrage" || (r.target as HTMLElement).id === "rundgang")) renderStart();
+  }).observe(document.body, {subtree: true, attributes: true, attributeFilter: ["hidden", "data-von-selbst"]});
   /* Tab bleibt im Bereich, solange er offen ist - hinter dem Schleier gibt es
      nichts, worauf ein Vorleser reagieren duerfte. Dieselbe Schleife wie beim
      Changelog. */
@@ -267,7 +332,6 @@ export function setup(): void {
   addEventListener("keydown", e => { if(e.key === "Escape" && state.filterOpen) toggleFilter(false); });
   $("#btnCompareNow").onclick = () => { kampfwahlSchliessen(true); switchTab("compare", true); };
   $("#winMin").onclick = () => winDo("minimize");
-  $("#winMax").onclick = () => winDo("maximize");
   $("#winClose").onclick = () => winDo("close");
   /* ---------- Tab am Ende der Seite, im eigenen Fenster ----------
      Critique 23.09.2026: nach "Anwenden" im Zeitverlauf fiel der Fokus mit

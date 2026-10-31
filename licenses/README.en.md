@@ -10,15 +10,14 @@ details are read from the files themselves, not copied from elsewhere.
 
 ## Fonts: SIL Open Font License 1.1
 
-The licence text is in [`OFL-1.1.txt`](OFL-1.1.txt). `src/renderer/styles.css` (and with it the built `boro-meter.html`) embeds five
+The licence text is in [`OFL-1.1.txt`](OFL-1.1.txt). `src/renderer/styles.css` (and with it the built `boro-meter.html`) embeds four
 subsets (U+0000 to U+00FF) as WOFF2. The notices read like this in the name table of
 the embedded faces:
 
 | Family | Copyright notice |
 |---|---|
-| Archivo Black | Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack) |
-| IBM Plex Sans Condensed (Regular, Medium, SemiBold) | Copyright 2019 IBM Corp. All rights reserved. |
-| IBM Plex Mono | Copyright 2017 IBM Corp. All rights reserved. |
+| Anton | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git) (Licence text: [`LICENSE-Anton-OFL.txt`](LICENSE-Anton-OFL.txt)) |
+| Source Sans 3 (Regular, SemiBold, Bold) | Google Inc. (Licence text: [`LICENSE-SourceSans3-OFL.txt`](LICENSE-SourceSans3-OFL.txt)) |
 
 The OFL is compatible with the GPL: the fonts keep their own licence and do not
 rub off on the program. They may be passed on as long as this licence text goes
@@ -47,23 +46,27 @@ because they are inside the shipped `.exe`:
 > asset repository and are put in when building. Without it the app draws its own
 > marks.
 >
+> Since 16.10.2026 all questlog images are in higher resolution, fetched once by hand from cdn.questlog.gg (image files only): skill, core and item icons at 128 × 128, the enemy portraits at 192 × 192 (WebP); `assets/spielbilder.ts` is now about 3.6 MB.
+>
 > What the release downloads embed: 275 skill icons from questlog.gg's `getSkillSets`
-> feed (plus "Falling Flower", WM_Common_SKILL_009, from a screenshot by B0R0AK of
+> feed (plus "Falling Flower", WM_Common_SKILL_009, since 21.10.2026 at 128 × 128 from cdn.questlog.gg, before that from a screenshot by B0R0AK of
 > 01.10.2026), 34 skill core icons from cdn.questlog.gg (28 and 30.09.2026) and 55
 > enemy images, 27 of them reduced screenshots (17 of them from screenshots by B0R0AK
-> taken in the game on 03.10.2026, head cut square, 96 × 96 WebP, together 63.3 kB,
-> about 84 kB as Base64), one (Vegamor as a whole, image
+> taken in the game on 03.10.2026, head cut square; since 16.10.2026 15 of them re-cut from the original photos at 192 × 192 WebP, Exodus comes from cdn.questlog.gg since 21.10.2026 at 192 × 192; Minezerok comes from cdn.questlog.gg since 16.10.2026 (`PT_NPC_M_Lich_MaenZerokA`, 192 × 192); plus Molgras and Murdock from two boss cards by B0R0AK, 192 × 192; the 21 boss photos together about 0.4 MB as Base64), one (Vegamor as a whole, image
 > `PT_NPC_M_Vagamont_Sprite` of the NPC `FD_L13_AB_M_SpiritTree_Vagamont_001`) from
 > cdn.questlog.gg on 01.10.2026; together with the other icons about 1.3 MB as
 > Base64 (counted on 30.09.2026).
 > In addition, since 01.10.2026, for the weeklies (also in `assets/spielbilder.ts`;
 > "Wochenband" redesign, later with merchants and the dimensional trial):
 > **19 item icons** from cdn.questlog.gg
-> (48 × 48 WebP, each with its id and path under `throne-and-liberty/assets/` as origin)
+> (128 × 128 WebP, each with its id and path under `throne-and-liberty/assets/` as origin)
 > and **4 boss images** of the raid (Dragaryle, Zairos and Calanthia from screenshots
 > by B0R0AK from the game of 01.10.2026, Radeth from a screenshot by B0R0AK of
-> 02.10.2026, shown in the records and in the meter), cut out and reduced (96 × 96 WebP); together
-> 56.6 kB, about 77 kB as Base64. The Hall of Illusions, the Infinity Portal, the
+> 02.10.2026, shown in the records and in the meter), cut out and first reduced to
+> 96 × 96 WebP. Since 29.10.2026 the four raid images, Verence, Marta, Haylock and Gaudian
+> (Hall of Illusions) are re-cut from boss cards by B0R0AK of 27 and 29.10.2026, same crop
+> (Haylock framed a little wider), 192 × 192 WebP (#258, #344); the four raid images together
+> 45.5 kB, about 61 kB as Base64. The Hall of Illusions, the Infinity Portal, the
 > region certificate and the dungeons of the dimensional trial carry drawn marks of
 > their own, no game image.
 >
@@ -112,7 +115,7 @@ pieces in a saved plan.
 
 | Icon | Origin | Licence |
 |---|---|---|
-| Practice dummy (`fremd:target-practice` in `assets/spielbilder.ts`) | "Target practice" by juicy_fish on Flaticon, style "Juicy Fish Outline", https://www.flaticon.com/free-icon/target-practice_5773977; provided by B0R0AK on 01.10.2026, reduced to 96 px as WebP | [Flaticon License](https://www.flaticon.com/legal): free for personal and commercial use, **attribution required** |
+| Practice dummy (`fremd:target-practice` in `assets/spielbilder.ts`) | "Target practice" by juicy_fish on Flaticon, style "Juicy Fish Outline", https://www.flaticon.com/free-icon/target-practice_5773977; provided by B0R0AK on 01.10.2026, original file (512 px) reduced to 192 px as WebP on 26.10.2026 | [Flaticon License](https://www.flaticon.com/legal): free for personal and commercial use, **attribution required** |
 
 The attribution, as Flaticon asks for it:
 

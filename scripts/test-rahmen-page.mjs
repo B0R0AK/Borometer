@@ -218,7 +218,7 @@ try {
     await s.page.evaluate(() => document.querySelector("#btnCompact").click());
     await s.page.waitForTimeout(400);
     const k = await kopf(s.page);
-    assert(Math.abs(k.h - 26) < 0.5 && k.ziehen !== "drag", "Kompakt: der Streifen bleibt 26 Punkt, ohne Ziehen auf der ganzen Leiste", k);
+    assert(Math.abs(k.h - 34) < 0.5 && k.ziehen !== "drag", "Kompakt: der Streifen ist 34 Punkt (#328), die Leiste selbst zieht nicht, nur ihre Fläche dahinter", k);
     assert(!s.fehler.length, "App: keine Fehler auf der Seite", s.fehler);
     await s.page.close();
   }
@@ -727,7 +727,9 @@ try {
         // der Name: fuer den Vorleser im Knopf (.vh), sichtbar als Blase (.btip, 0.19) statt title
         namen: k.map((b) => [b.querySelector(".btip")?.textContent || "", b.querySelector(".vh")?.textContent || "",
           b.querySelector(".btip")?.getAttribute("aria-hidden") === "true"]),
-        reiterRollen: document.querySelectorAll('[role="tab"], [role="tablist"], [role="tabpanel"], .tab[aria-selected], #tabs').length,
+        /* die Reiter des Streifens (#knTabs, Kompakt neu) sind kein Teil dieser Leiste: nur im Kompakt da, in der Vollansicht verborgen (unten gezaehlt) */
+        reiterRollen: [...document.querySelectorAll('[role="tab"], [role="tablist"], [role="tabpanel"], .tab[aria-selected], #tabs')].filter((e) => !e.closest("#knTabs")).length,
+        streifenReiterSichtbar: !!document.querySelector("#knTabs")?.getClientRects().length,
         land: !document.querySelector("#land").hidden, app: !document.querySelector("#app").hidden,
         panel: document.querySelector(".panel.on")?.id || "" };
     });
@@ -738,10 +740,12 @@ try {
     // Neugestaltung 28.09. (0.17) Weeklies ueber Start; der Builds-Reiter ist entfallen (#207)
     // folgt Spezifikation Rekorde 2a (02.10.2026): der Pokal steht unten nach den Weeklies, gleich streng
     // folgt Spezifikation Gilde 5 (06.10.2026): die Gilde zwischen Weeklies und Rekorden, gleich streng
-    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "start", "settings"]),
-      "Reihenfolge: Kampf, Rotation, Analyse, Vergleich, Verlauf, Gruppe, unten Weeklies, Gilde, Rekorde, Start und Einstellungen", l.folge);
+    // folgt Spezifikation Log-Archiv 7 (17.10.2026, #264): das Archiv nach den Rekorden, gleich streng
+    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "archiv", "start", "settings"]),
+      "Reihenfolge: Kampf, Rotation, Analyse, Vergleich, Verlauf, Gruppe, unten Weeklies, Gilde, Rekorde, Archiv, Start und Einstellungen", l.folge);
     assert(l.symbole && l.namen.every(([tip, vh, versteckt]) => tip && tip === vh && versteckt), "gezeichnete Symbole (22 Punkt, aria-hidden), der Name als Blase und fuer den Vorleser", l.namen);
     assert(l.reiterRollen === 0, "keine Reiterrollen und keine Reiterleiste mehr", l.reiterRollen);
+    assert(!l.streifenReiterSichtbar, "die Reiter des Streifens (Kampf | Weeklies) gibt es in der Vollansicht nicht", l.streifenReiterSichtbar);
     assert(l.land && eins(l.aktuell) === '["start"]' && eins(l.stopps) === '["start"]', "ohne Log: Start ist gewaehlt und der eine Tabstopp", l);
     assert(eins(l.aus) === eins(["timeline", "rotation", "analysis", "compare", "history"]), "ohne Log: Bereiche ohne Kampf gesperrt, Gruppe, Weeklies und Start nicht", l.aus);
 
@@ -803,8 +807,9 @@ try {
     l = await leiste();
     // DECISION 0.18: Waffen und Log-Einrichtung nach der Gruppe (vorher nach Builds)
     // folgt Spezifikation Rekorde 2a: Rekorde unten nach den Weeklies; Spezifikation Gilde 5: die Gilde dazwischen
-    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weapons", "setup", "weeklies", "gilde", "rekorde", "start", "settings"]) && l.symbole,
-      "Entwicklermodus: Waffen und Log-Einrichtung nach der Gruppe, Weeklies, Gilde, Rekorde, Start und Einstellungen bleiben unten", l.folge);
+    // Spezifikation Log-Archiv 7 (#264): das Archiv nach den Rekorden
+    assert(eins(l.folge) === eins(["timeline", "rotation", "analysis", "compare", "history", "party", "weapons", "setup", "weeklies", "gilde", "rekorde", "archiv", "start", "settings"]) && l.symbole,
+      "Entwicklermodus: Waffen und Log-Einrichtung nach der Gruppe, Weeklies, Gilde, Rekorde, Archiv, Start und Einstellungen bleiben unten", l.folge);
     await p.focus('#bereiche [data-tab="party"]');
     await p.keyboard.press("ArrowDown");
     assert(eins((await leiste()).aktuell) === '["weapons"]', "Pfeil ab von der Gruppe: Waffen");
@@ -889,7 +894,7 @@ try {
       return { tag: f.tagName, h: r.height, unten: Math.abs(r.bottom - innerHeight) < 1,
         live: document.querySelector("#sbLiveText").textContent, datei: document.querySelector("#sbDatei").textContent,
         dateiTitel: document.querySelector("#sbDatei").title,
-        mono: /Mono|Consolas|monospace/.test(getComputedStyle(document.querySelector("#sbDatei")).fontFamily),
+        schrift: /Source Sans 3/.test(getComputedStyle(document.querySelector("#sbDatei")).fontFamily),
         // die Zahl steht seit der Neugestaltung 28.09. (DECISION 0.24) nur noch im Kopf der Kampfwahl
         anzahl: document.querySelector("#fightCount").textContent, liste: document.querySelector("#fightCount").textContent,
         anzahlUnten: !!f.querySelector("#sbAnzahl, .sbanzahl"),
@@ -921,7 +926,7 @@ try {
     await beispielLaden(p);
     await p.waitForFunction(() => !document.querySelector("#app").hidden);
     z = await sb();
-    assert(z.datei === "Sample fight" && z.anzahl === "2 fights today" && z.mono, "Beispiel (heute): Datei in Mono, 2 Kaempfe heute", z);
+    assert(z.datei === "Sample fight" && z.anzahl === "2 fights today" && z.schrift, "Beispiel (heute): Datei in Source Sans 3, 2 Kaempfe heute", z);
     await p.setInputFiles("#fileInput", LOG);
     await p.waitForFunction(() => document.querySelector("#sbDatei").textContent.startsWith("TLCombat"));
     z = await sb();
@@ -1027,8 +1032,8 @@ try {
     const k = await p.evaluate(() => ({ weg: ["#kwKnopf", "#kampfwahl", "#bereiche", "#statusleiste"].map((q) => document.querySelector(q).getClientRects().length),
       top: document.querySelector(".top").getBoundingClientRect().height,
       kinder: [...document.querySelector(".top").children].filter((e) => e.getClientRects().length).map((e) => e.id || e.className) }));
-    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 26) < 0.5 && !k.kinder.includes("kwKnopf"),
-      "Kompakt: Knopf, Kampfwahl, Bereichs- und Statusleiste sind nicht da, der Streifen ist 26 Punkt", k);
+    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 34) < 0.5 && !k.kinder.includes("kwKnopf"),
+      "Kompakt: Knopf, Kampfwahl, Bereichs- und Statusleiste sind nicht da, der Streifen ist 34 Punkt (#328)", k);
     assert(!s.fehler.length, "Kompakt: keine Fehler auf der Seite", s.fehler);
     await p.close();
   }
@@ -1254,8 +1259,8 @@ try {
         untenZ: rz.bottom, trifftZ: !!obenZ && zr.contains(obenZ), quer: document.documentElement.scrollWidth > innerWidth };
     });
     // zwoelf Knoepfe seit der Neugestaltung 28.09.: dazu Builds und Weeklies; dreizehn seit den Rekorden (Spezifikation 2a); zwoelf ohne Builds (#207);
-    // dreizehn mit der Gilde (Spezifikation Gilde 5)
-    assert(z.sicht === 13 && z.unten <= z.sbOben + 0.5 && z.trifft && !z.quer, `${breite}x${hoehe} bei 150 %: Start ueber der Statusleiste und klickbar`, z);
+    // dreizehn mit der Gilde (Spezifikation Gilde 5); vierzehn mit dem Archiv (Spezifikation Log-Archiv 7, #264)
+    assert(z.sicht === 14 && z.unten <= z.sbOben + 0.5 && z.trifft && !z.quer, `${breite}x${hoehe} bei 150 %: Start ueber der Statusleiste und klickbar`, z);
     assert(z.untenZ <= z.sbOben + 0.5 && z.trifftZ, `${breite}x${hoehe} bei 150 %: das Zahnrad ueber der Statusleiste und klickbar`, z);
     await p.close();
   }

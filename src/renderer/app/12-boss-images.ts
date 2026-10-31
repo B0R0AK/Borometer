@@ -11,8 +11,13 @@ import { BOSS_ICON_BILD as SPIEL_BOSSBILD, WK_BOSS_BILD } from "../spielbilder";
    die Bilder der Weekly-Fluegel (wk:...); fuer 17 Bosse, bei denen
    questlog nur das Kartensymbol ausgibt, das jeder Dungeonboss traegt,
    Bildschirmfotos von B0R0AK aus dem Spiel vom 03.10.2026 (foto:...),
-   und die vier Bosse der Halle der Illusionen von seinen Bosskarten
-   vom 05.10.2026.
+   und die sechs Bosse der Halle der Illusionen von seinen Bosskarten
+   vom 05.10. und 15.10.2026 (Molgras und Murdock in der Fassung vom 16.10.2026). Die neu ausgeschnittenen Fotos und die questlog-Portraets tragen
+   192 x 192 Pixel (#258); Exodus traegt seit 21.10.2026 sein questlog-Portraet,
+   statt des kleinen Fotos (96 px). Minezerok traegt seit 16.10.2026
+   das questlog-Portraet statt des kleinen Fotos. Verence, Marta und die
+   Raid-Bilder (wk:) tragen seit 29.10.2026 192 px aus Bosskarten vom
+   27.10.2026, Haylock und Gaudian ebenso aus Karten vom 29.10.2026.
    Die eigene Marke boro:boss bleibt der Rueckfall: ohne Spielbilder
    (oeffentlicher Quelltext) und fuer einen kuenftigen Boss ohne Bild.
    test:spielbilder-core verlangt, dass mit den Spielbildern kein Boss
@@ -73,7 +78,7 @@ const BOSS_ICON: Record<string, string> = {
   "dragaryle":"wk:zitadelle",
   "duke magna":"foto:duke-magna",
   "excavator-9":"PT_NPC_M_Golem_KingMineBoom",
-  "exodus":"foto:exodus",
+  "exodus":"PT_NPC_L06_M_EvilEye_Exavis_001",
   "fellinex":"foto:fellinex",
   "gaitan":"foto:gaitan",
   "gaudian":"foto:gaudian",
@@ -107,9 +112,11 @@ const BOSS_ICON: Record<string, string> = {
   "malakar":"PT_NPC_M_EvilEye_Surveilant",
   "manticus":"PT_NPC_M_Manticus_ArcmanDecman",
   "marta":"foto:marta",
-  "minezerok":"foto:minezerok",
-  "minezrok":"foto:minezerok",
+  "minezerok":"PT_NPC_M_Lich_MaenZerokA",
+  "minezrok":"PT_NPC_M_Lich_MaenZerokA",
+  "molgras":"foto:molgras",
   "morokai":"PT_NPC_M_Elder_Morkus",
+  "murdock":"foto:murdock",
   "nerzatum":"foto:nerzatum",
   "nirma":"PT_NPC_M_Elder_Sema",
   "norn bercant":"foto:norn-bercant",

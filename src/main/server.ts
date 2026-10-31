@@ -15,10 +15,10 @@ import * as http from "node:http";
 import * as path from "node:path";
 import { loadBest, putBest } from "./best";
 import { CONFIG_MIGRATED, CONFIG_PATH, configString, loadConfig, updateConfig } from "./config";
-import { bareHost, errorName, fetchJson, HttpError, listenFrom, readJson, send, type Json } from "./http";
+import { errorName, fetchJson, HttpError, listenFrom, readJson, send, serverAddress, serverBase, type Json } from "./http";
 import { eventCounts, onEvent, type EventName } from "./events";
 import { hotkeyState } from "./hotkey";
-import { guessLogDir, latestAnswer, listLogs, logAnswer, newestLog, readLog } from "./logs";
+import { guessLogDir, latestAnswer, LIST_ALLE_MAX, LIST_MAX, listLogs, logAnswer, newestLog, readLog } from "./logs";
 import { isFirstStart } from "./firststart";
 import {
   askRename, buildBoard, KICK_PAUSE, lanAddress, makeCode, PARTY, publicPort, pushOnce, pushToHost,
@@ -26,14 +26,16 @@ import {
 } from "./party";
 import { bugReportsDir, FOLDERS, partyLogsDir, safeSaveName, savesDir } from "./paths";
 import { erinnerungAbfrage, erinnerungAntwort, erinnerungQuelle } from "./erinnerung";
-import { createWeeklies, loadWeeklies, putWeeklies } from "./weeklies";
-import { createGilde, loadGilde, putGilde } from "./gilde";
+import { createWeeklies, loadWeeklies, loescheWeekliesGeloest, putWeeklies } from "./weeklies";
+import { ARCHIV_DIR, archiviere, createArchiv, createSicherungen, leseArchivKampf, loadArchiv, loescheArchivGeloest, loeseArchiv, SICHERUNGEN_DIR } from "./archiv";
+import { createGilde, loadGilde, loescheGeloest, putGilde } from "./gilde";
+import * as gilden from "./gilde-online";
 import { leseFortschritt } from "./taskbar";
 import { startAuftrag } from "./start";
 import { autostartAn, autostartDa } from "./autostart";
 import { jumpListBauen } from "./jumplist";
 import { zuletztNeu } from "./windows-core";
-import { acrylicNow, currentWindow, kompaktMoeglich, kompaktStand, micaGrund, micaNow, themeChanged, winAction, windowPlaced } from "./window";
+import { acrylicNow, currentWindow, kompaktMoeglich, kompaktStand, micaGrund, micaNow, themeChanged, winAction } from "./window";
 
 export const FIRST_PORT = 8731;
 
@@ -58,6 +60,12 @@ export function setUpdate(found: { version: string; url: string } | null): void 
 
 function reply(res: http.ServerResponse, obj: unknown, code = 200): void {
   send(res, JSON.stringify(obj), JSON_TYPE, code, { "Cache-Control": "no-store" });
+}
+
+/** The answer of a guild-online call: its outcome, and the page-safe status after it (never a key). */
+async function onlineAntwort(res: http.ServerResponse, work: unknown): Promise<void> {
+  const result = (await work) as object;
+  reply(res, { ...result, status: gilden.status() });
 }
 
 function text(res: http.ServerResponse, body: string, code = 200, type = "text/plain; charset=utf-8"): void {
@@ -225,8 +233,9 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
 
     case "/api/logs": {
       // the log files of the watched folder, newest first, at most 60
-      // (logs.ts, listLogs; spec Nachtraege N3) - names, sizes and times only
-      const files = listLogs(STATE.dir).map((f) => ({ name: f.name, size: f.size, mtime: f.mtime }));
+      // (logs.ts, listLogs; spec Nachtraege N3) - names, sizes and times only;
+      // ?alle=1 at most LIST_ALLE_MAX, for "Alte Logs einlesen" (spec Log-Archiv 8)
+      const files = listLogs(STATE.dir, q.get("alle") === "1" ? LIST_ALLE_MAX : LIST_MAX).map((f) => ({ name: f.name, size: f.size, mtime: f.mtime }));
       return reply(res, { ok: true, files });
     }
 
@@ -269,8 +278,16 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         lang: cfg.lang === "de" || cfg.lang === "en" ? cfg.lang : null,
         // the first-start tour was finished or skipped (spec Rundgang 02.10.2026, 6)
         rundgangGesehen: cfg.rundgangGesehen === true,
+        // how often "later" was chosen on the tour question, 0..3 (spec Rundgang erweitert 3.1)
+        rundgangSpaeter: typeof cfg.rundgangSpaeter === "number" && Number.isInteger(cfg.rundgangSpaeter) && cfg.rundgangSpaeter >= 0 && cfg.rundgangSpaeter <= 3 ? cfg.rundgangSpaeter : 0,
+        // the notes on the areas: the switch (on unless turned off) and the areas that showed theirs
+        bereichHinweise: cfg.bereichHinweise !== false,
+        bereicheGezeigt: areaIds(cfg.bereicheGezeigt),
         // the settings held nothing a person set when this process started (firststart.ts)
         firstStart: FIRST_START,
+        // the log archive: on unless turned off; the version whose notice was acknowledged
+        archivAn: cfg.archivAn !== false,
+        archivHinweis: typeof cfg.archivHinweis === "number" ? cfg.archivHinweis : 0,
         // the update notice: off unless turned on (spec Update-Hinweis 2.4)
         updatePruefen: cfg.updatePruefen === true,
         // the Windows integration (spec Windows-Einbindung 9): off unless turned on
@@ -278,9 +295,6 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         meldenNurBest: cfg.meldenNurBest === true,
         trayBeimSchliessen: cfg.trayBeimSchliessen === true,
         windows: { da: currentWindow() !== null && process.platform === "win32", autostartDa: autostartDa(), autostart: autostartAn() },
-        // the window opened at its remembered place: the page does not size it
-        // from the default again at startup (Fenster-Extras, addendum 4)
-        windowPlaced: windowPlaced(),
       });
       return;
     }
@@ -301,6 +315,18 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
       const weeklies = loadWeeklies();
       return weeklies ? reply(res, { ok: true, data: weeklies }) : reply(res, { ok: false }, 503);
     }
+    case "/api/archiv/liste": {
+      // the log archive's directory (archiv.ts); a GET only reads, 503 when the file is there but unreadable
+      const archiv = loadArchiv();
+      return archiv ? reply(res, { ok: true, data: archiv }) : reply(res, { ok: false }, 503);
+    }
+    case "/api/archiv/kampf": {
+      // the lines of one archived fight; k is only a key, hashed to a file name inside archiv.ts, never a path
+      const k = q.get("k");
+      if (typeof k !== "string" || !k || k.length > 300) return reply(res, { ok: false }, 404);
+      const lines = leseArchivKampf(k);
+      return lines === null ? reply(res, { ok: false }, 404) : text(res, lines);
+    }
     case "/api/erinnerung":
       // open reminder requests and the next times (erinnerung.ts); reads the weeklies' file, answers 127.0.0.1 only
       return reply(res, { ok: true, ...erinnerungAbfrage() });
@@ -310,6 +336,9 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
       const gilde = loadGilde();
       return gilde ? reply(res, { ok: true, data: gilde }) : reply(res, { ok: false }, 503);
     }
+    case "/api/gilde-online/status":
+      // what the page may know about the joined guild: the file only, no request leaves, no key in it
+      return reply(res, { ok: true, status: gilden.status() });
     case "/api/party-log/list":
       return reply(res, listJson(partyLogsDir()));
     case "/api/party-log/load":
@@ -351,21 +380,33 @@ const CONFIG_KEYS = [
   "splitAfter", "gap", "minDur", "ghost", "uiZoom", "devMode",
   "skillNames", "ventiusTop", "compactAlpha", "mergePhases",
   "theme", "themeResolved", "logIndex", "randlosGesehen", "rundgangGesehen", "updatePruefen",
-  "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "lang", "gildeErinnerung",
+  "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "lang", "gildeErinnerung", "gildeOnline", "gildeServer",
+  "rundgangSpaeter", "bereichHinweise", "bereicheGezeigt", "archivAn", "archivHinweis",
 ];
 /* Of those, the ones that hold a true/false and nothing else - every key
    that ends in "Gesehen" (a note or tour acknowledged) is one, and so is
    updatePruefen, the switch of the update notice (spec Update-Hinweis 2.4). "fenster"
    (where the window was) is not among the keys at all: only window.ts
    writes it (spec Fenster-Extras 4). */
-const BOOLEAN_KEYS = ["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung"];
+/* The areas of the side bar that showed their first-visit note (spec Rundgang erweitert,
+   16.10.2026, 5.1): a short list of ids, each a few lower-case letters, once each. Which ids
+   exist is the page's business (rundgang-core.ts cleans the list again); the settings file
+   keeps only the shape, so nothing else gets in. */
+function areaIds(v: unknown): string[] {
+  if (!Array.isArray(v)) return [];
+  return [...new Set(v.filter((x): x is string => typeof x === "string" && /^[a-z]{3,12}$/.test(x)))].slice(0, 12);
+}
+const BOOLEAN_KEYS = ["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung", "gildeOnline", "bereichHinweise", "archivAn"];
 /* A first start (spec Rundgang 2, review M6): when this process started, the
    settings held none of the keys a person sets - the page's keys but the
    resolved theme and the tour's own flag, the log folder, the party server,
    staying on top. Read once, before anything is written: a tour left
-   half-way comes back on the next start only while nothing was chosen. */
+   half-way comes back on the next start only while nothing was chosen.
+   Acknowledging the archive notice (archivHinweis, #264) is not a choice -
+   it can happen inside the tour question's card - so it does not count;
+   switching the archive on or off (archivAn) does. */
 const FIRST_START = isFirstStart(loadConfig(),
-  [...CONFIG_KEYS.filter((k) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang"), "log_dir", "partyServer", "stayOnTop"]);
+  [...CONFIG_KEYS.filter((k) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang" && k !== "rundgangSpaeter" && k !== "bereicheGezeigt" && k !== "archivHinweis"), "log_dir", "partyServer", "stayOnTop"]);
 
 async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promise<void> {
   switch (url.pathname) {
@@ -430,7 +471,10 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
     }
 
     case "/api/party/server": {
-      const server = bareHost(sent.server);
+      // the address changes only by an act of the person (a click on Save or on
+      // "Use this server"); a request without that says nothing and writes nothing
+      if (sent.bestaetigt !== true) return reply(res, { ok: false, error: "not confirmed" });
+      const server = serverAddress(sent.server);
       updateConfig({ partyServer: server });
       return reply(res, { ok: true, server });
     }
@@ -439,11 +483,11 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       // a room on the shared party server instead of this machine: reachable
       // through one fixed address whether or not the creator's PC is still on
       const name = String(sent.name ?? "").trim().slice(0, 40) || "Host";
-      const server = bareHost(String(sent.server ?? "").trim() || configString("partyServer"));
+      const server = serverAddress(String(sent.server ?? "").trim() || configString("partyServer"));
       if (!server) return reply(res, { ok: false, error: "no party server is set" });
       let code: string;
       try {
-        const answer = await fetchJson(`http://${server}/party/create`, 8000, { name });
+        const answer = await fetchJson(`${serverBase(server)}/party/create`, 8000, { name });
         if (!answer.ok || typeof answer.code !== "string") throw new Error("refused");
         code = answer.code;
       } catch {
@@ -465,19 +509,19 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
         // one pasted string: CODE@ip:port
         const at = raw.indexOf("@");
         code = raw.slice(0, at).trim().toUpperCase();
-        host = bareHost(raw.slice(at + 1));
+        host = serverAddress(raw.slice(at + 1));
         if (!host.includes(":")) host += `:${FIRST_PORT + 1}`;
       } else {
         // a bare code means the shared party server everyone points at
         if (raw) code = raw.toUpperCase();
-        host = bareHost(configString("partyServer"));
+        host = serverAddress(configString("partyServer"));
       }
       if (code.length !== 4 || !host) {
         return reply(res, { ok: false, error: "that does not look like a party code, or no party server is set" });
       }
       try {
         const answer = await fetchJson(
-          `http://${host}/party/ping?code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`,
+          `${serverBase(host)}/party/ping?code=${encodeURIComponent(code)}&name=${encodeURIComponent(name)}`,
           6000,
         );
         if (!answer.ok) throw new Error("refused");
@@ -514,7 +558,7 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
         return reply(res, { ok: true });
       }
       try {
-        reply(res, await fetchJson(`http://${host}/party/kick`, 6000, { code, name, who }));
+        reply(res, await fetchJson(`${serverBase(host)}/party/kick`, 6000, { code, name, who }));
       } catch (err) {
         if (err instanceof HttpError) {
           // an old server has no such route at all, and that is worth saying
@@ -592,11 +636,11 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       // of failing silently when someone tries to host. A POST, and only the
       // configured server: an outbound request is an action, and a GET that
       // took any address let a foreign page make this app knock on it.
-      const server = bareHost(configString("partyServer"));
+      const server = serverAddress(configString("partyServer"));
       if (!server) return reply(res, { ok: false, reason: "unset" });
       const started = Date.now();
       try {
-        const info = await fetchJson(`http://${server}/health`, 4000);
+        const info = await fetchJson(`${serverBase(server)}/health`, 4000);
         reply(res, { ok: !!info.ok, rooms: info.rooms ?? 0, ms: Date.now() - started, server });
       } catch (err) {
         reply(res, { ok: false, reason: "unreachable", detail: errorName(err), server });
@@ -617,7 +661,7 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       }
       try {
         const answer = await fetchJson(
-          `http://${PARTY.host}/party/curve?code=${encodeURIComponent(PARTY.code)}&name=${encodeURIComponent(who)}`,
+          `${serverBase(PARTY.host)}/party/curve?code=${encodeURIComponent(PARTY.code)}&name=${encodeURIComponent(who)}`,
           6000,
         );
         reply(res, { ok: !!answer.ok, name: who, curve: answer.curve, casts: answer.casts });
@@ -644,12 +688,89 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
       return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
     }
 
+    case "/api/archiv/aufnehmen": {
+      // one fight { eintrag, text } into the archive (archiv.ts checks it); off when the person turned the archive off
+      if (loadConfig().archivAn === false) return reply(res, { ok: false }, 409);
+      const put = archiviere(sent);
+      return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
+    }
+    case "/api/archiv/ordner": {
+      // opens the archive folder; the page sends nothing, the path is ARCHIV_DIR (audit 5c pins openPath)
+      createArchiv();
+      const error = await shell.openPath(ARCHIV_DIR);
+      if (error) return reply(res, { ok: false, error }, 500);
+      return reply(res, { ok: true });
+    }
+    case "/api/archiv/loesen": {
+      // detaches or restores fights (archiv.ts, loeseArchiv): only the flag, also while the archive is off - the person's own act
+      const los = loeseArchiv(sent);
+      return reply(res, los, los.ok ? 200 : los.grund === "unavailable" ? 503 : 400);
+    }
+    case "/api/archiv/loeschen": {
+      // removes detached fights for good (archiv.ts, loescheArchivGeloest): typed confirmation, checked backup first;
+      // a refusal for a reason the page shows (nicht-geloest, bestaetigung, sicherung) is 200 with ok: false
+      const gone = loescheArchivGeloest(sent);
+      return reply(res, gone, gone.ok ? 200 : gone.grund === "abgelehnt" ? 400 : gone.grund === "unavailable" ? 503 : 200);
+    }
+    case "/api/archiv/sicherungen": {
+      // opens the backups' folder, made if missing; the page sends nothing, the path is SICHERUNGEN_DIR (audit 5c pins openPath)
+      createSicherungen();
+      const error = await shell.openPath(SICHERUNGEN_DIR);
+      if (error) return reply(res, { ok: false, error }, 500);
+      return reply(res, { ok: true });
+    }
+
     case "/api/gilde": {
       // the whole state at once; gilde.ts checks schema, size and count and
       // refuses a state that leaves out anything the file holds
       const put = putGilde(sent.data);
       return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);
     }
+
+    case "/api/weeklies-loeschen": {
+      // removes for good what the person detached: with the name, after the backup (weeklies.ts, loescheWeekliesGeloest)
+      const gone = loescheWeekliesGeloest(sent);
+      return reply(res, gone, gone.ok ? 200 : gone.grund === "unavailable" ? 503 : 400);
+    }
+
+    case "/api/gilde-loeschen": {
+      // removes for good what the person detached: with the name, after the backup (gilde.ts, loescheGeloest)
+      const gone = loescheGeloest(sent);
+      return reply(res, gone, gone.ok ? 200 : gone.grund === "unavailable" ? 503 : 400);
+    }
+
+    case "/api/gilde-online/gruenden":
+      return onlineAntwort(res, gilden.gruenden(sent.stand, String(sent.name ?? "")));
+    case "/api/gilde-online/beitreten":
+      return onlineAntwort(res, gilden.beitreten(String(sent.code ?? ""), typeof sent.key === "string" ? sent.key : undefined));
+    case "/api/gilde-online/abrufen":
+      return onlineAntwort(res, gilden.abrufen(undefined, sent.erzwingen === true));
+    case "/api/gilde-online/schreiben":
+      return onlineAntwort(res, gilden.schreiben(sent.stand));
+    case "/api/gilde-online/link":
+      return onlineAntwort(res, gilden.linkNeu(String(sent.label ?? "")));
+    case "/api/gilde-online/link-widerruf":
+      return onlineAntwort(res, gilden.linkWiderruf(String(sent.id ?? "")));
+    case "/api/gilde-online/links":
+      return onlineAntwort(res, gilden.links());
+    case "/api/gilde-online/staende":
+      return onlineAntwort(res, gilden.staende());
+    case "/api/gilde-online/stand-nr":
+      return onlineAntwort(res, gilden.standNr(Number(sent.n)));
+    case "/api/gilde-online/zurueck":
+      return onlineAntwort(res, gilden.zurueck(Number(sent.n)));
+    case "/api/gilde-online/marke":
+      return onlineAntwort(res, gilden.marke(Number(sent.n), String(sent.label ?? "")));
+    case "/api/gilde-online/schliessen":
+      return onlineAntwort(res, gilden.schliessen());
+    case "/api/gilde-online/oeffnen":
+      return onlineAntwort(res, gilden.oeffnen(String(sent.code ?? "")));
+    case "/api/gilde-online/loeschen":
+      return onlineAntwort(res, gilden.loeschen(String(sent.code ?? "")));
+    case "/api/gilde-online/sicherung":
+      return onlineAntwort(res, gilden.sicherung());
+    case "/api/gilde-online/verlassen":
+      return onlineAntwort(res, gilden.verlassen());
 
     case "/api/erinnerung": {
       // the page's answer: an id and the number of characters with something open, nothing else is read
@@ -663,6 +784,17 @@ async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promi
         if (key in sent && (!BOOLEAN_KEYS.includes(key) || typeof sent[key] === "boolean")) changes[key] = sent[key];
       }
       if (changes.lang !== "de" && changes.lang !== "en") delete changes.lang;
+      // the tour question: how often "later" was chosen, a whole number 0..3
+      if ("rundgangSpaeter" in changes && !(typeof changes.rundgangSpaeter === "number" && Number.isInteger(changes.rundgangSpaeter) && changes.rundgangSpaeter >= 0 && changes.rundgangSpaeter <= 3)) delete changes.rundgangSpaeter;
+      // the areas whose first-visit note came: a short list of ids, once each
+      if ("bereicheGezeigt" in changes) {
+        if (Array.isArray(changes.bereicheGezeigt)) changes.bereicheGezeigt = areaIds(changes.bereicheGezeigt);
+        else delete changes.bereicheGezeigt;
+      }
+      // the guild server: text and short; whether it is usable (https) is decided where it is used (gilde-online.ts)
+      if ("gildeServer" in changes && (typeof changes.gildeServer !== "string" || changes.gildeServer.length > 200)) delete changes.gildeServer;
+      // the archive notice: the version it was acknowledged in, a whole number; anything else is dropped
+      if ("archivHinweis" in changes && !(Number.isSafeInteger(changes.archivHinweis) && (changes.archivHinweis as number) >= 0)) delete changes.archivHinweis;
       updateConfig(changes);
       if ("lang" in changes) jumpListBauen();
       // the border and Windows' menus follow a new theme (window.ts)
@@ -716,7 +848,8 @@ async function handle(req: http.IncomingMessage, res: http.ServerResponse): Prom
   }
   if (req.method === "GET") return handleGet(url, res);
   if (req.method === "POST") {
-    const read = await readJson(req);
+    // the archive takes a whole log (up to 8M characters, more once escaped); every other route keeps the default cap
+    const read = await readJson(req, url.pathname === "/api/archiv/aufnehmen" ? 24 * 1024 * 1024 : undefined);
     if ("error" in read) return reply(res, { ok: false }, read.error === "too-large" ? 413 : 400);
     return handlePost(url, read.body, res);
   }
@@ -740,6 +873,8 @@ export async function startServer(pagePath: string): Promise<number> {
   STATE.port = port;
   // the weeklies' file on the first start, empty with its version (weeklies.ts)
   createWeeklies();
+  // the log archive's folder and directory on the first start (archiv.ts)
+  createArchiv();
   // the guild's file on the first start, empty with its version (gilde.ts)
   createGilde();
   return port;

@@ -1225,6 +1225,26 @@ function flip(zeichnen: () => void){
    voll stehen, die anderen auf 35 % - ohne Farbwechsel. Nur Klassen, kein
    Neuzeichnen. */
 let hebtK: string | null = null;
+/* Windows Teil 2: "In Rotation zeigen" aus dem Menue der Tafel haelt eine
+   Faehigkeit fest, auch ohne Zeigen oder Fokus. Zeigen und Fokus auf einem
+   anderen Namen gehen vor; der naechste Klick oder Tastendruck loest es. */
+let festK: string | null = null;
+export function rotationHervorheben(name: string){
+  const k = letzter?.keyOf.get(name);
+  /* Ohne Einsaetze in der Leiste gaebe es nichts zu zeigen, nur ein Abdunkeln. */
+  if(k == null || !$("#rotBar").querySelector('[data-k="' + CSS.escape(k) + '"]')) return;
+  festK = k;
+  hervorheben(k);
+  const los = () => {
+    document.removeEventListener("pointerdown", los, true);
+    document.removeEventListener("keydown", los, true);
+    if(festK !== k) return;
+    festK = null;
+    hervorheben(kVon(document.activeElement));
+  };
+  document.addEventListener("pointerdown", los, true);
+  document.addEventListener("keydown", los, true);
+}
 function hervorheben(k: string | null){
   hebtK = k;
   // in der Leiste und in der Reihenfolge (Aufgabe 11)
@@ -1270,10 +1290,10 @@ export function setup(): void {
     kastenOffen = kasten.open;
     kastenMerken();
   });
-  spalte.addEventListener("mouseover", e => hervorheben(kVon(e.target) ?? kVon(document.activeElement)));
-  spalte.addEventListener("mouseleave", () => hervorheben(kVon(document.activeElement)));
+  spalte.addEventListener("mouseover", e => hervorheben(kVon(e.target) ?? kVon(document.activeElement) ?? festK));
+  spalte.addEventListener("mouseleave", () => hervorheben(kVon(document.activeElement) ?? festK));
   spalte.addEventListener("focusin", e => hervorheben(kVon(e.target)));
-  spalte.addEventListener("focusout", e => { if(!kVon(e.relatedTarget)) hervorheben(null); });
+  spalte.addEventListener("focusout", e => { if(!kVon(e.relatedTarget)) hervorheben(festK); });
   /* Abspielen (Stufe 2): Knopf, Tempo; anhalten, sobald das Fenster
      verborgen ist. */
   $("#drPlay").addEventListener("click", () => {

@@ -6,7 +6,7 @@
 // (src/renderer/app/21-damage-table.ts, dazu Eye of Ventius aus setup())
 // hat ein Bild in KERN_BILD (assets/spielbilder.ts, ueber die Weiche) oder steht
 // in der benannten Ausnahmeliste. Jedes Bild ist ein gueltiges WebP von
-// 48 x 48 und hoechstens 6 kB. Der Quelltext wird gelesen, nicht gebaut:
+// 128 x 128 (seit #258, vorher 48) und hoechstens 12 kB (vorher 6). Der Quelltext wird gelesen, nicht gebaut:
 // SKILL_CORE ist nicht exportiert und die Seite haengt an DOM und Zustand.
 //
 // Run:  npm run test:kerne-core
@@ -31,7 +31,7 @@ function ok(cond, name, info) {
 /* Kerne ohne Bild, mit Grund. Drei Kerne ergeben im Log "Ice Rain", jeder mit
    anderem Symbol; welches der Zeile gehoert, sagt das Log nicht. */
 const AUSNAHMEN = ["Ice Rain"];
-const MAX_BYTES = 6 * 1024;
+const MAX_BYTES = 12 * 1024;
 
 // ---- die Kerne: die Schluessel von SKILL_CORE plus der zur Laufzeit angelegte
 const dt = app("21-damage-table.ts");
@@ -78,7 +78,7 @@ if (BILDER) {
     "ohne Spielbilder: coreBadge zeichnet CORE_GEM, wo KERN_BILD kein Bild hat");
 }
 
-// ---- jedes Bild: WebP, 48 x 48, hoechstens 6 kB
+// ---- jedes Bild: WebP, 128 x 128, hoechstens 12 kB
 function webpMasse(b) {
   if (b.length < 30 || b.toString("latin1", 0, 4) !== "RIFF" || b.toString("latin1", 8, 12) !== "WEBP") return null;
   if (b.readUInt32LE(4) + 8 !== b.length) return null;
@@ -98,17 +98,17 @@ function webpMasse(b) {
 for (const [name, b] of bilder) {
   const m = webpMasse(b);
   ok(!!m, name + ": gueltiger WebP-Kopf");
-  ok(!!m && m[0] === 48 && m[1] === 48, name + ": 48 x 48", "Masse " + (m && m.join(" x ")));
-  ok(b.length <= MAX_BYTES, name + ": hoechstens 6 kB", b.length + " Byte");
+  ok(!!m && m[0] === 128 && m[1] === 128, name + ": 128 x 128", "Masse " + (m && m.join(" x ")));
+  ok(b.length <= MAX_BYTES, name + ": hoechstens 12 kB", b.length + " Byte");
 }
 
 // Fallende Blume (Entscheidung 01.10.2026): die Waffen-Spezialisierung aller Waffen
-// traegt ihr Symbol unter beiden Namen, ein 64x64-WebP wie die uebrigen
+// traegt ihr Symbol unter beiden Namen, ein 128x128-WebP wie die uebrigen (seit 21.10.2026, #258)
 if (BILDER) {
   const fb = /^  "WM_Common_SKILL_009":"([A-Za-z0-9+/=]+)",$/m.exec(sb);
   ok(!!fb, "Fallende Blume: Symbol WM_Common_SKILL_009 in SKILL_ICON_BILD");
   const fbm = fb ? webpMasse(Buffer.from(fb[1], "base64")) : null;
-  ok(!!fbm && fbm[0] === 64 && fbm[1] === 64, "Fallende Blume: 64 x 64", "Masse " + (fbm && fbm.join(" x ")));
+  ok(!!fbm && fbm[0] === 128 && fbm[1] === 128, "Fallende Blume: 128 x 128", "Masse " + (fbm && fbm.join(" x ")));
 } else {
   ok(!/^  "WM_Common_SKILL_009":/m.test(spielbilderText(root, "leer")), "ohne Spielbilder: kein Symbol fuer Fallende Blume im Quelltext");
 }

@@ -79,6 +79,12 @@ export function ringMass(b: number, h: number, gestapelt: boolean): {d: number; 
   return {d, schrift: (b - d) / 2 >= 130};
 }
 
+/** Die Breite des Lochs (Radius r0) im Abstand dy von der Mitte, links und rechts um rand verkleinert; nie unter 0. Die Mitte des Rings haelt ihre Zeilen darin (#335). */
+export function sehne(r0: number, dy: number, rand: number): number {
+  const r = r0 - rand;
+  return r > Math.abs(dy) ? 2 * Math.sqrt(r * r - dy * dy) : 0;
+}
+
 export interface ArtZeile { kat: Kat; n: number; d: number; max: number; anteil: number }
 export interface ArtenBlock { zeilen: ArtZeile[]; n: number; d: number; max: number; schnitt: number }
 type Summe = {n: number; d: number; max: number};

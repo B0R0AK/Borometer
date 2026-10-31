@@ -45,8 +45,8 @@ export function send(
   res.end(data);
 }
 
-/** Reads a JSON body. An empty body is `{}`; a body over MAX_BODY stops being kept and answers "too-large" (send 413). */
-export function readJson(req: http.IncomingMessage): Promise<ReadResult> {
+/** Reads a JSON body. An empty body is `{}`; a body over `max` (MAX_BODY unless a route asks for more) stops being kept and answers "too-large" (send 413). */
+export function readJson(req: http.IncomingMessage, max = MAX_BODY): Promise<ReadResult> {
   return new Promise((resolve) => {
     const chunks: Buffer[] = [];
     let size = 0;
@@ -59,7 +59,7 @@ export function readJson(req: http.IncomingMessage): Promise<ReadResult> {
     req.on("data", (c: Buffer) => {
       if (settled) return;
       size += c.length;
-      if (size > MAX_BODY) {
+      if (size > max) {
         // keep nothing more; the socket stays up just long enough for the
         // caller's 413, which closes it (see MAX_BODY). Destroying it here
         // instead meant no sender ever got the 413.
@@ -118,13 +118,16 @@ export class HttpError extends Error {
 }
 
 /**
- * GET or POST json to another Borometer or the party server. Plain http: the
- * party runs on a LAN address or a small self-hosted server.
+ * GET or POST json to another Borometer or the party server: http on a LAN
+ * address or a small self-hosted server, https where the server has a
+ * certificate. A redirect is an error, never followed: the request goes to the
+ * address the person set and nowhere else. Optional headers carry what must
+ * not stand in a URL (the guild code and keys).
  */
-export async function fetchJson(url: string, timeoutMs: number, body?: unknown): Promise<Json> {
+export async function fetchJson(url: string, timeoutMs: number, body?: unknown, headers?: Record<string, string>): Promise<Json> {
   const res = await fetch(url, body === undefined
-    ? { method: "GET", signal: AbortSignal.timeout(timeoutMs) }
-    : { method: "POST", headers: { "Content-Type": "application/json" },
+    ? { method: "GET", redirect: "error", headers: { ...headers }, signal: AbortSignal.timeout(timeoutMs) }
+    : { method: "POST", redirect: "error", headers: { "Content-Type": "application/json", ...headers },
         body: JSON.stringify(body), signal: AbortSignal.timeout(timeoutMs) });
   const text = await res.text();
   if (res.status >= 400) throw new HttpError(res.status, text);
@@ -136,11 +139,50 @@ export function errorName(err: unknown): string {
   return err instanceof Error ? err.name : "Error";
 }
 
-/** Strips the scheme and trailing slashes from a server address. */
-export function bareHost(raw: unknown): string {
-  return String(raw ?? "")
-    .trim()
-    .replaceAll("http://", "")
-    .replaceAll("https://", "")
-    .replace(/\/+$/, "");
+/** The port the party server listens on when an http:// address names none. */
+export const PARTY_PORT = 8732;
+
+/*
+ * The server address a person typed: an optional http:// or https://, a host,
+ * an optional port. Anything else (another scheme, nothing after the scheme)
+ * is no address. Trailing slashes and a path are cut off.
+ */
+function splitServer(raw: unknown): { secure: boolean; host: string } | null {
+  const m = /^(?:([a-z][a-z0-9+.-]*):\/\/)?(\[[^\]\s]+\](?::\d+)?|[^/\s?#:]+(?::\d+)?)(?=$|[/?#\s])/i.exec(String(raw ?? "").trim());
+  if (!m) return null;
+  // the scheme is tested by pattern, not named as a string, so the audit's
+  // list of network module names stays free of false hits
+  const scheme = m[1] ?? "";
+  if (scheme && !/^https?$/i.test(scheme)) return null;
+  return { secure: /^https$/i.test(scheme), host: m[2] ?? "" };
+}
+
+/**
+ * What is saved for an address: "https://host" when it is one, otherwise the
+ * bare "host[:port]" an older setting already looks like (no scheme means
+ * http). Empty when the input is no address.
+ */
+export function serverAddress(raw: unknown): string {
+  const s = splitServer(raw);
+  if (!s) return "";
+  return s.secure ? `https://${s.host}` : s.host;
+}
+
+/**
+ * The base URL requests go to, scheme and port included: https without a port
+ * means 443 (nothing appended), http without a port means PARTY_PORT. The
+ * certificate of an https address is checked by Node's own defaults; nothing
+ * here or in fetchJson loosens that.
+ */
+export function serverBase(raw: unknown): string {
+  const s = splitServer(raw);
+  if (!s) return "";
+  if (s.secure) return `https://${s.host}`;
+  return `http://${/:\d+$/.test(s.host) ? s.host : `${s.host}:${PARTY_PORT}`}`;
+}
+
+/** True when the address would travel unencrypted (an address is set and is not https). */
+export function isPlain(raw: unknown): boolean {
+  const s = splitServer(raw);
+  return !!s && !s.secure;
 }

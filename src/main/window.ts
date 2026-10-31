@@ -19,16 +19,19 @@ import { autostartSetzen } from "./autostart";
 import { loadConfig, updateConfig } from "./config";
 import { bump } from "./events";
 import {
-  fensterNeu, neuerMerker, platzGross, platzKompakt, teilAus,
+  fensterNeu, neuerMerker, platzAbriss, platzKompakt, platzVoll, teilAus, VOLL_H, VOLL_W, vollGroesse,
   type LageGross, type LageKompakt, type Monitor, type Teil,
 } from "./lage";
 import { meldeKampf } from "./notify";
 import { setLiveBadge } from "./taskbar";
 import { auftragErledigt } from "./start";
+import { abrissTeil, fensterOptionen, kompaktMinimum, menueArt, streifenLage, type AbrissTeil, type Ansicht, type Lift } from "./windows-core";
+import { zeigeMenue } from "./menue";
 import type { Json } from "./http";
 
-export const WINDOW_W = 1280;
-export const WINDOW_H = 860;
+/* Full view's fixed size (#364): lage.ts holds the numbers and the rules. */
+export const WINDOW_W = VOLL_W;
+export const WINDOW_H = VOLL_H;
 /* the floor of a requested resize: the same numbers as minWidth and
    minHeight below, so a size the window would not really accept is never
    sent on to setSize. The height stood at 100, and compact with no fight asks
@@ -43,7 +46,7 @@ const MIN_ACTION_W = 180;
 const MIN_ACTION_H = 24;
 
 /*
- * The page's web preferences, one object for both windows (safety audit 8b):
+ * The page's web preferences, one object for all three windows (safety audit 8b):
  * no Node, no preload and no bridge into this process. The page talks to it
  * over http on 127.0.0.1 only. Throttling off: live logging and the fight
  * watch go on while the window is minimized or in the tray (spec
@@ -66,8 +69,6 @@ const state = {
   win: null as BrowserWindow | null,
   /** the size before compact shrank it, so Full view can restore it */
   prev: null as [number, number] | null,
-  /** whether the window was maximised when compact shrank it */
-  prevMax: false,
   max: false,
   /**
    * The header height the page last sent (chrome, material), unclamped:
@@ -83,8 +84,6 @@ const state = {
   compact: false,
   /** Windows' "Transparency effects" off, as last seen (transparencyChanged) */
   reduced: false,
-  /** the window opened at a remembered full-view place (fenster.gross) */
-  placed: false,
 };
 
 export function currentWindow(): BrowserWindow | null {
@@ -104,6 +103,13 @@ export function kompaktWindow(): BrowserWindow | null {
   return kompakt.win && !kompakt.win.isDestroyed() ? kompakt.win : null;
 }
 
+/* The torn-off window (spec Windows-Teil 2): at most one, the same page with
+   ?teil=<area>, the same SEITE. It closes with full view. */
+const abriss = { win: null as BrowserWindow | null, teil: null as AbrissTeil | null };
+export function abrissWindow(): BrowserWindow | null {
+  return abriss.win && !abriss.win.isDestroyed() ? abriss.win : null;
+}
+
 /*
  * What full view shows, for the strip to show the same (Kompakt-Fix
  * 01.10.2026): before it opens the strip, and whenever its fight changes
@@ -113,7 +119,7 @@ export function kompaktWindow(): BrowserWindow | null {
  * GET /api/log?name= for it, and logs.ts only compares it with a fresh
  * listing of the watched folder.
  */
-const STAND_GRUENDE = ["leer", "live", "datei", "fremd", "andere", "beispiel", "mehrere"];
+const STAND_GRUENDE = ["leer", "live", "datei", "fremd", "andere", "beispiel", "mehrere", "archiv"];
 const vollStand = { grund: "leer", datei: "", kampf: null as number | null };
 /* A log's file name and nothing else: no folder, no drive, no control
    character, ending in .txt or .log like the logs listLogs finds. */
@@ -157,19 +163,25 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
   /* Full view's place from last time (spec Fenster-Extras 3.4) while its
      title bar is still on a monitor, else the middle of the main monitor;
      nothing remembered: Electron's default, centred. */
-  const platz = platzGross(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
+  /* Full view has a fixed size (#364): of the remembered place only the
+     position is used, never the size and never "maximised". On a screen too
+     small for it, the size is the work area. */
+  const platz = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
+  const fest = vollGroesse(hauptmonitor());
   const win = new BrowserWindow({
     title: "Borometer",
-    width: platz ? platz.w : WINDOW_W,
-    height: platz ? platz.h : WINDOW_H,
+    width: platz ? platz.w : fest.w,
+    height: platz ? platz.h : fest.h,
     ...(platz ? { x: platz.x, y: platz.y } : {}),
     /*
      * 24 high: without a fight, compact shrinks to a strip of 26 points, and
      * a higher minimum would turn that back into a window with empty ground
-     * below it.
+     * below it. Full view itself cannot be dragged (ansichtSetzen below).
      */
     minWidth: 180,
     minHeight: 24,
+    maximizable: false,
+    fullscreenable: false,
     // Windows draws the frame: the buttons (with snap layouts on maximise),
     // the border to resize by, the corners and the shadow. The page's own
     // header is the title bar and marks where the window can be dragged.
@@ -183,12 +195,12 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
   });
   state.win = win;
   state.prev = null;
-  state.prevMax = false;
   state.max = false;
+  // not dragged bigger or smaller, not maximised: the size setting is the way (#364)
+  ansichtSetzen(win, "voll");
   state.header = undefined;
   state.through = false;
   state.compact = false;
-  state.placed = platz !== null;
   borderInTheme(win, cfg.themeResolved);
   materialSetzen(win, false, cfg.themeResolved);
   watchTransparency();
@@ -268,8 +280,6 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
       win.minimize();
       return;
     }
-    // maximised last time: maximised again, on the monitor its place is on
-    if (platz?.max) win.maximize();
     win.show();
   };
   win.once("ready-to-show", reveal);
@@ -283,6 +293,7 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
     if (state.win === win) state.win = null;
     // the strip does not outlive full view: closing full view ends the app
     kompaktWindow()?.close();
+    abrissWindow()?.close();
   });
 
   const origin = new URL(url).origin;
@@ -295,7 +306,7 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
 }
 
 /*
- * What both windows show is this app's own page and nothing else: links out
+ * What all three windows show is this app's own page and nothing else: links out
  * of the app open in the real browser, never inside the meter, and no window
  * opens another (safety audit 8b).
  */
@@ -373,6 +384,8 @@ function openKompakt(start: { live: boolean; durch: boolean }): boolean {
   // a new strip measures itself anew: its limit starts from its first size
   streifen.grenze = { w: 0, h: 0 };
   streifen.vorMenue = null;
+  // and starts without a remembered lift from an earlier strip (#327)
+  streifen.lift = null;
   const material = (): void => materialSetzen(kw, true, cfg.themeResolved);
   material();
   borderInTheme(kw, cfg.themeResolved);
@@ -411,6 +424,62 @@ function openKompakt(start: { live: boolean; durch: boolean }): boolean {
 }
 
 /*
+ * The torn-off window (spec Windows-Teil 2, 3): one area of the page in a
+ * window of its own. This process opens it itself, never the page; the area
+ * comes from the fixed list ABRISS_TEILE. Framed like full view, not on top,
+ * on the same material rules as full view (materialSetzen with compact off).
+ */
+function openAbriss(teil: AbrissTeil): boolean {
+  if (!currentWindow() || !seite.origin) return false;
+  const offen = abrissWindow();
+  if (offen && abriss.teil === teil) {
+    offen.show();
+    offen.focus();
+    return true;
+  }
+  offen?.close();
+  const cfg = loadConfig();
+  // its remembered place while it is still on a monitor (lage.ts)
+  const p = platzAbriss(teilAus(loadConfig().fenster, "abriss"), monitore(), hauptmonitor());
+  const aw = new BrowserWindow({
+    title: "Borometer",
+    width: p ? p.w : 900,
+    height: p ? p.h : 640,
+    ...(p ? { x: p.x, y: p.y } : {}),
+    minWidth: 320,
+    minHeight: 240,
+    titleBarStyle: "hidden",
+    titleBarOverlay: overlayFor(cfg.themeResolved),
+    backgroundColor: backgroundFor(cfg.themeResolved),
+    icon: seite.icon,
+    show: false,
+    // the page's preferences, the same as the other windows' (SEITE above)
+    webPreferences: SEITE,
+  });
+  abriss.win = aw;
+  abriss.teil = teil;
+  materialSetzen(aw, false, cfg.themeResolved);
+  borderInTheme(aw, cfg.themeResolved);
+  const zeigen = (): void => {
+    if (!aw.isDestroyed() && !aw.isVisible()) aw.show();
+  };
+  aw.webContents.once("did-finish-load", zeigen);
+  aw.webContents.once("did-fail-load", zeigen);
+  aw.on("move", () => abrissMerker.ereignis());
+  aw.on("resize", () => abrissMerker.ereignis());
+  aw.on("close", () => abrissMerker.jetzt());
+  aw.on("closed", () => {
+    if (abriss.win === aw) {
+      abriss.win = null;
+      abriss.teil = null;
+    }
+  });
+  nurEigeneSeite(aw, seite.origin);
+  void aw.loadURL(`${seite.origin}/?win=1&teil=${teil}`);
+  return true;
+}
+
+/*
  * The strip stays a strip (Kompakt-Fix 01.10.2026): the compact window could
  * be dragged to any size, as big as a monitor. Its maximum is now twice the
  * largest strip the page measured since it opened - twice the width for a
@@ -433,6 +502,8 @@ const streifen = {
   /** while the menu is open: the strip's outer bounds before it (outer: a content size read and set
       again came back a point narrower at 200 % scaling), and whether the menu lifted it */
   vorMenue: null as { w: number; h: number; x: number; y: number; gehoben: boolean } | null,
+  /** the strip was lifted off the bottom edge by its own growth (streifenLage) */
+  lift: null as Lift | null,
 };
 
 /* setMaximumSize counts the outer size; the strip measures its content. */
@@ -442,20 +513,40 @@ function grenzeSetzen(kw: BrowserWindow, w: number, h: number): void {
   kw.setMaximumSize(w + ow - cw, h + oh - ch);
 }
 
+/* The strip's floor (#348): the smallest size it stays readable at, which the
+   page measures (kompaktMinimum decides what becomes of the numbers). The
+   window cannot be dragged under it, so the bar never slides over the tabs.
+   setMinimumSize counts the outer size, like the maximum above. */
+function minimumSetzen(kw: BrowserWindow, min: unknown, w: number, h: number, wa: { width: number; height: number }): void {
+  const m = kompaktMinimum(min, w, h, wa);
+  if (!m) return;
+  const [ow = 0, oh = 0] = kw.getSize();
+  const [cw = 0, ch = 0] = kw.getContentSize();
+  kw.setMinimumSize(m.w + ow - cw, m.h + oh - ch);
+}
+
 /* While the menu is open it holds the window: a strip measured meanwhile
    only moves the limit, and closing the menu sizes back and sets it. The
    limit never passes the monitor's work area (review N2): one bad
    measurement - or a size beyond what setMaximumSize takes - must not lift
    it for good. */
-function streifenGroesse(kw: BrowserWindow, w: number, h: number, art: string): void {
+function streifenGroesse(kw: BrowserWindow, w: number, h: number, art: string, min: unknown): void {
   if (art === "menue") return menueAuf(kw, w, h);
   if (art === "zurueck") return menueZu(kw);
   const a = screen.getDisplayMatching(kw.getBounds()).workArea;
   streifen.grenze.w = Math.min(a.width, Math.max(streifen.grenze.w, KOMPAKT_MAX_FAKTOR * w));
   streifen.grenze.h = Math.min(a.height, Math.max(streifen.grenze.h, KOMPAKT_MAX_FAKTOR * h));
+  minimumSetzen(kw, min, w, h, a);
   if (streifen.vorMenue) return;
   grenzeSetzen(kw, streifen.grenze.w, streifen.grenze.h);
-  if (art === "streifen") sizeBySelf(kw, w, h);
+  if (art !== "streifen") return;
+  sizeBySelf(kw, w, h);
+  // A strip that grew past the work area's bottom is lifted like the menu below,
+  // and goes back when it shrinks, unless the player moved it meanwhile (#298).
+  const b = kw.getBounds();
+  const lage = streifenLage(b, a, streifen.lift);
+  streifen.lift = lage.lift;
+  if (lage.y !== b.y) positionBySelf(kw, { x: b.x, y: lage.y });
 }
 
 /*
@@ -628,15 +719,15 @@ function merkeLage(teil: Teil, neu: unknown): void {
   if (fenster) updateConfig({ fenster });
 }
 
-/* What is remembered: full view's bounds before maximising and whether it
-   was maximised, or compact's top-left corner. Nothing while minimised.
-   Compact is whatever holds the size from before it (state.prev). */
+/* What is remembered: full view's bounds (only the position is used again,
+   #364; never "maximised"), or compact's top-left corner. Nothing while
+   minimised. Compact is whatever holds the size from before it (state.prev). */
 function lageSchreiben(): void {
   const win = currentWindow();
   if (!win || win.isMinimized()) return;
   const b = win.getNormalBounds();
   if (state.prev) merkeLage("kompakt", { x: b.x, y: b.y });
-  else merkeLage("gross", { x: b.x, y: b.y, w: b.width, h: b.height, max: win.isMaximized() });
+  else merkeLage("gross", { x: b.x, y: b.y, w: b.width, h: b.height, max: false });
 }
 
 const merker = neuerMerker(lageSchreiben, {
@@ -654,6 +745,20 @@ function kompaktLageSchreiben(): void {
 }
 
 const kompaktMerker = neuerMerker(kompaktLageSchreiben, {
+  stelle: (fn, ms) => setTimeout(fn, ms),
+  loesche: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
+});
+
+/* The torn-off window's place, remembered as "abriss" (not which area it
+   showed: every opening names that). Nothing while minimised. */
+function abrissLageSchreiben(): void {
+  const aw = abrissWindow();
+  if (!aw || aw.isMinimized()) return;
+  const b = aw.getBounds();
+  merkeLage("abriss", { x: b.x, y: b.y, w: b.width, h: b.height, max: false });
+}
+
+const abrissMerker = neuerMerker(abrissLageSchreiben, {
   stelle: (fn, ms) => setTimeout(fn, ms),
   loesche: (t) => clearTimeout(t as ReturnType<typeof setTimeout>),
 });
@@ -684,30 +789,34 @@ function kompaktHin(win: BrowserWindow): void {
 }
 
 /*
+ * The set of things a person may do with this window by hand (windows-core,
+ * fensterOptionen): full view is fixed, the shrunk compact strip is dragged,
+ * never maximised (#364). Only these three flags are set here, and setting
+ * the floor of the strip stays with minimumSetzen.
+ */
+function ansichtSetzen(win: BrowserWindow, ansicht: Ansicht): void {
+  const o = fensterOptionen(ansicht);
+  win.setResizable(o.resizable);
+  win.setMaximizable(o.maximizable);
+  win.setFullScreenable(o.fullscreenable);
+}
+
+/*
  * Leaving compact, and a page reloaded in compact: full view's remembered
- * place, maximised again if it was. Without one, the size from before
- * compact as before. Compact's last corner is written first, while
- * state.prev still says compact.
+ * position at its fixed size (#364). Without one, the size from before
+ * compact - which was the fixed size. Compact's last corner is written first,
+ * while state.prev still says compact. Full view is fixed again only after
+ * it has its size back.
  */
 function backToFull(win: BrowserWindow): void {
   const prev = state.prev;
   if (!prev) return;
   merker.jetzt();
-  const g = platzGross(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
+  const g = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
   if (g) boundsBySelf(win, g);
   else sizeBySelf(win, prev[0], prev[1]);
-  const max = g ? g.max : state.prevMax;
   state.prev = null;
-  state.prevMax = false;
-  if (max) {
-    win.maximize();
-    state.max = true;
-  }
-}
-
-/** Whether the window opened at a remembered place (GET /api/config). */
-export function windowPlaced(): boolean {
-  return currentWindow() !== null && state.placed;
+  ansichtSetzen(win, "voll");
 }
 
 function int(v: unknown): number {
@@ -718,14 +827,17 @@ function int(v: unknown): number {
 /* What the compact window may be asked (N4): it has no frame buttons, no
    material the page switches and no size setting of its own. */
 const KOMPAKT_AKTIONEN = ["kompakt", "close", "resize", "pin", "seethrough", "clickthrough"];
+/* What the torn-off window may be asked: close it, and have its buttons follow the theme. */
+const ABRISS_AKTIONEN = ["close", "chrome"];
 
 export function winAction(sent: Json): Answer {
   const action = String(sent.do ?? "").trim();
-  // which window is meant: "main" (full view, also when the page names none) or "kompakt"
+  // which window is meant: "main" (full view, also when the page names none), "kompakt" or "abriss"
   const welches = sent.win ?? "main";
-  if (welches !== "main" && welches !== "kompakt") return fail("unknown window");
+  if (welches !== "main" && welches !== "kompakt" && welches !== "abriss") return fail("unknown window");
   if (welches === "kompakt" && !KOMPAKT_AKTIONEN.includes(action)) return fail("not for the compact window");
-  const win = welches === "kompakt" ? kompaktWindow() : currentWindow();
+  if (welches === "abriss" && !ABRISS_AKTIONEN.includes(action)) return fail("not for the torn-off window");
+  const win = welches === "kompakt" ? kompaktWindow() : welches === "abriss" ? abrissWindow() : currentWindow();
   if (!win) return fail("no window");
   try {
     switch (action) {
@@ -749,6 +861,28 @@ export function winAction(sent: Json): Answer {
           schliesseKompakt(true);
         }
         return ok({ offen: kompaktWindow() !== null });
+      }
+      case "menue": {
+        /*
+         * The native menu on a table row. The page names a kind from a fixed
+         * list and nothing else; the items and their words are fixed in
+         * menue.ts. Full view only - the compact window's list does not
+         * have it.
+         */
+        if (win !== state.win) return fail("only for full view");
+        if (menueArt(sent.art) === null) return fail("unknown menu");
+        zeigeMenue(win);
+        return ok();
+      }
+      case "abreissen": {
+        /*
+         * An area into a window of its own. The page names it from a fixed
+         * list (abrissTeil); full view only. A second request for the same
+         * area brings the window forward, another area replaces it.
+         */
+        const teil = abrissTeil(sent.teil);
+        if (teil === null || win !== state.win) return fail("unknown part");
+        return openAbriss(teil) ? ok({ offen: true }) : fail("no window here");
       }
       case "stand": {
         /*
@@ -799,7 +933,7 @@ export function winAction(sent: Json): Answer {
         // Its maximum follows the strip (streifenGroesse, Kompakt-Fix 2).
         if (win !== state.win) {
           const art = STREIFEN_ARTEN.find((a) => a === sent.art) ?? "streifen";
-          if (w > 0 && h > 0) streifenGroesse(win, Math.max(w, MIN_ACTION_W), Math.max(h, MIN_ACTION_H), art);
+          if (w > 0 && h > 0) streifenGroesse(win, Math.max(w, MIN_ACTION_W), Math.max(h, MIN_ACTION_H), art, sent.min);
           break;
         }
         if (w > 0 && h > 0) {
@@ -807,18 +941,14 @@ export function winAction(sent: Json): Answer {
           // anything below moves the window.
           const entering = !state.prev;
           if (entering) merker.jetzt();
-          // Leave the maximized state before sizing: a resized window that
-          // Windows still treats as maximized can snap back to the full
-          // monitor on the next window-manager event. Before the size is
-          // remembered, so it is the restored size and not the monitor's;
-          // whether it was maximised is remembered beside it.
-          const wasMax = win.isMaximized();
-          if (wasMax) win.unmaximize();
-          if (!state.prev) {
-            state.prev = win.getContentSize() as [number, number];
-            state.prevMax = wasMax;
-          }
+          // Full view cannot be maximised any more (#364); a window some other
+          // way maximised is still left before sizing, so it cannot snap
+          // back to the full monitor on the next window-manager event.
+          if (win.isMaximized()) win.unmaximize();
+          if (!state.prev) state.prev = win.getContentSize() as [number, number];
           state.max = false;
+          // the strip is dragged by hand, down to its floor (fixed again in backToFull)
+          if (entering) ansichtSetzen(win, "kompakt");
           sizeBySelf(win, Math.max(w, MIN_ACTION_W), Math.max(h, MIN_ACTION_H));
           // compact's own corner, if one is remembered
           if (entering) kompaktHin(win);
@@ -834,8 +964,11 @@ export function winAction(sent: Json): Answer {
         break;
       case "size": {
         /*
-         * Full view follows the app's own size setting: at 150 % the page
-         * asks for a window half as big again. Unlike resize this is not a
+         * Not sent by the page since #364: full view has a fixed size and the
+         * size setting scales the page inside it, not the window. The action
+         * stays as the audit pins it. It was: full view follows the app's own
+         * size setting, at 150 % the page asks for a window half as big
+         * again. Unlike resize this is not a
          * "size before compact" to come back to, so state.prev stays as it
          * is. Content size through sizeBySelf, so will-resize does not count
          * it as a hand on the border; the same floor as resize. Here a
@@ -907,6 +1040,12 @@ export function winAction(sent: Json): Answer {
          * request, and chrome.ts clamps the height to a whole number.
          */
         win.setTitleBarOverlay(overlayFor(sent.theme, sent.height));
+        // the torn-off window's header is its own: full view's height stays
+        if (win === abriss.win) {
+          borderInTheme(win, sent.theme);
+          materialSetzen(win, false, sent.theme);
+          break;
+        }
         state.header = sent.height;
         borderInTheme(win, sent.theme);
         // smoked glass puts full view on Acrylic, every other theme takes it off
@@ -943,15 +1082,6 @@ export function winAction(sent: Json): Answer {
         setLiveBadge(win, !!sent.on);
         break;
       }
-      case "maximize":
-        if (state.max || win.isMaximized()) {
-          win.unmaximize();
-          state.max = false;
-        } else {
-          win.maximize();
-          state.max = true;
-        }
-        break;
       default:
         return { status: 200, body: { ok: false } };
     }

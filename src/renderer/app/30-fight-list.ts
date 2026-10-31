@@ -12,6 +12,7 @@ import { renderCompare, vonHand } from "./28-compare";
 import { renderAll } from "./32-history";
 import { runNoteSync, syncCompareBtn } from "./45-startup";
 import { besterVon, schluesselVon } from "./46-best-pull";
+import { ABRISS_FENSTER } from "./41-server-mode";
 import { anzahlText } from "./55-statusleiste";
 import type { Fight, FightBlock, SavedRun } from "../types";
 
@@ -137,7 +138,8 @@ function railKopf(){
   /* Ein frueherer Tag aus dem Log-Ordner (Nachtraege N3) nennt seinen Tag
      aus der Aenderungszeit der Dateien, wie die Knoepfe daneben blaettern. */
   const neueste = state.encounters[0];
-  const tag = tagAnsichtLabel() ?? (neueste && state.wall ? (() => { const d = new Date(neueste.start), p = (x: number) => String(x).padStart(2, "0");
+  // ein Kampf aus dem Archiv (76-archiv.ts) hat keinen Tag im Log-Ordner: der Kopf sagt, woher er kommt
+  const tag = state.origin === "archiv" ? t("ar.ausArchivTag") : tagAnsichtLabel() ?? (neueste && state.wall ? (() => { const d = new Date(neueste.start), p = (x: number) => String(x).padStart(2, "0");
     return t("kw.tag", {w: d.getUTCDay(), d: p(d.getUTCDate()) + "." + p(d.getUTCMonth() + 1) + "."}); })() : "");
   const tagFeld = $("#kwTag");
   if(tagFeld.textContent !== tag) tagFeld.textContent = tag;
@@ -633,6 +635,8 @@ export function renderFights(){
    War er angehakt, ist er es danach wieder - hoechstens vier, wie beim
    Anhaken selbst. */
 export function entferneLauf(r: SavedRun){
+  // das abgerissene Fenster (Windows Teil 2) aendert keine gespeicherten Laeufe
+  if(ABRISS_FENSTER) return;
   const platz = state.runs.findIndex(o => o.id === r.id);
   if(platz < 0) return;
   const warVerglichen = state.cmpRuns.has(r.id);

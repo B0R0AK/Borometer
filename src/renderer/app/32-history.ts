@@ -20,6 +20,7 @@ import { renderFights, renderRuns } from "./30-fight-list";
 import { switchTab } from "./34-menus-drop-and-tabs";
 import { applyWindowSize } from "./36-dialog";
 import { standFolgen, syncWindowVars } from "./37-window-size-and-overlay";
+import { ABRISS_FENSTER } from "./41-server-mode";
 import { readWeaponPair, renderParty, sendReport, syncSaveRunBtns } from "./42-party";
 import { syncTabs } from "./43-more-menu-and-dev-mode";
 import { renderStart, syncCompareBtn } from "./45-startup";
@@ -30,9 +31,12 @@ import { syncTafel } from "./56-tafel";
 import { leerKnopf, leerTauschen, syncFelder } from "./58-felder";
 import { renderEinst } from "./57-einstellungen";
 import { syncWeeklies } from "./59-weeklies";
+import { kompaktAnsicht, syncLeiste } from "./72-kompakt-leiste";
 import { syncRekorde } from "./62-rekorde";
 import { syncGilde } from "./68-gilde";
+import { archivAufnehmen, syncArchiv } from "./76-archiv";
 import { paarCode } from "../build-core";
+import { charakterFuer, zuordnungsStand } from "../charaktere-core";
 import { besterPull, classDps, dummyClass, mindestLaenge, rangfolge } from "../best-pull-core";
 import { MIN_MEDIAN, abendText, einordnungSkala, gleicherBezug, kampfPaar, mitte } from "../build-core";
 import { TAG_MS, abendAchse, imZeitraum, mitDatum, pullLagen, zeitLagen, zeitSpanne, zusammenfuehren, type Spanne } from "../verlauf-core";
@@ -71,6 +75,11 @@ export function histRecord(){
      hierher also schon ueberschrieben. origin traegt dieselbe Auskunft und
      steht, wenn das hier laeuft. */
   if(state.origin === "sample" || !state.text) return;
+  /* Ein Kampf aus dem Archiv (76, oeffneArchivKampf) ist schon festgehalten: er steht im Verlauf, unter
+     den besten Pulls und im Archiv seit dem Lesen seines Logs. Sein Text ist nur das Stueck dieses einen
+     Kampfs - als Stand der ganzen Datei ersetzte er deren Eintrag im Verlauf. Darum wird nichts geschrieben:
+     nicht in den Verlauf, nicht an die besten Pulls, nicht noch einmal ins Archiv (Spezifikation Log-Archiv 7). */
+  if(state.origin === "archiv") return;
   const key = (state.fileNames || []).join(" + ");
   if(!key) return;
   /* Ein Log nur mit Uhrzeit (state.wall false, Fix verlauf-ohne-datum): der
@@ -83,13 +92,22 @@ export function histRecord(){
   if(!state.wall) return;
   // ein altes b (Zuordnung aus der Zeit des Builds-Reiters, #207): der alte Eintrag derselben Datei mit derselben Startzeit gibt es weiter, gelesen oder gezeigt wird es nirgends
   const altB = new Map((state.hist.files[key]?.fights ?? []).filter(x => typeof x.b === "string").map(x => [x.at, x.b!]));
+  /* Der Charakter eines Kampfs (Spezifikation Twinks 3): allein eine Kennung, nie fuer die Summe einer Gruppe.
+     Solange die Weeklies nicht gelesen sind (charaktereBekannt), weiss die Seite nicht, welche Charaktere es
+     gibt: dann bleibt das ch des alten Eintrags mit derselben Startzeit, statt es zu verlieren. */
+  const altCh = new Map((state.hist.files[key]?.fights ?? []).filter(x => typeof x.ch === "string").map(x => [x.at, x.ch!]));
+  const chVon = (at: number, g: unknown) => g ? undefined : !state.charaktereBekannt ? altCh.get(at) : state.charaktere.length ? charakterFuer(angreifer(), state.charaktere) : undefined;
   const fights: HistFight[] = [];
+  // neu gerechnete Kaempfe fuer das Archiv (76-archiv.ts), nach dem Eintrag in den Verlauf
+  const frisch: [HistFight, Encounter][] = [];
   state.encounters.forEach((seg) => {
     if(histNur && !histNur.has(seg) && histMerk.has(seg)){
       const alt = histMerk.get(seg);
       /* Das gemerkte Objekt gilt nur, solange sein b dem des Verzeichnisses entspricht (sonst neu rechnen). */
       if(!alt) return;
-      if((alt.b ?? undefined) === altB.get(alt.at)){ fights.push(alt); return; }
+      // ebenso sein ch: wurden die Charaktere inzwischen geaendert, neu rechnen (Spezifikation Twinks 3)
+      const ch = chVon(alt.at, alt.g);
+      if((alt.b ?? undefined) === altB.get(alt.at) && alt.ch === ch){ fights.push(alt); return; }
     }
     histMerk.set(seg, null);
     // seg.stats, nicht stats(seg): segment() hat es dort schon abgelegt, und
@@ -115,6 +133,11 @@ export function histRecord(){
     // das Paar als zwei Zahlen, nie Text
     const w = paarCode(paarVon(seg, histStill) ?? []);
     if(w) f.w = w;
+    /* Der Charakter (Spezifikation Twinks 3): allein seine Kennung, nie der
+       Name. "" heisst: es gibt Charaktere, und keiner passt. Ohne Charaktere
+       und bei der Summe einer Gruppe bleibt das Feld weg (siehe oben). */
+    const ch = chVon(seg.start, f.g);
+    if(ch !== undefined) f.ch = ch;
     /* Treffer, kritisch, schwer, verfehlt (Spezifikation Steckbrief 3.1 und
        4.3): vier ganze Zahlen, keine Namen. Treffer sind alle Schadenszeilen
        des Spielers in diesem Kampf, die Fehlschlaege eingeschlossen - die
@@ -122,28 +145,57 @@ export function histRecord(){
     const miss = seg.missed || 0;
     f.hits = st.hits + miss; f.crit = st.crit; f.heavy = st.heavy; f.miss = miss;
     topDazu(f, seg.events);
-    fights.push(f); histMerk.set(seg, f);
+    fights.push(f); histMerk.set(seg, f); frisch.push([f, seg]);
   });
   /* Geschickt wird nur eine Aenderung (Spezifikation Live-Leistung 4). Die
      Groesse allein ist keine: sie waechst mit jeder Zeile, auch mit denen,
      die keinen Kampf aendern, und nichts liest sie. */
   // das Nachlesen der Rekorde nimmt die Kaempfe selbst entgegen und schreibt nichts hier (histNachlesen)
+  insArchiv(histStill && histStillAb ? ohneErsten(frisch) : frisch);
   if(histStill){ histStillFights = fights; return; }
   const alt = state.hist.files[key];
   /* Eine Datei, die bisher nur die Rekorde nachgelesen haben (nach), ist
      jetzt geoeffnet: ihr Eintrag wird der eines geoeffneten Logs. */
+  /* Ein anderer Zuordnungsstand allein zaehlt erst, wenn die Charaktere gelesen sind (charaktereBekannt). */
   const anders = fights.length
-    ? !alt || !!alt.nach || JSON.stringify(alt.fights) !== JSON.stringify(fights)
+    ? !alt || !!alt.nach || JSON.stringify(alt.fights) !== JSON.stringify(fights) || (state.charaktereBekannt && (alt.zv ?? "") !== zuordnungsStand(state.charaktere))
     : !!alt;
   if(anders){
     if(!fights.length) delete state.hist.files[key];
-    else state.hist.files[key] = {size: state.text.length, fights};
+    else state.hist.files[key] = {size: state.text.length, fights, ...zvTeil(alt)};
     histCollect();
     persistPref("logIndex", state.hist.files);
   }
   // dieselben Kaempfe, fuer "Gegen deinen besten Pull" (46-best-pull.ts)
   bestRecord(histNur);
 }
+/* Das Archiv (Spezifikation Log-Archiv 6): jeder neu gerechnete Kampf, solange
+   state noch der Text ist, aus dem er kommt - auch beim Nachlesen der Rekorde
+   (histStill). Der Aufruf steht vor dem Eintrag in den Verlauf (die Zeile mit
+   histStill bleibt so, wie das Audit sie liest); archivAufnehmen merkt sich
+   dabei nur den Auftrag und entscheidet selbst, ob er dorthin gehoert.
+   Geschnitten und gesendet wird erst asynchron, wenn histRecord laengst fertig
+   ist. Es wirft nie. */
+const insArchiv = (l: readonly [HistFight, Encounter][]) => { for(const [f, seg] of l) (histSammler ?? archivAufnehmen)(f, seg); };
+/* Lesen die Rekorde nur das neue Ende einer Datei (histNachlesen mit ab > 0), kann der erste
+   Kampf darin an der Grenze der letzten Lesung angeschnitten sein: er kaeme mit einem falschen
+   Beginn als zweiter Kampf unter neuem Schluessel ins Archiv. Er bleibt draussen; das ganze
+   Lesen der Datei (Oeffnen, Live) nimmt ihn mit. */
+let histStillAb = false;
+const ohneErsten = (l: readonly [HistFight, Encounter][]) => {
+  const erster = Math.min(...state.encounters.map(e => e.start));
+  return l.filter(([, seg]) => seg.start !== erster);
+};
+
+/* Der Angreifer, dessen Kaempfe gezaehlt werden: der gewaehlte, oder bei "alle"
+   der eine, wenn das Log nur einen hat (dann bleibt state.player "__all");
+   "" bei einer Gruppe unter "alle" (die bekommt ohnehin kein ch). */
+const angreifer = () => state.player !== "__all" ? state.player : state.players.length === 1 ? state.players[0]! : "";
+/** Der Zuordnungsstand fuer einen Index-Eintrag (nur Kennungen); nichts, solange es keine Charaktere gibt.
+    Solange die Charaktere nicht gelesen sind (charaktereBekannt), bleibt der Stand des alten Eintrags (altZv). */
+type IndexEintrag = (typeof state.hist.files)[string] | undefined;
+const altZv = (alt: IndexEintrag): {zv?: string} => typeof alt?.zv === "string" ? {zv: alt.zv} : {};
+const zvTeil = (alt: IndexEintrag): {zv?: string} => { if(!state.charaktereBekannt) return altZv(alt); const s = zuordnungsStand(state.charaktere); return s ? {zv: s} : {}; };
 
 /* Rekorde (Spezifikation Rekorde 3, Fixrunde 1): der hoechste Einzeltreffer
    des Spielers im Kampf als Zahl und die Kennung der Faehigkeit, die ihn
@@ -194,8 +246,46 @@ function topDazu(f: HistFight, ev: readonly CombatEvent[]){
    gelesen) und nach (nur nachgelesen, nicht geoeffnet: "Zuletzt geoeffnet"
    auf Start laesst ihn aus). Geloescht wird nichts. */
 let histStill = false, histStillFights: HistFight[] = [];
+/* Alte Logs einlesen (histFuerArchiv): die neu gerechneten Kaempfe gehen an diesen Sammler statt an die Aufnahme */
+let histSammler: ((f: HistFight, seg: Encounter) => void) | null = null;
 export type NachErgebnis = "ok" | "leer" | "fremd";
 export function histNachlesen(name: string, text: string, ab: number, bytes: number, kopf: string): NachErgebnis {
+  const alt = state.hist.files[name];
+  const altFights = (alt?.fights || []) as HistFight[];
+  const {ergebnis, neu} = stillRechnen(name, (ab > 0 && /^CombatLogVersion/i.test(kopf) ? kopf.split("\n")[0] + "\n" : "") + text, ab > 0);
+  /* Der Eintrag. Nichts geht verloren: beim neuen Ende stehen die alten
+     Kaempfe und dahinter die neuen; beim ganzen Lesen gewinnt der neu
+     gelesene Kampf (er traegt top), und ein Kampf, den nur der alte Eintrag
+     kennt, bleibt (zusammenfuehren, ueber den Beginn). Eine Datei, die schon
+     geoeffnet war, bleibt eine geoeffnete (kein nach). */
+  const letzter = altFights.length ? Math.max(...altFights.map(f => f.at)) : -Infinity;
+  const fights = ab > 0 ? altFights.concat(neu.filter(f => f.at > letzter))
+    : alt && !alt.nach ? altFights.map(f => { const n = neu.find(x => x.at === f.at); return n && n.top != null ? {...f, top: n.top, topSid: n.topSid ?? "", ...(n.ch === undefined ? {} : {ch: n.ch})} : f; })
+    : zusammenfuehren(neu, altFights);
+  const size = (ab > 0 && typeof alt?.size === "number" ? alt.size : 0) + text.length;
+  /* beim Anhaengen (ab > 0) bleibt der alte Stand zv: nur ganz gelesen ist die Datei neu zugeordnet;
+     und nur, wenn sich ein Angreifer fand (ok) - "fremd" oder "leer" wird beim naechsten Mal wieder versucht */
+  const zv = ab > 0 || ergebnis !== "ok" ? altZv(alt) : zvTeil(alt);
+  state.hist.files[name] = !alt || alt.nach ? {size, bytes, nach: true, fights, ...zv} : {...alt, size, bytes, fights, ...zv};
+  histCollect();
+  persistPref("logIndex", state.hist.files);
+  return ergebnis;
+}
+
+/** Alte Logs einlesen (76-archiv.ts, Spezifikation Log-Archiv 8): die Kaempfe einer ganzen Datei, gerechnet
+    mit denselben Schritten wie das Nachlesen der Rekorde, gehen an nimm - solange state der Text der Datei ist
+    (archivAufnehmen liest dort Text, Spalten und Zeit). Anders als histNachlesen schreibt es nichts: keinen
+    Eintrag in den Verlauf (er bleibt, was die App gesehen hat), keinen besten Pull; der Stand der Seite
+    steht danach wieder, wie er war. Wessen Kampf und welcher Charakter: wie dort (meInLog, charakterFuer). */
+export function histFuerArchiv(name: string, text: string, nimm: (f: HistFight, seg: Encounter) => void): NachErgebnis {
+  histSammler = nimm;
+  try { return stillRechnen(name, text, false).ergebnis; }
+  finally { histSammler = null; }
+}
+
+/* Die Schritte von loadText auf einem fremden Text, ohne ihn zu zeigen (histNachlesen, histFuerArchiv):
+   der Stand vorher wird gemerkt und danach in einem Zug zurueckgelegt. */
+function stillRechnen(name: string, volltext: string, nurEnde: boolean): {ergebnis: NachErgebnis; neu: HistFight[]} {
   const s = state as unknown as Record<string, unknown>;
   const vorher = new Map<string, unknown>(), inhalt = new Map<string, unknown[]>();
   for(const k of Object.keys(s)){
@@ -203,13 +293,11 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
     vorher.set(k, v);
     if(v instanceof Set || v instanceof Map) inhalt.set(k, [...v]);
   }
-  const alt = state.hist.files[name];
-  const altFights = (alt?.fights || []) as HistFight[];
   let ergebnis: NachErgebnis = "leer";
   let neu: HistFight[] = [];
   try {
     state.fromSample = false; state.origin = "file";
-    state.text = (ab > 0 && /^CombatLogVersion/i.test(kopf) ? kopf.split("\n")[0] + "\n" : "") + text;
+    state.text = volltext;
     state.fileNames = [name];
     state.clearBefore = null; state.entfernt = new Set();
     const parsed = parseGrid(state.text);
@@ -218,7 +306,10 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
       state.parsed = parsed; state.mapping = mapping;
       buildEvents();
       const leute = state.players, gruppe = (state.party && state.party.name) || "", gewaehlt = vorher.get("player") as string;
+      // gehoert genau einer der Angreifer zu einem Charakter, ist er es (Spezifikation Twinks 3)
+      const meine = leute.filter(l => charakterFuer(l, state.charaktere));
       const ich = leute.length === 1 ? leute[0]!
+        : meine.length === 1 ? meine[0]!
         : gruppe && leute.includes(gruppe) ? gruppe
         : gewaehlt !== "__all" && leute.includes(gewaehlt) ? gewaehlt : null;
       if(ich === null) ergebnis = leute.length ? "fremd" : "leer";
@@ -226,6 +317,7 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
         state.player = ich;
         setVentiusLernen(false);
         segment();
+        histStillAb = nurEnde;
         histStill = true; histStillFights = [];
         histRecord();
         neu = histStillFights;
@@ -234,6 +326,7 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
     }
   } finally {
     histStill = false; setVentiusLernen(true);
+    histStillAb = false;
     for(const k of Object.keys(s)) if(!vorher.has(k)) delete s[k];
     for(const [k, v] of vorher){
       s[k] = v;
@@ -242,20 +335,7 @@ export function histNachlesen(name: string, text: string, ab: number, bytes: num
       if(i && v instanceof Map){ v.clear(); for(const [a, b] of i as [unknown, unknown][]) v.set(a, b); }
     }
   }
-  /* Der Eintrag. Nichts geht verloren: beim neuen Ende stehen die alten
-     Kaempfe und dahinter die neuen; beim ganzen Lesen gewinnt der neu
-     gelesene Kampf (er traegt top), und ein Kampf, den nur der alte Eintrag
-     kennt, bleibt (zusammenfuehren, ueber den Beginn). Eine Datei, die schon
-     geoeffnet war, bleibt eine geoeffnete (kein nach). */
-  const letzter = altFights.length ? Math.max(...altFights.map(f => f.at)) : -Infinity;
-  const fights = ab > 0 ? altFights.concat(neu.filter(f => f.at > letzter))
-    : alt && !alt.nach ? altFights.map(f => { const n = neu.find(x => x.at === f.at); return n && n.top != null ? {...f, top: n.top, topSid: n.topSid ?? ""} : f; })
-    : zusammenfuehren(neu, altFights);
-  const size = (ab > 0 && typeof alt?.size === "number" ? alt.size : 0) + text.length;
-  state.hist.files[name] = !alt || alt.nach ? {size, bytes, nach: true, fights} : {...alt, size, bytes, fights};
-  histCollect();
-  persistPref("logIndex", state.hist.files);
-  return ergebnis;
+  return {ergebnis, neu};
 }
 
 /* Verlauf, Einordnung und Start zaehlen nur, was geoeffnet
@@ -274,7 +354,7 @@ export function histCollect(){
 
 /* Ein Kampf im Verlauf: aus dem Verzeichnis (logIndex) oder gespeichert -
    "Kampf speichern" (state.runs) und die besten Pulls (state.best). */
-type VKampf = HistFight & { gespeichert?: boolean };
+export type VKampf = HistFight & { gespeichert?: boolean };
 interface VZiel { key: string; name: string; fights: VKampf[]; best?: number; med?: number }
 
 /* Die gespeicherten Kaempfe an bekannten Bossen, mit Uhr. Ein Kampf steht
@@ -293,6 +373,14 @@ function gespeicherteKaempfe(): VKampf[] {
         raus.push({name: p.run.name, dps: p.run.dps, dmg: p.run.total, dur: p.run.seconds, at: p.at, gespeichert: true});
   }
   return raus;
+}
+
+/** Die Kaempfe an einem Boss (histKey) wie der Verlauf sie fuehrt - fuer die Bossseite im Archiv (76, #292): das Verzeichnis
+    ohne Uebungspuppe und ohne Summen einer Gruppe, dazu gespeicherte Kaempfe und beste Pulls; derselbe Kampf einmal. */
+export function kaempfeAmBoss(schluessel: string): VKampf[] {
+  const log = state.hist.fights.filter(f => !f.c && !f.g && knownBoss(f.name) && histKey(f.name) === schluessel);
+  const weg = gespeicherteKaempfe().filter(f => histKey(f.name) === schluessel);
+  return zusammenfuehren(log, weg);
 }
 
 /** Die Bosse, die der Verlauf zeigt (histKey) - fuer die Rekorde (62), die in ihn wechseln. */
@@ -410,14 +498,9 @@ export function renderHistory(){
      die Pulls nacheinander statt als Streifen am Rand der Datumsachse. */
   const abend = abendAchse(k.map(f => f.at));
   const bild = histPlot(z, k, cur, wahl, besterK, W, H, spanne, logKey, abend);
+  plotZuletzt = W + "x" + H;
   if(vpl.dataset.marke !== bild.svg){ vpl.innerHTML = bild.svg; vpl.dataset.marke = bild.svg; }
-  const hatLog = k.some(f => f.file === logKey), hatAlt = k.some(f => f.file !== logKey);
-  const leg = (hatLog ? '<span><i class="p log"></i>' + esc(t("verlauf.lgLog")) + "</span>" : "") +
-    (hatAlt ? '<span><i class="p alt"></i>' + esc(t("verlauf.lgFrueher")) + "</span>" : "") +
-    // "bester" nur, wo ein Punkt Gold traegt (der beste Pull im Zeitraum)
-    (besterK >= 0 ? '<span><i class="p best"></i>' + esc(t("tafel.bester")) + "</span>" : "") +
-    (bild.median != null ? '<span><i class="l"></i>' + esc(t("verlauf.median") + " " + fmt(bild.median)) + "</span>" : "") +
-    (abend ? '<span class="vlgachse">' + esc(t("verlauf.lgAbend")) + "</span>" : "");
+  const leg = legendeHtml(k, logKey, besterK, bild.median, abend);
   const lg = $("#histLeg");
   if(lg.dataset.marke !== leg){ lg.innerHTML = leg; lg.dataset.marke = leg; }
 
@@ -503,6 +586,17 @@ export function renderHistory(){
   }
 }
 
+/** Die Legende unter dem Diagramm (Verlauf und Bossseite im Archiv): die Art der Punkte, die da sind, Gold nur am besten Pull. */
+export function legendeHtml(k: readonly VKampf[], logKey: string, besterK: number, median: number | null, abend: boolean): string {
+  const hatLog = k.some(f => f.file === logKey), hatAlt = k.some(f => f.file !== logKey);
+  return (hatLog ? '<span><i class="p log"></i>' + esc(t("verlauf.lgLog")) + "</span>" : "") +
+    (hatAlt ? '<span><i class="p alt"></i>' + esc(t("verlauf.lgFrueher")) + "</span>" : "") +
+    // "bester" nur, wo ein Punkt Gold traegt (der beste Pull im Zeitraum)
+    (besterK >= 0 ? '<span><i class="p best"></i>' + esc(t("tafel.bester")) + "</span>" : "") +
+    (median != null ? '<span><i class="l"></i>' + esc(t("verlauf.median") + " " + fmt(median)) + "</span>" : "") +
+    (abend ? '<span class="vlgachse">' + esc(t("verlauf.lgAbend")) + "</span>" : "");
+}
+
 /* Die Liste "Kaempfe" reicht bis zur Unterkante der Flaeche (Feinschliff
    02.10., Abschnitt 4; DESIGN.md: mehr Hoehe heisst mehr Zeilen): so viele
    ganze Zeilen, wie zwischen ihrem Kopf und der Statusleiste Platz haben,
@@ -551,7 +645,7 @@ function histWaehle(i: number){
    Schwelle; der beste Pull nach der Regel traegt im Diagramm das Gold.
    Die Kennung "bester" (Klasse, data-marke) bleibt. */
 const MIDDOT = "\u00b7";
-function einordHtml(key: string): string {
+export function einordHtml(key: string): string {
   const seg = state.encounters[state.sel];
   if(!seg) return "";
   const st = seg.stats || stats(seg);
@@ -579,9 +673,9 @@ function achsText(v: number){
   const x = v >= 1e6 ? v / 1e6 : v >= 1e3 ? v / 1e3 : v;
   return String(+x.toFixed(2)) + (v >= 1e6 ? "M" : v >= 1e3 ? "k" : "");
 }
-function histPlot(z: VZiel, k: VKampf[], cur: number, wahl: number, gold: number, W: number, H: number, spanne: Spanne, logKey: string, abend: boolean):
+/** Das Diagramm ueber die Zeit als SVG (Verlauf, 32, und die Bossseite im Archiv, 76): z traegt nur den Namen fuer den Vorleser. */
+export function histPlot(z: {name: string}, k: VKampf[], cur: number, wahl: number, gold: number, W: number, H: number, spanne: Spanne, logKey: string, abend: boolean):
     { svg: string; median: number | null } {
-  plotZuletzt = W + "x" + H;
   const rand = {links: 52, rechts: 12, oben: 28, unten: 24};
   const innen = W - rand.links - rand.rechts;
   /* Datumsachse: hoechstens acht Beschriftungen, auf schmalen Flaechen
@@ -824,15 +918,23 @@ export function renderAll(){
   const rekorde = state.rekorde && !einst && !weeklies && !kompakt;
   /* Die Gilde (68, Spezifikation Gilde 5) ist der sechste Ort, wie die Weeklies. */
   const gilde = state.gilde && !einst && !weeklies && !rekorde && !kompakt;
-  $("#land").hidden = ((has || solo) && !start) || einst || weeklies || rekorde || gilde;
-  $("#app").hidden = (!has && !solo) || start || einst || weeklies || rekorde || gilde;
+  /* Das Archiv (76, Spezifikation Log-Archiv 7) ist der siebte Ort, wie die Rekorde. */
+  const archiv = state.archiv && !einst && !weeklies && !rekorde && !gilde && !kompakt;
+  // Kompakt neu: im Streifen steht entweder der Kampf oder die Leiste der Weeklies (72)
+  const kw = kompakt && kompaktAnsicht() === "weeklies";
+  /* Das abgerissene Fenster (77) hat keine Startseite: ohne Kampf sagt #abrissLeer, dass die Vollansicht keinen zeigt. */
+  $("#land").hidden = ((has || solo) && !start) || einst || weeklies || rekorde || gilde || archiv || kw || ABRISS_FENSTER;
+  $("#app").hidden = (!has && !solo) || start || einst || weeklies || rekorde || gilde || archiv || kw;
   $("#einst").hidden = !einst;
   $("#weeklies").hidden = !weeklies;
   $("#rekorde").hidden = !rekorde;
   $("#gilde").hidden = !gilde;
+  $("#archiv").hidden = !archiv;
+  syncLeiste();             // die Reiter und die Leiste der Weeklies im Streifen (72)
   syncWeeklies(weeklies);   // zeichnet die Weeklies und haelt den Minutentakt nur, solange sie offen sind (59)
   syncRekorde(rekorde);     // zeichnet die Rekorde und fragt beim Oeffnen einmal nach neuen Logs (62)
   syncGilde(gilde);         // zeichnet die Gilde nur, solange sie offen ist (68)
+  syncArchiv(archiv);       // zeichnet das Archiv nur, solange es offen ist (76)
   if(einst) renderEinst();
   if(!$("#land").hidden) renderStart();
   $(".stage").classList.toggle("landing", !$("#land").hidden);
@@ -853,7 +955,7 @@ export function renderAll(){
        Leeren auf Verlauf oder in der Gruppe ohne Kampf stand sonst der
        gewaehlte Knopf gesperrt und gedimmt da. */
     const usable = has || tb.dataset.tab === "party" || tb.dataset.tab === "start" || tb.dataset.tab === "settings" ||
-                   tb.dataset.tab === "weeklies" || tb.dataset.tab === "rekorde" || tb.dataset.tab === "gilde" ||
+                   tb.dataset.tab === "weeklies" || tb.dataset.tab === "rekorde" || tb.dataset.tab === "gilde" || tb.dataset.tab === "archiv" ||
                    (!!state.parsed && tb.dataset.tab === "setup") ||
                    (tb.dataset.tab === state.tab && !$("#app").hidden);
     tb.disabled = !usable;
@@ -1025,7 +1127,7 @@ export function loadText(text: string, names: string[], quiet?: boolean, ganz?: 
      auch. Ein Live-Takt an derselben Datei laesst Start stehen, sonst waere
      Start waehrend der Aufzeichnung nach zwei Sekunden wieder weg. Gilt erst,
      wenn der Text genommen wird (unten, verlassen()). */
-  const verlassen = () => { if(nextOrigin !== "watch" || !sameFile){ state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false; } };
+  const verlassen = () => { if(nextOrigin !== "watch" || !sameFile){ state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false; } };
 
   /* ganz: Live laedt ganz, wenn das Ende nicht anzuhaengen ging (loadTail,
      41-server-mode.ts). Dann immer mit parseGrid - der Weg hier unten zaehlt

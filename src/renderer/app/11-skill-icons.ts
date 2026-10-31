@@ -3,13 +3,15 @@ import { skillIcon } from "./12-boss-images";
 import { renderRotation } from "./25-rotation";
 
 /* ---------- die Symbole ----------
-   313 Symbole: 275 aus dem Feed getSkillSets von questlog.gg, verkleinert
-   von 200x200 (einige 300x300) auf 64x64, und 38 aus eigenen Vorlagen
+   313 Symbole: 275 aus dem Feed getSkillSets von questlog.gg, seit
+   16.10.2026 (#258) aus den Originaldateien von cdn.questlog.gg (200x200,
+   einige 300x300) auf 128x128 gebracht (dazu seit 21.10.2026 Fallende Blume), und 38 aus eigenen Vorlagen
    ("boro:..."), weiter in 32x32. Deine Rotation zeigt die Symbole
    mit 32 bis 40 Punkten, bei 175 % Windows-Skalierung also 56 bis 70
-   Pixel; 32x32 wurde dort matschig (Entscheidung 27.09.). Die questlog-Bilder
-   wiegen jetzt 658 kB als Webp (Qualitaet 0,85), 878 kB als Base64. Die
-   Vorlagen bleiben klein, bis es sie wieder in voller Groesse gibt.
+   Pixel, bei 200 % bis 80; 32x32 wurde dort matschig (Entscheidung 27.09.),
+   64x64 reichte nicht fuer 200 %. Die questlog-Bilder wiegen jetzt rund
+   1,5 MB als Webp (Qualitaet 0,82), 2,0 MB als Base64. Die Vorlagen bleiben
+   klein, bis es sie wieder in voller Groesse gibt.
 
    Zwei Tabellen und nicht eine: 616 Namen zeigen auf 313 Bilder. Derselbe
    Skill heisst auf Deutsch anders und traegt dasselbe Symbol, und

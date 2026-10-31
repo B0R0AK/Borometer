@@ -163,9 +163,9 @@ export function toast(msg: Say,ms?: number,tone?: string | null,action?: ToastAc
    stehen (Pruefung N4, M3). */
 function kompaktNachschneiden(){
   if(document.body.classList.contains("compact")) requestAnimationFrame(() => markiereRest());
-  /* Ohne Kampf hat die Meldung im Fenster ihren eigenen Platz (36,
-     compactWindowSize): es misst sich neu, wenn sie kommt oder geht. */
-  if(document.body.classList.contains("compact") && document.body.classList.contains("noFight")) applyWindowSize();
+  /* Die Meldung hat im Fenster ihren eigenen Platz (36, compactWindowSize): es misst sich neu, wenn sie kommt oder geht. Ohne
+     Kampf steht sie neben dem Streifen, mit Kampf schiebt sie die Liste im Fluss (Kompakt neu, Panel: die Hoehe folgt dem Inhalt). */
+  if(document.body.classList.contains("compact")) applyWindowSize();
 }
 // for the call sites that report a failure — reads as what it is at the
 // place it is raised, without a bare "bad" string floating in the argument list

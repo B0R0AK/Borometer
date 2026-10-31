@@ -158,8 +158,8 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, index = {}, lis
 /* auf Zustaende warten, nie auf eine feste Zeit */
 const warte = (p, fn, arg, ms = 8000) => p.waitForFunction(fn, arg, { timeout: ms }).then(() => true).catch(() => false);
 async function bis(fn, ms = 8000) {
-  const ende = Date.now() + ms;
-  while (Date.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
+  const ende = performance.now() + ms;
+  while (performance.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
   return !!(await fn());
 }
 const rekordeAuf = async (p) => {
@@ -398,7 +398,8 @@ try {
       const e = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
       return { sicht: [...document.querySelectorAll("#bereiche .tab")].filter((b) => !b.hidden).length, unten: r.bottom, sbOben: sb.top, trifft: !!e && g.contains(e) };
     });
-    assert(z.sicht === 13 && z.unten <= z.sbOben + 0.5 && z.trifft, "1280 x 860 bei 200 % mit Entwicklermodus: das Zahnrad steht ueber der Statusleiste und ist anklickbar", z);
+    // vierzehn mit dem Archiv (Spezifikation Log-Archiv 7, #264)
+    assert(z.sicht === 14 && z.unten <= z.sbOben + 0.5 && z.trifft, "1280 x 860 bei 200 % mit Entwicklermodus: das Zahnrad steht ueber der Statusleiste und ist anklickbar", z);
     await p.close();
   }
 

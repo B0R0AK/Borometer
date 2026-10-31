@@ -12,7 +12,7 @@
  * platform has; both write the same corner.
  */
 
-export type Teil = "gross" | "kompakt";
+export type Teil = "gross" | "kompakt" | "abriss";
 export interface LageGross { x: number; y: number; w: number; h: number; max: boolean }
 export interface LageKompakt { x: number; y: number }
 /** a monitor's work area, in DIP */
@@ -88,6 +88,61 @@ export function platzGross(roh: unknown, monitore: readonly Monitor[], haupt: Mo
   return { ...rueckfall(lage, haupt), max: lage.max };
 }
 
+/*
+ * Full view has a fixed size (#364): VOLL_W x VOLL_H, or the work area of its
+ * monitor when that is smaller (a small screen). Of the remembered place only
+ * the position is used - never the size, never "maximised": an old file with
+ * another size, or a window that was maximised last time, does not tip the
+ * fixed size. The file itself is left as it is.
+ */
+export const VOLL_W = 1280;
+export const VOLL_H = 860;
+
+/** The fixed size on a monitor's work area (null: none known, the default size). */
+export function vollGroesse(monitor: Monitor | null): { w: number; h: number } {
+  return monitor
+    ? { w: Math.min(VOLL_W, monitor.width), h: Math.min(VOLL_H, monitor.height) }
+    : { w: VOLL_W, h: VOLL_H };
+}
+
+/*
+ * Where full view opens: the remembered position at the fixed size, moved in
+ * so that all of it lies on the monitor it is mostly on; or, when no monitor
+ * holds the remembered title bar any more, the middle of the main monitor.
+ * Null: nothing usable is remembered, the caller opens centred at the fixed
+ * size. `max` is always false.
+ */
+export function platzVoll(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null): LageGross | null {
+  const lage = pruefen(roh, "gross");
+  if (!lage) return null;
+  const fest = { x: lage.x, y: lage.y, w: VOLL_W, h: VOLL_H };
+  if (sichtbar(fest, monitore)) {
+    let beste: Monitor | null = null;
+    let flaeche = 0;
+    for (const m of monitore) {
+      const sx = Math.min(fest.x + fest.w, m.x + m.width) - Math.max(fest.x, m.x);
+      const sy = Math.min(fest.y + fest.h, m.y + m.height) - Math.max(fest.y, m.y);
+      if (sx > 0 && sy > 0 && sx * sy > flaeche) {
+        flaeche = sx * sy;
+        beste = m;
+      }
+    }
+    if (beste) {
+      const { w, h } = vollGroesse(beste);
+      const x = Math.max(beste.x, Math.min(lage.x, beste.x + beste.width - w));
+      const y = Math.max(beste.y, Math.min(lage.y, beste.y + beste.height - h));
+      return { x, y, w, h, max: false };
+    }
+  }
+  if (!haupt) return null;
+  return { ...rueckfall(vollGroesse(haupt), haupt), max: false };
+}
+
+/** Where the torn-off window opens: a place like full view's, kept apart under "abriss". */
+export function platzAbriss(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null): LageGross | null {
+  return platzGross(roh, monitore, haupt);
+}
+
 /** Where compact goes: its remembered corner, the fallback, or null to stay where it is. */
 export function platzKompakt(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null): LageKompakt | null {
   const lage = pruefen(roh, "kompakt");
@@ -107,7 +162,7 @@ export function platzKompakt(roh: unknown, monitore: readonly Monitor[], haupt: 
  * one it removes.
  */
 export function fensterNeu(alt: unknown, teil: Teil, neu: unknown): Record<string, unknown> | null {
-  const lage = teil === "gross" ? pruefen(neu, "gross") : pruefen(neu, "kompakt");
+  const lage = teil === "kompakt" ? pruefen(neu, "kompakt") : pruefen(neu, "gross");
   if (!lage) return null;
   if (alt === undefined) return { [teil]: lage };
   const o = objekt(alt);

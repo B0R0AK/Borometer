@@ -83,6 +83,24 @@ const entschieden = (p) => p.waitForFunction(() => {
 });
 const offen = (p) => p.waitForFunction(() => { const r = document.querySelector("#rundgang"); return !!r && !r.hidden && r.getClientRects().length > 0; });
 const zu = (p) => p.waitForFunction(() => { const r = document.querySelector("#rundgang"); return !!r && r.hidden; });
+/* Seit #265 (Spezifikation 16.10.2026) startet der Rundgang nie von selbst: beim ersten Start
+   steht ein Band ganz oben auf Start (#rgFrage), "Rundgang zeigen" startet ihn. */
+const frageDa = (p) => p.waitForFunction(() => { const b = document.querySelector("#rgFrage"); return !!b && !b.hidden && b.getClientRects().length > 0; });
+const frageWeg = (p) => p.waitForFunction(() => { const b = document.querySelector("#rgFrage"); return !b || b.hidden; });
+const ueberFrage = async (p) => { await frageDa(p); await p.click("#rgFrageJa"); await offen(p); };
+/* Was das Band gerade zeigt. */
+const frage = (p) => p.evaluate(() => {
+  const b = document.querySelector("#rgFrage");
+  const sicht = (e) => !!e && e.getClientRects().length > 0;
+  const z = b?.querySelector("#rgFrageZusatz");
+  return {
+    sicht: sicht(b), titel: b?.querySelector("#rgFrageTitel")?.textContent.trim() || "", satz: b?.querySelector("#rgFrageSatz")?.textContent.trim() || "",
+    knoepfe: b ? [...b.querySelectorAll("button")].map((x) => x.textContent.trim()) : [], heiss: b ? b.querySelectorAll(".btn.hot").length : 0,
+    rolle: b?.getAttribute("role") || "", name: b?.getAttribute("aria-label") || "", beschriftet: b?.getAttribute("aria-labelledby") || "",
+    erstes: document.querySelector("#land").firstElementChild === b, fokusDrin: !!b && b.contains(document.activeElement),
+    zusatzLeer: !!z && z.hidden && !z.textContent.trim(), von: document.querySelector("#rundgang")?.dataset.vonSelbst || "",
+  };
+});
 /* Was die Karte gerade zeigt. */
 const karte = (p) => p.evaluate((ziele) => {
   const r = document.querySelector("#rundgang");
@@ -110,12 +128,64 @@ const helferRunde = (p) => p.evaluate(() => fetch("/api/ping").then(() => true))
 const bisPosts = async (s, n) => { for (let i = 0; i < 100 && configPosts(s).length < n; i++) await new Promise((r) => setTimeout(r, 20)); };
 
 try {
-  // --- 1. Erster Start in der App: erscheint, Schritt 1 ohne Ordner, Rolle und Namen
+  // --- 0. Erster Start in der App: der Rundgang startet nicht, ein Band fragt (Spezifikation 16.10.2026, 3.1)
   {
     const s = await oeffne();
     const p = s.page;
     await entschieden(p);
+    await frageDa(p);
+    const f = await frage(p);
+    const k0 = await karte(p);
+    assert(!k0.offen && !k0.ring.length && f.von === "ja", "erster Start: der Rundgang startet nicht von selbst, das Band steht", { k0, f });
+    assert(f.titel === "Kurzer Rundgang?" && /Sechs Karten zeigen dir die Knöpfe, die du zwischen zwei Pulls brauchst\./.test(f.satz), "das Band fragt: „Kurzer Rundgang?“ und der Satz", f);
+    assert(JSON.stringify(f.knoepfe) === JSON.stringify(["Nein, danke", "Später", "Rundgang zeigen"]) && f.heiss === 1,
+      "drei Knöpfe in der Tab-Folge Nein, Später, Ja; Ja ist der eine heiße", f);
+    assert(f.rolle === "region" && f.name === "Rundgang" && f.beschriftet === "rgFrageTitel" && f.erstes, "role=region „Rundgang“, das erste Element auf Start", f);
+    assert(!f.fokusDrin && f.zusatzLeer, "das Band nimmt keinen Fokus; die Stelle für den Zusatz (Archiv, #264) ist leer und versteckt", f);
+    assert(!s.posts.length, "beim Erscheinen schreibt das Band nichts", s.posts);
+    const dom = await p.evaluate(() => {
+      const b = document.querySelector("#rgFrage"), r = b.getBoundingClientRect();
+      const ueber = [...document.querySelectorAll("body *")].filter((e) => getComputedStyle(e).position === "fixed" && e.getClientRects().length > 0
+        && e.getBoundingClientRect().width >= innerWidth - 2 && e.getBoundingClientRect().height >= innerHeight - 2);
+      return { pos: getComputedStyle(b).position, schatten: getComputedStyle(b).boxShadow, ueber: ueber.length, drin: r.left >= 0 && r.right <= innerWidth };
+    });
+    assert(dom.pos === "static" && !dom.ueber && dom.drin, "ein Band im Fluss, kein Overlay, kein abgedunkelter Grund", dom);
+    await p.click("#rgFrageJa");
     await offen(p);
+    assert((await frage(p)).sicht === false && (await karte(p)).schritt === "Schritt 1 von 6" && !s.posts.length,
+      "„Rundgang zeigen“ blendet das Band aus und startet bei Schritt 1, ohne etwas zu schreiben", { f: await frage(p), k: await karte(p), posts: s.posts });
+    await p.close();
+  }
+
+  // --- 0b. Das Log-Archiv (#264) dockt an #rgFrageZusatz an: beim ersten Start eine Karte, nicht zwei
+  {
+    const s = await oeffne({ config: { archivAn: true, archivHinweis: 0 } });
+    const p = s.page;
+    await entschieden(p);
+    await frageDa(p);
+    await p.waitForFunction(() => !!document.querySelector("#rgFrageArchivOk"));
+    const f = await frage(p);
+    const z = await p.evaluate(() => ({ text: document.querySelector("#rgFrageZusatz").textContent.replace(/\s+/g, " ").trim(),
+      land: document.querySelector("#landArchiv").getClientRects().length > 0 }));
+    assert(!f.zusatzLeer && /Archiv/.test(z.text) && !z.land && !f.fokusDrin
+      && JSON.stringify(f.knoepfe) === JSON.stringify(["Verstanden", "Nein, danke", "Später", "Rundgang zeigen"]) && f.heiss === 1,
+      "Archiv nicht quittiert: sein Satz steht im Zusatz mit eigenem „Verstanden“ vor den drei Knöpfen, kein zweiter Hinweis auf Start, kein Fokus genommen", { f, z });
+    assert(!s.posts.length, "beim Erscheinen schreibt auch der Zusatz nichts", s.posts);
+    await p.close();
+    const q = await oeffne({ config: { archivAn: true, archivHinweis: 1 } });
+    await entschieden(q.page);
+    await frageDa(q.page);
+    const g = await frage(q.page);
+    assert(g.zusatzLeer && JSON.stringify(g.knoepfe) === JSON.stringify(["Nein, danke", "Später", "Rundgang zeigen"]), "Archiv quittiert: der Zusatz bleibt leer und versteckt", g);
+    await q.page.close();
+  }
+
+  // --- 1. Der Rundgang nach „Rundgang zeigen“: Schritt 1 ohne Ordner, Rolle und Namen
+  {
+    const s = await oeffne();
+    const p = s.page;
+    await entschieden(p);
+    await ueberFrage(p);
     const k = await karte(p);
     assert(k.offen && k.schritt === "Schritt 1 von 6" && k.titel === "Log-Ordner", "leere Config, leerer logIndex: der Rundgang steht bei Schritt 1", k);
     assert(/Kampf-Logs, die Throne and Liberty selbst schreibt/.test(k.satz) && /CombatLogs/.test(k.satz), "Schritt 1: der Satz der Spezifikation", k.satz);
@@ -151,31 +221,45 @@ try {
       ["Update-Nutzer ohne Verlauf (firstStart: false, logIndex leer)", { config: { firstStart: false, logIndex: {} } }],
       ["alter Helfer ohne firstStart", { config: { firstStart: undefined } }],
       ["im Browser ohne App", { app: false }],
+      // Spezifikation 16.10.2026, 2: dreimal "Spaeter" gilt wie "Nein"
+      ["dreimal Später im ersten Start", { config: { rundgangSpaeter: 3 } }],
+      ["dreimal Später, kein erster Start mehr", { config: { firstStart: false, rundgangSpaeter: 3 } }],
+      ["Bestandsnutzer, nie gefragt", { config: { firstStart: false, rundgangSpaeter: 0 } }],
     ]) {
       const s = await oeffne(opt);
       const p = s.page;
       await entschieden(p);
       const k = await karte(p);
       const v = await p.evaluate(() => document.querySelector("#rundgang").dataset.vonSelbst);
-      assert(!k.offen && v === "nein" && !k.ring.length, name + ": kein Rundgang von selbst, kein Ring", { k, v });
+      assert(!k.offen && v === "nein" && !k.ring.length && !(await frage(p)).sicht, name + ": kein Rundgang von selbst, kein Ring, kein Band", { k, v });
       await p.close();
     }
-    // vor der Antwort von /api/config: unbekannt, nichts; danach erscheint er
+    // wieder fragen: einmal und zweimal Spaeter, auch ohne ersten Start
+    for (const n of [1, 2]) {
+      const w = await oeffne({ config: { firstStart: false, rundgangSpaeter: n } });
+      await entschieden(w.page);
+      await frageDa(w.page);
+      const fw = await frage(w.page);
+      assert(fw.sicht && fw.von === "ja" && !(await karte(w.page)).offen, n + "× Später, kein erster Start: das Band kommt wieder, der Rundgang nicht", fw);
+      await w.page.close();
+    }
+    // vor der Antwort von /api/config: unbekannt, nichts; danach erscheint das Band
     const s = await oeffne({ configHalt: true });
     const p = s.page;
-    const vorher = await p.evaluate(() => { const r = document.querySelector("#rundgang"); return { da: !!r, offen: !!r && !r.hidden, v: r?.dataset.vonSelbst ?? null }; });
-    assert(vorher.da && !vorher.offen && !vorher.v, "vor der Antwort von /api/config: nichts entschieden, nichts zu sehen", vorher);
+    const vorher = await p.evaluate(() => { const r = document.querySelector("#rundgang"), b = document.querySelector("#rgFrage");
+      return { da: !!r, offen: !!r && !r.hidden, band: !!b && !b.hidden, v: r?.dataset.vonSelbst ?? null }; });
+    assert(vorher.da && !vorher.offen && !vorher.band && !vorher.v, "vor der Antwort von /api/config: nichts entschieden, nichts zu sehen", vorher);
     s.configFrei();
     await entschieden(p);
-    await offen(p);
-    assert((await karte(p)).schritt === "Schritt 1 von 6", "nach der Antwort von /api/config erscheint er", await karte(p));
+    await frageDa(p);
+    assert((await frage(p)).sicht && !(await karte(p)).offen, "nach der Antwort von /api/config erscheint das Band, nicht der Rundgang", await frage(p));
     await p.close();
     // das Kompaktfenster (?kompakt=1) zeigt ihn nie
     const kf = await oeffne({ suffix: "&kompakt=1", warten: false });
     await kf.page.waitForFunction(() => document.documentElement.classList.contains("kfenster") && !!document.body.dataset.bereit);
     await entschieden(kf.page);
     const kk = await karte(kf.page);
-    assert(!kk.offen && !kk.ring.length, "im Kompaktfenster (?kompakt=1) kein Rundgang", kk);
+    assert(!kk.offen && !kk.ring.length && !(await frage(kf.page)).sicht, "im Kompaktfenster (?kompakt=1) kein Rundgang und kein Band", kk);
     await kf.page.close();
   }
 
@@ -183,7 +267,7 @@ try {
   {
     const s = await oeffne();
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     await p.click("#rgOrdnerKnopf");
     await p.waitForFunction(() => document.querySelector("#modalBg")?.classList.contains("on"));
     await p.fill("#modalInput", "C:\\Spiele\\TL\\CombatLogs");
@@ -197,7 +281,7 @@ try {
     assert(fokusNach === "rgWeiter", "nach der Wahl steht der Fokus wieder auf „Weiter“", fokusNach);
     await p.close();
     const m = await oeffne({ helfer: { dir: "D:\\TL\\CombatLogs" } });
-    await offen(m.page);
+    await ueberFrage(m.page);
     const km = await karte(m.page);
     assert(!km.ordnerKnopf && km.ordnerStand.includes("D:\\TL\\CombatLogs") && /CombatLogs/.test(km.satz), "mit Ordner: Schritt 1 zeigt den Pfad und den Satz, nur „Weiter“", km);
     await m.page.close();
@@ -207,7 +291,7 @@ try {
   {
     const s = await oeffne();
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     const gesehen = [];
     for (let i = 0; i < 6; i++) {
       await p.waitForFunction((n) => document.querySelector("#rgSchritt")?.textContent.trim() === `Schritt ${n} von 6`, i + 1);
@@ -250,7 +334,7 @@ try {
   {
     const s = await oeffne();
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     await weiter(p);
     await p.click("#rgSkip");
     await zu(p);
@@ -259,7 +343,7 @@ try {
     assert(JSON.stringify(configPosts(s)) === JSON.stringify([{ rundgangGesehen: true }]), "„Überspringen“: genau ein POST mit {rundgangGesehen: true}", s.posts);
     await p.close();
     const e = await oeffne();
-    await offen(e.page);
+    await ueberFrage(e.page);
     await e.page.focus("#btnWatch");
     await e.page.keyboard.press("Escape");
     await helferRunde(e.page);
@@ -277,12 +361,12 @@ try {
   {
     const s = await oeffne();
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     await weiter(p); await weiter(p);
     await p.waitForFunction(() => document.querySelector("#rgSchritt")?.textContent.trim() === "Schritt 3 von 6");
     await p.reload();
     await p.waitForFunction(() => !!document.body.dataset.bereit);
-    await offen(p);
+    await ueberFrage(p);
     const k = await karte(p);
     assert(k.schritt === "Schritt 1 von 6" && !s.posts.length, "neu geladen ohne „Fertig“: der Rundgang kommt wieder, bei Schritt 1, nichts geschrieben", { k, posts: s.posts });
     await p.close();
@@ -316,7 +400,7 @@ try {
   {
     const s = await oeffne({ helfer: { dir: "D:\\TL\\CombatLogs" } });
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     await weiter(p);
     /* folgt #155 (Entscheidung 06.10.): mit Log-Ordner oeffnet die Pille auch ohne Log die Kampfwahl
        (fruehere Tage), nicht den Datei-Dialog; Strg+K ebenso. Beides muss bei offener Karte ankommen. */
@@ -347,7 +431,7 @@ try {
   {
     const s = await oeffne();
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     await weiter(p);
     await p.waitForFunction(() => document.activeElement?.id === "rgWeiter");
     await p.keyboard.press("Tab");
@@ -370,7 +454,7 @@ try {
   {
     const s = await oeffne({ lang: "en", kfenster: true });
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     const titel = [];
     let kompakt = "";
     for (let i = 0; i < 6; i++) {
@@ -385,7 +469,7 @@ try {
     assert((await karte(p)).weiter === "Done", "EN: „Done“", await karte(p));
     await p.close();
     const r = await oeffne({ kfenster: false });
-    await offen(r.page);
+    await ueberFrage(r.page);
     for (let i = 0; i < 3; i++) await weiter(r.page);
     const kr = await karte(r.page);
     assert(kr.titel === "Kompakt" && /Strg\+Umschalt\+D schaltet das Durchklicken\./.test(kr.satz) && !/durchklickbar, damit/.test(kr.satz),
@@ -403,7 +487,7 @@ try {
     // Ziel nicht zu sehen: Schritt 1 auf den Weeklies - unten mittig, ohne Pfeil, sagt wo
     // Lage und Groesse ohne Gleiten gemessen (die Bewegung prueft 13)
     const w = await oeffne({ motion: "reduce" });
-    await offen(w.page);
+    await ueberFrage(w.page);
     await w.page.click('#bereiche [data-tab="weeklies"]');
     await w.page.waitForFunction(() => document.querySelector("#rundgang")?.dataset.seite === "keine");
     const kw = await karte(w.page);
@@ -419,7 +503,7 @@ try {
     for (const theme of ["dark", "light", "tnl"]) {
       const s = await oeffne({ config: { theme }, motion: "reduce" });
       const p = s.page;
-      await offen(p);
+      await ueberFrage(p);
       await p.waitForFunction((t) => document.documentElement.dataset.theme === t, theme);
       for (let i = 0; i < 6; i++) {
         const f = await p.evaluate(() => {
@@ -468,7 +552,7 @@ try {
   {
     const s = await oeffne({ breite: 560, hoehe: 860, motion: "reduce" });
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     for (let i = 0; i < 6; i++) {
       const g = await p.evaluate(() => { const r = document.querySelector("#rundgang").getBoundingClientRect();
         const sb = document.querySelector("#statusleiste").getBoundingClientRect();
@@ -484,14 +568,14 @@ try {
     await p.close();
     for (const [breite, hoehe] of [[1280, 860], [2000, 1480]]) {
       const g = await oeffne({ breite, hoehe, motion: "reduce" });
-      await offen(g.page);
+      await ueberFrage(g.page);
       const m = await g.page.evaluate(() => ({ w: document.querySelector("#rundgang").getBoundingClientRect().width,
         quer: document.documentElement.scrollWidth > innerWidth }));
       assert(m.w <= 340.5 && m.w >= 280 && !m.quer, `${breite} × ${hoehe}: die Karte ist höchstens 340 Punkt breit, kein Querrollen`, m);
       await g.page.close();
     }
     const z = await oeffne({ config: { uiZoom: 200 }, motion: "reduce" });
-    await offen(z.page);
+    await ueberFrage(z.page);
     await z.page.waitForFunction(() => document.documentElement.style.zoom === "2");
     for (let i = 0; i < 6; i++) {
       const m = await z.page.evaluate(() => { const r = document.querySelector("#rundgang").getBoundingClientRect();
@@ -510,7 +594,7 @@ try {
   for (const [breite, hoehe] of [[1280, 860], [560, 860], [2000, 1480]]) {
     const s = await oeffne({ breite, hoehe, motion: "reduce" });
     const p = s.page;
-    await offen(p);
+    await ueberFrage(p);
     for (let i = 0; i < 6; i++) {
       await p.waitForFunction((n) => document.querySelector("#rgSchritt")?.textContent.trim() === `Schritt ${n} von 6`, i + 1);
       const v = await p.evaluate((ziele) => {
@@ -549,15 +633,18 @@ try {
     const p = s.page;
     await p.focus("#kwKnopf");
     s.configFrei();
-    await offen(p);
+    await frageDa(p);
     const f = await p.evaluate(() => document.activeElement?.id || "");
-    assert(f === "kwKnopf", "von selbst: ein schon gesetzter Fokus bleibt, wo er ist", f);
+    assert(f === "kwKnopf", "das Band erscheint, ein schon gesetzter Fokus bleibt, wo er ist", f);
+    await p.click("#rgFrageJa");
+    await offen(p);
+    await p.focus("#kwKnopf");
     await p.keyboard.press("F6");
     assert(await p.evaluate(() => document.activeElement?.id) === "rgWeiter", "F6 führt dann in die Karte", await p.evaluate(() => document.activeElement?.id));
     await p.close();
     // G2: Start verlassen, dann Ueberspringen - der Fokus landet auf etwas Sichtbarem
     const w = await oeffne();
-    await offen(w.page);
+    await ueberFrage(w.page);
     await w.page.click('#bereiche [data-tab="weeklies"]');
     await w.page.waitForFunction(() => !document.querySelector("#weeklies").hidden);
     await w.page.click("#rgSkip");
@@ -582,12 +669,98 @@ try {
   {
     for (const motion of ["no-preference", "reduce"]) {
       const s = await oeffne({ motion });
-      await offen(s.page);
+      await ueberFrage(s.page);
       const d = await s.page.evaluate(() => { const c = getComputedStyle(document.querySelector("#rundgang"));
         return { prop: c.transitionProperty, dauer: c.transitionDuration }; });
       if (motion === "reduce") assert(d.dauer.split(",").every((x) => parseFloat(x) === 0), "reduzierte Bewegung: die Karte springt", d);
       else assert(/left/.test(d.prop) && /top/.test(d.prop) && d.dauer.split(",").every((x) => x.trim() === "0.12s"), "sonst gleitet sie 120 ms", d);
       await s.page.close();
+    }
+  }
+
+  // --- 16. Die Antworten: Später, Nein und Ja schreiben genau das, was die Spezifikation sagt (3.1)
+  {
+    const bisPosts2 = async (s, n) => { for (let i = 0; i < 100 && s.posts.length < n; i++) await new Promise((r) => setTimeout(r, 20)); };
+    const a = await oeffne();
+    await frageDa(a.page);
+    await a.page.click("#rgFrageSpaeter");
+    await frageWeg(a.page);
+    await bisPosts2(a, 1);
+    await helferRunde(a.page);
+    const fa = await a.page.evaluate(() => document.activeElement?.id || "");
+    assert(JSON.stringify(a.posts) === JSON.stringify([{ rundgangSpaeter: 1 }]) && !(await karte(a.page)).offen,
+      "Später: genau ein POST {rundgangSpaeter: 1}, das Band geht, der Rundgang startet nicht", a.posts);
+    assert(fa === "btnPickFolder", "Später: der Fokus aus dem Band geht auf „Log-Ordner wählen“", fa);
+    await a.page.close();
+    const b = await oeffne({ config: { firstStart: false, rundgangSpaeter: 2 } });
+    await frageDa(b.page);
+    await b.page.click("#rgFrageSpaeter");
+    await frageWeg(b.page);
+    await bisPosts2(b, 1);
+    await helferRunde(b.page);
+    assert(JSON.stringify(b.posts) === JSON.stringify([{ rundgangSpaeter: 3 }]), "zum dritten Mal Später: {rundgangSpaeter: 3}, danach fragt Borometer nicht mehr", b.posts);
+    await b.page.close();
+    const c = await oeffne();
+    await frageDa(c.page);
+    await c.page.click("#rgFrageNein");
+    await frageWeg(c.page);
+    await bisPosts2(c, 1);
+    await helferRunde(c.page);
+    assert(JSON.stringify(c.posts) === JSON.stringify([{ rundgangGesehen: true }]) && !(await karte(c.page)).offen,
+      "Nein, danke: genau ein POST {rundgangGesehen: true}, kein Rundgang", c.posts);
+    // „Rundgang zeigen“ in den Einstellungen bleibt danach erreichbar
+    await c.page.click('#bereiche [data-tab="settings"]');
+    await c.page.click("#eRundgang");
+    await offen(c.page);
+    assert((await karte(c.page)).schritt === "Schritt 1 von 6", "nach Nein ist der Rundgang über Einstellungen › Info noch da", await karte(c.page));
+    await c.page.close();
+  }
+
+  // --- 17. Das Band: Englisch, vier Themen, Größen - es verdeckt nichts und rollt nie waagerecht
+  {
+    const en = await oeffne({ lang: "en" });
+    await frageDa(en.page);
+    const fe = await frage(en.page);
+    assert(fe.titel === "Quick tour?" && /Six cards show you the buttons you need between two pulls\./.test(fe.satz)
+      && JSON.stringify(fe.knoepfe) === JSON.stringify(["No thanks", "Later", "Show the tour"]) && fe.name === "Tour", "EN: Quick tour? mit den drei Knöpfen", fe);
+    await en.page.close();
+    for (const theme of ["dark", "light", "tnl", "glas"]) {
+      const s = await oeffne({ config: { theme }, motion: "reduce" });
+      const p = s.page;
+      await p.waitForFunction((t) => document.documentElement.dataset.theme === t, theme);
+      await frageDa(p);
+      const f = await p.evaluate(() => {
+        const e = document.querySelector("#rgFrage"), cs = getComputedStyle(e);
+        const texte = [...e.querySelectorAll("*")].filter((x) => x.getClientRects().length > 0 && [...x.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()));
+        const klein = texte.filter((x) => parseFloat(getComputedStyle(x).fontSize) < 11).map((x) => x.id || x.className);
+        const rotGruen = texte.map((x) => getComputedStyle(x).color).filter((c) => { const [R, G, B] = c.match(/\d+(\.\d+)?/g).map(Number);
+          return (R > 150 && G < 90 && B < 90) || (G > 150 && R < 90 && B < 120); });
+        return { klein, rotGruen, radius: cs.borderRadius, font: cs.fontFamily === getComputedStyle(document.body).fontFamily };
+      });
+      assert(!f.klein.length && !f.rotGruen.length && f.radius === "6px" && f.font, `${theme}: Schrift ab 11 Punkt, Textschrift der App, 6 Punkt Rundung, kein Rot und Grün`, f);
+      assert(!s.fehler.length, `${theme}: keine Fehler`, s.fehler);
+      await p.close();
+    }
+    for (const [breite, hoehe] of [[560, 860], [1280, 860], [2000, 1480]]) {
+      const s = await oeffne({ breite, hoehe, motion: "reduce" });
+      const p = s.page;
+      await frageDa(p);
+      const v = await p.evaluate(() => {
+        const band = document.querySelector("#rgFrage"), br = band.getBoundingClientRect();
+        const mitte = (r) => [(r.left + r.right) / 2, (r.top + r.bottom) / 2];
+        const treffer = (e) => { const [x, y] = mitte(e.getBoundingClientRect()); const h = document.elementFromPoint(x, y); return !!h && (h === e || e.contains(h)); };
+        const knoepfe = [...document.querySelectorAll("#land button, header.top button, #bereiche button, #statusleiste button")]
+          .filter((b) => b.getClientRects().length > 0 && !b.disabled).filter((b) => {
+            const [x, y] = mitte(b.getBoundingClientRect()); return x >= 0 && y >= 0 && x < innerWidth && y < innerHeight; })
+          .filter((b) => !treffer(b)).map((b) => b.id || b.dataset.tab || b.className);
+        const h = document.querySelector("#landHinweis");
+        const hinweisFrei = !h || !h.getClientRects().length || treffer(h) || (() => { const r = h.getBoundingClientRect(), [x, y] = [r.left + 3, r.top + 3]; const e = document.elementFromPoint(x, y); return !!e && !band.contains(e); })();
+        return { quer: document.documentElement.scrollWidth > innerWidth, drin: br.left >= 0 && br.right <= innerWidth, hoch: Math.round(br.height), knoepfe, hinweisFrei,
+          alleDrei: [...band.querySelectorAll("button")].every((b) => { const r = b.getBoundingClientRect(); return r.left >= br.left - 0.5 && r.right <= br.right + 0.5; }) };
+      });
+      assert(!v.quer && v.drin && v.alleDrei && !v.knoepfe.length && v.hinweisFrei && v.hoch <= 140,
+        `${breite} × ${hoehe}: das Band rollt nicht waagerecht, hält die Knöpfe in sich und verdeckt keinen Knopf und nicht den Hinweis auf Start`, v);
+      await p.close();
     }
   }
 } finally {

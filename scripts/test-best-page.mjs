@@ -496,7 +496,7 @@ try {
     "Lesen gescheitert: die Seite schreibt nichts", events);
   readOk = true;
   const until = async (cond, ms) => {
-    for (const end = Date.now() + ms; Date.now() < end && !cond();) await served.waitForTimeout(250);
+    for (const end = performance.now() + ms; performance.now() < end && !cond();) await served.waitForTimeout(250);
     return cond();
   };
   await until(() => events.some((e) => e.startsWith("POST 200")), 20000);
@@ -675,7 +675,7 @@ try {
     };
     const s1 = await served({});
     await s1.setInputFiles("#fileInput", P1);
-    for (const end = Date.now() + 15000; Date.now() < end && !gespeichert;) await s1.waitForTimeout(250);
+    for (const end = performance.now() + 15000; performance.now() < end && !gespeichert;) await s1.waitForTimeout(250);
     await s1.close();
     assert(gespeichert?.key === "dummy:60" && Array.isArray(gespeichert?.entry?.best?.run?.casts),
       "SERVED: der erste Versuch wurde mit Einsaetzen festgehalten", gespeichert?.key);
@@ -875,7 +875,7 @@ try {
         await s3.evaluate((x) => document.querySelector(`[data-tab="${x}"]`).click(), n);
         await s3.waitForTimeout(150);
       }
-      for (const end = Date.now() + 6000; Date.now() < end && !s3Posts.length;) await s3.waitForTimeout(250);
+      for (const end = performance.now() + 6000; performance.now() < end && !s3Posts.length;) await s3.waitForTimeout(250);
       assert(s3Posts.length > 0 && s3Posts.every((p) => p.entry?.best?.at !== altAt),
         "ohne Lauf: boro-best.json haelt nur, was einen Lauf hat", s3Posts.map((p) => p.entry?.best?.at));
       /* Mit Server: unter der Zeile des Bezugs der Satz und der Knopf "Log
@@ -905,7 +905,7 @@ try {
       await s3.waitForTimeout(250);
       await s3.focus("#btnOhneLauf");
       await s3.keyboard.press("Enter");
-      for (const end = Date.now() + 8000; Date.now() < end && !logHolt.includes("alt.txt");) await s3.waitForTimeout(100);
+      for (const end = performance.now() + 8000; performance.now() < end && !logHolt.includes("alt.txt");) await s3.waitForTimeout(100);
       assert(logHolt.includes("alt.txt"), "ohne Lauf: der Knopf holt die Datei ueber GET /api/log?name=alt.txt", logHolt);
       await s3.waitForFunction(() => { const b = document.querySelector("#btnBestPull"); return !!b && !b.hidden && !!b.offsetParent; },
         null, { timeout: 8000 }).catch(() => {});
@@ -922,6 +922,61 @@ try {
       assert(nach.fokus === "kwKnopf", "ohne Lauf: der Fokus steht danach auf der Kampfwahl wie nach jedem Wechsel des Kampfes", nach);
       assert(!s3Errors.length, "ohne Lauf: keine Fehler in der Seite", s3Errors);
       await s3.close();
+    }
+
+    /* Log-Archiv (Spezifikation 8, #264): die Datei des besten Pulls ohne Lauf fehlt im Log-Ordner, der
+       Kampf liegt aber im Archiv - "Log oeffnen" holt ihn von dort (GET /api/archiv/kampf), der Kopf sagt
+       "from the archive". Liegt er auch dort nicht, bleibt der bisherige Satz ("no longer in the log folder"). */
+    for (const imArchiv of [true, false]) {
+      const altAt = at(10, 21, 0);
+      const L11 = logFile("best-11.txt", [V(26, 1.0)]);
+      const altText = logText([{ target: "Vulcanus", start: altAt, secs: 90, scale: 3 }]);
+      const k = "alt.txt|" + altAt;
+      const p = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+      const pErrors = [], kampfHolt = [];
+      p.on("pageerror", (e) => pErrors.push(String(e)));
+      await p.addInitScript(() => { try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ } });
+      await p.route("http://boro.test/**", async (route) => {
+        const req = route.request();
+        const url = new URL(req.url()), path = url.pathname;
+        const json = (status, body) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) });
+        // der Log-Ordner kennt alt.txt nicht mehr
+        if (path === "/api/logs" && req.method() === "GET") return json(200, { ok: true, files: [] });
+        if (path === "/api/log" && req.method() === "GET") return json(404, { ok: false });
+        if (path === "/api/archiv/liste" && req.method() === "GET") return json(200, { ok: true, data: { v: 1, kaempfe: imArchiv
+          ? [{ k, platz: "raid:vulcanus", boss: "Vulcanus", at: altAt, dps: 20000, dmg: 1800000, dur: 90, datei: "alt.txt", zeilen: altText.split("\n").length }] : [] } });
+        if (path === "/api/archiv/kampf" && req.method() === "GET") {
+          kampfHolt.push(url.searchParams.get("k"));
+          return url.searchParams.get("k") === k && imArchiv ? route.fulfill({ status: 200, contentType: "text/plain; charset=utf-8", body: altText }) : route.fulfill({ status: 404, body: "" });
+        }
+        if (path === "/api/config" && req.method() === "GET")
+          return json(200, { archivAn: true, archivHinweis: 1, logIndex: { "alt.txt": { size: 1, fights: [{ name: "Vulcanus", dps: 20000, dmg: 1800000, dur: 90, at: altAt }] } } });
+        if (path === "/api/best" && req.method() === "GET") return json(200, { ok: true, best: {} });
+        if (path.startsWith("/api/")) return json(200, {});
+        return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html });
+      });
+      await p.goto("http://boro.test/index.html");
+      await p.waitForFunction(() => !!document.body.dataset.bereit);
+      await p.setInputFiles("#fileInput", L11);
+      await p.waitForFunction(() => (document.querySelector("#hName")?.textContent || "").includes("Vulcanus"));
+      await p.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await p.waitForFunction(() => !!document.querySelector("#btnOhneLauf")?.offsetParent, null, { timeout: 8000 }).catch(() => {});
+      const da = await p.evaluate(() => !!document.querySelector("#btnOhneLauf")?.offsetParent);
+      assert(da, `Archiv (${imArchiv ? "liegt dort" : "fehlt dort"}): der Knopf „Open log“ steht`);
+      await p.focus("#btnOhneLauf").catch(() => {});
+      await p.keyboard.press("Enter");
+      if (imArchiv) {
+        await p.waitForFunction(() => /from the archive/.test(document.querySelector("#hMeta")?.textContent || ""), null, { timeout: 8000 }).catch(() => {});
+        const m = await p.evaluate(() => ({ meta: document.querySelector("#hMeta")?.textContent || "", name: document.querySelector("#hName")?.textContent || "", fokus: document.activeElement?.id || "" }));
+        assert(kampfHolt.includes(k) && /from the archive/.test(m.meta) && /Vulcanus/.test(m.name) && m.fokus === "kwKnopf",
+          "Archiv: die Datei fehlt im Log-Ordner, „Open log“ holt den Kampf aus dem Archiv, der Kopf sagt es", { kampfHolt, m });
+      } else {
+        await p.waitForFunction(() => [...document.querySelectorAll("#toast.on")].some((e) => /no longer in the log folder/.test(e.textContent)), null, { timeout: 8000 }).catch(() => {});
+        const t = await p.evaluate(() => [...document.querySelectorAll("#toast.on")].map((e) => e.textContent).join(" "));
+        assert(/alt\.txt is no longer in the log folder/.test(t) && !kampfHolt.length, "nicht im Archiv: der bisherige Satz, keine Anfrage nach dem Kampf", { t, kampfHolt });
+      }
+      assert(!pErrors.length, "Archiv-Rückfall: keine Fehler in der Seite", pErrors);
+      await p.close();
     }
 
     /* Alte Zuordnung (#207): das Verzeichnis traegt noch b aus der Zeit des Builds-Reiters. Die Seite liest es nicht
@@ -993,7 +1048,7 @@ try {
     let festgehalten = null;
     const h1 = await offen({}, null, (b) => { festgehalten = b; });
     await ladeVulcanus(h1, join(work, "bau-lb.txt"));
-    for (const ende = Date.now() + 10000; Date.now() < ende && !festgehalten;) await h1.waitForTimeout(200);
+    for (const ende = performance.now() + 10000; performance.now() < ende && !festgehalten;) await h1.waitForTimeout(200);
     await h1.close();
     const entry = structuredClone(festgehalten?.entry);
     const spaeter = entry.best.at + 864e5 * 40;

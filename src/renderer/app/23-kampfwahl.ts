@@ -8,7 +8,8 @@ import { darfEntfernen } from "./19-grouping-and-party-fights";
 import { kampfEntfernen, renderFights } from "./30-fight-list";
 import { loadText, renderAll, setLoadOrigin } from "./32-history";
 import { schliesseAndereKopffenster } from "./34-menus-drop-and-tabs";
-import { liveFortsetzen, livePausieren, SERVED, serverDir } from "./41-server-mode";
+import { applyWindowSize } from "./36-dialog";
+import { ABRISS_FENSTER, liveBeenden, liveFortsetzen, livePausieren, SERVED, serverDir } from "./41-server-mode";
 import { isWatching, syncLiveBtn } from "./45-startup";
 import { gelesenMelden } from "./66-windows";
 import { berlinTag, logTage, tagTeile, type LogTag } from "../verlauf-core";
@@ -308,7 +309,7 @@ export function syncKwKnopf(){
    gewaehlt (0.21). */
 export function waehleKampf(i: number){
   if(i < 0 || i >= state.encounters.length) return;
-  state.sel = i; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
+  state.sel = i; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false;
   ungelesenLesen();
   renderAll();
 }
@@ -357,7 +358,7 @@ function neuerKampfPruefen(){
   const neu = state.encounters.filter(seg => seg.start > vorher.start).length;
   if(!neu) return;
   gelesen = {name: neueste.stats.name, wann: Date.now()};
-  const imKampf = state.tab === "timeline" && !state.start && !state.einst && !state.weeklies && !state.rekorde && !state.gilde;
+  const imKampf = state.tab === "timeline" && !state.start && !state.einst && !state.weeklies && !state.rekorde && !state.gilde && !state.archiv;
   if(!imKampf || state.sel !== 0){ ungelesenN += neu; syncUngelesen(); }
   /* #153: blieb die Auswahl beim aelteren Kampf, sagt der Vorleser den
      neuen an; sprang sie mit, nennt ihn der Knopf schon. */
@@ -424,6 +425,14 @@ export function tagAnsichtLabel(): string | null {
 export function tagAnsichtVerlassen(){
   tagLauf++;
   ansicht = null; livePausiert = false; laedt = false;
+  syncTage();
+}
+/** Ein Kampf aus dem Archiv kommt (76-archiv.ts): wie ein frueherer Tag pausiert er Live, und "Heute" nimmt
+    es wieder auf. Ein Tag, der gerade laedt, verfaellt; die Ansicht eines Tages endet. */
+export function archivKampfKommt(){
+  tagLauf++;
+  laedt = false; ansicht = null;
+  if(livePausieren()) livePausiert = true;
   syncTage();
 }
 async function tageHolen(): Promise<LogTag[] | null> {
@@ -509,8 +518,12 @@ async function dateiHolen(name: string, lauf: number): Promise<string | null> {
     from = to;
   }
 }
-/* Die Dateien eines Tages laden. Laeuft Live, pausiert es. */
-async function tagLaden(tag: string, namen: string[]){
+/* Die Dateien eines Tages laden. Laeuft Live, pausiert es. wennFehlt: kennt der Helfer
+   eine der Dateien nicht (404, nie bei einem Lesefehler), darf der Rufer sie anders holen
+   (das Archiv, 76); gelingt es, steht kein Satz. Es bekommt aktuell mit: kam inzwischen ein
+   neuerer Klick (tagLauf), laedt es nichts mehr - und hier steht dann auch kein Satz. */
+type WennFehlt = (aktuell: () => boolean) => Promise<boolean>;
+async function tagLaden(tag: string, namen: string[], wennFehlt?: WennFehlt){
   const lauf = ++tagLauf;
   if(livePausieren()) livePausiert = true;
   laedt = true;
@@ -519,7 +532,13 @@ async function tagLaden(tag: string, namen: string[]){
   for(const name of namen){
     const text = await dateiHolen(name, lauf);
     if(lauf !== tagLauf) return;
-    if(text === null){ laedt = false; syncTage(); toastFail(tt("kw.tagFehler")); return; }
+    if(text === null){
+      laedt = false; syncTage();
+      if(holStatus === 404 && wennFehlt){
+        if(await wennFehlt(() => lauf === tagLauf) || lauf !== tagLauf) return;
+      }
+      toastFail(tt("kw.tagFehler")); return;
+    }
     texte.push(text);
   }
   laedt = false;
@@ -548,22 +567,33 @@ async function zuHeute(){
   if(!liste || !liste.length) return;
   await tagLaden(liste[0]!.tag, liste[0]!.dateien.map(d => d.name));
 }
-/** "Zuletzt geoeffnet" auf Start (45-startup.ts): die genannten Dateien ueber dieselbe Route. */
-export async function oeffneDateien(namen: string[]){
+/** "Zuletzt geoeffnet" auf Start (45-startup.ts): die genannten Dateien ueber dieselbe Route.
+    wennFehlt (Rekorde 62, Tafel 56): fehlt eine Datei im Log-Ordner - nicht in der Liste oder
+    404 von /api/log -, holt der Rufer den Kampf anders (das Archiv, 76); nur wenn auch das
+    nicht geht, steht der bisherige Satz. Ein Lesefehler faellt nie still zurueck. */
+export async function oeffneDateien(namen: string[], wennFehlt?: WennFehlt){
   if(!SERVED || !namen.length) return;
   const liste = await tageHolen();
   if(!liste){ toastFail(tt("party.helperNoAnswer")); return; }
   const alle = liste.flatMap(x => x.dateien);
   const fehlt = namen.find(n => !alle.some(d => d.name === n));
-  if(fehlt !== undefined){ toastFail(tt("land.dateiFehlt", {name: fehlt})); return; }
+  if(fehlt !== undefined){
+    if(wennFehlt){
+      // ein eigener Lauf wie bei tagLaden: ein neuerer Klick nimmt diesem das Laden ab
+      const lauf = ++tagLauf;
+      laedt = false; syncTage();
+      if(await wennFehlt(() => lauf === tagLauf) || lauf !== tagLauf) return;
+    }
+    toastFail(tt("land.dateiFehlt", {name: fehlt})); return;
+  }
   /* Die Datei, die Live gerade liest: nichts zu laden, nur zeigen. */
   if(isWatching() && gleich(state.fileNames || [], namen)){
-    state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
+    state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false;
     renderAll();
     return;
   }
   const neueste = Math.max(...alle.filter(d => namen.includes(d.name)).map(d => d.mtime));
-  await tagLaden(berlinTag(neueste * 1000), namen);
+  await tagLaden(berlinTag(neueste * 1000), namen, wennFehlt);
 }
 
 /* ---------- Der Streifen zeigt, was die Vollansicht zeigt (Kompakt-Fix 01.10.) ----------
@@ -577,11 +607,18 @@ export async function oeffneDateien(namen: string[]){
    Streifen schon zeigt, bleibt stehen, wenn die Vollansicht danach zum
    Beispiel wechselt - er ist echt und aus dem Log-Ordner. */
 const STREIFEN_SATZ: Record<string, string> = {fremd: "compact.idleFremd", beispiel: "compact.idleBeispiel", mehrere: "compact.idleMehrere",
-  andere: "compact.idleAndere", kampf: "compact.idleKampf", fehler: "compact.idleFehler"};
+  andere: "compact.idleAndere", kampf: "compact.idleKampf", fehler: "compact.idleFehler", archiv: "compact.idleArchiv"};
 let streifenLauf = 0;
 /* Der Ruhesatz des Streifens statt "Kein Log", oder wieder "Kein Log". Ueber
    data-i18n, damit ein Sprachwechsel ihn mitnimmt (31). */
 function ruheSatz(grund: string){
+  /* Das abgerissene Fenster hat keinen Streifen: sein Leertext (#abrissLeer, 77) sagt bei Beispiel und
+     Archiv, was die Vollansicht zeigt, statt "kein Kampf" (#352). */
+  if(ABRISS_FENSTER){
+    const leer = document.getElementById("abrissLeer");
+    const k = grund === "beispiel" ? "abriss.leerBeispiel" : grund === "archiv" ? "abriss.leerArchiv" : "abriss.leer";
+    if(leer && leer.dataset.i18n !== k){ leer.dataset.i18n = k; leer.textContent = t(k); }
+  }
   const el = $("#compactIdle");
   const key = Object.hasOwn(STREIFEN_SATZ, grund) ? STREIFEN_SATZ[grund]! : "compact.idleShort";
   const titel = key === "compact.idleShort" ? "compact.idle" : key + "Titel";
@@ -589,7 +626,13 @@ function ruheSatz(grund: string){
   el.dataset.i18n = key; el.dataset.i18nTitle = titel;
   el.textContent = t(key); el.title = t(titel);
   // der Satz ist breiter als "Kein Log": der Streifen misst sich neu (36)
-  if(document.body.classList.contains("compact")) renderAll();
+  if(document.body.classList.contains("compact")){
+    renderAll();
+    /* Ohne Kampf kehrt renderAll vor applyWindowSize um (32). Kam der Satz erst nach der
+       Nachmessung des Streifens (langsame Antwort auf /api/log), blieb das Fenster auf "Kein Log"
+       gerechnet (#224); darum misst er hier selbst. */
+    applyWindowSize();
+  }
 }
 /* Der Streifen zeigt keinen Kampf mehr (Gutachten M1, M3): folgt er der
    Vollansicht nicht, zeigt er nicht still einen alten oder anderen Kampf,
@@ -617,6 +660,15 @@ async function streifenDatei(name: string, frisch: boolean): Promise<"ok" | "fre
 }
 /** Der Stand der Vollansicht aus /api/state (41): beim Laden und bei jedem Ereignis kompaktstand. */
 export async function streifenFolgt(k: {grund?: unknown; datei?: unknown; kampf?: unknown} | null | undefined){
+  /* Das abgerissene Fenster (Windows Teil 2) liest mit, solange die
+     Vollansicht live mitliest - dieselbe Datei, wie der Streifen, der mit
+     Live aufging -, und hoert damit auf, sobald sie etwas anderes zeigt. Es
+     schreibt dabei nichts (Verlauf, beste Pulls, Archiv, Meldungen fragen
+     ABRISS_FENSTER). */
+  if(SERVED && k && ABRISS_FENSTER){
+    if(k.grund === "live"){ if(serverDir && !isWatching()) liveFortsetzen(); return; }
+    liveBeenden();
+  }
   if(!SERVED || !k || isWatching()) return;
   const lauf = ++streifenLauf;
   let grund = typeof k.grund === "string" ? k.grund : "";
@@ -636,7 +688,12 @@ export async function streifenFolgt(k: {grund?: unknown; datei?: unknown; kampf?
     }
     const i = da === "ok" ? finde() : -1;
     if(i >= 0){
-      if(i !== state.sel) waehleKampf(i);
+      if(i !== state.sel){
+        waehleKampf(i);
+        /* Ein anderer Kampf im abgerissenen Fenster beginnt oben: das Fenster hat keine Bereichsleiste, die zurueckfuehrte,
+           und ein gerollter Stand bliebe sonst (nur gekuerzt) stehen. */
+        if(ABRISS_FENSTER) window.scrollTo(0, 0);
+      }
       ruheSatz("");
       return;
     }
@@ -774,6 +831,8 @@ export function setup(): void {
      gehoert der App (preventDefault). Nicht im Kompakt und nicht, solange
      ein Dialog offen ist. */
   addEventListener("keydown", e => {
+    // das abgerissene Fenster zeigt nur den Kampf der Vollansicht: keine Suche (#351)
+    if(ABRISS_FENSTER) return;
     if(!(e.ctrlKey || e.metaKey) || e.altKey || e.shiftKey || e.key.toLowerCase() !== "k") return;
     // auch dort, wo es nichts oeffnet: sonst griffe das Browserkuerzel
     e.preventDefault();
@@ -792,6 +851,8 @@ export function setup(): void {
      einem Eingabefeld (dort springt Strg+Pfeil ueber Woerter), nicht im
      Kompakt und nicht, solange ein Dialog offen ist. */
   addEventListener("keydown", e => {
+    // im abgerissenen Fenster wechselt nur die Vollansicht den Kampf (#351)
+    if(ABRISS_FENSTER) return;
     if(!e.ctrlKey || e.altKey || e.shiftKey || e.metaKey || (e.key !== "ArrowLeft" && e.key !== "ArrowRight")) return;
     const a = document.activeElement as HTMLElement | null;
     if(a && (a.matches("input, textarea, select, [contenteditable]") || a.isContentEditable)) return;

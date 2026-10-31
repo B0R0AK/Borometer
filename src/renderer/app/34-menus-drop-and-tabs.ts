@@ -23,7 +23,7 @@ import { loadText, refreshPlayers, renderAll, renderHistory, setLoadOrigin } fro
 import { readFiles } from "./33-input";
 import { download, ladeGruppenLog } from "./35-party-log-files";
 import { askPick, askText, openModal } from "./36-dialog";
-import { SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, ABRISS_TAB, SERVED } from "./41-server-mode";
 import { renderParty, syncPartyPill } from "./42-party";
 import { syncTabs, toggleMore } from "./43-more-menu-and-dev-mode";
 import { isWatching, liveSay, setWatching } from "./45-startup";
@@ -205,6 +205,9 @@ export async function kampfSpeichern(){
   // mode-appropriate action — see the Party setup tab for why this isn't
   // two separate buttons competing for the same spot
   if(state.group === "party"){ $("#btnSavePartyLog").click(); return; }
+  /* Das abgerissene Fenster (Windows Teil 2) schreibt nichts: ein Lauf hier
+     stuende nur in seinem Speicher, die Meldung "gespeichert" waere falsch. */
+  if(ABRISS_FENSTER) return;
   const seg = state.encounters[state.sel]; if(!seg) return;
   const tag = await askText(t("head.saveAsRun"), t("toast.nameThisRun"), seg.stats.name);
   if(tag === null || !tag.trim()) return;
@@ -214,11 +217,15 @@ export async function kampfSpeichern(){
 }
 
 export function switchTab(name: string, scrolled?: boolean){
+  /* Das abgerissene Fenster (Windows Teil 2) zeigt nur seinen einen Bereich:
+     ein Weg in einen anderen (das Urteil, ein Hinweis, ein Menue) bleibt dort
+     ohne Wirkung - es gibt keine Bereichsleiste, die zurueckfuehrte. */
+  if(ABRISS_TAB && name !== ABRISS_TAB) return;
   /* Start ist kein Reiter, sondern die Startseite, auch mit geladenem Log
      (Instrumententafel 3.3). Der Bereich darunter bleibt in state.tab; ein
      Klick auf einen Bereich oder ein Kampf aus der Kampfwahl fuehrt zurueck. */
   if(name === "start"){
-    state.start = true; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
+    state.start = true; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
@@ -227,7 +234,7 @@ export function switchTab(name: string, scrolled?: boolean){
      Kampf erreichbar, state.tab bleibt, und dieselben Wege fuehren hinaus
      (ein Bereich, ein Kampf aus der Kampfwahl, eine neue Datei). */
   if(name === "settings"){
-    state.einst = true; state.start = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
+    state.einst = true; state.start = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false;
     renderAll();   // ruft renderEinst() selbst, wenn die Einstellungen stehen
     window.scrollTo(0, 0);
     einstOben();          // die Sprungleiste leuchtet wieder mit dem Rollen (57)
@@ -235,27 +242,34 @@ export function switchTab(name: string, scrolled?: boolean){
   }
   /* Weeklies (9.1): der vierte Ort, wie die Einstellungen. */
   if(name === "weeklies"){
-    state.weeklies = true; state.start = false; state.einst = false; state.rekorde = false; state.gilde = false;
+    state.weeklies = true; state.start = false; state.einst = false; state.rekorde = false; state.archiv = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
   }
   /* Rekorde (Spezifikation Rekorde 2a): der fuenfte Ort, wie die Weeklies. */
   if(name === "rekorde"){
-    state.rekorde = true; state.start = false; state.einst = false; state.weeklies = false; state.gilde = false;
+    state.rekorde = true; state.start = false; state.einst = false; state.weeklies = false; state.gilde = false; state.archiv = false;
+    renderAll();
+    window.scrollTo(0, 0);
+    return;
+  }
+  /* Archiv (Spezifikation Log-Archiv 7): der siebte Ort, wie die Rekorde - ohne geladenes Log offen. */
+  if(name === "archiv"){
+    state.archiv = true; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
   }
   /* Gilde (Spezifikation Gilde 5): der sechste Ort, wie die Weeklies. */
   if(name === "gilde"){
-    state.gilde = true; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false;
+    state.gilde = true; state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false;
     renderAll();
     window.scrollTo(0, 0);
     return;
   }
-  const warStart = state.start || state.einst || state.weeklies || state.rekorde || state.gilde;
-  state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.gilde = false;
+  const warStart = state.start || state.einst || state.weeklies || state.rekorde || state.gilde || state.archiv;
+  state.start = false; state.einst = false; state.weeklies = false; state.rekorde = false; state.archiv = false; state.gilde = false;
   // wer den Bereich Kampf oeffnet, hat den neuen Kampf gesehen (0.21)
   if(name === "timeline") ungelesenLesen();
   const back = TAB_ORDER.indexOf(name) < TAB_ORDER.indexOf(state.tab);
@@ -295,6 +309,9 @@ export function switchTab(name: string, scrolled?: boolean){
      solange man darauf steht, und gehen beim Verlassen - nicht erst beim
      naechsten Durchlauf. syncTabs ruft syncBereiche selbst. */
   syncTabs();
+  /* Der Hinweis je Bereich (74) kommt oder geht jetzt, vor dem Rollen: das Rollen rechnet mit seiner
+     Hoehe. Er meldet sich hier an, 34 kennt ihn nicht. */
+  bereichGewechselt.forEach(f => f());
   // actually take the person to the panel they picked — switching what is
   // behind a scroll position they cannot see is not the same as arriving
   if(scrolled) bringPanelIntoView(name);
@@ -306,9 +323,13 @@ export function switchTab(name: string, scrolled?: boolean){
    fokusHielt: der Fokus stand vor dem Sperren in der Leiste (renderAll).
    Wurde der fokussierte Knopf gesperrt oder versteckt, geht der Fokus an
    den Tabstopp, statt auf den body zu fallen. */
+/** Wer den Wechsel eines Bereichs sofort erfahren will, noch vor dem Rollen an den Anfang (74). */
+export const bereichGewechselt: Array<() => void> = [];
+/** Wer nach jedem Setzen der Bereichsleiste nachziehen will, auch auf Start und in den Einstellungen (77). */
+export const bereichGesetzt: Array<() => void> = [];
 export function syncBereiche(fokusHielt?: boolean){
   const land = document.getElementById("land");
-  const hier = state.einst ? "settings" : state.weeklies ? "weeklies" : state.rekorde ? "rekorde" : state.gilde ? "gilde"
+  const hier = state.einst ? "settings" : state.weeklies ? "weeklies" : state.rekorde ? "rekorde" : state.gilde ? "gilde" : state.archiv ? "archiv"
     : state.start || (!!land && !land.hidden) ? "start" : state.tab;
   const knoepfe = [...document.querySelectorAll<HTMLButtonElement>("#bereiche .tab")];
   knoepfe.forEach(b => {
@@ -331,6 +352,7 @@ export function syncBereiche(fokusHielt?: boolean){
   const verloren = a && knoepfe.includes(a) ? (a.hidden || a.disabled)
     : !!fokusHielt && !(a && a.closest && a.closest("#bereiche"));
   if(verloren && stopp) stopp.focus({preventScroll: true});
+  bereichGesetzt.forEach(f => f());
 }
 /* Die Titelleiste klebt. Wer im Zeitverlauf weit unten war und dann
    "Analyse" waehlt, stand sonst mitten in der Analyse: das neue Panel begann
@@ -340,7 +362,11 @@ export function syncBereiche(fokusHielt?: boolean){
    keine Bewegung. Sieht man den Anfang schon, bleibt alles, wo es ist. */
 /* Mit Feldern (58-felder.ts) beginnt ein Bereich mit seiner Kopfzeile, die
    ueber dem Panel steht - sie ist dann der Anfang, nicht das Panel. */
+/* Steht der Hinweis des Bereichs (74), steht er ueber allem und ist der Anfang: sonst rollte der
+   Wechsel ihn aus dem Bild. */
 function bereichAnfang(name: string): HTMLElement | null {
+  const hinweis = document.getElementById("bereichsHinweis");
+  if(hinweis && !hinweis.hidden) return hinweis;
   return document.body.classList.contains("felder") ? document.getElementById("bereichKopf") : document.getElementById("p-"+name);
 }
 function panelAnfangZeigen(name: string){
@@ -566,12 +592,16 @@ export function setup(): void {
   });
   addEventListener("keydown", e => { if(e.key === "Escape" && state.openMenuOpen) toggleOpenMenu(false); });
   hilfeBinden();
-  addEventListener("dragenter", e => { e.preventDefault(); dragDepth++; $("#dropOverlay").classList.add("on"); });
+  // nur Dateien von aussen zeigen die Ablage; ein Ziehen innerhalb der Seite (Gilde: Mitglied zur Ablage) bleibt unberuehrt
+  const vonAussen = (e: DragEvent) => !!e.dataTransfer && [...e.dataTransfer.types].includes("Files");
+  /* Das abgerissene Fenster nimmt keine Dateien: abgefangen wird das Ablegen trotzdem, sonst liefe
+     das Fenster zur Datei (#351); eine Ablage zeigt es nicht, geoeffnet wird nichts. */
+  addEventListener("dragenter", e => { e.preventDefault(); if(ABRISS_FENSTER || !vonAussen(e)) return; dragDepth++; $("#dropOverlay").classList.add("on"); });
   addEventListener("dragover", e => e.preventDefault());
-  addEventListener("dragleave", () => { if(--dragDepth <= 0) $("#dropOverlay").classList.remove("on"); });
+  addEventListener("dragleave", e => { if(!vonAussen(e)) return; if(--dragDepth <= 0) $("#dropOverlay").classList.remove("on"); });
   addEventListener("drop", e => {
     e.preventDefault(); dragDepth = 0; $("#dropOverlay").classList.remove("on");
-    if(e.dataTransfer!.files.length) readFiles(e.dataTransfer!.files);   // a drop always carries one
+    if(!ABRISS_FENSTER && e.dataTransfer!.files.length) readFiles(e.dataTransfer!.files);   // a drop always carries one
   });
   /* Beide rufen denselben Umschalter. #btnWatch2 ist die Einladung auf der
      Startseite ("Live-Aufzeichnung starten") und verschwindet, sobald die
@@ -636,8 +666,8 @@ export function setup(): void {
     const b = (e.target as HTMLElement).closest<HTMLButtonElement>(".tab");
     if(!b || b.disabled) return;
     const name = b.dataset.tab!;
-    // ohne Kampf gehen nur Gruppe, Weeklies, Gilde, Rekorde, Start und Einstellungen (und die Einrichtung, wenn sie da ist)
-    if(!state.encounters.length && !["party", "weeklies", "gilde", "rekorde", "start", "settings", "setup"].includes(name)) return;
+    // ohne Kampf gehen nur Gruppe, Weeklies, Gilde, Rekorde, Archiv, Start und Einstellungen (und die Einrichtung, wenn sie da ist)
+    if(!state.encounters.length && !["party", "weeklies", "gilde", "rekorde", "archiv", "start", "settings", "setup"].includes(name)) return;
     switchTab(name, true);
   };
   $("#partyPill").onclick = () => {

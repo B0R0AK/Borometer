@@ -16,6 +16,7 @@ import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { chromium } from "playwright";
 import { gebauterModus } from "./bilder-weiche.mjs";
+import { layoutProbe } from "./analyse-layout-probe.mjs";
 
 const root = join(dirname(fileURLToPath(import.meta.url)), "..");
 /* Ohne Spielbilder (BORO_BILDER=aus) tragen die Zeilen statt img.sic die volle
@@ -36,16 +37,42 @@ const stamp = (ms) => {
          `${two(d.getUTCHours())}:${two(d.getUTCMinutes())}:${two(d.getUTCSeconds())}:${two(d.getUTCMilliseconds(), 3)}`;
 };
 const at = (day, h, m) => Date.UTC(2026, 8, day, h, m, 0);
-/* Eine Zeile je Treffer: [ms, Skill, ID, Schaden, Krit, Ziel, Angreifer = "Tester"]. */
+/* Eine Zeile je Treffer: [ms, Skill, ID, Schaden, Krit, Ziel, Angreifer = "Tester", Stark = false].
+   #218: `stark` setzt die Spalte "heavy" (und bei Krit die Trefferart wie im Spiel); ohne `stark`
+   bleiben die Zeilen genau wie vorher. */
 function logText(treffer) {
-  const rows = [...treffer].sort((a, b) => a[0] - b[0]).map(([t, skill, sid, dmg, krit, ziel, wer = "Tester"]) =>
-    `${stamp(t)},DamageDone,${skill},${sid},${Math.round(dmg)},${krit ? 1 : 0},0,${krit ? "kCritical" : "kNormalHit"},${wer},${ziel}`);
+  const rows = [...treffer].sort((a, b) => a[0] - b[0]).map(([t, skill, sid, dmg, krit, ziel, wer = "Tester", stark = false]) =>
+    `${stamp(t)},DamageDone,${skill},${sid},${Math.round(dmg)},${krit ? 1 : 0},${stark ? 1 : 0},` +
+    `${stark ? (krit ? "kMaxDamageByCriticalDecision" : "kNormalHit") : krit ? "kCritical" : "kNormalHit"},${wer},${ziel}`);
   return ["CombatLogVersion,4", ...rows].join("\n") + "\n";
 }
 const work = mkdtempSync(join(tmpdir(), "boro-analyse-"));
 const logFile = (name, treffer) => { const p = join(work, name); writeFileSync(p, logText(treffer)); return p; };
 
 const QF = ["Quick Fire", 964762401], DM = ["Detonation Mark", 953174691], ST = ["Strafing", 945674044];
+
+/* Werkbank (#218, Spezifikation 2026-10-07, Abschnitt 3.1): welche Faehigkeit
+   welches Fach bekommt, aus den Treffern des gezeigten Kampfes gerechnet -
+   Schaden je Faehigkeit absteigend, die erste Hauptfach, die naechsten drei
+   mit mindestens 0,8 % mittlere Faecher, der Rest "Weitere Faehigkeiten".
+   Nur fuer Einsatz-Faehigkeiten (Laufzeit und Passiv rechnet der Test selbst
+   heraus). Die Namen wie auf der Seite (Deutsch); die Ventius-Familie heisst
+   als Salve "Auge von Ventius". */
+const DE_NAME = { "Quick Fire": "Schnellfeuer", "Detonation Mark": "Detonierendes Mal", "Strafing": "Beschuss",
+  "Blade Storm": "Klingensturm", "Agile Shot": "Agiler Schuss", "Decisive Sniping": "Entschlossener Scharfschuss" };
+function faecherVon(treffer, { ventius = false } = {}) {
+  const summe = new Map();
+  for (const [, skill, , dmg] of treffer) {
+    const n = ventius && skill === "Decisive Sniping" ? "Auge von Ventius" : DE_NAME[skill] || skill;
+    summe.set(n, (summe.get(n) || 0) + Math.round(dmg));
+  }
+  const ges = [...summe.values()].reduce((a, b) => a + b, 0);
+  const folge = [...summe.entries()].sort((a, b) => b[1] - a[1]);
+  const mittel = folge.slice(1).filter(([, d]) => d / ges >= 0.008).slice(0, 3).map(([n]) => n);
+  return { haupt: folge[0]?.[0] || "", mittel, weitere: folge.slice(1).map(([n]) => n).filter((n) => !mittel.includes(n)) };
+}
+/* der zuletzt geschriebene Pull einer Serie (Pulls zehn Minuten auseinander, je unter 5 min) */
+const letzterPull = (treffer) => { const m = Math.max(...treffer.map((r) => r[0])); return treffer.filter((r) => r[0] > m - 300000); };
 
 /* Ein Kampf fuer die Nebenziele: 60 s auf das Hauptziel, alle 500 ms ein
    Treffer (1000-5000 Schaden, im Schnitt 3000), dazu `neben` als Liste
@@ -108,7 +135,7 @@ try {
   /* Kontrast der Schrift gegen ihren tatsaechlichen Grund: die Hintergruende
      der Vorfahren uebereinander gelegt (halbdurchsichtige Mulden), nur
      sichtbare Elemente. */
-  const kontraste = (sels) => page.evaluate((sels) => {
+  const kontraste = (sels, p = page) => p.evaluate((sels) => {
     const rgb = (c) => { const m = c.match(/[\d.]+/g).map(Number); return { r: m[0], g: m[1], b: m[2], a: m.length > 3 ? m[3] : 1 }; };
     const lum = ({ r, g, b }) => { const f = (x) => { x /= 255; return x <= 0.03928 ? x / 12.92 : Math.pow((x + 0.055) / 1.055, 2.4); };
       return 0.2126 * f(r) + 0.7152 * f(g) + 0.0722 * f(b); };
@@ -126,14 +153,16 @@ try {
     };
     return sels.map((s) => [s, kontrast(s)]).filter((x) => x[1] != null);
   }, sels);
-  const themen = async (sels, name) => {
-    for (const theme of ["dark", "light", "tnl"]) {
-      await page.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
-      await page.waitForTimeout(150);
-      const k = await kontraste(sels);
+  /* #218 (Spezifikation 2026-10-07, 8.3): alle vier Themen, Glas eingeschlossen - strenger als vorher (drei) */
+  const THEMEN = ["dark", "light", "tnl", "glas"];
+  const themen = async (sels, name, p = page) => {
+    for (const theme of THEMEN) {
+      await p.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+      await p.waitForTimeout(150);
+      const k = await kontraste(sels, p);
       assert(k.length === sels.length && k.every(([, v]) => v >= 4.5), `${name}, Thema ${theme}: Kontrast >= 4,5:1`, k);
     }
-    await page.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+    await p.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
   };
 
   // --- 1 \u00b7 Nebenziele (Spezifikation 3.1, 3.2, 4.4)
@@ -214,11 +243,18 @@ try {
   const fenster = () => page.evaluate(() => {
     /* Neugestaltung 28.09., Aufgabe 5 (folgt Entwurf, Luecken 4): die Fragen sind die
        Ueberschriften der Felder unter der Form (h3), in der Reihenfolge der Seite */
+    /* #218 (Werkbank, Spezifikation 2026-10-07, 4 und 8.2): das Fenster steht im Hauptfach unter seinem
+       Satz, die Frage ist dort ein h4; die Faecher sind h3 mit dem Namen der Faehigkeit. Gelesen werden
+       darum h3 und h4 in der Reihenfolge der Seite, ohne die Zusatzzeile (small) der Faecher. */
     const secs = [...document.querySelectorAll("#findings .fsec")];
     const w = secs.find((s) => s.querySelector(".fwin"));
     const q = (sel) => w?.querySelector(sel);
+    const nurName = (h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); };
     return {
-      fragen: [...document.querySelectorAll("#findings h3")].map((h) => h.textContent || ""),
+      fragen: [...document.querySelectorAll("#findings :is(h3,h4)")].map(nurName),
+      // das Fenster im ersten Fach (dem Hauptfach), die Frage dort als h4#fensterH
+      imHaupt: !!w && !!w.closest(".wbfach") && w.closest(".wbfach") === document.querySelector("#findings .wbfach") &&
+        w.querySelector("h4")?.id === "fensterH",
       da: !!w,
       gef: q(".fgef")?.textContent || "",
       v: q(".fant .v")?.textContent || "",
@@ -272,15 +308,19 @@ try {
   {
     await frisch();
     // fuenf gewoehnliche Pulls, der letzte mit 30 % aussen (34 innen zu 81,2k, 26 aussen zu 45,5k)
-    await load(logFile("fenster-30.txt", serie(21, "Fellinex", 5, {}, { setz: [34, 26, 81200, 45500] })), "Fellinex");
+    const tr30 = serie(21, "Fellinex", 5, {}, { setz: [34, 26, 81200, 45500] });
+    await load(logFile("fenster-30.txt", tr30), "Fellinex");
     await tab("analysis");
     const f = await fenster();
     /* folgt Entwurf (DECISION 4.13): die Frage ist ein Feld unter den drei Feldern -
-       vorher zwischen "Rhythmus" und "Treffer"; geprueft wird wie vorher die genaue Stelle */
-    const iD = f.fragen.indexOf("Hast du durchgedrückt?"), iF = f.fragen.indexOf("Hast du im Fenster getroffen?");
-    assert(iD === 2 && iF === iD + 1 && f.fragen.length === iF + 1 &&
-      JSON.stringify(f.fragen.slice(0, 3)) === JSON.stringify(["Wer trägt?", "Wie triffst du?", "Hast du durchgedrückt?"]),
-      "die Frage steht direkt unter den drei Feldern (Ventius gibt es hier nicht)", f.fragen);
+       vorher zwischen "Rhythmus" und "Treffer"; geprueft wird wie vorher die genaue Stelle.
+       #218 (Werkbank, Spezifikation 2026-10-07, 8.2): die drei Felder sind entfallen; die Frage steht als
+       h4 im Hauptfach (Schnellfeuer), direkt unter seiner h3, danach die mittleren Faecher (Beschuss,
+       Detonierendes Mal) - die Namen aus dem gezeigten Pull gerechnet, die Folge genau. */
+    const fa30 = faecherVon(letzterPull(tr30));
+    const soll30 = [fa30.haupt, "Hast du im Fenster getroffen?", ...fa30.mittel];
+    assert(f.imHaupt && fa30.weitere.length === 0 && JSON.stringify(f.fragen) === JSON.stringify(soll30),
+      "die Frage steht direkt unter den drei Feldern (Ventius gibt es hier nicht)", { fragen: f.fragen, soll: soll30, imHaupt: f.imHaupt });
     // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar (diese Kaempfe haben keinen); vorher erkannter Build, der Satz endete auf "mit diesem Build."
     assert(/^Borometer hat das Fenster selbst gefunden: in den 6\u00a0s nach Detonierendes Mal trifft Schnellfeuer im Schnitt \d+\u00a0% st\u00e4rker \(\d+\.\dk statt \d+\.\dk\) \u2013 gemessen \u00fcber 6 Pulls mit diesen Waffen\.$/.test(f.gef),
       "Satz: gefunden, 6 s nach Detonierendes Mal, ueber 6 Pulls", f.gef);
@@ -307,9 +347,10 @@ try {
       "EN: Frage, Antwort, Balkenwort", e);
     await sprache("de");
     // 560 px: keine waagerechte Rolle, Kacheln untereinander; drei Themen mit Kontrast
+    // #218: alle vier Themen (Glas dazu), das Fenster steht jetzt im Hauptfach
     await page.setViewportSize({ width: 560, height: 900 });
     await page.waitForTimeout(300);
-    for (const theme of ["dark", "light", "tnl"]) {
+    for (const theme of THEMEN) {
       await page.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
       await page.waitForTimeout(150);
       const k = await kontraste([".fwin .fgef", ".fwerte .k", ".fwerte .z", ".fwerte .r", ".fwin .fkrit", ".fant .mwort"]);
@@ -391,7 +432,9 @@ try {
     // folgt Entwurf (DECISION 4.14): der Start steht unter "Weitere Befunde", nicht mehr im Rhythmus
     const f = [...document.querySelectorAll("#p-analysis .find")].find((x) => x.querySelector(".k")?.textContent === "Die ersten 10\u00a0s" ||
       x.querySelector(".k")?.textContent === "The first 10\u00a0s");
-    const sec = f?.closest("section")?.querySelector("h3")?.textContent || "";
+    /* #218 (Spezifikation 2026-10-07, 8.2): "Weitere Befunde" ist entfallen; die Liste #weitereListe
+       steht im Kampfstreifen #verdict unter der h3 "Der Kampf" - gelesen wird die h3 des Streifens */
+    const sec = f?.closest("#weitereListe") ? f.closest("#verdict")?.querySelector("h3")?.textContent || "" : "";
     return f ? { sec, v: f.querySelector(".v")?.textContent || "", n: f.querySelector(".n")?.textContent || "" } : null;
   });
   const formSatz = () => page.evaluate(() => document.querySelector("#verdictText")?.textContent || "");
@@ -401,7 +444,7 @@ try {
     await load(logFile("start-schwach.txt", serie(26, "Fellinex", 5, {}, { leise: 10000 })), "Fellinex");
     await tab("analysis");
     const z = await startZeile();
-    assert(z && z.sec === "Weitere Befunde" && /^\d+\.\dk$/.test(z.v) &&
+    assert(z && z.sec === "Der Kampf" && /^\d+\.\dk$/.test(z.v) &&
       /^bester Pull \d+\.\dk \u00b7 Dein Start war deutlich schw\u00e4cher: \d+\u00a0% deines besten Pulls\.$/.test(z.n),
       "schwacher Start: Eintrag unter Weitere Befunde mit Wert, bestem Pull und Satz", z);
     /* Issue #106: der Start steht genau einmal - unter "Weitere Befunde" (oben), nicht noch als
@@ -492,9 +535,29 @@ try {
     const f = await fenster();
     assert(/ nach Detonierendes Mal trifft Auge von Ventius im Schnitt /.test(f.gef), "Salve: der Hauptschaden heisst Auge von Ventius", f.gef);
     // folgt Entwurf (DECISION 4.13, Luecken 4.10): die drei Felder, das Fenster, der Kasten Auge von Ventius
-    const iD = f.fragen.indexOf("Hast du durchgedrückt?"), iF = f.fragen.indexOf("Hast du im Fenster getroffen?");
-    assert(iD >= 0 && iF === iD + 1 && f.fragen[iF + 1] === "Auge von Ventius" && f.fragen.length === iF + 2,
-      "Reihenfolge: drei Felder, Fenster, Ventius", f.fragen);
+    /* #218 (Spezifikation 2026-10-07, 8.2): das Ventius-Fach ist das Hauptfach (Meister Schaden), seine h3
+       "Auge von Ventius" zuerst, darin die Frage zum Fenster als h4, danach die mittleren Faecher */
+    const faV = faecherVon(letzterPull(tr), { ventius: true });
+    const sollV = [faV.haupt, "Hast du im Fenster getroffen?", ...faV.mittel];
+    const vHaupt = await page.evaluate(() => document.querySelector("#findings .wbfach")?.classList.contains("vfeld") || false);
+    assert(faV.haupt === "Auge von Ventius" && vHaupt && f.imHaupt && JSON.stringify(f.fragen) === JSON.stringify(sollV),
+      "Reihenfolge: drei Felder, Fenster, Ventius", { fragen: f.fragen, soll: sollV, vHaupt, imHaupt: f.imHaupt });
+    /* #218 neu (Spezifikation 3.3, 8.3): je Salve eine Saeule, gefuellte Perlen bis zur erreichten Zahl
+       der Nachbeben, leere bis zum Bestwert des Kampfes (ventiusMix().top). Hier fliegt jede Salve mit
+       zwei Wellen zu drei (Eroeffnung, +1000 ms, +1100 ms): 32 Salven je Pull, je zwei gefuellte Perlen,
+       keine leere. Die Saeulen trennt der Test an ihrer Lage (Mitte der Perle auf der x-Achse). */
+    const perlen = await page.evaluate(() => {
+      const spalten = new Map();
+      for (const e of document.querySelectorAll('#findings .vfeld svg [data-welle]')) {
+        const r = e.getBoundingClientRect(), x = Math.round((r.left + r.width / 2) * 2) / 2;
+        const s = spalten.get(x) || { voll: 0, leer: 0 }; spalten.set(x, s);
+        if (e.getAttribute("data-welle") === "1") s.voll++; else s.leer++;
+      }
+      return [...spalten.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => s);
+    });
+    const salvenJePull = Math.ceil((96000 - 300) / 3000);
+    assert(perlen.length === salvenJePull && perlen.every((s) => s.voll === 2 && s.leer === 0),
+      "Ventius: je Saeule so viele gefuellte Perlen wie Nachbeben (ventiusMix), keine leere beim Bestwert", { salvenJePull, perlen });
   }
   {
     await frisch();
@@ -537,6 +600,12 @@ try {
     await tab("analysis");
     assert(await unterZielen() === "Davon 7\u00a0% auf Fellini.", "ohne Uhr: Satz ohne \"ab\" und ohne Zahl oben", await unterZielen());
     assert((await kopf()).hidden, "ohne Uhr: keine Zeile im Kopf (dort steht keine Zahl)");
+    // Abschlusspruefung I1: ohne Uhr gibt es keinen besten Pull - kein Eintrag, kein "noch kein Pull"
+    await tab("analysis");
+    const ohneUhr = await page.evaluate(() => ({ eintrag: !!document.querySelector('#wbKenn .find[data-k="gegenBest"]'),
+      kenn: !!document.querySelector("#wbKenn"), text: document.querySelector("#p-analysis").innerText }));
+    assert(ohneUhr.kenn && !ohneUhr.eintrag && !/noch kein Pull|dein erster Pull/.test(ohneUhr.text),
+      "ohne Uhr: kein Eintrag „Gegen deinen besten Pull“, kein „noch kein Pull“", ohneUhr);
   }
 
   // --- 8 \u00b7 Kopf und Schadenstafel (Issue #53)
@@ -596,24 +665,25 @@ try {
         chips: !!document.querySelector("#chips"), treffer: document.querySelector("#hMeta [data-f=treffer]")?.textContent || "",
         satz: satz?.fontSize, zeile: document.querySelector("#bars .row:not(.sub)").getBoundingClientRect().height };
     });
-    assert(/Archivo/.test(schrift.dps) && /Plex/.test(schrift.unter), "die DPS der Zeile in Archivo Black, die Unterzeile in Plex", schrift);
-    assert(!schrift.chips && /Plex/.test(schrift.summe) && schrift.summeW === "600" && /^\d+ Treffer$/.test(schrift.treffer) &&
+    assert(/Anton/.test(schrift.dps) && /Source Sans 3/.test(schrift.unter), "die DPS der Zeile in Anton, die Unterzeile in Source Sans 3", schrift);
+    assert(!schrift.chips && /Source Sans 3/.test(schrift.summe) && schrift.summeW === "600" && /^\d+ Treffer$/.test(schrift.treffer) &&
       schrift.satz === "13.5px" && schrift.zeile === 44,
-      "keine Werteleiste, Treffer in der Faktenzeile, Schaden dort in Plex 600, Lese-Satz 13,5 px, Zeile 44 px", schrift);
+      "keine Werteleiste, Treffer in der Faktenzeile, Schaden dort in Source Sans 3 600, Lese-Satz 13,5 px, Zeile 44 px", schrift);
 
     /* Ohne Spielbilder entfaellt der Unterschied "ohne Farbring" (Liste) gegen "mit Farbring" (Kompakt):
        die Platte .sic.leer ist bewusst kein Ring, sondern die volle Flaeche in der Serienfarbe, und bleibt
        in beiden Ansichten so (styles.css, Kommentar vor "body:not(.compact) #bars .row .nm img.sic").
        Geprueft wird darum an allen drei Stellen dieselbe Platte: 16 Punkt, Flaeche in --sic-c. */
-    const ringe = () => page.evaluate((bilder) => bilder ? [...document.querySelectorAll("#bars .row .nm img.sic")]
+    const ringe = (seite = 16) => page.evaluate(([bilder, seite]) => bilder ? [...document.querySelectorAll("#bars .row .nm img.sic")]
       .map((e) => /0px 0px 0px 1\.5px/.test(getComputedStyle(e).boxShadow))
       : [...document.querySelectorAll("#bars .row:not(.catrow) .nm span.sic.leer:not(.hatch)")].map((e) => {
         const probe = document.createElement("i"); probe.style.color = "var(--sic-c)"; e.appendChild(probe);
         const farbe = getComputedStyle(probe).color; probe.remove();
         const r = e.getBoundingClientRect(), bg = getComputedStyle(e).backgroundColor;
-        return { platte: !!e.style.getPropertyValue("--sic-c") && bg === farbe && bg !== "rgba(0, 0, 0, 0)" && r.width === 16 && r.height === 16, bg, farbe, w: r.width, h: r.height };
-      }), BILDER);
+        return { platte: !!e.style.getPropertyValue("--sic-c") && bg === farbe && bg !== "rgba(0, 0, 0, 0)" && r.width === seite && r.height === seite, bg, farbe, w: r.width, h: r.height };
+      }), [BILDER, seite]);
     const ohneSym = " (ohne Spielbilder: Platte in --sic-c, 16 Punkt)";
+    const ohneSymKompakt = " (ohne Spielbilder: Platte in --sic-c, 18 Punkt)"; /* Kompakt neu, Panel (#287): 18 statt 26 Punkt */
     let r = await ringe();
     assert(r.length >= 3 && r.every((x) => BILDER ? !x : x.platte), "Liste: Symbole ohne Farbring" + (BILDER ? "" : ohneSym), r);
 
@@ -703,15 +773,19 @@ try {
     const kompakt = await page.evaluate(() => {
       const sicht = (e) => !!e && getComputedStyle(e).display !== "none" && e.getBoundingClientRect().width > 0;
       const z = document.querySelector("#bars .row:not(.sub)");
-      const f = z.querySelector(".fill").getBoundingClientRect(), n = z.querySelector(".nmt").getBoundingClientRect();
+      const f = z.querySelector(".fill").getBoundingClientRect(), zb = z.getBoundingClientRect();
       return { zellen: [...z.querySelectorAll("[role=gridcell]")].filter(sicht).map((c) => c.dataset.k || c.className.split(" ")[0]),
-        spur: Math.round(f.height), unter: f.top >= n.bottom - 1, links: Math.abs(f.left - n.left) <= 2,
-        dmg: getComputedStyle(z.querySelector('[data-k="damage"]')).fontFamily };
+        fuellt: f.height >= 18 && f.left <= zb.left + 1, nameSicht: sicht(z.querySelector(".nmt")),
+        dmg: getComputedStyle(z.querySelector('[data-k="share"]')).fontFamily };
     });
-    assert(JSON.stringify(kompakt.zellen) === JSON.stringify(["nm", "damage"]) && kompakt.spur === 3 && kompakt.unter && kompakt.links && /Archivo/.test(kompakt.dmg),
-      "Kompakt (Overlay-Look): Name und Schaden, der Balken als Spur unter dem Namen, die Zahl in Archivo", kompakt);
-    r = await ringe();
-    assert(r.length >= 3 && r.every((x) => BILDER ? x : x.platte), "Kompakt: die Symbole behalten ihren Farbring" + (BILDER ? "" : ohneSym), r);
+    /* Kompakt neu (14.10.2026, #241): je Zeile eine Platte - Schaden und Anteil stehen, der Name nur fuer Vorleser (Zelle ohne eigenen
+       Kasten), die Spur liegt unter der Zahl in der Breite der Platte, die Zahl in der Textschrift (die Platte ist 44 Punkt breit) */
+    /* Kompakt neu, Panel (21.10.2026, #287): je Zeile steht der Anteil (der Schaden nur im Namen fuer Vorleser), der Name ist sichtbar,
+       der Balken fuellt die Zeile von der Kante an, die Zahl steht in der Textschrift. */
+    assert(JSON.stringify(kompakt.zellen) === JSON.stringify(["share"]) && kompakt.fuellt && kompakt.nameSicht && !/Anton/.test(kompakt.dmg),
+      "Kompakt (Panel): Anteil je Zeile, der Name sichtbar, der Balken fuellt die Zeile, die Zahl in der Textschrift", kompakt);
+    r = await ringe(18);
+    assert(r.length >= 3 && r.every((x) => BILDER ? x : x.platte), "Kompakt: die Symbole behalten ihren Farbring" + (BILDER ? "" : ohneSymKompakt), r);
     await page.evaluate(() => document.querySelector("#btnCompact").click());
     await page.waitForTimeout(300);
 
@@ -1084,6 +1158,13 @@ try {
     const BAU_LB = bauLog("bau-lb.txt", [VB(LB, 20, 0, 1.3)]);
     const BAU_DA1 = bauLog("bau-da1.txt", [VB(DA, 21, 0, 1.0)]);
     const BAU_DA2 = bauLog("bau-da2.txt", [VB(DA, 22, 0, 1.2), VB(DA, 22, 10, 1.0, (s, t) => s === "Fatal Stigma" && t >= 20000 && t % 1000 === 0)]);
+    // derselbe Build mit Beschuss (Armbrust) als staerkster Faehigkeit: der gespeicherte Dolch-Pull kennt sie nicht
+    const BAU_DA3 = bauLog("bau-da3.txt", [VB(muster([[ST, 8]]).concat(DA), 23, 0, 1.0)]);
+    /* Abstand gegen den zweitbesten Pull: der beste Dolch-Kampf (21:00, 90 s) ist hinten stark
+       (45 s mit 0,7, dann 45 s mit 2,1, im Schnitt 1,4); der zweitbeste (21:10, 50 s, 1,25)
+       liegt ueber die gemeinsamen 50 s vorn - dort waechst der Rueckstand des besten. */
+    const BAU_DA4 = bauLog("bau-da4.txt", [{ bau: DA, start: at(24, 21, 0), secs: 45, scale: 0.7 },
+      { bau: DA, start: at(24, 21, 0) + 45000, secs: 45, scale: 2.1 }, { bau: DA, start: at(24, 21, 10), secs: 50, scale: 1.25 }]);
 
     const q = await browser.newPage({ viewport: { width: 1280, height: 860 } });
     const qErrors = [];
@@ -1111,8 +1192,40 @@ try {
     // Kampf waehlen: der Reihe nach in der Liste (0 der neueste)
     const waehle = async (i) => { await q.evaluate((k) => document.querySelectorAll("#fightList .fight")[k].click(), i); await q.waitForTimeout(150); };
 
+    // der Geist des besten Pulls (#218, Task 10): Kennzeile, gestrichelte Kurve, Spiegel und Tabelle
+    const geist = () => q.evaluate(() => {
+      const g = document.querySelector('#wbKenn .find[data-k="gegenBest"]');
+      return { v: g?.querySelector(".v")?.textContent || "", n: g?.querySelector(".n")?.textContent || "",
+        pfad: !!document.querySelector("#saeulen path.wbgeist"), label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "" };
+    });
+    // das Hauptfach aufklappen und seine Tabelle lesen: Spaltenkoepfe, je Zeile die Zellen, der Spiegel im grossen Bild
+    const tabelle = async () => {
+      await q.evaluate(() => { const b = document.querySelector('#findings .wbfach.haupt .wbauf[aria-expanded="false"]'); if (b) b.click(); });
+      await q.waitForTimeout(150);
+      return q.evaluate(() => {
+        const t = document.querySelector("#findings .wbfach.haupt .wbvgl");
+        if (!t) return null;
+        return { kopf: [...t.querySelectorAll("thead th")].map((x) => x.textContent.trim()),
+          zeilen: [...t.querySelectorAll("tbody tr")].map((r) => [...r.children].map((x) => x.textContent.trim())),
+          fein: [...document.querySelectorAll("#findings .wbfach.haupt .wbmehr .wbfein")].map((x) => x.textContent).join(" "),
+          spiegel: [...document.querySelectorAll('#findings .wbfach.haupt .wbbild2[data-bild="gross"] rect')]
+            .filter((r) => (r.getAttribute("fill") || "").includes("--wbspiegel")).length };
+      });
+    };
     // der beste Pull: Langbogen + Armbrust
     await qLoad(BAU_LB);
+    await qTab("analysis");
+    const gLb = await geist();
+    // Abschlusspruefung I1: der Kampf ist selbst ein Pull mit diesen Waffen - "noch kein Pull" waere falsch
+    assert(gLb.v === "–" && gLb.n === "dein erster Pull an Vulcanus" && !gLb.pfad && !/gestrichelt/.test(gLb.label),
+      "Geist: der erste Pull sagt „dein erster Pull an …“ und zeigt keinen Geist", gLb);
+    await q.evaluate(() => document.querySelector("#btnLang").click());
+    await q.waitForTimeout(150);
+    const gLbEn = await geist();
+    assert(gLbEn.v === "–" && gLbEn.n === "your first pull on Vulcanus" && !gLbEn.pfad,
+      "Geist: Englisch - der erste Pull sagt „your first pull on …“", gLbEn);
+    await q.evaluate(() => document.querySelector("#btnLang").click());
+    await q.waitForTimeout(150);
     // ein schwaecherer Kampf mit Dolch + Armbrust: kein Pull desselben Builds - kein Bezug, auch nicht der Langbogen
     await qLoad(BAU_DA1);
     await qTab("analysis");
@@ -1120,6 +1233,9 @@ try {
     const da1Text = await alles();
     assert(da1 === null && !/bester Pull|zweitbester Pull/.test(da1Text),
       "anderer Build: keine Start-Zeile und kein Vergleichswert gegen den besten Pull aus dem Langbogen-Build", { da1, text: da1Text.slice(0, 600) });
+    const gDa1 = await geist();
+    assert(gDa1.v === "–" && /^noch kein Pull mit diesen Waffen an Vulcanus/.test(gDa1.n) && !gDa1.pfad,
+      "Geist: erster Dolch-Pull, kein Geist aus dem Langbogen-Build", gDa1);
     // zwei Dolch-Kaempfe im Log: der schwaechere (21:10) gegen den staerkeren desselben Builds (21:00)
     await qLoad(BAU_DA2);
     await qTab("analysis");
@@ -1140,6 +1256,131 @@ try {
     const fruehEn = await qStart();
     assert(!!fruehEn && fruehEn.bp === "second best pull" && fruehEn.x.replace(/\D/g, "") === (frueh?.x || "-").replace(/\D/g, ""),
       "Englisch: derselbe Bezug, der zweitbeste desselben Builds", fruehEn);
+    await q.evaluate(() => document.querySelector("#btnLang").click());
+    await q.waitForTimeout(150);
+    // der schwaechere Dolch-Kampf gegen den staerkeren desselben Builds
+    await waehle(0);
+    await qTab("analysis");
+    const gSpaet = await geist();
+    assert(/^[−+]\d+,\d %$/.test(gSpaet.v) && gSpaet.v.startsWith("−") && /^\S+ am 22\.09\.$/.test(gSpaet.n),
+      "Geist: zweiter Pull desselben Builds, gegen den besten mit Vorzeichen und %, Wert am Tag", gSpaet);
+    assert(gSpaet.pfad && /gestrichelt dein bester Pull vom 22\.09\./.test(gSpaet.label),
+      "Geist: gestrichelte Kurve path.wbgeist, im Namen des Bildes beschrieben", gSpaet);
+    const abst = await q.evaluate(() => {
+      const e = document.querySelector('#weitereListe .find[data-k="abstand"]');
+      const f = document.querySelector('#wbFahnen .wbfahne[data-k="abstand"]');
+      if (f) f.click();
+      return { e: !!e, von: Number(e?.dataset.von), bis: Number(e?.dataset.bis), n: e?.querySelector(".n")?.textContent || "",
+        weg: !!e?.querySelector("button.inrot"), fahne: !!f, lese: document.querySelector("#wbLese")?.textContent || "" };
+    });
+    assert(abst.e && abst.fahne && abst.bis - abst.von === 15 && /Rückstand zum besten Pull/.test(abst.n) && abst.weg && /Abstand wächst/.test(abst.lese),
+      "Geist: Fahne „Abstand wächst“ mit 15 s, Satz, Weg in die Rotation und Lesezeile", abst);
+    await q.evaluate(() => document.querySelector("#wbLese [data-aufheben]")?.click());
+    const tSpaet = await tabelle();
+    assert(!!tSpaet && tSpaet.kopf.some((x) => /^bester Pull$/i.test(x)) && tSpaet.kopf.some((x) => /^dieser Pull$/i.test(x)) && tSpaet.spiegel > 0,
+      "Geist: aufgeklapptes Fach mit Spalte „bester Pull“ und Spiegel unter der Grundlinie", tSpaet);
+    // der beste Dolch-Kampf: der Geist ist der zweitbeste
+    await waehle(1);
+    await qTab("analysis");
+    const gFrueh = await geist();
+    assert(gFrueh.v.startsWith("+") && /^zweitbester /.test(gFrueh.n) && gFrueh.pfad && /gestrichelt dein zweitbester Pull/.test(gFrueh.label),
+      "Geist: im besten Pull selbst gegen den zweitbesten, mit +", gFrueh);
+    // gespeicherter Bezug: der erste Dolch-Kampf allein; der gespeicherte zweitbeste Pull ist der Dolch-Kampf vom 22.09. 21:00
+    await qLoad(BAU_DA1);
+    await qTab("analysis");
+    const gGesp = await geist();
+    assert(gGesp.v.startsWith("−") && gGesp.pfad && /am 22\.09\.$/.test(gGesp.n),
+      "Geist: gegen den gespeicherten Pull desselben Builds", gGesp);
+    const tGesp = await tabelle();
+    const stark = tGesp && tGesp.zeilen.find((z) => /^Meist stark$/.test(z[0]));
+    assert(!!tGesp && tGesp.kopf.some((x) => /^bester Pull$/i.test(x)) && !!stark && stark[2] === "–" && /speichert nicht/.test(tGesp.fein),
+      "Geist: gespeicherter Pull - „stark“ zeigt – und sagt warum", tGesp);
+    // eine Faehigkeit, die der gespeicherte Pull nicht traegt: "nicht gespeichert", nie eine Null
+    await qLoad(BAU_DA3);
+    await qTab("analysis");
+    const gDa3 = await geist();
+    const tDa3 = await tabelle();
+    const haupt3 = await q.evaluate(() => document.querySelector("#findings .wbfach.haupt")?.dataset.n || "");
+    assert(gDa3.pfad && haupt3 === "Strafing" && !!tDa3 && tDa3.kopf.some((x) => /^bester Pull$/i.test(x)) &&
+      tDa3.zeilen.every((z) => z[2] === "nicht gespeichert"),
+      "Geist: Faehigkeit ausserhalb des gespeicherten Pulls zeigt „nicht gespeichert“, keine Null", { gDa3, haupt3, tDa3 });
+    // ein Pull eines anderen Builds (Langbogen): kein Geist
+    await qLoad(BAU_LB);
+    await qTab("analysis");
+    const gLb2 = await geist();
+    assert(!gLb2.pfad && gLb2.v === "–", "Geist: Langbogen-Pull zeigt keinen Geist", gLb2);
+    // der beste Pull selbst gegen den zweitbesten, der ueber die gemeinsame Strecke vorn liegt
+    await qLoad(BAU_DA4);
+    await qTab("analysis");
+    await waehle(1);
+    await qTab("analysis");
+    const zweitAbst = () => q.evaluate(() => {
+      const e = document.querySelector('#weitereListe .find[data-k="abstand"]');
+      return { e: !!e, text: e?.textContent || "", aria: e?.querySelector("button.inrot")?.getAttribute("aria-label") || "",
+        n: document.querySelector('#wbKenn .find[data-k="gegenBest"] .n')?.textContent || "" };
+    });
+    const zDe = await zweitAbst();
+    assert(zDe.e && /zweitbesten Pull/.test(zDe.text) && !/Rückstand zum besten Pull/.test(zDe.text) && /zweitbesten Pull/.test(zDe.aria),
+      "Geist: im besten Pull sagt „Abstand wächst“ zweitbester Pull, im Satz und im Namen des Knopfs", zDe);
+    assert(/^zweitbester Pull, .+ (am \d\d\.\d\d\.|aus diesem Log)$/.test(zDe.n),
+      "Geist: Kennzeile im besten Pull nennt den zweitbesten Pull", zDe);
+    await q.evaluate(() => document.querySelector("#btnLang").click());
+    await q.waitForTimeout(150);
+    const zEn = await zweitAbst();
+    assert(zEn.e && /second best pull/.test(zEn.text) && !/gap to your best pull/.test(zEn.text) && /second best pull/.test(zEn.aria) &&
+      /^second best pull, .+ (on \d\d\/\d\d|in this log)$/.test(zEn.n),
+      "Geist: Englisch - Abstand und Kennzeile gegen den second best pull", zEn);
+    await q.evaluate(() => document.querySelector("#btnLang").click());
+    await q.waitForTimeout(150);
+    /* Abschlusspruefung I2: der 50-s-Pull (21:10) gegen den 90-s-Besten - die Einsaetze des besten Pulls nach
+       dem Ende dieses Kampfs stehen nicht als Block am rechten Rand (wie die Kurve auf die Laenge geschnitten).
+       Je Bild hoechstens ein Spiegel-Strich in den letzten 2 Punkt (der letzte Einsatz vor dem Ende). */
+    await waehle(0);
+    await qTab("analysis");
+    await tabelle();
+    const rand = await q.evaluate(() => [...document.querySelectorAll("#findings svg.wbglut")].map((svg) => {
+      const W = +(svg.getAttribute("viewBox") || "0 0 0 0").split(" ")[2];
+      const sp = [...svg.querySelectorAll("rect")].filter((r) => (r.getAttribute("fill") || "").includes("--wbspiegel"));
+      return { W, n: sp.length, rand: sp.filter((r) => +r.getAttribute("x") >= W - 2).length };
+    }).filter((x) => x.n > 0));
+    assert(rand.length > 0 && rand.every((x) => x.rand <= 1),
+      "Geist: kuerzerer Pull gegen laengeren Besten - kein Stapel gespiegelter Einsaetze am rechten Rand", rand);
+    /* Abschlusspruefung I1: ein duenner Dolch-Kampf (15 Treffer) - der beste Pull desselben Builds ist
+       gespeichert, nur der Geist wird unter der Schwelle nicht gezeichnet: kein Eintrag, kein "noch kein Pull" */
+    const BAU_DUENN = bauLog("bau-duenn.txt", [{ bau: DA, start: at(25, 21, 0), secs: 7.5, scale: 1.0 }]);
+    await qLoad(BAU_DUENN);
+    await qTab("analysis");
+    const duenn = await q.evaluate(() => ({ eintrag: !!document.querySelector('#wbKenn .find[data-k="gegenBest"]'),
+      kenn: document.querySelector("#wbKenn")?.textContent || "", text: document.querySelector("#p-analysis").innerText,
+      pfad: !!document.querySelector("#saeulen path.wbgeist") }));
+    assert(!duenn.eintrag && !duenn.pfad && !/noch kein Pull|dein erster Pull/.test(duenn.text) && duenn.kenn.length > 0,
+      "Geist: duenner Kampf mit gespeichertem Bezug - kein Eintrag „Gegen deinen besten Pull“, kein „noch kein Pull“", duenn);
+    /* Abschlusspruefung I1: der Langbogen-Pull sagt "noch kein Pull mit diesen Waffen" (Ruling 10); in der
+       Gruppentafel gibt es keinen besten Pull - dort entfaellt der Eintrag */
+    await qLoad(BAU_LB);
+    await qTab("analysis");
+    const gegenBest = () => q.evaluate(() => ({ eintrag: !!document.querySelector('#wbKenn .find[data-k="gegenBest"]'),
+      n: document.querySelector('#wbKenn .find[data-k="gegenBest"] .n')?.textContent || "",
+      text: document.querySelector("#p-analysis").innerText }));
+    const gbEinzeln = await gegenBest();
+    assert(gbEinzeln.eintrag && /^noch kein Pull mit diesen Waffen an Vulcanus$/.test(gbEinzeln.n),
+      "Geist: Langbogen-Pull neben Dolch-Pulls sagt „noch kein Pull mit diesen Waffen an …“", gbEinzeln);
+    const zeile = (name, dps) => ({ name, dps, damage: dps * 60, seconds: 60, waiting: false, target: "Vulcanus" });
+    const gruppe = { boroPartyLog: 2, when: new Date(at(26, 20, 0)).toISOString(), code: "RAID", target: "Vulcanus", history: [],
+      fights: [{ target: "Vulcanus", when: new Date(at(26, 20, 0)).toISOString(), seconds: 60, board: [zeile("Mitglied A", 40000)] }],
+      board: [zeile("Mitglied A", 40000), zeile("Mitglied B", 30000)] };
+    const gruppePfad = join(work, "gruppe-vulcanus.json");
+    writeFileSync(gruppePfad, JSON.stringify(gruppe));
+    await q.setInputFiles("#partyLogInput", gruppePfad);
+    await q.waitForTimeout(250);
+    await q.evaluate(() => document.querySelector("#segParty").click());
+    await q.waitForTimeout(250);
+    await qTab("analysis");
+    const gbGruppe = await gegenBest();
+    assert(!gbGruppe.eintrag && !/noch kein Pull|dein erster Pull/.test(gbGruppe.text),
+      "Gruppentafel: kein Eintrag „Gegen deinen besten Pull“, kein „noch kein Pull“", gbGruppe);
+    await q.evaluate(() => document.querySelector('#groupSeg [data-g="skill"]').click());
+    await q.waitForTimeout(150);
     assert(!qErrors.length, "zwei Builds: keine Fehler in der Seite", qErrors);
     await q.close();
   }
@@ -1186,14 +1427,17 @@ try {
         mech: [...document.querySelectorAll("#saeulen .mechz")].map((z) => z.dataset.zeit),
         gaps: [...document.querySelectorAll("#saeulen .gapz")].map((z) => z.dataset.zeit),
         leg: document.querySelector("#vlegMech")?.hidden === false,
-        luecken: [...document.querySelectorAll("#p-analysis .find")]
+        // #218: die Zahl der Luecken steht in der Kennzeile des Kopfs (#wbKenn), die Strecken im Streifen
+        luecken: [...document.querySelectorAll('#wbKenn .find[data-k="luecken"]')]
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent).find((x) => /^Lücken/.test(x)) || "",
         px: document.querySelector("#mechanikZeile") ? parseFloat(getComputedStyle(document.querySelector("#mechanikZeile")).fontSize) : 0,
         urteil: document.querySelector("#verdictText")?.hidden ? "" : document.querySelector("#verdictText")?.textContent || "",
-        weitere: document.querySelector("#weitereListe")?.textContent || "",
+        /* #218: "Weitere Befunde" ist entfallen; die Befunde stehen verteilt (Kopf, Streifen, Faecher) -
+           gelesen werden alle Eintraege des Bereichs (strenger: nirgends ein Mechanik-Eintrag) */
+        weitere: [...document.querySelectorAll("#p-analysis .find")].map((f) => f.textContent).join(" | "),
         label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "",
         rolle: document.querySelector("#mechanikZeile")?.getAttribute("role") || "",
-        mechEintrag: [...document.querySelectorAll('#weitereListe .find[data-k="mechanik"]')]
+        mechEintrag: [...document.querySelectorAll('#p-analysis .find[data-k="mechanik"]')]
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent),
         fuss: (() => { const e = document.querySelector("#fussMech"); return e && !e.hidden ? e.textContent : ""; })(),
         art: [...document.querySelectorAll("#p-analysis .find")]
@@ -1417,7 +1661,7 @@ try {
     let gespeichert = null;
     const g1 = await geoeffnet({}, (b) => { gespeichert = b; });
     await ladeUndAnalyse(g1, logFile("unbekannt-1.txt", serie(1, "Fellinex", 1, {})));
-    for (const ende = Date.now() + 10000; Date.now() < ende && !gespeichert;) await g1.waitForTimeout(200);
+    for (const ende = performance.now() + 10000; performance.now() < ende && !gespeichert;) await g1.waitForTimeout(200);
     await g1.close();
     assert(!!gespeichert?.key && !!gespeichert?.entry?.best?.run?.skills?.length, "unbekannter Bezug: ein bester Pull wurde festgehalten", gespeichert?.key);
     // derselbe Pull, aber an einem anderen Zeitpunkt (kein Eintrag im Verzeichnis); mit oder ohne lesbaren Lauf
@@ -1460,13 +1704,17 @@ try {
     /* `pulls` (wahlweise) legt weitere Pulls desselben Logs davor, zehn Minuten auseinander, mit ihren
        eigenen Optionen; `krit` macht jeden dritten Treffer kritisch (doppelter Schaden). */
     let fTag = 0;
+    /* #218: die Treffer des zuletzt geschriebenen Pulls ([ms, Skill, ID, Schaden]), fuer die Faecher */
+    let flachLetzter = [];
     const flachLog = (name, boss, { pulls = [], ...letzter } = {}) => {
       const tag = 10 + (fTag++), rows = [];
       [...pulls, letzter].forEach(({ secs = 90, delle = null, krit = false }, p) => {
+        if (p === pulls.length) flachLetzter = [];
         for (let k = 0; k * 500 < secs * 1000; k++) {
           const t = k * 500, [skill, sid] = k % 2 ? DM : QF, kr = krit && k % 3 === 0;
           let dmg = (9000 + (k * 7919 % 2001)) * (kr ? 2 : 1);
           if (delle && t >= delle[0] * 1000 && t < delle[1] * 1000) dmg *= delle[2];
+          if (p === pulls.length) flachLetzter.push([t, skill, sid, Math.round(dmg)]);
           rows.push(`${stamp(at(tag, 20, p * 10) + t)},DamageDone,${skill},${sid},${Math.round(dmg)},${kr ? 1 : 0},0,${kr ? "kCritical" : "kNormalHit"},Tester,${boss}`);
         }
       });
@@ -1475,10 +1723,16 @@ try {
       return f;
     };
     const zaehle = (text, re) => (text.match(new RegExp(re.source, "g")) || []).length;
-    const fBefunde = () => fp.evaluate(() => [...document.querySelectorAll("#weitereListe .find")]
+    // #218: die Befunde stehen verteilt (Kennzeile, Streifen, Faecher) - gelesen werden alle des Bereichs
+    const fBefunde = () => fp.evaluate(() => [...document.querySelectorAll("#p-analysis .find")]
       .map((f) => f.dataset.k + " | " + f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
         (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
     const fText = () => fp.evaluate(() => document.querySelector("#p-analysis").innerText);
+    /* #218 (Ruling 9): die zeitgebundenen Befunde stehen vollstaendig in #weitereListe im Streifen -
+       die positiven Proben verlangen den Eintrag zusaetzlich dort */
+    const fListe = () => fp.evaluate(() => [...document.querySelectorAll("#weitereListe .find")]
+      .map((f) => f.dataset.k + " | " + f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
+        (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
 
     // #105: ein gleichmaessiger Kampf - keine schwaechste Stelle, kein "Pruefe"
     await fLoad(flachLog("flach.txt", "Fellinex"), "Fellinex");
@@ -1491,7 +1745,8 @@ try {
     await fLoad(flachLog("delle40.txt", "Fellinex", { delle: [40, 43, 0.4] }), "Fellinex");
     await fTab("analysis");
     bf = await fBefunde();
-    assert(bf.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)),
+    let fl = await fListe();
+    assert(bf.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)) && fl.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)),
       "#105: eine Strecke unter dem halben Median steht als schwaechste Stelle", bf);
     // eine Delle auf 70 %: schwaecher als ueblich, aber nicht unter der Haelfte - kein Eintrag
     await fLoad(flachLog("delle70.txt", "Fellinex", { delle: [40, 43, 0.7] }), "Fellinex");
@@ -1506,12 +1761,16 @@ try {
     await fLoad(flachLog("flach-krit.txt", "Fellinex", { krit: true }), "Fellinex");
     await fTab("analysis");
     alles = await fText();
-    const dWie = await fp.evaluate(() => document.querySelector("#dWie")?.innerText || "");
+    // #218: "Wie triffst du?" ist entfallen; derselbe Satz steht im Kopf des Kampfstreifens (#wbWie)
+    const dWie = await fp.evaluate(() => document.querySelector("#wbWie")?.innerText || "");
     assert(zaehle(alles, /deines Schadens kamen aus Krits/) === 1 && /deines Schadens kamen aus Krits/.test(dWie),
       "#106: der Krit-Satz steht genau einmal, unter \"Wie triffst du?\"", alles);
-    assert(/\d+\u00a0% deiner Treffer kritisch, \d+\u00a0% stark\./.test(dWie) && /Treffer, davon \d+\u00a0% kritisch/.test(alles),
-      "#106: jeder Krit-Wert sagt, worauf er sich bezieht (Treffer, Schaden)", dWie);
-    const d3 = await fp.evaluate(() => [...document.querySelectorAll("#dDurch .fein")].map((x) => x.textContent).join(" | "));
+    // #269: die Rate nennt die direkten Treffer; die leise Zeile sagt, woraus gerechnet ist, die Gesamtzahl bleibt
+    assert(/\d+\u00a0% deiner direkten Treffer kritisch, \d+\u00a0% stark\./.test(dWie) && /Treffer, davon \d+\u00a0% kritisch/.test(alles) &&
+      !/Gerechnet/.test(dWie),
+      "#106/#269: jeder Krit-Wert sagt, worauf er sich bezieht (direkte Treffer, Schaden); sind alle Treffer direkt, steht keine Basiszeile", dWie);
+    // #218: "Hast du durchgedrueckt?" ist entfallen; die Einsaetze je Minute stehen in der Kennzeile
+    const d3 = await fp.evaluate(() => [...document.querySelectorAll('#wbKenn .find[data-k="jeMinute"] .fein')].map((x) => x.textContent).join(" | "));
     assert(!/Lücken/.test(d3) && /^\d+,\d je Minute\./.test(d3), "#106: ohne Luecken kein \"Ohne die Luecken ..., mit ihnen\"", d3);
     assert(!/Hälfte|fachen/.test(alles), "#106: kein Haelftensatz beim 1,0-fachen", alles);
     // eine deutlich staerkere zweite Haelfte steht da
@@ -1519,13 +1778,29 @@ try {
     await fTab("analysis");
     assert(/Deine zweite Hälfte lief mit [\d.]+k, dem 1,\d-fachen der ersten\./.test(await fText()),
       "#106: ab dem 1,15-fachen steht der Haelftensatz", await fp.evaluate(() => document.querySelector("#verdictText").textContent));
+    /* #218 (8.3): hier steht der Satz unter dem Streifen sicher - seine Breite bei 2000 x 1480 wird jetzt
+       gemessen und unten mit der Lesezeile geprueft (hoechstens 75 Zeichen) */
+    await fp.setViewportSize({ width: 2000, height: 1480 });
+    await fp.waitForTimeout(300);
+    const formsatzBreit = await fp.evaluate(() => {
+      const e = document.querySelector("#verdictText");
+      if (!e || !e.getClientRects().length || !e.textContent.trim()) return -1;
+      const m = document.createElement("span");
+      m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+      e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove();
+      return Math.round(e.getBoundingClientRect().width / ch * 10) / 10;
+    });
+    await fp.setViewportSize({ width: 1280, height: 860 });
+    await fp.waitForTimeout(300);
     /* Der Start genau einmal: zwei Pulls, der zweite mit schwachem Start (die ersten 10 s auf 30 %).
        Er steht unter "Weitere Befunde", nicht noch einmal unter der Form. */
     await fLoad(flachLog("start.txt", "Fellinex", { pulls: [{}], delle: [0, 10, 0.3] }), "Fellinex");
     await fTab("analysis");
     alles = await fText();
     bf = await fBefunde();
-    assert(bf.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)),
+    fl = await fListe();
+    assert(bf.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)) &&
+      fl.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)),
       "#106: der schwache Start steht unter Weitere Befunde", bf);
     assert(zaehle(alles, /Dein Start war deutlich schwächer/) === 1 && !/Start/.test(await fp.evaluate(() => document.querySelector("#verdictText").textContent)),
       "#106: der Start steht genau einmal, nicht unter der Form", alles);
@@ -1533,11 +1808,19 @@ try {
     /* #109: ein h2 (der Name des Bereichs; mit Feldern steht er in der Kopfzeile, das h2 im Panel ist
        dann nicht gezeichnet), darunter alle Felder als h3 auf einer Ebene - zuerst das Urteil, ganz unten
        der Fuss; kein Sprung zurueck auf h2. Gezaehlt wird, was der Vorleser bekommt: was eine Box hat. */
+    /* #218 (Spezifikation 2026-10-07, 8.2): die Folge ist wieder genau festgelegt - H2 Analyse, H3 Urteil,
+       H3 Der Kampf, je Fach eine H3 mit dem Namen der Faehigkeit (Hauptfach, dann die mittleren), "Weitere
+       Faehigkeiten" nur, wenn welche uebrig sind, zuletzt der Fuss. Dieser Kampf hat nur Schnellfeuer und
+       Detonierendes Mal, kein Fenster, keine Laufzeit, kein Passiv, ein Ziel. Die Faecher tragen in ihrer
+       h3 eine Zusatzzeile (small); verglichen wird der Name. */
+    const faStart = faecherVon(flachLetzter);
+    const sollBaum = ["H2 Analyse", "H3 Urteil", "H3 Der Kampf", "H3 " + faStart.haupt, ...faStart.mittel.map((n) => "H3 " + n),
+      ...(faStart.weitere.length ? ["H3 Weitere Fähigkeiten"] : []), "H3 Was das Log nicht weiß"];
     const baum = await fp.evaluate(() => [...document.querySelectorAll("#bereichKopf h2, #p-analysis :is(h1,h2,h3,h4)")]
-      .filter((h) => h.getClientRects().length > 0).map((h) => h.tagName + " " + h.textContent.trim()));
-    assert(baum[0] === "H2 Analyse" && baum.slice(1).every((h) => h.startsWith("H3 ")) &&
-      baum[1] === "H3 Urteil" && baum[2] === "H3 Weitere Befunde" && baum[3] === "H3 Form des Kampfes" &&
-      baum.at(-1) === "H3 Was das Log nicht weiß", "#109: Ueberschriften h2 Analyse, dann nur h3 in der Reihenfolge der Seite", baum);
+      .filter((h) => h.getClientRects().length > 0).map((h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove());
+        return h.tagName + " " + c.textContent.trim(); }));
+    assert(JSON.stringify(baum) === JSON.stringify(sollBaum) && baum.slice(1).every((h) => h.startsWith("H3 ")),
+      "#109: Ueberschriften h2 Analyse, dann nur h3 in der Reihenfolge der Seite", { baum, soll: sollBaum });
     const sprung = async () => fp.evaluate(() => document.querySelector(".skiplink").textContent);
     assert(await sprung() === "Zum Bereich Analyse springen", "#109: der Sprunglink nennt den Bereich Analyse", await sprung());
     await fTab("rotation");
@@ -1589,22 +1872,32 @@ try {
     assert(w.ganz === "Die Analyse liest den ganzen Kampf. Von/bis 0:38\u20130:48 gilt nur in der Rotation.",
       "#107: mit Von/bis in der Rotation sagt die Analyse, dass sie den ganzen Kampf liest", w);
     // "Die Folge in der Rotation" unter "Hast du durchgedrueckt?"
-    const fo = await fp.evaluate(() => document.querySelector("#dDurch button.inrot")?.textContent || "");
+    // #218: jetzt an den Einsaetzen je Minute in der Kennzeile des Kopfs
+    const fo = await fp.evaluate(() => document.querySelector('#wbKenn .find[data-k="jeMinute"] button.inrot')?.textContent || "");
     assert(fo === "Die Folge in der Rotation ›", "#107: der Verweis auf die Folge ist ein Knopf", fo);
-    await fp.evaluate(() => document.querySelector("#dDurch button.inrot").click());
+    await fp.evaluate(() => document.querySelector('#wbKenn .find[data-k="jeMinute"] button.inrot')?.click());
     await fp.waitForTimeout(400);
     assert((await weg()).tab === "p-rotation", "#107: \"Die Folge in der Rotation\" oeffnet die Rotation", await weg());
     /* Tastatur: von der Bereichsleiste aus erreicht Tab "Zum Beleg" und die Knoepfe in den Befunden */
     await fTab("analysis");
     await fp.evaluate(() => document.querySelector('#bereiche [data-tab="analysis"]').focus());
-    const erreicht = new Set();
-    for (let i = 0; i < 60; i++) {
+    /* #218: die Werkbank bringt mehr Knoepfe (Fahnen, "Mehr zu ..."), darum bis zu 120 Schritte; die
+       Folge des ersten Erreichens wird mitgeschrieben (Fahne = "fahne", "Mehr zu ..." = "fach") */
+    const erreicht = new Set(), folge = [];
+    for (let i = 0; i < 120; i++) {
       await fp.keyboard.press("Tab");
       const k = await fp.evaluate(() => { const a = document.activeElement;
-        return a?.closest("#p-analysis") ? (a.classList.contains("zubeleg") ? "beleg" : a.closest(".find")?.dataset.k || a.closest("section")?.id || "") : ""; });
+        return a?.closest("#p-analysis") ? (a.classList.contains("zubeleg") ? "beleg" : a.classList.contains("wbfahne") ? "fahne" :
+          a.classList.contains("wbauf") ? "fach" : a.closest(".find")?.dataset.k || a.closest("section")?.id || "") : ""; });
+      if (k && !erreicht.has(k)) folge.push(k);
       if (k) erreicht.add(k);
     }
-    assert(erreicht.has("beleg") && erreicht.has("luecken") && erreicht.has("dDurch"), "#107: alle neuen Wege mit Tab erreichbar", [...erreicht]);
+    // #218: der Weg zur Folge sitzt an den Einsaetzen je Minute (Kennzeile), nicht mehr im Feld #dDurch
+    assert(erreicht.has("beleg") && erreicht.has("luecken") && erreicht.has("jeMinute"), "#107: alle neuen Wege mit Tab erreichbar", [...erreicht]);
+    // #218 (Spezifikation 8.2, letzte Zeile): Zum Beleg, dann die erste Fahne, dann das erste Fach
+    const iBeleg = folge.indexOf("beleg"), iFahne = folge.indexOf("fahne"), iFach = folge.indexOf("fach");
+    assert(iBeleg >= 0 && iFahne > iBeleg && iFach > iFahne,
+      "#107/#218: Tab erreicht Zum Beleg, die erste Fahne, das erste Fach in dieser Folge", folge);
     // die schwaechste Stelle: ihr Knopf nennt die Strecke, die Rotation zeigt sie mit Rand
     await fLoad(flachLog("delle40b.txt", "Fellinex", { delle: [40, 43, 0.4] }), "Fellinex");
     await fTab("analysis");
@@ -1649,9 +1942,583 @@ try {
     assert(ts > 0 && ts <= 900.5, "#110: die Ziele hoechstens 900 Punkt breit", ts);
     await fp.setViewportSize({ width: 1280, height: 860 });
 
+    /* --- Werkbank #218 (Spezifikation 2026-10-07, Abschnitte 2, 3, 5, 6 und 8.3). Ein Kampf von 60 s
+       an Fellinex mit Faehigkeiten aller Arten, Skills aus dem Woerterbuch, Angreifer "Tester":
+       Schnellfeuer alle 700 ms (10000), Beschuss alle 2 s (15000), Detonierendes Mal alle 6 s (30000),
+       Klingensturm alle 5 s (20000), ein Agiler Schuss (1000, unter 0,8 %), Protest von Mutter Natur
+       alle 400 ms (300) ausser zwischen 20,0 und 32,0 s, und Blitzgeschwindigkeit (940593086, in der
+       Waffentabelle "Passive") alle 1300 ms mit 40000 - der meiste Schaden, aber nie Hauptfach.
+       `stumm`: in der Luecke des Protests trifft auch sonst nichts (dann ist es eine Luecke, kein "aus"). */
+    const PR = ["Mother Nature's Protest", 963754730], LS = ["Lightning Speed", 940593086];
+    const BS = ["Blade Storm", 945408027], AG = ["Agile Shot", 944723371];
+    const PR_AUS = [20000, 32000];
+    const werkbankTreffer = (start, { stumm = false } = {}) => {
+      const tr = [], drin = (t) => t > PR_AUS[0] && t < PR_AUS[1];
+      const alle = (s, ms, dmg) => { for (let t = 0; t < 60000; t += ms) if (!(stumm && drin(t))) tr.push([start + t, s[0], s[1], dmg, false, "Fellinex"]); };
+      /* Schnellfeuer in allen vier Hitzestufen (Spezifikation 3.3): jeder dritte Treffer kritisch, jeder
+         vierte ab dem zweiten stark - also normal, stark (1), kritisch (2) und kritisch stark (3) */
+      for (let t = 0, k = 0; t < 60000; t += 700, k++)
+        if (!(stumm && drin(t))) tr.push([start + t, QF[0], QF[1], 10000, k % 3 === 0, "Fellinex", "Tester", k % 4 === 1]);
+      alle(ST, 2000, 15000); alle(DM, 6000, 30000); alle(BS, 5000, 20000); alle(LS, 1300, 40000);
+      tr.push([start + 50000, AG[0], AG[1], 1000, false, "Fellinex"]);
+      for (let t = 0; t < 60000; t += 400) if (!drin(t)) tr.push([start + t, PR[0], PR[1], 300, false, "Fellinex"]);
+      return tr;
+    };
+    const mmss = (s) => Math.floor(s / 60) + ":" + two(s % 60);
+    /* Ruling 1: der Erwartungswert aus dem eigenen Log, gerundet wie die Seite (ganze Sekunden) */
+    const prZeiten = (tr) => tr.filter((r) => r[1] === PR[0]).map((r) => r[0] - tr.reduce((m, x) => Math.min(m, x[0]), Infinity)).sort((a, b) => a - b);
+    const ausErwartet = (tr) => {
+      const z = prZeiten(tr);
+      let a = 0, b = 0;
+      for (let i = 1; i < z.length; i++) if (z[i] - z[i - 1] > b - a) { a = z[i - 1]; b = z[i]; }
+      return Math.round((b - a) / 1000) + "\u00a0s aus, ab " + mmss(Math.round(a / 1000));
+    };
+    /* eine Zeile der Werkbank (nach Name oder data-n) und die h3, unter der sie steht */
+    const wbZeile = (muster) => fp.evaluate((m) => {
+      const re = new RegExp(m);
+      const z = [...document.querySelectorAll("#findings .wbzeile[data-n]")].find((x) => re.test(x.dataset.n + " " + x.textContent));
+      if (!z) return null;
+      const nurName = (h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); };
+      const vorher = [...document.querySelectorAll("#findings h3")].filter((h) => h.compareDocumentPosition(z) & Node.DOCUMENT_POSITION_FOLLOWING);
+      return { text: z.textContent, n: z.querySelector(".n")?.textContent || "", unter: vorher.length ? nurName(vorher.at(-1)) : "" };
+    }, muster);
+    const wbKoepfe = () => fp.evaluate(() => [...document.querySelectorAll("#findings :is(h3,h4)")].filter((h) => h.getClientRects().length > 0)
+      .map((h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); }));
+    const versuch = async (fn) => { try { await fn(); return true; } catch { return false; } };
+
+    const wbTr = werkbankTreffer(at(5, 22, 0));
+    await fLoad(logFile("werkbank.txt", wbTr), "Fellinex");
+    await fTab("analysis");
+    // Faecher und Zeilen: Einsatz-Faehigkeiten nach Schaden, dann Laufzeit, Weitere Faehigkeiten, Passiv
+    const faWb = faecherVon(wbTr.filter((r) => r[1] !== PR[0] && r[1] !== LS[0]));
+    const sollWb = [faWb.haupt, ...faWb.mittel, "Laufzeit", "Weitere Fähigkeiten", "Passiv"];
+    const koepfe = await wbKoepfe();
+    assert(faWb.haupt === "Schnellfeuer" && faWb.weitere.length === 1 && JSON.stringify(koepfe) === JSON.stringify(sollWb),
+      "Werkbank: Hauptfach, mittlere Faecher nach Schaden, dann Laufzeit, Weitere Faehigkeiten, Passiv", { koepfe, soll: sollWb });
+    // Protest aus (5.5): in der Luecke trafen andere Faehigkeiten weiter
+    const aus = ausErwartet(wbTr);
+    let pr = await wbZeile("Protest von Mutter Natur|Mother Nature's Protest");
+    assert(!!pr && pr.unter === "Laufzeit" && pr.text.includes(aus),
+      "Werkbank: Protest steht unter Laufzeit und sagt \"" + aus + "\"", { pr, aus });
+    // Passiv (3.1): Treffer statt Einsaetze, nie Hauptfach - auch mit dem meisten Schaden
+    const nLs = wbTr.filter((r) => r[1] === LS[0]).length;
+    const ls = await wbZeile("Blitzgeschwindigkeit|Lightning Speed");
+    const lsFach = await fp.evaluate(() => [...document.querySelectorAll("#findings .wbfach")].map((f) => f.querySelector("h3")?.textContent || "")
+      .filter((h) => /Blitzgeschwindigkeit/.test(h)));
+    assert(!!ls && ls.unter === "Passiv" && ls.n.includes(nLs + " Treffer") && !/Einsatz|Einsätze/.test(ls.n) && !lsFach.length,
+      "Werkbank: Passiv-Faehigkeit unter Passiv, sie zaehlt Treffer, nicht Einsaetze, und hat kein Fach", { ls, nLs, lsFach });
+    const ersteH = await fp.evaluate(() => { const h = document.querySelector("#findings .wbfach h3"); if (!h) return "";
+      const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); });
+    assert(ersteH === "Schnellfeuer", "Werkbank: das Hauptfach ist die staerkste Einsatz-Faehigkeit, nie die passive", ersteH);
+
+    // Zeigen auf ein Fach zeichnet seine Einsaetze als Kerben in den Kampfstreifen; Verlassen nimmt sie weg (6)
+    const kerben = () => fp.evaluate(() => document.querySelectorAll("#saeulen .wbkerbe").length);
+    const gezeigt = await versuch(() => fp.locator("#findings .wbfach").first().hover({ timeout: 2000 }));
+    await fp.waitForTimeout(150);
+    const kMit = await kerben();
+    await fp.mouse.move(2, 2);
+    await fp.waitForTimeout(150);
+    const kOhne = await kerben();
+    assert(gezeigt && kMit >= 1 && kOhne === 0, "Werkbank: Zeigen auf ein Fach zeichnet Kerben in den Streifen, Verlassen entfernt sie", { gezeigt, kMit, kOhne });
+    // dasselbe mit dem Fokus (Tastatur)
+    const fokussiert = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().focus({ timeout: 2000 }));
+    await fp.waitForTimeout(150);
+    const kFokus = await kerben();
+    await fp.evaluate(() => document.activeElement?.blur());
+    assert(fokussiert && kFokus >= 1, "Werkbank: Fokus auf ein Fach zeichnet ebenfalls Kerben", { fokussiert, kFokus });
+
+    // "Mehr zu ...": aria-expanded wechselt, der Fokus bleibt auf dem Knopf, die Region ist sichtbar (3.2, 6)
+    const aufKnopf = () => fp.evaluate(() => {
+      const a = document.activeElement, b = document.querySelector("#findings .wbfach .wbauf");
+      const id = b?.getAttribute("aria-controls") || "", r = id ? document.getElementById(id) : null;
+      return { text: (b?.textContent || "").trim(), exp: b?.getAttribute("aria-expanded") || "", id,
+        fokus: !!a && a.classList.contains("wbauf") && a.getAttribute("aria-controls") === id,
+        region: !!r && !r.hidden && r.getClientRects().length > 0 && r.getBoundingClientRect().height > 0,
+        // Spezifikation 6: die Region hat eine Ueberschrift - ein sichtbares h4 oder aria-labelledby auf sichtbaren Text
+        kopf: (() => {
+          if (!r) return "";
+          const h = [...r.querySelectorAll("h4")].find((x) => x.getClientRects().length && x.textContent.trim());
+          if (h) return h.textContent.trim();
+          const l = (r.getAttribute("aria-labelledby") || "").split(/\s+/).map((i) => i && document.getElementById(i))
+            .filter((x) => x && x.getClientRects().length && x.textContent.trim());
+          return l.map((x) => x.textContent.trim()).join(" ");
+        })() };
+    });
+    const zu0 = await aufKnopf();
+    assert(zu0.text === "Mehr zu Schnellfeuer" && zu0.exp === "false" && /-m$/.test(zu0.id) && !zu0.region,
+      "Mehr zu: der Knopf nennt die Faehigkeit, zu, mit aria-controls auf die Region", zu0);
+    const geklickt = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().focus({ timeout: 2000 }));
+    if (geklickt) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(450); }
+    const auf1 = await aufKnopf();
+    assert(geklickt && auf1.exp === "true" && auf1.fokus && auf1.region,
+      "Mehr zu: Enter klappt auf, aria-expanded true, der Fokus bleibt auf dem Knopf, die Region ist sichtbar", auf1);
+    assert(geklickt && auf1.region && auf1.kopf.length > 0,
+      "Mehr zu: die aufgeklappte Region hat eine Ueberschrift (h4 oder aria-labelledby)", auf1);
+    if (geklickt) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(450); }
+    const zu1 = await aufKnopf();
+    assert(geklickt && zu1.exp === "false" && zu1.fokus && !zu1.region,
+      "Mehr zu: noch einmal Enter klappt zu, der Fokus bleibt auf dem Knopf", zu1);
+
+    // Kein Rot und kein Gruen als Urteil (8.3): die Glut-Striche fuellen weder mit --pos noch mit --neg
+    for (const theme of THEMEN) {
+      await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+      await fp.waitForTimeout(150);
+      const fb = await fp.evaluate(() => {
+        const probe = (v) => { const s = document.createElement("span"); s.style.color = `var(${v})`; document.body.append(s);
+          const c = getComputedStyle(s).color; s.remove(); return c; };
+        const pos = probe("--pos"), neg = probe("--neg");
+        const h = [1, 2, 3].map((i) => probe("--h" + i));
+        const farbig = (f) => f && f !== "none" && !f.startsWith("url");
+        // Fuellung und Strich jedes Elements der Glut-Bilder (Striche koennen rect, line oder path sein)
+        const teile = [...document.querySelectorAll("#findings .wbglut :is(rect, circle, line, path)")]
+          .map((e) => { const s = getComputedStyle(e); return [s.fill, s.stroke].filter(farbig); }).filter((x) => x.length);
+        const alle = teile.flat();
+        return { pos, neg, n: teile.length, rotGruen: alle.filter((f) => f === pos || f === neg),
+          stufen: h.map((c) => teile.filter((x) => x.includes(c)).length), h };
+      });
+      assert(fb.n > 0 && fb.rotGruen.length === 0, `Werkbank, Thema ${theme}: die Glut nutzt weder --pos noch --neg`, fb);
+      /* #218 (3.3): der Kampf hat Schnellfeuer in allen Hitzestufen - je Stufe 1-3 mindestens ein Strich in
+         ihrer Farbe (--h1 stark, --h2 kritisch, --h3 kritisch stark), die drei Farben verschieden */
+      assert(fb.stufen.every((n) => n >= 1) && new Set(fb.h).size === 3,
+        `Werkbank, Thema ${theme}: Striche in jeder Hitzestufe 1 bis 3`, { stufen: fb.stufen, h: fb.h });
+    }
+    await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+
+    // 560 px und Kontrast in allen vier Themen (8.3)
+    await fp.setViewportSize({ width: 560, height: 900 });
+    await fp.waitForTimeout(300);
+    await themen([".wbsatz", ".wbname small", "#wbKenn dt", ".wbzeile .n small"], "Werkbank 560 px: Satz, Fachzeile, Kennzeile, Zeile", fp);
+    for (const theme of THEMEN) {
+      await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+      await fp.waitForTimeout(150);
+      const breit = await fp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+      assert(breit, `Werkbank 560 px, Thema ${theme}: kein waagerechtes Rollen`, breit);
+    }
+    await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+    await fp.setViewportSize({ width: 1280, height: 860 });
+    await fp.waitForTimeout(300);
+
+    // 2000 x 1480: keine leere Zelle in der Werkbank, kein Satz breiter als 75 Zeichen (2, 3.4, 8.3)
+    await fp.setViewportSize({ width: 2000, height: 1480 });
+    await fp.waitForTimeout(300);
+    const packung = () => fp.evaluate(() => {
+      const bank = document.querySelector("#findings .wbbank");
+      if (!bank || !bank.getClientRects().length) return null;
+      const b = bank.getBoundingClientRect(), cs = getComputedStyle(bank), px = (v) => parseFloat(v) || 0;
+      const L = b.left + px(cs.borderLeftWidth) + px(cs.paddingLeft), R = b.right - px(cs.borderRightWidth) - px(cs.paddingRight);
+      const O = b.top + px(cs.borderTopWidth) + px(cs.paddingTop), U = b.bottom - px(cs.borderBottomWidth) - px(cs.paddingBottom);
+      const kinder = [...bank.children].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect());
+      const flaeche = kinder.reduce((a, r) => a + r.width * r.height, 0);
+      const cg = px(cs.columnGap), rg = px(cs.rowGap);
+      /* die Fugen je Fach: liegt seine linke (obere) Kante nicht am Rand des Rasters, gehoert ihm eine
+         Fuge in seiner Hoehe (Breite), mit 2 px Toleranz */
+      const fugen = kinder.reduce((a, r) => a + (r.left > L + 1 ? (cg + 2) * r.height : 0) + (r.top > O + 1 ? (rg + 2) * r.width : 0), 0);
+      return { n: kinder.length, leer: Math.round((R - L) * (U - O) - flaeche), fugen: Math.round(fugen) };
+    });
+    let pk = await packung();
+    assert(!!pk && pk.n >= 2 && pk.leer >= -2 && pk.leer <= pk.fugen, "Werkbank 2000 x 1480: keine leere Zelle (geschlossen)", pk);
+    const aufgeklappt = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().click({ timeout: 2000 }));
+    await fp.waitForTimeout(450);
+    pk = await packung();
+    assert(aufgeklappt && !!pk && pk.n >= 2 && pk.leer >= -2 && pk.leer <= pk.fugen, "Werkbank 2000 x 1480: keine leere Zelle (Hauptfach offen)", pk);
+    if (aufgeklappt) { await versuch(() => fp.locator("#findings .wbfach .wbauf").first().click({ timeout: 2000 })); await fp.waitForTimeout(450); }
+    const saetze = await fp.evaluate(() => [...document.querySelectorAll("#findings .wbsatz")].filter((e) => e.getClientRects().length).map((e) => {
+      const m = document.createElement("span");
+      m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+      e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove();
+      return Math.round(e.getBoundingClientRect().width / ch * 10) / 10;
+    }));
+    assert(saetze.length > 0 && saetze.every((x) => x <= 75.5), "Werkbank 2000 x 1480: kein Satz breiter als 75 Zeichen", saetze);
+    await fp.setViewportSize({ width: 1280, height: 860 });
+    await fp.waitForTimeout(300);
+
+    // Protest ohne andere Treffer in der Luecke: das ist eine Luecke, kein "aus" (5.5)
+    const stummTr = werkbankTreffer(at(6, 22, 0), { stumm: true });
+    await fLoad(logFile("werkbank-stumm.txt", stummTr), "Fellinex");
+    await fTab("analysis");
+    pr = await wbZeile("Protest von Mutter Natur|Mother Nature's Protest");
+    assert(!!pr && pr.unter === "Laufzeit" && !/\d+[\s\u00a0]s aus\b/.test(pr.text),
+      "Werkbank: ohne fremde Treffer in der Luecke sagt Protest kein \"aus\"", pr);
+
+    // #269: Protest ist Laufzeit - die Rate zaehlt ihn nicht mit, die Gesamtzahl der Treffer schon
+    const wieStumm = await fp.evaluate(() => document.querySelector("#wbWie")?.innerText || "");
+    const basisStumm = /Gerechnet über (\S+) von (\S+) Treffern, ohne Laufzeit und Passiv\./.exec(wieStumm);
+    assert(/deiner direkten Treffer/.test(wieStumm) && !!basisStumm && basisStumm[1] !== basisStumm[2],
+      "#269: mit Laufzeit im Kampf nennt die Rate die direkten Treffer, weniger als alle", wieStumm);
+
+    // Fahnen (5.1, 6): Knopf mit aria-pressed, Enter schaltet, die Lesezeile bekommt den Satz, Escape hebt auf
+    const fahnen = () => fp.evaluate(() => {
+      const f = [...document.querySelectorAll("#verdict .wbfahne")], l = document.querySelector("#wbLese");
+      return { alle: f.map((x) => x.tagName + ":" + x.dataset.k + ":" + x.getAttribute("aria-pressed")),
+        lese: (l?.textContent || "").trim(), live: l?.getAttribute("aria-live") || "", weg: !!l?.querySelector("button.inrot") };
+    });
+    const fa0 = await fahnen();
+    assert(fa0.alle.length > 0 && fa0.alle.every((x) => /^BUTTON:[\w-]+:false$/.test(x)) && fa0.alle.some((x) => x.startsWith("BUTTON:luecken:")) &&
+      fa0.live === "polite" && fa0.lese === "",
+      "Fahnen: Knoepfe mit aria-pressed=false, eine fuer die Luecke, die Lesezeile aria-live=polite und leer", fa0);
+    const fahneFokus = await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }));
+    if (fahneFokus) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(200); }
+    const fa1 = await fahnen();
+    assert(fahneFokus && fa1.alle.some((x) => x === "BUTTON:luecken:true") && fa1.lese.length > 0 && fa1.weg,
+      "Fahnen: Enter schaltet die Fahne ein, die Lesezeile bekommt ihren Satz mit dem Weg in die Rotation", fa1);
+    const fahneZu = async () => {
+      if (await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }))) {
+        await fp.keyboard.press("Escape"); await fp.waitForTimeout(200);
+      }
+    };
+    if (fahneFokus) await fahneZu();
+    const fa2 = await fahnen();
+    assert(fahneFokus && fa2.alle.every((x) => x.endsWith(":false")) && fa2.lese === "",
+      "Fahnen: Escape setzt aria-pressed=false und leert die Lesezeile", fa2);
+    // Spezifikation 6: auch die Leertaste schaltet
+    const fahneLeer = await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }));
+    if (fahneLeer) { await fp.keyboard.press(" "); await fp.waitForTimeout(200); }
+    const fa3 = await fahnen();
+    assert(fahneLeer && fa3.alle.some((x) => x === "BUTTON:luecken:true") && fa3.lese.length > 0,
+      "Fahnen: die Leertaste schaltet die Fahne ebenso ein, die Lesezeile bekommt ihren Satz", fa3);
+    /* die Lesezeile in allen vier Themen lesbar (8.3), bei 560 px wie im Brief, solange sie einen Satz traegt:
+       erst je Thema pruefen, dass der Satz den Wechsel uebersteht, dann den Kontrast messen */
+    await fp.setViewportSize({ width: 560, height: 900 });
+    await fp.waitForTimeout(300);
+    for (const theme of THEMEN) {
+      await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+      await fp.waitForTimeout(150);
+      const l = (await fahnen()).lese;
+      assert(l.length > 0, `Fahnen 560 px, Thema ${theme}: die Lesezeile behaelt ihren Satz beim Themenwechsel`, l);
+    }
+    await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+    await themen(["#wbLese"], "Lesezeile der Fahne", fp);
+    // 2000 x 1480: der Satz unter dem Streifen und die Lesezeile (mit Satz) hoechstens 75 Zeichen breit
+    await fp.setViewportSize({ width: 2000, height: 1480 });
+    await fp.waitForTimeout(300);
+    const zeilenBreit = await fp.evaluate(() => {
+      const inCh = (e) => { if (!e || !e.getClientRects().length || !e.textContent.trim()) return -1; const m = document.createElement("span");
+        m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+        e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return Math.round(e.getBoundingClientRect().width / ch * 10) / 10; };
+      return { verdictText: inCh(document.querySelector("#verdictText")), lese: inCh(document.querySelector("#wbLese")) };
+    });
+    // #verdictText gemessen am Kampf mit Haelftensatz (oben, "haelften.txt"): dort steht er sicher, also > 0
+    assert(zeilenBreit.lese > 0 && zeilenBreit.lese <= 75.5 && formsatzBreit > 0 && formsatzBreit <= 75.5,
+      "Werkbank 2000 x 1480: #verdictText und die Lesezeile hoechstens 75 Zeichen breit", { ...zeilenBreit, formsatzBreit });
+    await fp.setViewportSize({ width: 1280, height: 860 });
+    await fp.waitForTimeout(300);
+    if (fahneLeer) await fahneZu();
+
+    /* #269: die Marke nennt die Dauer ("Luecke 5 s"), und Zeigen oder Fokus verbinden Befund, Marke und
+       Kurve. Gewartet wird auf den Zustand (data-zeig, .wbzeig), nie auf eine Zeit. */
+    {
+      const marken = () => fp.evaluate(() => [...document.querySelectorAll("#verdict .wbfahne")].filter((f) => /^luecke/.test(f.dataset.k)).map((f) => {
+        const b = document.querySelector(`#weitereListe .find[data-k="${f.dataset.k}"]${f.dataset.k === "luecke" ? `[data-von="${f.dataset.id.split("@")[1]}"]` : ""}`);
+        return { id: f.dataset.id, text: f.querySelector(".l")?.textContent, label: f.getAttribute("aria-label"), befund: b?.querySelector(".v")?.textContent || "" };
+      }));
+      const ms = await marken();
+      assert(ms.length > 0 && ms.every((m) => /^Lücke \d+\u00a0s$/.test(m.text) && m.label.startsWith(m.text + ", ") &&
+        m.befund.endsWith(" · " + m.text.slice("Lücke ".length))),
+        "#269: jede Luecken-Marke nennt ihre Dauer, dieselbe wie ihr Befund, auch im Namen fuer den Vorleser", ms);
+      const zeigZustand = () => fp.evaluate(() => {
+        const band = document.querySelector("#saeulen .wbzeig"), r = band && !band.hidden ? band.getBoundingClientRect() : null, box = document.querySelector("#saeulen").getBoundingClientRect();
+        const probe = document.createElement("i"); probe.style.color = "var(--gold)"; document.body.appendChild(probe);
+        const gold = getComputedStyle(probe).color; probe.remove();
+        return { band: !!r, links: r ? Math.round(r.left - box.left) : null, breit: r ? Math.round(r.width) : null, hoch: r ? Math.round(r.height) : null, boxH: Math.round(box.height),
+          drin: r ? r.left >= box.left - 1 && r.right <= box.right + 1 : null,
+          gold: !!band && (getComputedStyle(band).boxShadow + getComputedStyle(band).backgroundColor).includes(gold),
+          befund: [...document.querySelectorAll('#weitereListe .find[data-zeig="true"]')].map((e) => e.dataset.k + ":" + (e.dataset.von || "")),
+          fahne: [...document.querySelectorAll('#verdict .wbfahne[data-zeig="true"]')].map((e) => e.dataset.id),
+          gedrueckt: document.querySelectorAll('#verdict .wbfahne[aria-pressed="true"]').length };
+      });
+      const ruhig = () => fp.waitForFunction(() => !document.querySelector("#saeulen .wbzeig:not([hidden])") &&
+        !document.querySelector('#verdict [data-zeig="true"], #weitereListe [data-zeig="true"]'), null, { timeout: 5000 });
+      const an = (id) => fp.waitForFunction((i) => document.querySelector(`#verdict .wbfahne[data-id="${i}"][data-zeig="true"]`) &&
+        document.querySelector("#saeulen .wbzeig:not([hidden])"), id, { timeout: 5000 });
+      const erste = ms[0].id;
+      // Zeigen auf die Marke hebt Befund und Stelle der Kurve hervor, ohne zu waehlen
+      await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).hover();
+      await an(erste);
+      let z = await zeigZustand();
+      assert(z.band && z.befund.length === 1 && z.fahne.length === 1 && z.gedrueckt === 0 && !z.gold && z.drin && z.breit > 0 && z.hoch <= z.boxH + 1,
+        "#269: Zeigen auf die Marke hebt ihren Befund und die Stelle der Kurve hervor (ohne Gold, ohne Auswahl)", z);
+      await fp.mouse.move(2, 2);
+      await ruhig();
+      // Zeigen auf den Befund hebt Marke und Stelle hervor
+      await fp.locator(`#weitereListe .find[data-k="luecken"]`).hover();
+      await an(ms.find((m) => m.id === "luecken")?.id || erste);
+      z = await zeigZustand();
+      assert(z.band && z.befund.length === 1 && z.fahne.length === 1, "#269: Zeigen auf den Befund hebt seine Marke und die Stelle der Kurve hervor", z);
+      await fp.mouse.move(2, 2);
+      await ruhig();
+      // umgekehrt: Zeigen auf die Stelle der Kurve hebt Befund und Marke hervor
+      const mitte = await fp.evaluate(() => { const g = document.querySelector("#saeulen .gapz"); if (!g) return null; const r = g.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
+      if (mitte) {
+        await fp.mouse.move(mitte.x, mitte.y);
+        await fp.waitForFunction(() => document.querySelector("#saeulen .wbzeig:not([hidden])") && document.querySelector('#weitereListe .find[data-zeig="true"]'), null, { timeout: 5000 });
+        z = await zeigZustand();
+        assert(z.band && z.befund.length === 1 && z.fahne.length === 1 && z.gedrueckt === 0, "#269: Zeigen auf die Stelle der Kurve hebt Befund und Marke hervor", z);
+        await fp.mouse.move(2, 2);
+        await ruhig();
+      }
+      assert(!!mitte, "#269: die Kurve traegt eine Luecken-Zone zum Zeigen", mitte);
+      // Tastatur: der Fokus auf die Marke hebt hervor und der Vorleser bekommt es benannt; der Fokus weg nimmt es zurueck
+      // war die Marke schon im Fokus (vorige Proben), fuehrt focus() kein Ereignis aus: erst weg
+      await fp.evaluate(() => document.activeElement?.blur());
+      await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).focus();
+      await an(erste);
+      await fp.waitForFunction(() => /^Auf der Kurve hervorgehoben: Lücke \d+\u00a0s, \d+:\d\d–\d+:\d\d\.$/.test(document.querySelector("#wbZeigLese")?.textContent || ""), null, { timeout: 5000 });
+      const lese = await fp.evaluate(() => ({ text: document.querySelector("#wbZeigLese").textContent, live: document.querySelector("#wbZeigLese").getAttribute("aria-live") }));
+      assert(lese.live === "polite", "#269: die Meldung zur hervorgehobenen Stelle ist aria-live=polite", lese);
+      await fp.evaluate(() => document.activeElement?.blur());
+      await ruhig();
+      assert((await fp.evaluate(() => document.querySelector("#wbZeigLese").textContent)) === "", "#269: ohne Fokus ist die Meldung leer", null);
+      // vier Themen, 560 Punkt ohne waagerechtes Rollen, 2000 x 1480 nichts gestreckt
+      for (const [breite, hoehe] of [[560, 900], [2000, 1480], [1280, 860]]) {
+        await fp.setViewportSize({ width: breite, height: hoehe });
+        for (const theme of THEMEN) {
+          await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+          await fp.mouse.move(2, 2);
+          await ruhig();
+          await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).hover();
+          await an(erste);
+          z = await zeigZustand();
+          const breitOk = await fp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
+          assert(z.band && !z.gold && z.drin && z.hoch <= z.boxH + 1 && breitOk,
+            `#269: ${breite} x ${hoehe}, Thema ${theme}: die Stelle ist hervorgehoben, ohne Gold, nicht gestreckt, ohne waagerechtes Rollen`, { ...z, breitOk });
+        }
+      }
+      await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+      await fp.mouse.move(2, 2);
+    }
+
+    /* Werkbank fuellt die Flaeche (#270, 22.10.2026, Aufbau B): ein Kampf, in dem eine Faehigkeit fast
+       alles traegt (Schnellfeuer, 99 %), ein mittleres Fach (Detonierendes Mal, 1,5 %) und drei Weitere unter
+       0,8 % (Beschuss, Klingensturm, Agiler Schuss). Bei 2000 x 1480 (ab 1200 Punkt Hoehe) rueckt "Weitere
+       Faehigkeiten" als Zeilen in die rechte Spalte unter das mittlere Fach, bis die Spalte so hoch ist wie das
+       Hauptfach; darunter bleibt nichts leer. Bei 1440 x 900 und 560 Punkt steht alles wie vorher. */
+    {
+      const fStart = at(9, 22, 0), ftr = [];
+      for (let t = 300; t < 60000; t += 3000) { ftr.push([fStart + t, "Decisive Sniping", 964581976, 80000, false, "Fellinex"]); for (const ab of [1000, 1100]) for (const x of [0, 5, 10]) ftr.push([fStart + t + ab + x, "Decisive Sniping", 964581976, 80000, false, "Fellinex"]); }
+      for (let t = 0; t < 60000; t += 6000) ftr.push([fStart + t, DM[0], DM[1], 60000, false, "Fellinex"]);
+      for (let t = 0; t < 60000; t += 2000) ftr.push([fStart + t + 100, ST[0], ST[1], 2000, false, "Fellinex"]);
+      for (let t = 0; t < 60000; t += 5000) ftr.push([fStart + t + 200, BS[0], BS[1], 4000, false, "Fellinex"]);
+      ftr.push([fStart + 50000, AG[0], AG[1], 1000, false, "Fellinex"]);
+      await fLoad(logFile("werkbank-fuellt.txt", ftr), "Fellinex");
+      await fTab("analysis");
+      const fuell = () => fp.evaluate(() => {
+        const bank = document.querySelector("#findings .wbbank"), haupt = bank?.querySelector(".wbfach.haupt");
+        if (!bank || !haupt) return null;
+        const H = haupt.getBoundingClientRect(), sicht = (e) => e.getClientRects().length && !e.closest("[hidden]");
+        const rechts = [...bank.children].filter((e) => e !== haupt && sicht(e) && e.getBoundingClientRect().left >= H.right - 2 && e.getBoundingClientRect().top < H.bottom - 2);
+        // leer: vom tiefsten sichtbaren Inhalt eines Kastens bis zu seinem Boden (ohne Innenabstand)
+        const leer = rechts.map((e) => {
+          const r = e.getBoundingClientRect(), pb = parseFloat(getComputedStyle(e).paddingBottom) || 0;
+          let u = r.top;
+          for (const d of e.querySelectorAll("*")) { const b = d.getBoundingClientRect(); if (b.height && sicht(d)) u = Math.max(u, b.bottom); }
+          return Math.round(r.bottom - pb - u);
+        });
+        const rest = bank.querySelector(".wbrest"), zeilen = [...bank.querySelectorAll(".wbzeile")].filter(sicht);
+        const erstes = bank.querySelector(".wbgruppe:not(.wbrest)");
+        const kopf = rest ? document.getElementById(rest.getAttribute("aria-labelledby") || "") : null;
+        return { rechts: rechts.length, leer, maxLeer: leer.length ? Math.max(...leer) : null, hauptH: Math.round(H.height),
+          rest: !!rest, restZeilen: rest ? [...rest.querySelectorAll(".wbzeile")].map((z) => z.dataset.n) : [],
+          alleZeilen: zeilen.map((z) => z.dataset.n), hoechsteZeile: Math.max(0, ...zeilen.map((z) => Math.round(z.getBoundingClientRect().height))),
+          restVorGruppen: !!rest && !!erstes && !!(rest.compareDocumentPosition(erstes) & Node.DOCUMENT_POSITION_FOLLOWING),
+          restNachFaechern: !!rest && [...bank.querySelectorAll(".wbfach")].every((f) => !!(f.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING)),
+          kopf: kopf ? kopf.textContent.trim() : "", knoepfe: rest ? [...rest.querySelectorAll(".wbzeile")].every((z) => z.tagName === "BUTTON") : false,
+          weitereUnten: [...document.querySelectorAll("#findings .wbgruppe:not(.wbrest)")].filter(sicht).map((g) => g.querySelector("h3")?.textContent.trim()),
+          breit: document.documentElement.scrollWidth <= window.innerWidth + 1 };
+      });
+      await fp.setViewportSize({ width: 2000, height: 1480 });
+      await fp.waitForFunction(() => document.documentElement.classList.contains("h-min-1200") && !!document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
+      let fz = await fuell();
+      assert(!!fz && fz.rest && fz.restZeilen.length >= 1, "Werkbank #270, 2000 x 1480: Weitere Faehigkeiten rueckt als Zeilen in die rechte Spalte", fz);
+      assert(!!fz && fz.maxLeer !== null && fz.maxLeer <= 60, "Werkbank #270, 2000 x 1480: rechts neben dem Hauptfach bleibt hoechstens eine Zeile leer", fz);
+      assert(!!fz && fz.hoechsteZeile <= 44, "Werkbank #270, 2000 x 1480: jede Zeile hoechstens 44 Punkt hoch (nie gestreckt)", fz);
+      assert(!!fz && new Set(fz.alleZeilen).size === fz.alleZeilen.length && fz.alleZeilen.length === 3,
+        "Werkbank #270, 2000 x 1480: jede der drei Weiteren steht genau einmal (keine doppelt, keine verloren)", fz);
+      assert(!!fz && fz.restVorGruppen && fz.restNachFaechern && fz.knoepfe && fz.kopf === "Weitere Fähigkeiten",
+        "Werkbank #270, 2000 x 1480: die Zeilen stehen in der Lesefolge vor den Gruppen, sind Knoepfe, die Gruppe hat ihre Ueberschrift", fz);
+      // Tastatur: nach dem letzten Knopf des mittleren Fachs kommt die erste Zeile der rechten Spalte
+      const tab1 = await versuch(() => fp.locator("#findings .wbfach.mittel .wbauf").last().focus({ timeout: 2000 }));
+      if (tab1) await fp.keyboard.press("Tab");
+      const fokusRest = await fp.evaluate(() => !!document.activeElement?.closest(".wbrest") && document.activeElement.classList.contains("wbzeile"));
+      assert(tab1 && fokusRest, "Werkbank #270: Tab geht vom mittleren Fach in die Zeilen der rechten Spalte", { tab1, fokusRest });
+      await fp.evaluate(() => document.activeElement?.blur());
+      // vier Themen: kein waagerechtes Rollen, nichts gestreckt, Kontrast der Zeilen
+      for (const theme of THEMEN) {
+        await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
+        await fp.waitForFunction((th) => document.documentElement.dataset.theme === th, theme, { timeout: 5000 });
+        const f2 = await fuell();
+        assert(!!f2 && f2.rest && f2.breit && f2.hoechsteZeile <= 44 && f2.maxLeer <= 60, `Werkbank #270, 2000 x 1480, Thema ${theme}: gefuellt, ohne waagerechtes Rollen, nichts gestreckt`, f2);
+      }
+      await themen([".wbrest .wbzeile .n small", ".wbrest .wbzeile .nn", ".wbrest > h3"], "Werkbank #270 2000 x 1480: Zeile, Name, Ueberschrift", fp);
+      // 1440 x 900: wie vorher, nichts rueckt auf
+      await fp.setViewportSize({ width: 1440, height: 900 });
+      await fp.waitForFunction(() => !document.documentElement.classList.contains("h-min-1200") && !document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
+      fz = await fuell();
+      assert(!!fz && !fz.rest && fz.weitereUnten.includes("Weitere Fähigkeiten") && fz.alleZeilen.length === 3,
+        "Werkbank #270, 1440 x 900: unveraendert, Weitere Faehigkeiten steht unten", fz);
+      // 560 Punkt: untereinander, nichts verschoben, kein waagerechtes Rollen
+      await fp.setViewportSize({ width: 560, height: 900 });
+      await fp.waitForFunction(() => !document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
+      fz = await fuell();
+      assert(!!fz && !fz.rest && fz.breit && fz.weitereUnten.includes("Weitere Fähigkeiten"), "Werkbank #270, 560 Punkt: unveraendert und ohne waagerechtes Rollen", fz);
+      // zurueck auf gross: die Zeilen ruecken wieder auf (nach dem Wechsel der Fenstergroesse)
+      await fp.setViewportSize({ width: 2000, height: 1480 });
+      await fp.waitForFunction(() => !!document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
+      fz = await fuell();
+      assert(!!fz && fz.rest && fz.maxLeer <= 60, "Werkbank #270: nach dem Wechsel zurueck auf 2000 x 1480 ruecken die Zeilen wieder auf", fz);
+      await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
+      await fp.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5000 });
+      await fp.setViewportSize({ width: 1280, height: 860 });
+      await fp.waitForFunction(() => window.innerWidth === 1280, null, { timeout: 5000 });
+    }
+
+    /* Werkbank-Zeilen sagen, was auffaellt (#270, Stufe 2): drei mittlere Faecher (Detonierendes Mal, Beschuss,
+       Klingensturm) und als vierte Faehigkeit mit Gewicht (3 %) der Agile Schuss in "Weitere Faehigkeiten". Er
+       fehlt von 0:20 bis 0:45 (25 s bei einem Takt von 5 s): eine Pause, die nur ihm gehoert, solange die
+       anderen weitertreffen. Fehlen auch die anderen (eine Luecke des ganzen Kampfes), ist es keine Pause. Dazu
+       die Legende ueber den Zeilen (Satz, vier Hitzestufen, Pause), die Achse mit Beginn und Ende, Hinweise
+       je Strich und eine gemeinsame Zeitachse: alle Striche einer Gruppe beginnen bei derselben Stelle. */
+    {
+      const pStart = at(9, 23, 0);
+      const pauseLog = (name, { luecke = false } = {}) => {
+        const tr = [], still = (t) => luecke && t > 20000 && t < 45000;
+        for (let t = 0; t < 60000; t += 700) if (!still(t)) tr.push([pStart + t, QF[0], QF[1], 10000, false, "Fellinex"]);
+        for (let t = 0; t < 60000; t += 6000) if (!still(t)) tr.push([pStart + t, DM[0], DM[1], 30000, false, "Fellinex"]);
+        for (let t = 0; t < 60000; t += 2000) if (!still(t)) tr.push([pStart + t + 100, ST[0], ST[1], 15000, false, "Fellinex"]);
+        for (let t = 0; t < 60000; t += 5000) if (!still(t)) tr.push([pStart + t + 200, BS[0], BS[1], 20000, false, "Fellinex"]);
+        for (let t = 0; t < 60000; t += 5000) if (t <= 20000 || t >= 45000) tr.push([pStart + t + 300, AG[0], AG[1], 8000, false, "Fellinex"]);
+        return logFile(name, tr);
+      };
+      const zeilen = () => fp.evaluate(() => {
+        const sicht = (e) => e.getClientRects().length && !e.closest("[hidden]");
+        const z = [...document.querySelectorAll("#findings .wbzeile")].filter(sicht).map((b) => {
+          const s = b.querySelector(".wbstrich");
+          return { n: b.dataset.n, satz: b.querySelector(".n small")?.textContent || "", befund: b.classList.contains("befund"),
+            schraffur: !!s?.querySelector("pattern"), titel: [...(s?.querySelectorAll("rect > title") || [])].map((x) => x.textContent),
+            links: Math.round(s?.getBoundingClientRect().left || 0), rechts: Math.round(s?.getBoundingClientRect().right || 0),
+            hoch: Math.round(b.getBoundingClientRect().height), gruppe: b.closest(".wbgruppe")?.querySelector("h3")?.textContent || "" };
+        });
+        const kopf = [...document.querySelectorAll("#findings .wbzkopf")].filter(sicht).map((k) => ({
+          satz: k.querySelector(".wbzleg")?.textContent || "", stufen: k.querySelectorAll(".wbsw i").length, pause: k.querySelector(".wbsw span:last-child")?.textContent || "",
+          achse: k.querySelectorAll(".ach, .wbkopf2").length }));
+        return { z, kopf };
+      });
+      await fp.setViewportSize({ width: 2000, height: 1480 });
+      await fLoad(pauseLog("werkbank-pause.txt"), "Fellinex");
+      await fTab("analysis");
+      let zs = await zeilen();
+      const ag = zs.z.find((x) => x.n === "Agile Shot");
+      assert(!!ag && ag.satz === "Pause 0:20–0:45 (25 s), sonst alle 5,0 s" && ag.befund,
+        "Werkbank-Zeile #270: Agiler Schuss nennt seine Pause 0:20–0:45 und ist ein Befund", ag);
+      assert(!!ag && ag.schraffur && ag.titel.length >= 3 && ag.titel[0] === ag.satz && ag.titel.slice(1).every((x) => /^[0-9]+:[0-9][0-9] · [^ ]+ · [^ ]+/.test(x)),
+        "Werkbank-Zeile #270: die Pause ist im Strich schraffiert, jeder Strich hat seinen Hinweis (Zeit, Schaden, Hitze)", ag);
+      assert(zs.z.length >= 1 && zs.z.every((x) => x.hoch <= 44 && x.satz.length > 0),
+        "Werkbank-Zeile #270: jede Zeile hat einen Satz und ist hoechstens 44 Punkt hoch", zs.z);
+      assert(zs.z.filter((x) => x.befund).length === 1, "Werkbank-Zeile #270: ohne Abweichung kein Befund (genau eine Zeile mit Befund)", zs.z);
+      for (const g of [...new Set(zs.z.map((x) => x.gruppe))]) {
+        const in_ = zs.z.filter((x) => x.gruppe === g);
+        assert(new Set(in_.map((x) => x.links)).size === 1 && new Set(in_.map((x) => x.rechts)).size === 1,
+          `Werkbank-Zeile #270: alle Striche der Gruppe "${g}" beginnen und enden an derselben Stelle (eine Zeitachse)`, in_);
+      }
+      assert(zs.kopf.length >= 1 && zs.kopf.every((k) => k.satz === "Strich = Einsatz, Höhe = Schaden; ohne Strich kein Einsatz." && k.stufen === 1 && k.pause === "auffällige Pause" && k.achse === 0),
+        "Werkbank-Zeile #270: die Legende nennt in einem Satz, was ein Strich ist und warum manchmal keiner steht, dazu die Pause (eine Zeile, keine Achse)", zs.kopf);
+      // die Legende kostet keine Hoehe: bei einer Gruppe ab 760 Punkt steht sie in der Zeile der Ueberschrift
+      const kopfZeile = await fp.evaluate(() => { const g = [...document.querySelectorAll("#findings .wbgruppe")].find((x) => x.querySelector(":scope > .wbzkopf") && x.getClientRects().length);
+        if (!g) return null; const h = g.querySelector(":scope > h3").getBoundingClientRect(), k = g.querySelector(":scope > .wbzkopf").getBoundingClientRect();
+        return { breit: Math.round(g.getBoundingClientRect().width), gleicheZeile: Math.abs((h.top + h.bottom) / 2 - (k.top + k.bottom) / 2) < 12, kopfH: Math.round(k.height) }; });
+      assert(!!kopfZeile && (kopfZeile.breit < 760 || kopfZeile.gleicheZeile), "Werkbank-Zeile #270: ab 760 Punkt Gruppenbreite steht die Legende in der Zeile der Ueberschrift", kopfZeile);
+      // dieselbe Pause in einer Luecke des ganzen Kampfes: keine Pause, keine Schraffur
+      await fLoad(pauseLog("werkbank-pause-luecke.txt", { luecke: true }), "Fellinex");
+      await fTab("analysis");
+      zs = await zeilen();
+      const ag2 = zs.z.find((x) => x.n === "Agile Shot");
+      assert(!!ag2 && !ag2.befund && !ag2.schraffur && /^\d+ Einsätze, alle /.test(ag2.satz),
+        "Werkbank-Zeile #270: fehlt in der Pause auch alles andere (Luecke des Kampfes), ist es kein Befund", ag2);
+      // 560 Punkt: nichts rollt waagerecht, die Zeilen bleiben hoechstens 44 Punkt
+      await fp.setViewportSize({ width: 560, height: 900 });
+      await fp.waitForFunction(() => document.documentElement.classList.contains("w-max-560"), null, { timeout: 5000 }).catch(() => {});
+      const schmal = await fp.evaluate(() => ({ breit: document.documentElement.scrollWidth <= window.innerWidth + 1,
+        hoch: Math.max(0, ...[...document.querySelectorAll("#findings .wbzeile")].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().height))) }));
+      assert(schmal.breit && schmal.hoch > 0 && schmal.hoch <= 44, "Werkbank-Zeile #270, 560 Punkt: kein waagerechtes Rollen, Zeilen hoechstens 44 Punkt", schmal);
+      // vier Themen: der Satz der Zeile und die Legende halten den Kontrast
+      await fp.setViewportSize({ width: 2000, height: 1480 });
+      await fLoad(pauseLog("werkbank-pause.txt"), "Fellinex");
+      await fTab("analysis");
+      await themen([".wbzeile .n small", ".wbzleg"], "Werkbank-Zeile #270: Satz, Legende", fp);
+      await fp.setViewportSize({ width: 1280, height: 860 });
+      await fp.waitForFunction(() => window.innerWidth === 1280, null, { timeout: 5000 });
+    }
+
+    /* Ventius mit wechselnden Salven (3.3, 8.3): jede dritte Salve nur eine Welle zu drei, die anderen zwei.
+       Der Bestwert des Kampfes (ventiusMix().top) ist 2: je Saeule so viele gefuellte Perlen wie Nachbeben,
+       die fehlenden bis 2 leer. */
+    const DS = ["Decisive Sniping", 964581976], vStart = at(7, 22, 0), vTr = [], vWellen = [];
+    for (let t = 300, i = 0; t < 60000; t += 3000, i++) {
+      const w = i % 3 === 2 ? 1 : 2;
+      vTr.push([vStart + t, DS[0], DS[1], 80000, false, "Fellinex"]);
+      for (const ab of [1000, 1100].slice(0, w)) for (const x of [0, 5, 10]) vTr.push([vStart + t + ab + x, DS[0], DS[1], 80000, false, "Fellinex"]);
+      vWellen.push(w);
+    }
+    for (let t = 700; t < 60000; t += 1000) vTr.push([vStart + t, ST[0], ST[1], 20000, false, "Fellinex"]);
+    await fLoad(logFile("salven-mix.txt", vTr), "Fellinex");
+    await fTab("analysis");
+    const vSaeulen = await fp.evaluate(() => {
+      const spalten = new Map();
+      for (const e of document.querySelectorAll('#findings .vfeld svg [data-welle]')) {
+        const r = e.getBoundingClientRect(), x = Math.round((r.left + r.width / 2) * 2) / 2;
+        const s = spalten.get(x) || { voll: 0, leer: 0 }; spalten.set(x, s);
+        if (e.getAttribute("data-welle") === "1") s.voll++; else s.leer++;
+      }
+      return [...spalten.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => s.voll + "/" + s.leer);
+    });
+    const vSoll = vWellen.map((w) => w + "/" + (2 - w));
+    assert(JSON.stringify(vSaeulen) === JSON.stringify(vSoll),
+      "Ventius: gefuellte Perlen je Saeule gleich den Nachbeben, leere bis zum Bestwert", { ist: vSaeulen, soll: vSoll });
+    // #270: Achse unter den Perlen (Beginn, Ende), Legende statt der Leserichtung
+    const vVorher = fp.viewportSize();
+    await fp.setViewportSize({ width: 2000, height: 1480 });
+    await fp.waitForFunction(() => window.innerWidth === 2000, null, { timeout: 5000 });
+    const vBeschrift = await fp.evaluate(() => {
+      const f = document.querySelector("#findings .vfeld");
+      const a = f?.querySelector(".vachse");
+      return { zeit: a?.querySelector(".vzeit")?.textContent || "", lese: a?.querySelector(".wbachse")?.textContent || "", leg: [...(a?.querySelectorAll(".perlleg > span") || [])].map((x) => x.textContent), hoch: Math.round(a?.getBoundingClientRect().height || 0) };
+    });
+    assert(/^0:00 – [0-9]+:[0-9][0-9]$/.test(vBeschrift.zeit) && vBeschrift.lese === "Von links nach rechts in Einsatzreihenfolge." && vBeschrift.leg.length === 4 && vBeschrift.hoch > 0 && vBeschrift.hoch <= 24,
+      "Ventius #270, 2000 x 1480: unter den Perlen eine Zeile mit Zeitraum, Leserichtung und vier Eintraegen der Legende", vBeschrift);
+    await fp.setViewportSize(vVorher);
+    await fp.waitForFunction((w) => window.innerWidth === w, vVorher.width, { timeout: 5000 });
+
+    /* Ruling 19 (Fix-Runde 3 von Task 9): am Beispielkampf hat jede Zeile der Werkbank ihren Strich
+       (mindestens 80 Punkt) und ist hoechstens 44 Punkt hoch - bei 2000 x 1480, 1300 und 1100 Punkt Breite */
+    await fp.evaluate(() => document.querySelector("#btnSample")?.click());
+    await fp.waitForFunction(() => /Ramux/.test(document.querySelector("#hName")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
+    await fTab("analysis");
+    const zeilenMass = () => fp.evaluate(() => ({
+      striche: [...document.querySelectorAll("#findings .wbstrich")].map((e) => Math.round(e.getBoundingClientRect().width * 10) / 10),
+      hoehen: [...document.querySelectorAll("#findings .wbzeile")].map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10),
+      // der Inhalt passt in die Zeile: gekappter Inhalt (max-height) zeigte sich nur hier
+      ueber: [...document.querySelectorAll("#findings .wbzeile")].map((e) => ({ n: e.dataset.n, s: e.scrollHeight, c: e.clientHeight }))
+        .filter((x) => x.s > x.c + 1),
+    }));
+    for (const [breite, hoehe] of [[2000, 1480], [1300, 860], [1100, 860]]) {
+      await fp.setViewportSize({ width: breite, height: hoehe });
+      await fp.waitForTimeout(400);
+      const zm = await zeilenMass();
+      assert(zm.striche.length > 0 && zm.striche.every((w) => w >= 80),
+        `Werkbank ${breite} x ${hoehe}, Beispielkampf: jeder Strich einer Zeile mindestens 80 Punkt breit`, zm.striche);
+      assert(zm.hoehen.length > 0 && zm.hoehen.every((h) => h <= 44.5),
+        `Werkbank ${breite} x ${hoehe}, Beispielkampf: jede Zeile hoechstens 44 Punkt hoch`, zm.hoehen);
+      assert(zm.hoehen.length > 0 && zm.ueber.length === 0,
+        `Werkbank ${breite} x ${hoehe}, Beispielkampf: der Inhalt jeder Zeile passt hinein (scrollHeight <= clientHeight + 1)`, zm.ueber);
+    }
+    await fp.setViewportSize({ width: 1280, height: 860 });
+    await fp.waitForTimeout(300);
+
     assert(!fErrors.length, "Feinschliff: keine Fehler in der Seite", fErrors);
     await fp.close();
   }
+
+  /* #236: das Layout der Analyse bei jeder Zoomstufe und vier Fenstergroessen, ruhig und mit gedrueckter Fahne */
+  await layoutProbe(browser, dist, assert);
 } finally {
   await browser.close();
   rmSync(work, { recursive: true, force: true });

@@ -197,7 +197,7 @@ async function schriften(){
   try{
     await Promise.all([f.load("400 22px " + cssv("--display")), f.load("400 13px " + cssv("--sans")),
                        f.load("600 13px " + cssv("--sans")), f.load("400 34px " + cssv("--hero-font")),
-                       // die Palatino ist eine Systemschrift; geladen wird sie, damit sie steht, bevor gemalt wird
+                       // --serif ist jetzt Source Sans 3 (eingebettet); geladen wird sie, damit sie steht, bevor gemalt wird
                        f.load("400 13px " + cssv("--serif"))]);
   }catch{ /* eine Schrift fehlt: die Leinwand nimmt die naechste der Kette */ }
 }
@@ -231,7 +231,7 @@ export async function zeichne(inh: BildInhalt): Promise<HTMLCanvasElement> {
   ctx.fillStyle = cssv("--gold-ink");
   ctx.fillRect(RAND, RAND - 10, 28, 2);
   let y = RAND + 12;
-  // die Marke: BOROMETER, der Satz davor, und der Name des Spiels in der Palatino
+  // die Marke: BOROMETER, der Satz davor, und der Name des Spiels in der Textschrift
   ctx.font = "400 12px " + display;
   ctx.fillStyle = cssv("--gold-ink");
   ctx.fillText("BOROMETER", RAND, y);

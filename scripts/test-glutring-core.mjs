@@ -91,6 +91,14 @@ const OBEN = -Math.PI / 2;
   eq(core.ringMass(300, 300, false), { d: 280, schrift: false }, "nie kleiner als 280");
   eq(core.ringMass(296, Infinity, true), { d: 280, schrift: false }, "gestapelt schmal: 280");
 }
+// --- 5b. Breite des Lochs im Abstand von der Mitte (#335)
+{
+  eq(core.sehne(100, 0, 6), 188, "auf der Hoehe der Mitte: Durchmesser minus Rand beidseits");
+  eq(Math.round(core.sehne(100, 60, 6)), 145, "weiter unten schmaler (Radius 94, Abstand 60)");
+  eq(core.sehne(100, 94, 6), 0, "auf dem Rand des Lochs: keine Breite");
+  eq(core.sehne(100, 150, 6), 0, "ausserhalb: nie negativ, nie NaN");
+  eq(core.sehne(100, -60, 6), core.sehne(100, 60, 6), "oben wie unten");
+}
 // --- 6. Trefferarten (Spezifikation 4; E 5)
 {
   const tr = [

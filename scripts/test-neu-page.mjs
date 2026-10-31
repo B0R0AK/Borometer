@@ -22,8 +22,9 @@
 // Abschnitt 4: Analyse (Luecken 4) - Urteil in der Form des Entwurfs mit der
 // Leerzeit nach dem Median als einem Kandidaten, "Weitere Befunde" als Zeile
 // darunter, Form des Kampfes als Saeulen je Sekunde mit Luecken, gestricheltem
-// Median und der Definition als Satz, die drei Felder, der Ventius-Kasten mit
-// "je Boss", der Fuss "Was das Log nicht weiss"; grosse Fenster nutzen die Hoehe.
+// Median und der Definition als Satz, die drei Felder, der Ventius-Kasten (seine
+// Tabelle "je Boss" steht seit #218 Etappe 3 in den Rekorden, Abschnitt "Auge von
+// Ventius"), der Fuss "Was das Log nicht weiss"; grosse Fenster nutzen die Hoehe.
 // Abschnitt 5: Vergleich (Luecken 5) - Umschalter Bester Pull / Letzter Pull im Kopf
 // (letzter gesperrt mit Grund), zwei grosse Zahlen, der Satz mit der Summe, alle Faehigkeiten
 // mit "nur in diesem / nur im besten", neutral gegen den besten Pull (DECISION 5.6), Rot und
@@ -43,7 +44,7 @@
 // Verzeichnis der gelesenen Dateien (jede Zeile ein Knopf seit Nachtraege N3), ohne Ordner die Einrichtung als leises Feld
 // (DECISION 1.12); Weeklies mit Kopf, leer und ohne Skelettzeilen.
 // Abschnitt 10: Einstellungen (Luecken 10) - eine rollende Seite mit Sprungleiste (Klick springt, beim Rollen
-// leuchtet der Abschnitt mit), acht Abschnitte, Themen als Kacheln mit Auto, Bewegung verringern nur als Anzeige
+// leuchtet der Abschnitt mit), neun Abschnitte, Themen als Kacheln mit Auto, Bewegung verringern nur als Anzeige
 // (DECISION 10.4), Overlay, Log-Ordner mit Filter und Kampfdatei, Gruppe und Server (Speichern nur hier), Entwickler
 // mit Beispielen und Auszug aus dem Aenderungsprotokoll, Info mit Sicherheit (DECISION 10.12); kein neuer Schluessel.
 // Abschnitt 11: Overlay im Kompakt (Luecken 11.2 bis 11.7, DECISION 11.1/11.4/11.6) - randloser Streifen mit Top 5,
@@ -105,11 +106,11 @@ const RAIL = JSON.parse(readFileSync(join(root, "scripts/fixtures/entwurf-rail.j
 /* Die zwei Kern-Symbole des Entwurfs sind Questlog-Grafik und gehen nicht
    hinaus; festgehalten ist nur der SHA-256 ihrer Base64-Daten (ohne Kopf). */
 const KERNE_SHA = {
-  "Blade Storm": "e5ee9b28fa53c1b24be7c7ed4d383c17c58d3302d7ee60c6b4d40c0a27c48c21",
-  "Silver Reaper's Soul Harvest": "b43363fd9afcb763803a8319c6172a739e67a60048d2828c6a844d0656e00ce0",
+  "Blade Storm": "6b2ef160dc0eb05e4b3862e6e282595f82c159d1e7224b1121fe5195cd5db573",
+  "Silver Reaper's Soul Harvest": "91588fabb93f266573f38ce65b20ff45402150b16bf07a51f34115c1230040e1",
 };
 const SYMBOL_VON = { timeline: "kampf", rotation: "rotation", analysis: "analyse", compare: "vergleich", history: "verlauf",
-  party: "gruppe", weeklies: "weeklies", gilde: "gilde", rekorde: "rekorde", start: "start", settings: "einstellungen" };
+  party: "gruppe", weeklies: "weeklies", gilde: "gilde", rekorde: "rekorde", archiv: "archiv", start: "start", settings: "einstellungen" };
 /* Das Wappen der Gilde (Spezifikation Gilde 5; Entscheidung 07.10.2026, statt der drei Koepfe): ein eigenes Symbol im Stil
    der Leiste, der Funke im oberen Feld ist der Akzent; festgehalten wie gebaut, gleich streng gefragt wie die anderen. */
 const RAIL_GILDE = '<svg viewBox="0 0 24 24"><path d="M12 2.6l7.6 2.7v5.6c0 4.8-3.2 8.6-7.6 10.4-4.4-1.8-7.6-5.6-7.6-10.4V5.3z"/><path d="M4.4 11.4h15.2"/><path d="M8.6 14.4l3.4 2.6 3.4-2.6"/>'
@@ -121,6 +122,10 @@ RAIL.rekorde = '<svg viewBox="0 0 24 24"><path d="M7 3.6h10v5a5 5 0 0 1-10 0z"/>
   + '<path d="M12 13.6v3.2"/><path d="M8.6 20.4h6.8l-.9-3.6H9.5z"/>'
   + '<path d="M12 5.5l.8 1.7 1.7.8-1.7.8-.8 1.7-.8-1.7-1.7-.8 1.7-.8z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)" stroke-width="1"/></svg>';
 RAIL.gilde = RAIL_GILDE;
+/* Die Truhe des Archivs (Spezifikation Log-Archiv 7, #264): Deckel, Kasten, Band, die Schliesse unter der Kerbe ist der
+   Akzent; festgehalten wie gebaut, gleich streng gefragt wie die anderen. */
+RAIL.archiv = '<svg viewBox="0 0 24 24"><path d="M3.6 10.2V8.4a4 4 0 0 1 4-4h8.8a4 4 0 0 1 4 4v1.8"/><rect x="3.6" y="10.2" width="16.8" height="9.8" rx="1.4"/>'
+  + '<path d="M3.6 14.6h6.2M14.2 14.6h6.2"/><path d="M10.2 10.2v3.4a1.8 1.8 0 0 0 3.6 0v-3.4z" fill="var(--acc, #E8A33D)" stroke="var(--acc, #E8A33D)"/></svg>';
 // der Inhalt eines Symbols ohne Leerraum, zum Vergleich Element fuer Element
 // (selbstschliessende Elemente wie im Entwurf, ausgeschrieben wie im DOM)
 const innen = (svg) => svg.replace(/^<svg[^>]*>/, "").replace(/<\/svg>\s*$/, "")
@@ -210,7 +215,7 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
     /* folgt Spezifikation Rundgang 02.10.2026: ein erster Start der App zeigt den
        Rundgang. Diese Proben gelten der App danach; den Rundgang selbst prueft
        test-rundgang-page.mjs. Eine eigene config kann es ueberschreiben. */
-    if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, ...config });
+    if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, bereichHinweise: false, ...config });
     if (path === "/api/config") { s.posts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
     /* Durchklick wie window.ts: die Antwort nennt den neuen Stand (Abschnitt 11) */
     if (path === "/api/win") { const b = JSON.parse(req.postData() || "{}"); s.win.push(b); return json({ ok: true, max: false, w: b.do === "resize" ? b.w : 400, h: b.do === "resize" ? b.h : 28, on_top: b.do === "pin" ? !!b.on : false,
@@ -344,7 +349,13 @@ const ANA = (() => {
   const gesamt = [...je.values()].reduce((a, b) => a + b, 0);
   const reihe = [...je.entries()].sort((a, b) => b[1] - a[1]);
   const art = (kr, st) => tr.filter((x) => !!x[4] === kr && !!x[5] === st).length;
+  /* #269: die Krit-Rate der direkten Treffer laesst Faehigkeiten weg, die ueber 20 Treffer nie kritisch trafen (hier
+     Decisive Sniping); alle drei Faehigkeiten sind Einsaetze, nichts ist Laufzeit oder Passiv */
+  const jeSk = new Map();
+  for (const x of tr) { const e = jeSk.get(x[1]) || [0, 0]; e[0]++; e[1] += x[4] ? 1 : 0; jeSk.set(x[1], e); }
+  const nie = [...jeSk.values()].filter(([h, c]) => c === 0 && h >= 20), nieTreffer = nie.reduce((a, [h]) => a + h, 0);
   return { T, sek, med, max: Math.max(...sek), gesamt, reihe, hits: tr.length,
+    kritDirekt: tr.filter((x) => x[4]).length / (tr.length - nieTreffer), nieZahl: nie.length,
     krit: tr.filter((x) => x[4]).length, stark: tr.filter((x) => x[5]).length,
     arten: { normal: art(false, false), crit: art(true, false), heavy: art(false, true), critheavy: art(true, true) } };
 })();
@@ -417,7 +428,7 @@ try {
     assert(g.stage && g.radius === "12px" && Math.abs(g.stage.left - g.leiste.right - 8) < 1 && Math.abs(g.innen - g.stage.right - 8) < 1,
       "0.1 der Inhalt ist eine Flaeche mit 12 Punkt Rundung und 8 Punkt Luft", g);
     assert(g.sb && Math.abs(g.sb.height - 26) < 0.5 && Math.abs(g.sb.bottom - g.hoch) < 1, "0.1 Statusleiste 26 Punkt am unteren Rand", g.sb);
-    assert(g.mark === "BOROMETER" && g.markBild === 0 && /Archivo/.test(g.markDisplay), "0.3 Wortmarke: BOROMETER als Text links, ohne Bild", g);
+    assert(g.mark === "BOROMETER" && g.markBild === 0 && /Anton/.test(g.markDisplay), "0.3 Wortmarke: BOROMETER als Text links, ohne Bild", g);
     assert(g.hive && g.ersterKnopf && g.hive.bottom <= g.ersterKnopf.top && g.hiveAlt === "The Hive", "0.3 HIVE oben in der Symbolleiste", g);
     assert(g.spalten === 2, "keine Kampfliste links: neben der Symbolleiste steht nur der Inhalt", g.spalten);
     const liste = await p.evaluate(() => ({ imFeld: !!document.querySelector("#kampfwahl #fightList"),
@@ -944,8 +955,8 @@ try {
       }; });
       assert(PUPPE.length > 1000 && kw.n === 2 && kw.zeilen.length === 2 && kw.zeilen.every((x) => x === PUPPE) && kw.pille === PUPPE,
         `Uebungspuppe (${lang}): beide Kaempfe in der Kampfwahl und die Pille mit dem Symbol der Puppe` + (BILDER ? "" : " (ohne Spielbilder: Marke)"), { n: kw.n, zeilen: kw.zeilen.map((x) => x.length), pille: kw.pille.length });
-      assert(kopf === PUPPE && ziele.includes(PUPPE) && kompakt.src === PUPPE && kompakt.sicht,
-        `Uebungspuppe (${lang}): Kampfkopf, Ziele-Tabelle und Kompakt mit dem Symbol der Puppe` + (BILDER ? "" : " (ohne Spielbilder: Marke)"),
+      assert(kopf === PUPPE && ziele.includes(PUPPE) && kompakt.src === PUPPE && !kompakt.sicht,
+        `Uebungspuppe (${lang}): Kampfkopf und Ziele-Tabelle mit dem Symbol der Puppe; im Kompakt traegt der Kopf das Bild weiter, zeigt es aber nicht (Panel, kein Bossbild)` + (BILDER ? "" : " (ohne Spielbilder: Marke)"),
         { kopf: kopf.length, ziele: ziele.map((x) => x.length), kompakt: { sicht: kompakt.sicht, src: kompakt.src.length } });
       assert(!s.fehler.length, `Uebungspuppe (${lang}): keine Fehler auf der Seite`, s.fehler);
       await p.close();
@@ -977,9 +988,10 @@ try {
     });
     // folgt Spezifikation Rekorde 2a (02.10.2026): der Pokal unten nach den Weeklies, gleich streng
     // folgt Spezifikation Gilde 5 (06.10.2026): die Gilde zwischen Weeklies und Rekorden, gleich streng
-    assert(JSON.stringify(l.folge) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "start", "settings"]),
-      "0.17 Reihenfolge: Kampf bis Gruppe, unten Weeklies, Gilde, Rekorde, Start, Einstellungen (Builds entfiel, #207)", l.folge);
-    assert(JSON.stringify(l.unten) === JSON.stringify(["weeklies", "gilde", "rekorde", "start", "settings"]), "0.17 Weeklies, Gilde, Rekorde, Start und Einstellungen unten", l.unten);
+    // folgt Spezifikation Log-Archiv 7 (17.10.2026, #264): das Archiv nach den Rekorden, gleich streng
+    assert(JSON.stringify(l.folge) === JSON.stringify(["timeline", "rotation", "analysis", "compare", "history", "party", "weeklies", "gilde", "rekorde", "archiv", "start", "settings"]),
+      "0.17 Reihenfolge: Kampf bis Gruppe, unten Weeklies, Gilde, Rekorde, Archiv, Start, Einstellungen (Builds entfiel, #207)", l.folge);
+    assert(JSON.stringify(l.unten) === JSON.stringify(["weeklies", "gilde", "rekorde", "archiv", "start", "settings"]), "0.17 Weeklies, Gilde, Rekorde, Archiv, Start und Einstellungen unten", l.unten);
     const falsch = l.svg.filter((v) => v.box !== "0 0 24 24" || v.w !== 22 || v.h !== 22 || v.versteckt !== "true"
       || innen(v.inhalt) !== innen(RAIL[SYMBOL_VON[v.tab]]));
     assert(!falsch.length, "0.16 die eigenen Symbole aus dem Entwurf, 22 Punkt, fuer den Vorleser verborgen", falsch.map((v) => v.tab));
@@ -995,7 +1007,10 @@ try {
     await p.mouse.move(700, 500);
     await p.focus('#bereiche [data-tab="timeline"]');
     await p.keyboard.press("ArrowDown");
-    await p.waitForTimeout(300);
+    /* auf das Ende des Uebergangs warten, nicht 300 ms: unter Last (zwoelf Laeufe
+       zugleich) zeichnet Chromium den ersten Frame spaeter, die Blase stand dann
+       noch auf opacity 0 (#224). Haengt sie wirklich nicht, meldet das die FAIL-Zeile. */
+    await p.waitForFunction(() => { const t = document.querySelector('#bereiche [data-tab="rotation"] .btip'); return !!t && getComputedStyle(t).opacity === "1"; }, null, { timeout: 5000 }).catch(() => {});
     const tipF = await p.evaluate(() => { const t = document.querySelector('#bereiche [data-tab="rotation"] .btip'); return { deck: getComputedStyle(t).opacity, text: t.textContent }; });
     assert(tipF.deck === "1" && tipF.text === "Rotation", "0.19 Fokus: die Blase steht auch mit der Tastatur", tipF);
     // Auswahl: Glutflaeche und 3 x 16 Punkt Kante in --pick (0.20)
@@ -1172,10 +1187,12 @@ try {
        Ruhe abwarten (#hDps 400 ms unveraendert), "wechsel" entfernen, auf den
        neuen Kampf warten (eine Zeile mehr in der Kampfliste), wieder Ruhe. */
     const ruhe = async (pg) => {
-      for (const ende = Date.now() + 10000; Date.now() < ende;) {
+      for (const ende = performance.now() + 10000; performance.now() < ende;) {
         const a = await pg.evaluate(() => document.querySelector("#hDps").textContent);
         await pg.waitForTimeout(400);
-        if (a === await pg.evaluate(() => document.querySelector("#hDps").textContent)) return a;
+        /* Ruhe heisst: 400 ms gleicher Text UND keine laufende Zaehlung (data-zaehlt, 20-meter-head). Unter Last liegen zwischen
+           zwei Frames mehr als 400 ms; die Zahl stand dann mitten in der Zaehlung still und galt als fertig (#224). */
+        if (a === await pg.evaluate(() => document.querySelector("#hDps").textContent) && await pg.evaluate(() => document.querySelector("#hDps").dataset.zaehlt !== "1")) return a;
       }
       return null;
     };
@@ -1201,6 +1218,23 @@ try {
     assert(zaehl.vorRuhig && zaehl.neu && !zaehl.wechselVorher && zaehl.ende !== zaehl.vor && zaehl.werte.length >= 3 &&
       zaehl.werte.at(-1) === zaehl.ende && zaehl.endeRuhig === zaehl.ende && zaehl.wechsel,
       "0.22 neuer Kampf: die grosse Zahl zaehlt hoch, die Pille gleitet", zaehl);
+    /* 0.22, zweiter Takt mitten im Hochzaehlen (#224): setHeroDps setzte bei "Wert unveraendert" den Endwert und liess die
+       laufende Animation weiterzaehlen - die Zahl sprang auf den Endwert und wieder zurueck. Auf dem Runner kam das unter
+       Last zufaellig (3 von 12 Laeufen, "7.866" mitten in der Reihe). Hier sind die Frames fest langsam (200 ms), das Hochzaehlen
+       dauert 3,2 s und der Live-Takt (alle 2 s) trifft es sicher. Die Reihe der Zwischenwerte muss in eine Richtung laufen. */
+    await p.evaluate(() => { window.requestAnimationFrame = (f) => setTimeout(() => f(performance.now()), 200); });
+    /* Mitten im Zaehlen zeichnet der Test den Kopf neu, ohne dass sich der Wert aendert: die Gruppierung wechselt (renderAll). */
+    const stoeren = async () => {
+      await p.waitForFunction(() => window.__werte && window.__werte.length >= 2, null, { timeout: 15000 }).catch(() => {});
+      for (const g of ["target", "skill", "target", "skill"]) {
+        await p.evaluate((x) => document.querySelector(`#groupSeg [data-g="${x}"]`)?.click(), g);
+        await p.waitForTimeout(450);
+      }
+    };
+    const [langsam] = await Promise.all([zaehlProbe(p, at(22, 45, 0), 60, 1.7), stoeren()]);
+    const zahl = (t) => /k$/.test(t) ? Math.round(parseFloat(t) * 1000) : +String(t).replace(/\D/g, ""), nums = langsam.werte.map(zahl), richtung = Math.sign(zahl(langsam.ende) - zahl(langsam.vor));
+    assert(langsam.neu && langsam.werte.length >= 3 && richtung !== 0 && nums.every((v, i) => !i || (v - nums[i - 1]) * richtung >= 0) && langsam.werte.at(-1) === langsam.ende,
+      "0.22 ein zweiter Takt mitten im Hochzaehlen setzt die Zahl nicht auf den Endwert zurueck", langsam);
     assert(!s.fehler.length, "Live: keine Fehler auf der Seite", s.fehler);
     await p.close();
     // 0.22 bei weniger Bewegung: alles springt, kein Zwischenwert, keine Gleitklasse
@@ -1787,9 +1821,47 @@ try {
   const zurAnalyse = async (s, datei = ANA_LOG) => {
     if (datei) await mitLog(s, datei); else await beispiel(s.page);
     await bereich(s.page, "analysis");
-    await s.page.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen rect").length > 0, null, { timeout: 5000 }).catch(() => {});
+    await s.page.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
   };
-  /* Was die Analyse zeigt: Urteil, Weitere Befunde, Form, drei Felder, Ventius, Fuss. */
+  /* Was die Analyse zeigt: Urteil, Weitere Befunde, Form, drei Felder, Ventius, Fuss.
+     #218 (Spezifikation 2026-10-07, 8.2): "Weitere Befunde" ist entfallen - die Befunde stehen in der
+     Kennzeile des Kopfs (#wbKenn: je Minute, Skillung, Luecken ab 2 s) und in der Liste unter dem
+     Kampfstreifen (#weitereListe: Luecken, groesster Treffer, Fehlschlaege, schwaechste Stelle); gelesen
+     werden beide, die Kennzeile zuletzt (sie traegt "Luecken ab 2 s"). Die Form ist der Kampfstreifen
+     #verdict mit der Glutkurve (ein Punkt je Sekunde, 2 s geglaettet) statt der Saeulen. Von den drei
+     Feldern ist "Wer traegt?" das Hauptfach der Werkbank (#findings .wbfach.haupt: Name, Anteil, darunter
+     leise woraus und wer danach), "Wie triffst du?" ist #wbWie im Kopf des Streifens,
+     "Hast du durchgedrueckt?" der Eintrag "Einsaetze je Minute" der Kennzeile. Der groesste Treffer und
+     die Fehlschlaege stehen im Fach ihrer Faehigkeit (#findings .wbbefunde .find), der Kasten Auge von
+     Ventius ist das Fach .vfeld (Perlen je Salve als g.wbsalve mit data-best und data-lesbar). */
+  /* #218 Etappe 3 (Entscheidung vom 08.10.2026): die Tabelle "Bester Einsatz je Boss" steht im Bereich Rekorde als
+     eigener Abschnitt "Auge von Ventius" (#rks-ventius), nicht mehr in der Analyse. rkVent liest ihn: Ueberschrift,
+     Zeilen (Name, Nachbeben, Treffer, "x von y" mit der Spur), Rollen der Tabelle, Folge der Ueberschriften. */
+  const zuRekorden = async (p) => {
+    await bereich(p, "rekorde");
+    // laut statt still: ohne offenen und gezeichneten Bereich waere jede Probe danach leer und ohne Aussage
+    const da = await p.waitForFunction(() => !document.querySelector("#rekorde").hidden && !!document.querySelector("#rkInhalt [data-rk]") &&
+      !!document.querySelector("#rks-dungeon h3"), null, { timeout: 5000 }).then(() => true).catch(() => false);
+    assert(da, "#218 Etappe 3: der Bereich Rekorde ist offen und gezeichnet (#rkInhalt [data-rk], die Seite Dungeons)");
+  };
+  const rkVent = (p) => p.evaluate(() => {
+    const q = (x, r = document) => r.querySelector(x), qa = (x, r = document) => [...r.querySelectorAll(x)];
+    const txt = (e) => (e?.textContent || "").replace(/[ \t\n\r]+/g, " ").trim();
+    const sek = q("#rks-ventius"), tab = sek ? q(".vtab", sek) : null;
+    const zeilen = tab ? qa('[role="row"]', tab) : [];
+    return {
+      da: !!sek, h: sek ? txt(q("h3", sek)) : "", hEbene: sek ? q("h3", sek)?.tagName : "",
+      // jede Ueberschrift in #rekorde, die man sieht, in der Folge des Dokuments
+      folge: qa("#rekorde :is(h1,h2,h3,h4,h5,h6)").filter((h) => h.getClientRects().length).map((h) => [+h.tagName.slice(1), txt(h)]),
+      gesamtVent: qa("#rekorde h3").filter((h) => /Ventius/.test(h.textContent)).length,
+      tab: !!tab, rolle: tab?.getAttribute("role") || "", label: tab?.getAttribute("aria-label") || "",
+      kopf: zeilen[0] ? [...zeilen[0].children].map((c) => c.getAttribute("role")) : [],
+      reihen: zeilen.slice(1).map((z) => ({ rolle: z.getAttribute("role"), zellen: [...z.children].map((c) => c.getAttribute("role")) })),
+      boss: qa(".vtabzeile", sek || document.createElement("i")).map((z) => [txt(q(".bn", z)), txt(q(".vpips b", z)), txt(q(".tr", z))]),
+      oft: qa(".vtabzeile", sek || document.createElement("i")).map((z) => ({ wort: txt(q(".owort", z)), spur: parseFloat(q(".ospur i", z)?.style.width || "-1") })),
+      note: txt(q(".ventnote", sek || document.createElement("i"))),
+    };
+  });
   const anaBlick = (p) => p.evaluate(() => {
     const q = (x) => document.querySelector(x);
     const r = (e) => e && e.getClientRects().length ? e.getBoundingClientRect().toJSON() : null;
@@ -1809,29 +1881,61 @@ try {
       kopf: q("#bereichKopf")?.innerText || "",
       // der Satz ohne den Knopf "Zum Beleg" an seinem Ende (#107)
       urteil: { uv: txt("#analysisCall .uv"), un: ohneKnopf(q("#analysisCall .un")), r: r(q("#analysisCall")), uk: !!q("#analysisCall .uk") },
-      titel: document.querySelectorAll("#weitere [title]").length, weitereText: q("#weitere")?.innerText || "",
-      weitere: { h: txt("#weitereTitel"), r: r(q("#weitere")),
-        items: [...document.querySelectorAll("#weitere .find")].map((f) => ({ k: f.dataset.k, dt: (f.querySelector(".k")?.textContent || "").trim(),
-          v: (f.querySelector(".v")?.textContent || "").trim(), n: (f.querySelector(".n")?.textContent || "").trim(), r: r(f) })) },
-      form: { h: txt("#formTitel"), def: txt("#lueckeDef"), leg: txt("#verdict .vlegend"), r: r(q("#verdict")),
-        balken: sa ? [...sa.querySelectorAll("rect")].map((x) => +x.getAttribute("height")) : [],
+      titel: document.querySelectorAll("#wbKenn [title], #weitereListe [title], #findings .wbbefunde [title]").length,
+      weitereText: (q("#wbKenn")?.innerText || "") + "\n" + (q("#weitereListe")?.innerText || "") + "\n" +
+        [...document.querySelectorAll("#findings .wbbefunde")].map((d) => d.innerText).join("\n"),
+      // die Liste steht im Streifen unter seiner h3; r ist das Feld des Streifens, kenn die Kennzeile im Kopf
+      weitere: { h: (q("#weitereListe")?.closest("#verdict")?.querySelector("h3")?.textContent || "").trim(), r: r(q("#verdict")),
+        liste: r(q("#weitereListe")), kenn: r(q("#wbKenn")),
+        items: [...document.querySelectorAll("#weitereListe .find"), ...document.querySelectorAll("#findings .wbbefunde .find"),
+          ...document.querySelectorAll("#wbKenn .find")].map((f) => ({ k: f.dataset.k, dt: (f.querySelector(".k")?.textContent || "").trim(),
+          v: (f.querySelector(".v")?.textContent || "").trim(),
+          // in der Kennzeile ist der leise Satz von "je Minute" ein eigenes .fein; die Zahl der Einsaetze steht davor
+          n: (f.querySelector(".n")?.textContent || "").trim(), fach: f.closest(".wbfach")?.dataset.n || "", r: r(f) })) },
+      form: { h: txt("#formTitel"), def: txt("#lueckeDef"), leg: txt("#verdict .vlegend"), r: r(q("#verdictForm")),
+        // die Glutkurve: je Sekunde ein Punkt (x = Sekunde + 0,5), y von oben in Hundertsteln der Hoehe
+        balken: (() => { const d = sa?.querySelector("svg path.wblinie")?.getAttribute("d") || "";
+          return [...d.matchAll(/L([\d.]+) ([\d.]+)/g)].map((m) => [+m[1], +m[2]]).filter(([x]) => x % 1 !== 0); })(),
         svg: r(sa?.querySelector("svg")), sa: r(sa), label: sa?.getAttribute("aria-label") || "", rolle: sa?.getAttribute("role") || "",
         zonen: sa ? [...sa.querySelectorAll(".gapz")].map((z) => z.dataset.zeit) : [],
         med: sa?.querySelector(".med") ? parseFloat(sa.querySelector(".med").style.bottom) : -1,
         medStrich: sa?.querySelector(".med") ? getComputedStyle(sa.querySelector(".med")).borderTopStyle : "" },
       // die Knoepfe in den leisen Saetzen (Wege in die Rotation, #107) gehoeren nicht zum Satz
-      drei: [...document.querySelectorAll("#drei > section")].map((s) => ({ id: s.id, h: (s.querySelector("h3")?.textContent || "").trim(),
-        ant: (s.querySelector(".ant")?.textContent || "").trim(), leise: [...s.querySelectorAll(".fein")].map((x) => { const c = x.cloneNode(true); c.querySelectorAll("button").forEach((k) => k.remove()); return c.textContent.trim(); }).join(" | "), r: r(s) })),
-      stapel: [...document.querySelectorAll("#dWie .stapel i")].map((i) => ({ art: i.dataset.art, w: parseFloat(i.style.width) })),
-      lg: [...document.querySelectorAll("#dWie .lg > span")].map((x) => x.textContent.trim()),
-      vent: { h: txt(".vkasten h3"), vkw: txt(".vkasten .vkw"), r: r(q(".vkasten")),
-        salven: [...document.querySelectorAll(".vkasten .salven i")].map((i) => i.classList.contains("best")),
-        leer: document.querySelectorAll(".vkasten .salven i.leer").length, wort: txt(".vkasten .salvenwort"),
-        vorbehalt: txt(".vkasten .kvorbehalt"),
-        boss: [...document.querySelectorAll(".vkasten .vtabzeile")].map((z) => [(z.querySelector(".bn")?.textContent || "").trim(),
+      drei: (() => {
+        const ohne = (x) => { const c = x.cloneNode(true); c.querySelectorAll("button").forEach((k) => k.remove()); return c.textContent.trim(); };
+        const t1 = q("#findings .wbfach.haupt"), t2 = q("#wbWie"), t3 = q('#wbKenn .find[data-k="jeMinute"]');
+        // im Hauptfach: der Name ohne die Zusatzzeile, der Anteil ohne "des Schadens", leise die Zeilen .wbfein
+        const nurText = (x) => { if (!x) return ""; const c = x.cloneNode(true); c.querySelectorAll("small").forEach((k) => k.remove()); return c.textContent.trim(); };
+        return [
+          t1 && { id: "haupt", h: nurText(t1.querySelector("h3")), ant: nurText(t1.querySelector(".wbanteil")),
+            leise: [...t1.querySelectorAll(".wbfein:not(.salvenwort)")].map(ohne).join(" | "), r: r(t1),
+            zweit: (() => { const z = document.querySelectorAll("#findings .wbfach")[1]; return z ? { h: nurText(z.querySelector("h3")), ant: nurText(z.querySelector(".wbanteil")) } : null; })() },
+          t2 && { id: t2.id, h: (t2.closest("#verdict")?.querySelector("h3")?.textContent || "").trim(), ant: (t2.querySelector(".ant")?.textContent || "").trim(),
+            leise: [...t2.querySelectorAll(".fein")].map(ohne).join(" | "), r: r(t2) },
+          t3 && { id: "jeMinute", h: (t3.querySelector(".k")?.textContent || "").trim(), ant: (t3.querySelector(".wbein")?.textContent || "").trim(),
+            leise: [...t3.querySelectorAll(".fein")].map(ohne).join(" | "), r: r(t3) },
+        ].filter(Boolean);
+      })(),
+      stapel: [...document.querySelectorAll("#wbWie .wbrampe i")].map((i) => ({ art: i.dataset.art, w: parseFloat(i.style.width) })),
+      lg: [...document.querySelectorAll("#wbWie .lg > span")].map((x) => x.textContent.trim()),
+      // #218: der Kasten ist das Fach Auge von Ventius (.vfeld); eine Saeule je Salve ist g.wbsalve in seinem Bild
+      vent: { h: (() => { const x = q("#findings .vfeld h3")?.cloneNode(true); x?.querySelectorAll("small").forEach((k) => k.remove()); return (x?.textContent || "").trim(); })(),
+        /* Designpruefung 08.10.: der Satz zur optimalen Entfernung steht einmal, als Unterschrift der Perlen
+           (.salvenwort), darueber leise die Leserichtung (.wbachse); links nur, was ein Nachbeben ist */
+        achse: txt("#findings .vfeld .wbachse"), nachbeben: txt("#findings .vfeld .wbteile > div:first-child > .wbfein"),
+        text: q("#findings .vfeld")?.innerText || "", r: r(q("#findings .vfeld")),
+        salven: [...document.querySelectorAll("#findings .vfeld svg g.wbsalve")].map((g) => g.dataset.best === "1"),
+        leer: document.querySelectorAll('#findings .vfeld svg g.wbsalve[data-lesbar="0"]').length, wort: txt("#findings .vfeld .salvenwort"),
+        vorbehalt: txt("#findings .vfeld .kvorbehalt"),
+        boss: [...document.querySelectorAll("#findings .vfeld .vtabzeile")].map((z) => [(z.querySelector(".bn")?.textContent || "").trim(),
           (z.querySelector(".vpips b")?.textContent || "").trim(), (z.querySelector(".tr")?.textContent || "").trim()]),
-        vkz: [...document.querySelectorAll(".vkasten .vkz > div")].map((d) => [...d.children].map((c) => c.textContent.trim())),
-        tab: !!q(".vkasten .vtab") },
+        vkz: [...document.querySelectorAll("#findings .vfeld .vkz > div")].map((d) => [...d.children].map((c) => c.textContent.trim())),
+        tab: !!q("#findings .vfeld .vtab"),
+        // #218 Etappe 3: in der ganzen Analyse keine Tabelle je Boss und kein Aufklapper mehr
+        jeBossIn: document.querySelectorAll("#p-analysis .vtab, #p-analysis .wbjeboss, #p-analysis .vtabzeile").length,
+        /* Entscheidung vom 11.10.2026: der Wortlaut steht gewollt im Knopf zu den Rekorden (.wbrk, eigene Probe mit
+           dem genauen Text); ausserhalb des Knopfes darf er nirgends in der ganzen Analyse stehen */
+        ohneRk: (() => { const x = q("#p-analysis")?.cloneNode(true); x?.querySelectorAll(".wbrk").forEach((k) => k.remove()); return x?.textContent || ""; })() },
       fuss: { h: txt("#afussTitel"), li: [...document.querySelectorAll("#afuss li")].map((l) => l.textContent.trim()), r: r(q("#afuss")) },
       status: r(q("#statusleiste")), rollY: scrollY + (q("#app")?.scrollTop || 0) + (q(".stage")?.scrollTop || 0),
       klein, quer: document.documentElement.scrollWidth > innerWidth,
@@ -1846,7 +1950,7 @@ try {
     await p.waitForFunction(() => /\d/.test(document.querySelector("#bkRotZahl")?.textContent || ""));
     const rotZahl = +(await p.evaluate(() => document.querySelector("#bkRotZahl").textContent)).replace(/\D/g, "");
     await bereich(p, "analysis");
-    await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen rect").length > 0, null, { timeout: 5000 }).catch(() => {});
+    await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
     const b = await anaBlick(p);
     // 4.1-4.3: der Kopf nennt Bereich und Kampf; die Leerzeit nach Median ist der teuerste Kandidat - Form des Entwurfs
     /* Fixrunde 1 (Pruefung Befund 4): die Analyse sagt "Luecke" (nach dem Median), der Zeitverlauf und der
@@ -1861,14 +1965,20 @@ try {
       b.urteil.un.includes("Die längste Lücke liegt bei 0:20\u20130:26.") && b.urteil.un.endsWith("Ob der Boss da nicht zu treffen war, steht nicht im Log."),
       "4.3 Urteil: gemessen am Median, Kosten = Leerzeit mal Median, die laengste Luecke, was das Log nicht weiss", { un: b.urteil.un, med: kurz(ANA.med) });
     // 4.4: Weitere Befunde als Zeile unter dem Urteil
+    /* #218 (8.2): die Kennzeile steht im Kopf neben dem Urteil, die Liste im Streifen unter der Kurve: das Feld des
+       Streifens (h3 "Der Kampf") unter dem Urteil, gleich breit, die Kennzeile im Kopf ueber dem Streifen, die Liste
+       unter der Kurve in der Breite des Streifens */
     const w = Object.fromEntries(b.weitere.items.map((x) => [x.k, x]));
-    assert(b.weitere.h === "Weitere Befunde" && b.weitere.r && b.urteil.r && b.weitere.r.top >= b.urteil.r.bottom - 1 &&
-      Math.abs(b.weitere.r.left - b.urteil.r.left) < 1 && Math.abs(b.weitere.r.width - b.urteil.r.width) < 1 && b.form.r && b.form.r.top >= b.weitere.r.bottom - 1,
-      "4.4 Weitere Befunde: eine Zeile unter dem Urteil, ueber der Form, volle Breite", { w: b.weitere.r, u: b.urteil.r, f: b.form.r });
+    assert(b.weitere.h === "Der Kampf" && b.weitere.r && b.urteil.r && b.weitere.r.top >= b.urteil.r.bottom - 1 &&
+      Math.abs(b.weitere.r.left - b.urteil.r.left) < 1 && Math.abs(b.weitere.r.width - b.urteil.r.width) < 1 && b.form.r && b.form.r.top >= b.weitere.r.top &&
+      b.weitere.kenn && b.weitere.kenn.top >= b.urteil.r.top && b.weitere.kenn.bottom <= b.weitere.r.top + 1 &&
+      b.weitere.liste && b.weitere.liste.top >= b.form.r.bottom - 1 && b.weitere.liste.right <= b.weitere.r.right + 1 &&
+      b.weitere.liste.left >= b.form.r.left - 1 && b.weitere.liste.width >= b.form.r.width - 1,
+      "4.4 Weitere Befunde: eine Zeile unter dem Urteil, ueber der Form, volle Breite", { w: b.weitere.r, u: b.urteil.r, f: b.form.r, kenn: b.weitere.kenn, liste: b.weitere.liste });
     assert(w.luecken?.dt === "Lücken ab 2\u00a0s" && w.luecken.v === "3" && w.luecken.n === "zusammen 10\u00a0s" &&
-      w.groesster?.dt === "Größter Treffer" && w.groesster.v === "250.0k \u00b7 Detonierendes Mal" &&
+      w.groesster?.dt === "Größter Treffer" && w.groesster.v === "250.0k" && w.groesster.fach === "Detonation Mark" &&
       w.fehl?.dt === "Fehlschläge" && /^2 \u00b7 /.test(w.fehl.v) && w.jeMinute?.dt === "Einsätze je Minute" && /^\d+,\d$/.test(w.jeMinute.v) && !!w.skillung,
-      "4.4/4.14 Weitere Befunde: Luecken ab 2 s (3, zusammen 10 s), groesster Treffer mit Faehigkeit (DECISION 2.3), Fehlschlaege, Einsaetze je Minute, Rhythmus verdichtet",
+      "4.4/4.14 Weitere Befunde: Luecken ab 2 s (3, zusammen 10 s), groesster Treffer im Fach seiner Faehigkeit ohne ihren Namen (DECISION 2.3, Designpruefung 08.10.), Fehlschlaege, Einsaetze je Minute, Rhythmus verdichtet",
       b.weitere.items.map(({ r, ...x }) => x));
     /* Eine Luecke ist schon benannt: die schwaechste Stelle liegt nicht in einer Luecke nach dem Median und
        haelt ihre drei Sekunden Abstand (vorher lag sie bei 0:33-0:36, mitten in der Luecke 0:33-0:35) */
@@ -1880,17 +1990,22 @@ try {
     assert(b.titel === 0 && !!w.skillung?.n && !!w.schwach?.n && /Ein Fehlschlag steht im Log als Treffer ohne Schaden\./.test(w.fehl?.n || "") &&
       [w.skillung?.n, w.schwach?.n, w.fehl?.n].every((x) => b.weitereText.includes(x)),
       "4.4 Weitere Befunde: die Saetze zu Skillung, schwaechster Stelle und Fehlschlaegen sind sichtbar, kein title", { titel: b.titel, w });
-    const eineZeile = b.weitere.items.filter((x) => ["luecken", "groesster", "fehl", "jeMinute"].includes(x.k));
+    // #218: die Kennzeile des Kopfs (Schaden je Sekunde, Meister Schaden, gegen den besten Pull, je Minute) in einer Zeile
+    const eineZeile = b.weitere.items.filter((x) => ["dps", "meister", "gegenBest", "jeMinute"].includes(x.k));
     assert(eineZeile.length === 4 && eineZeile.every((x) => Math.abs(x.r.top - eineZeile[0].r.top) < 1),
       "4.4 1280: die vier Befunde des Entwurfs stehen nebeneinander in einer Zeile", eineZeile.map((x) => x.r.top));
     // 4.5: Form des Kampfes
-    assert(b.form.h === "Form des Kampfes" && b.form.balken.length === ANA.T && Math.max(...b.form.balken) === 100 &&
-      b.form.balken.every((h, i) => Math.abs(h - 100 * ANA.sek[i] / ANA.max) < 0.2),
+    /* #218: die Glutkurve - je Sekunde ein Punkt, die Sekunde mit je halbem Gewicht der Nachbarn (2 s geglaettet),
+       gemessen an der hoechsten geglaetteten Sekunde (92 % der Hoehe) */
+    const glatt = ANA.sek.map((v, i) => ((i ? ANA.sek[i - 1] : v) / 2 + v + (i + 1 < ANA.T ? ANA.sek[i + 1] : v) / 2) / 2);
+    const gMax = Math.max(...glatt);
+    assert(b.form.h === "Der Kampf" && b.form.balken.length === ANA.T && Math.min(...b.form.balken.map(([, y]) => y)) === 8 &&
+      b.form.balken.every(([x, y], i) => x === i + 0.5 && Math.abs(y - (100 - 92 * glatt[i] / gMax)) < 0.01),
       "4.5 Form: eine Saeule je Sekunde (60), Hoehe = Schaden der Sekunde am hoechsten gemessen", { n: b.form.balken.length, balken: b.form.balken.slice(0, 12) });
     assert(JSON.stringify(b.form.zonen) === JSON.stringify(["0:20\u20130:26", "0:33\u20130:35", "0:40\u20130:42"]),
       "4.3/4.5 Luecken nach dem Median: 20-26 und 40-42 s ohne Treffer, 33-35 s unter 2 % - nicht die ersten 3 und nicht die letzten 5 s", b.form.zonen);
-    assert(Math.abs(b.form.med - 100 * ANA.med / ANA.max) < 0.2 && b.form.medStrich === "dashed" && b.form.leg.includes("Median der Sekunden mit Treffern (" + kurz(ANA.med) + ")"),
-      "4.5 der Median gestrichelt auf seiner Hoehe, die Legende nennt ihn", { med: b.form.med, soll: 100 * ANA.med / ANA.max, strich: b.form.medStrich, leg: b.form.leg });
+    assert(Math.abs(b.form.med - 92 * ANA.med / gMax) < 0.2 && b.form.medStrich === "dashed" && b.form.leg.includes("Median der Sekunden mit Treffern (" + kurz(ANA.med) + ")"),
+      "4.5 der Median gestrichelt auf seiner Hoehe, die Legende nennt ihn", { med: b.form.med, soll: 92 * ANA.med / gMax, strich: b.form.medStrich, leg: b.form.leg });
     assert(b.form.def === "Eine Lücke: mindestens 2\u00a0s, in denen weniger als 2\u00a0% einer gewöhnlichen Sekunde ankam; die ersten 3 und letzten 5\u00a0s zählen nicht.",
       "4.5 die Definition der Luecke steht als Satz dabei (gewuenscht)", b.form.def);
     assert(b.form.rolle === "img" && b.form.label.includes("0:20\u20130:26") && b.form.label.includes("3 Lücken"), "4.5 Vorleser: die Saeulen als Bild mit den Luecken", b.form.label);
@@ -1898,14 +2013,22 @@ try {
     const leer = { h: "", ant: "", leise: "", r: null };
     const [d1 = leer, d2 = leer, d3 = leer] = b.drei;
     const [erst, zweit] = ANA.reihe;
-    assert(b.drei.length === 3 && d1.h === "Wer trägt?" && d2.h === "Wie triffst du?" && d3.h === "Hast du durchgedrückt?" &&
-      b.drei.every((x) => Math.abs(x.r.top - d1.r.top) < 1) && b.drei.every((x) => x.r.top >= b.form.r.bottom - 1),
+    /* #218: "Wer traegt?" unter dem Streifen, "Wie triffst du?" (#wbWie) im Kopf des Streifens neben der Kurve,
+       "Hast du durchgedrueckt?" als "Einsaetze je Minute" in der Kennzeile ueber dem Streifen.
+       Task 9: "Wer traegt?" ist das Hauptfach der Werkbank - seine Ueberschrift ist die staerkste Faehigkeit */
+    assert(b.drei.length === 3 && d1.h === "Schnellfeuer" && erst[0] === "Quick Fire" && d2.h === "Der Kampf" && d3.h === "Einsätze je Minute" &&
+      d1.r.top >= b.weitere.r.bottom - 1 && d2.r.top >= b.weitere.r.top && d2.r.right <= b.form.r.left + 1 && d3.r.bottom <= b.weitere.r.top + 1,
       "4.7-4.9 drei Felder nebeneinander unter der Form", b.drei.map((x) => [x.h, x.r?.top]));
-    assert(d1.ant === "Schnellfeuer mit " + prozDe(erst[1] / ANA.gesamt, 1) + " des Schadens." && d1.leise.includes("Danach ") && d1.leise.includes(prozDe(zweit[1] / ANA.gesamt, 1)),
-      "4.7 Wer traegt: die staerkste Faehigkeit mit ihrem Anteil, danach die zweite", { ant: d1.ant, leise: d1.leise });
+    /* Task 9: der Name steht als Ueberschrift des Hauptfachs, der Anteil daneben; "Danach ..." leise darunter,
+       und das zweite Fach ist die zweite Faehigkeit mit demselben Anteil */
+    assert(d1.h === "Schnellfeuer" && erst[0] === "Quick Fire" && d1.ant === prozDe(erst[1] / ANA.gesamt, 1) &&
+      d1.leise.includes("Danach Detonierendes Mal mit " + prozDe(zweit[1] / ANA.gesamt, 1)) && zweit[0] === "Detonation Mark" &&
+      d1.zweit?.h === "Detonierendes Mal" && d1.zweit.ant === prozDe(zweit[1] / ANA.gesamt, 1),
+      "4.7 Wer traegt: die staerkste Faehigkeit mit ihrem Anteil, danach die zweite", { h: d1.h, ant: d1.ant, leise: d1.leise, zweit: d1.zweit });
     const N = ANA.hits;
     // #106: der Satz sagt, worauf sich der Anteil bezieht (die Treffer)
-    assert(d2.ant === prozDe(ANA.krit / N) + " deiner Treffer kritisch, " + prozDe(ANA.stark / N) + " stark.", "4.8 Wie triffst du: Anteil kritisch und stark", d2.ant);
+    assert(d2.ant === prozDe(ANA.kritDirekt) + " deiner direkten Treffer kritisch, " + prozDe(ANA.stark / N) + " stark." && ANA.nieZahl === 1 && ANA.kritDirekt > ANA.krit / N,
+      "4.8 Wie triffst du: Anteil der direkten Treffer kritisch und stark (#269, ohne die nie kritische Faehigkeit)", d2.ant);
     assert(JSON.stringify(b.stapel.map((x) => x.art)) === JSON.stringify(["normal", "crit", "heavy", "critheavy"]) &&
       b.stapel.every((x) => Math.abs(x.w - 100 * ANA.arten[x.art] / N) < 0.2) &&
       JSON.stringify(b.lg) === JSON.stringify(["normal " + prozDe(ANA.arten.normal / N), "kritisch " + prozDe(ANA.arten.crit / N),
@@ -1919,29 +2042,89 @@ try {
     // 4.10/4.11: Ventius-Kasten
     /* Fixrunde 1 (Pruefung Befund 1): auch die unlesbare Salve steht als leere Saeule an ihrer Stelle (16 s),
        und "Salven" zaehlt genau die Saeulen */
-    assert(b.vent.h === "Auge von Ventius" && b.vent.vkw === "4 von 6 lesbaren Salven auf Vulcanus mit 3 Nachbeben" &&
+    assert(b.vent.h === "Auge von Ventius" &&
       JSON.stringify(b.vent.salven) === JSON.stringify([true, false, false, true, true, false, true]) && b.vent.leer === 1 &&
-      b.vent.wort.endsWith("1 weitere Salve nicht lesbar"),
+      b.vent.wort.endsWith(" 1 lie\u00df sich nicht lesen."),
       "4.10 Ventius: Kopf, eine Saeule je Salve in Einsatzreihenfolge, die besten hervorgehoben, die unlesbare leer", b.vent);
-    assert(JSON.stringify(b.vent.vkz) === JSON.stringify([["Treffer je Einsatz", "8,1"], ["Fehlende Treffer", "6", "bis zur besten Stelle in diesem Kampf"], ["Salven", "7", "57 Treffer"]]) &&
-      +b.vent.vkz[2][1] === b.vent.salven.length,
-      "4.10 Ventius: Treffer je Einsatz, fehlende Treffer, Salven - so viele wie Saeulen", b.vent.vkz);
+    assert(b.vent.h === "Auge von Ventius" && b.vent.achse === "Von links nach rechts in Einsatzreihenfolge." &&
+      JSON.stringify(b.vent.salven) === JSON.stringify([true, false, false, true, true, false, true]) && b.vent.leer === 1 &&
+      b.vent.wort === "2 Salven nicht auf der optimalen Entfernung verwendet, zwischen 0:13 und 0:45. Sie erreichten 2 statt 3 Nachbeben, 6 Treffer weniger. 1 lie\u00df sich nicht lesen." &&
+      b.vent.nachbeben.startsWith("Jedes Nachbeben trifft bis zu dreimal") && !b.vent.text.includes("besten Stelle") &&
+      b.vent.text.split("nicht auf der optimalen Entfernung").length === 2 && b.vent.text.split("Nachbeben\nbis").length === 2,
+      "4.10 Ventius: Kopf, eine Saeule je Salve in Einsatzreihenfolge, die besten hervorgehoben, die unlesbare leer; der Satz zur Entfernung einmal unter den Perlen", b.vent);
+    // Designpruefung 08.10.: alle Zahlen in einem Raster, der Median nennt seine Grundlage
+    assert(JSON.stringify(b.vent.vkz.slice(0, 4)) === JSON.stringify([["Treffer je Einsatz", "8,1"], ["Fehlende Treffer", "6", "bis zur optimalen Entfernung in diesem Kampf"],
+      ["Salven", "7", "57 Treffer"], ["Nachbeben", "bis 3"]]) && b.vent.vkz.length === 5 && b.vent.vkz[4][0] === "Median je Salve" &&
+      /^über 7 Salven, Spanne \S+ bis \S+$/.test(b.vent.vkz[4][2] || "") && +b.vent.vkz[2][1] === b.vent.salven.length,
+      "4.10 Ventius: Treffer je Einsatz, fehlende Treffer, Salven - so viele wie Saeulen -, Nachbeben, Median je Salve ueber 7 Salven", b.vent.vkz);
+    /* #218 Etappe 3 (Entscheidung vom 08.10.2026): die Zeile je Boss steht in den Rekorden, Abschnitt "Auge von Ventius";
+       die Analyse zeigt keine anderen Bosse mehr. Danach zurueck in die Analyse (4.12 und Englisch lesen dort). */
+    await zuRekorden(p);
+    const rv = await rkVent(p);
+    await bereich(p, "analysis");
+    await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv"), null, { timeout: 5000 }).catch(() => {});
+    /* #218 Etappe 3 (Entscheidung vom 11.10.2026): das Ventius-Fach sagt, wo die Tabelle je Boss jetzt steht - ein Knopf,
+       der die Rekorde oeffnet, zum Abschnitt rollt und den Fokus auf dessen Ueberschrift setzt */
+    const hin = await p.evaluate(() => {
+      const k = [...document.querySelectorAll("#findings .vfeld button.wbrk")];
+      return { n: k.length, t: (k[0]?.textContent || "").replace(/\s+/g, " ").trim(), typ: k[0]?.getAttribute("type") || "" };
+    });
+    assert(hin.n === 1 && hin.t === "Bester Einsatz je Boss: in den Rekorden ›" && hin.typ === "button",
+      "#218 Etappe 3: das Ventius-Fach nennt die Rekorde als Ort der Tabelle je Boss, als Knopf", hin);
+    if (hin.n === 1) {
+      await p.focus("#findings .vfeld button.wbrk");
+      await p.keyboard.press("Enter");
+      const sprung = await p.waitForFunction(() => {
+        const s = document.querySelector("#rks-ventius"), r = s?.getBoundingClientRect();
+        return !document.querySelector("#rekorde").hidden && document.activeElement?.id === "rkst-ventius" && !!r && r.top >= 0 && r.top < innerHeight;
+      }, null, { timeout: 5000 }).then(() => true).catch(() => false);
+      const ziel = await p.evaluate(() => ({ fokus: document.activeElement?.id || "", rekorde: !document.querySelector("#rekorde").hidden,
+        top: document.querySelector("#rks-ventius")?.getBoundingClientRect().top ?? null, hoehe: innerHeight }));
+      assert(sprung, "#218 Etappe 3: der Knopf oeffnet die Rekorde, der Abschnitt Auge von Ventius steht im Blick, der Fokus auf seiner Ueberschrift", ziel);
+      await bereich(p, "analysis");
+      await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv"), null, { timeout: 5000 }).catch(() => {});
+    }
     // Fixrunde 1 (Pruefung Befund 7): der Vorbehalt, auf den sich das Urteil beruft, und die Zeile je Boss
     assert(b.vent.vorbehalt.includes("die besten Salven 2.000, die schwächeren 1.500") && b.vent.vorbehalt.includes("die 6 fehlenden Treffer") &&
-      JSON.stringify(b.vent.boss) === JSON.stringify([["Vulcanus", "3", "10"]]),
-      "4.10/4.11 Ventius: der Vorbehalt nennt beide Trefferwerte und die fehlenden Treffer, je Boss Vulcanus mit 3 Nachbeben", b.vent);
-    assert(b.vent.tab && b.vent.r && d1.r && b.vent.r.top >= d1.r.bottom - 1, "4.11 Ventius je Boss steht im Kasten, der Kasten unter den drei Feldern", b.vent);
+      JSON.stringify(rv.boss) === JSON.stringify([["Vulcanus", "3", "10"]]),
+      "4.10/4.11 Ventius: der Vorbehalt nennt beide Trefferwerte und die fehlenden Treffer, je Boss Vulcanus mit 3 Nachbeben", { vent: b.vent, rekorde: rv });
+    /* Task 9: der Kasten ist ein Fach der Werkbank neben (breit) oder unter (schmal) dem Hauptfach, unter dem Streifen;
+       #218 Etappe 3: die Tabelle je Boss steht nicht mehr im Kasten, sondern in den Rekorden */
+    assert(rv.tab && !b.vent.tab && b.vent.jeBossIn === 0 && b.vent.r && d1.r && b.vent.r.top >= b.weitere.r.bottom - 1 &&
+      (b.vent.r.top >= d1.r.bottom - 1 || (b.vent.r.left >= d1.r.right - 1 && b.vent.r.top >= d1.r.top - 1)),
+      "4.11 Ventius je Boss steht im Kasten, der Kasten unter den drei Feldern", { vent: b.vent, haupt: d1.r, rekorde: rv.tab });
+    assert(rv.tab && !b.vent.tab, "#218 Etappe 3: Ventius je Boss steht in den Rekorden, nicht mehr im Kasten", { kasten: b.vent.tab, rekorde: rv.tab });
+    assert(b.vent.jeBossIn === 0 && !/Bester Einsatz je Boss/.test(b.vent.ohneRk) && /Auge von Ventius/.test(b.vent.ohneRk),
+      "#218 Etappe 3: die Analyse (#p-analysis) enthaelt keine .vtab und kein .wbjeboss mehr - keine anderen Bosse im Kampf", { n: b.vent.jeBossIn });
+    // die Rekorde: Ueberschrift h3 "Auge von Ventius", in der Folge der Ueberschriften ohne Sprung
+    const fi = rv.folge.findIndex(([e, x]) => e === 3 && x === "Auge von Ventius");
+    assert(rv.da && rv.h === "Auge von Ventius" && rv.hEbene === "H3" && fi > 0 && rv.gesamtVent === 1 &&
+      rv.folge.every(([e], i) => i === 0 || e <= rv.folge[i - 1][0] + 1) && rv.folge[0][0] === 2,
+      "#218 Etappe 3: die Rekorde haben den Abschnitt mit h3 „Auge von Ventius“, erreichbar in der Folge der Ueberschriften", rv.folge);
+    // die Rollen: Tabelle mit Namen, eine Kopfzeile mit fuenf Spaltenkoepfen, jede Zeile fuenf Zellen
+    assert(rv.rolle === "table" && rv.label === "Bester Einsatz von Auge von Ventius je Boss" &&
+      JSON.stringify(rv.kopf) === JSON.stringify(Array(5).fill("columnheader")) && rv.reihen.length === 1 &&
+      rv.reihen.every((z) => z.rolle === "row" && JSON.stringify(z.zellen) === JSON.stringify(Array(5).fill("cell"))),
+      "#218 Etappe 3: role=table mit Namen, role=row, fuenf columnheader, je Zeile fuenf cell", rv);
+    // "x von y": so oft der Bestwert erreicht wurde, von allen Einsaetzen, die Spur im selben Verhaeltnis
+    const xy = rv.oft.map((o) => [/^(\d+) von (\d+)$/.exec(o.wort), o.spur]);
+    assert(xy.length === 1 && xy.every(([m, s]) => m && +m[1] >= 1 && +m[1] <= +m[2] && Math.abs(s - 100 * m[1] / m[2]) < 0.06) &&
+      rv.note.includes("über alle Logs, die du geladen hast"),
+      "#218 Etappe 3: je Boss „x von y“ mit der Spur im selben Verhaeltnis, der Satz „ueber alle Logs, die du geladen hast“", { oft: rv.oft, note: rv.note });
     // 4.12: der Fuss
-    assert(b.fuss.h === "Was das Log nicht weiß" && b.fuss.li.length === 4 && b.fuss.li[0] === "ob der Boss in einer Lücke unverwundbar war oder du laufen musstest" &&
-      b.fuss.r && b.vent.r && b.fuss.r.top >= b.vent.r.bottom - 1, "4.12 Fuss: vier Punkte, ganz unten", b.fuss);
+    /* Spezifikation 2026-10-07 (#218): drei Saetze mehr - Bereitschaft, Zustaende am Ziel, kritische Treffer */
+    assert(b.fuss.h === "Was das Log nicht weiß" && b.fuss.li.length === 7 && b.fuss.li[0] === "ob der Boss in einer Lücke unverwundbar war oder du laufen musstest" &&
+      JSON.stringify(b.fuss.li.slice(4)) === JSON.stringify(["ob eine Fähigkeit bereit war, als du sie gedrückt hast",
+        "Zustände am Ziel: das Log zeigt sie nur an Nebenzielen", "kritische Treffer hängen an Stärkungen, und die schreibt das Log nicht mit"]) &&
+      b.fuss.r && b.vent.r && b.fuss.r.top >= b.vent.r.bottom - 1, "4.12 Fuss: sieben Punkte, ganz unten", b.fuss);
     assert(!b.quer && !b.klein.length && !s.fehler.length, "4 1280 x 860: kein waagerechtes Rollen, jeder Text mindestens 11 Punkt, keine Fehler", { quer: b.quer, klein: b.klein, fehler: s.fehler });
     // Englisch: dieselben Stellen
     await p.evaluate(() => document.querySelector("#btnLang")?.click());
     await p.waitForFunction(() => document.documentElement.lang === "en" && /in gaps/.test(document.querySelector("#analysisCall .uv")?.textContent || ""), null, { timeout: 4000 }).catch(() => {});
     const e = await anaBlick(p);
     assert(e.urteil.uv === "10 seconds in gaps" && e.urteil.un.startsWith("What cost you most: Measured against your ordinary second") &&
-      e.titel === 0 && e.weitere.h === "Further findings" && e.form.h === "Shape of the fight" &&
-      e.fuss.h === "What the log does not know" && e.drei.map((x) => x.h).join("|") === "Who carries it?|How do you hit?|Did you keep pressing?" &&
+      e.titel === 0 && e.weitere.h === "The fight" && e.form.h === "The fight" &&
+      e.fuss.h === "What the log does not know" && e.fuss.li.length === 7 && e.fuss.li[6] === "crits depend on buffs, and the log does not record those" && e.drei.map((x) => x.h).join("|") === "Quick Fire|The fight|Casts per minute" &&
       e.form.def === "A gap: at least 2\u00a0s in which less than 2% of an ordinary second landed; the first 3 and last 5\u00a0s do not count.",
       "4 Englisch: Urteil, Weitere Befunde, Form mit Definition, drei Felder, Fuss", { uv: e.urteil.uv, h: e.weitere.h, form: e.form.h, def: e.form.def, drei: e.drei.map((x) => x.h), fuss: e.fuss.h });
     await p.close();
@@ -1990,8 +2173,12 @@ try {
         const b = await anaBlick(p);
         const wo = `${breite} × ${hoehe}${datei ? "" : ", Beispiel"}`;
         if (datei) hoehen[breite + "x" + hoehe] = b.form.sa?.height;
-        const nebeneinander = b.drei.length === 3 && b.drei.every((x) => Math.abs(x.r.top - b.drei[0].r.top) < 1);
-        const untereinander = b.drei.length === 3 && b.drei.every((x, i) => !i || x.r.top >= b.drei[i - 1].r.bottom - 1);
+        /* #218: von den drei Feldern steht "Wie triffst du?" (#wbWie) im Kopf des Streifens - breit neben der Kurve,
+           schmal (unter 760 Punkt Bereich) darueber; die Kennzeile mit "je Minute" ueber dem Streifen, "Wer traegt?" darunter */
+        const [w1, w2, w3] = b.drei;
+        const rahmen = b.drei.length === 3 && w3.r.bottom <= b.weitere.r.top + 1 && w1.r.top >= b.weitere.r.bottom - 1;
+        const nebeneinander = rahmen && w2.r.right <= b.form.r.left + 1 && w2.r.top < b.form.r.bottom;
+        const untereinander = rahmen && w2.r.bottom <= b.form.r.top + 1;
         assert(!b.quer && !b.klein.length && !s.fehler.length && (breite >= 1000 ? nebeneinander : untereinander) &&
           b.weitere.r && b.urteil.r && b.weitere.r.top >= b.urteil.r.bottom - 1 && b.form.svg && b.form.sa && Math.abs(b.form.svg.width - b.form.sa.width) < 1,
           `4 ${wo}: kein waagerechtes Rollen, Text mindestens 11 Punkt, Befunde unter dem Urteil, Saeulen in voller Breite, drei Felder ${breite >= 1000 ? "nebeneinander" : "untereinander"}; keine Fehler`,
@@ -2013,7 +2200,8 @@ try {
             const inCh = (e) => { if (!e || !e.getClientRects().length) return -1; const m = document.createElement("span");
           m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
           e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return e.getBoundingClientRect().width / ch; };
-            const h = document.querySelector("#weitereTitel").getBoundingClientRect(), dl = document.querySelector("#weitereListe");
+            // #218: die Liste steht im Streifen unter seiner h3 ("Der Kampf")
+            const h = document.querySelector("#formTitel").getBoundingClientRect(), dl = document.querySelector("#weitereListe");
             const items = [...dl.children].map((x) => x.getBoundingClientRect());
             return { ueber: h.bottom <= dl.getBoundingClientRect().top + 0.5, raster: getComputedStyle(dl).display === "grid",
               links: items.length > 0 && Math.abs(items[0].left - dl.getBoundingClientRect().left) < 1,
@@ -2021,12 +2209,36 @@ try {
                  (bei einer Spalte steht jeder allein, das ist dann richtig) */
               allein: new Set(items.map((r) => Math.round(r.left))).size < 2 ? 0
                 : items.filter((r, i) => i < items.length - 1 && !items.some((o, j) => j !== i && Math.abs(o.top - r.top) < 1)).length,
-              def: inCh(document.querySelector("#lueckeDef")), salven: inCh(document.querySelector(".salvenwort")),
-              vtab: document.querySelector(".vtab")?.getBoundingClientRect().width || -1 };
+              def: inCh(document.querySelector("#lueckeDef")), salven: inCh(document.querySelector(".salvenwort")) };
           });
+          /* #218 Etappe 3: die Ventius-Tabelle steht in den Rekorden (#rks-ventius) - dort gemessen, in jeder Groesse */
+          await zuRekorden(p);
+          const rk = await p.evaluate(() => {
+            const inCh = (e) => { if (!e || !e.getClientRects().length) return -1; const m = document.createElement("span");
+              m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
+              e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return e.getBoundingClientRect().width / ch; };
+            const sek = document.querySelector("#rks-ventius"), tab = sek?.querySelector(".vtab");
+            const rollt = document.querySelector(".rkrollt");
+            // jeder Text im Abschnitt: hoechstens 75 Zeichen breit (der Satz darunter ist der laengste)
+            const texte = sek ? [...sek.querySelectorAll("*")].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim()) && e.getClientRects().length)
+              .map((e) => ({ k: e.className || e.tagName, ch: +inCh(e).toFixed(1) })) : [];
+            const z = sek ? [...sek.querySelectorAll(".vtabzeile")] : [];
+            return { vtab: tab?.getBoundingClientRect().width || -1,
+              quer: document.documentElement.scrollWidth > innerWidth || (!!rollt && rollt.scrollWidth > rollt.clientWidth) ||
+                (!!sek && sek.scrollWidth > sek.clientWidth + 0.5) || (!!tab && tab.scrollWidth > tab.clientWidth + 0.5),
+              texte, breitster: Math.max(-1, ...texte.map((x) => x.ch)), zeilen: z.map((e) => e.getBoundingClientRect().height),
+              bossSchrift: z[0] ? getComputedStyle(z[0].querySelector(".bn")).fontFamily : "",
+              zahlSchrift: z[0] ? [".tr", ".vpips b"].map((x) => getComputedStyle(z[0].querySelector(x)).fontFamily) : [] };
+          });
+          m.vtab = rk.vtab;
           assert(m.ueber && m.raster && m.links && m.allein === 0, `#110 ${wo}: Weitere Befunde als Raster, die Ueberschrift darueber`, m);
           assert(m.def > 0 && m.def <= 70.5 && m.salven > 0 && m.salven <= 70.5 && m.vtab > 0 && m.vtab <= 900.5,
             `#110 ${wo}: Erklaersaetze hoechstens 70 Zeichen, Ventius-Tabelle hoechstens 900 Punkt`, m);
+          assert(!rk.quer && rk.zeilen.length === 1, `#218 Etappe 3 ${wo}: Rekorde mit dem Abschnitt Auge von Ventius ohne waagerechtes Rollen`, rk);
+          if (breite === 2000)
+            assert(rk.zeilen.every((h) => h > 0 && h <= 44) && rk.breitster > 0 && rk.breitster <= 75 && /Source Sans 3/.test(rk.bossSchrift) &&
+              rk.zahlSchrift.length === 2 && rk.zahlSchrift.every((f) => /^"?Anton/.test(f)),
+              `#218 Etappe 3 ${wo}: Zeilen hoechstens 44 Punkt, Text hoechstens 75 Zeichen, Bossname in Source Sans 3, Zahlen in Anton`, rk);
         }
         await p.close();
       }
@@ -2037,6 +2249,65 @@ try {
     assert(hoehen["1280x860"] >= 120 && hoehen["2000x1480"] >= 112,
       "4.5 die Saeulen: bei 1280 x 860 mindestens 120 Punkt, im grossen Fenster nie unter 112", hoehen);
 
+  }
+  /* --- #218 Etappe 3: der Abschnitt "Auge von Ventius" in den Rekorden - ohne gemerkte Bosse gar nicht (keine
+     leere Ueberschrift), auf Englisch "Eye of Ventius", Kontrast mindestens 4,5:1 in den vier Themen */
+  {
+    const s = await oeffne({ app: true, lang: "de" }); const p = s.page;
+    await zuRekorden(p);
+    const leer = await rkVent(p);
+    // Gegenprobe: der Bereich ist gezeichnet - Titel h2 und die Seite Dungeons stehen in der Folge der Ueberschriften
+    const gezeichnet = (v) => v.folge.some(([e, x]) => e === 2 && x === "Rekorde") && v.folge.some(([e, x]) => e === 3 && x === "Dungeons");
+    assert(gezeichnet(leer) && !leer.da && leer.gesamtVent === 0 && !leer.tab && !leer.folge.some(([, x]) => /Ventius/.test(x)),
+      "#218 Etappe 3: ohne gemerkte Bosse (kein ventiusTop) fehlt der Abschnitt ganz, keine leere Ueberschrift", leer);
+    // ein Kampf ohne Ventius bringt auch keinen
+    await mitLog(s, LOG);
+    // die Probe: das Log hat Zeilen, aber keine Auge von Ventius (keine Salve der Familie)
+    const balken = await p.evaluate(() => { const r = [...document.querySelectorAll("#bars .row")]; return { n: r.length, vent: r.filter((x) => /Ventius/.test(x.textContent)).length }; });
+    assert(balken.n > 0 && balken.vent === 0, "#218 Etappe 3: das Log ohne Ventius hat Zeilen, keine davon Auge von Ventius", balken);
+    await zuRekorden(p);
+    const ohne = await rkVent(p);
+    assert(gezeichnet(ohne) && ohne.folge.some(([e, x]) => e === 3 && x === "Höchster Treffer insgesamt") && !ohne.da && ohne.gesamtVent === 0, "#218 Etappe 3: ein Log ohne Ventius - kein Abschnitt in den Rekorden", ohne);
+    assert(!s.fehler.length, "#218 Etappe 3: keine Fehler", s.fehler);
+    await p.close();
+    const e = await oeffne({ app: true, lang: "en" });
+    await mitLog(e, ANA_LOG);
+    await zuRekorden(e.page);
+    const en = await rkVent(e.page);
+    assert(en.da && en.h === "Eye of Ventius" && en.hEbene === "H3" && en.label === "Best Eye of Ventius cast per boss" &&
+      JSON.stringify(en.boss) === JSON.stringify([["Vulcanus", "3", "10"]]) && /^\d+ of \d+$/.test(en.oft[0]?.wort || "") &&
+      en.folge.every(([lv], i) => i === 0 || lv <= en.folge[i - 1][0] + 1),
+      "#218 Etappe 3 Englisch: h3 „Eye of Ventius“, Tabelle mit Namen, Vulcanus 3 / 10, „x of y“", en);
+    await e.page.close();
+  }
+  {
+    const lum = (rgb) => { const [r, g, b] = rgb.slice(0, 3).map((v) => { v /= 255; return v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4; });
+      return 0.2126 * r + 0.7152 * g + 0.0722 * b; };
+    const kontrast = (a, b) => { const x = lum(a), y = lum(b); return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05); };
+    for (const thema of ["dark", "light", "tnl", "glas"]) {
+      const s = await oeffne({ app: true, lang: "de", config: { theme: thema } }); const p = s.page;
+      await mitLog(s, ANA_LOG);
+      await zuRekorden(p);
+      const saetze = await p.evaluate(() => {
+        const rgba = (c) => { const m = c.match(/[\d.]+/g) || ["0", "0", "0", "0"]; return [+m[0], +m[1], +m[2], m[3] === undefined ? 1 : +m[3]]; };
+        const misch = (o, u2) => [0, 1, 2].map((i) => o[i] * o[3] + u2[i] * (1 - o[3])).concat(1);
+        const grund = (e) => { const sch = []; for (let x = e; x; x = x.parentElement) { const c = rgba(getComputedStyle(x).backgroundColor); if (c[3] > 0) sch.push(c); if (c[3] >= 1) break; }
+          let g = [255, 255, 255, 1]; for (const c of sch.reverse()) g = misch(c, g); return g; };
+        const out = [];
+        const sek = document.querySelector("#rks-ventius");
+        if (!sek) return out;
+        const it = document.createTreeWalker(sek, NodeFilter.SHOW_TEXT);
+        for (let n; (n = it.nextNode()); ) {
+          const e = n.parentElement;
+          if (!n.textContent.trim() || !e || e.closest(".vh") || !e.getClientRects().length) continue;
+          const g = grund(e); out.push({ text: n.textContent.trim().slice(0, 30), farbe: misch(rgba(getComputedStyle(e).color), g), grund: g });
+        }
+        return out;
+      });
+      const schwach = saetze.map((x) => ({ ...x, k: +kontrast(x.farbe, x.grund).toFixed(2) })).filter((x) => x.k < 4.5);
+      assert(saetze.length >= 8 && !schwach.length, `#218 Etappe 3 Kontrast ${thema}: jeder Text im Abschnitt Auge von Ventius mindestens 4,5:1 (${saetze.length} geprueft)`, schwach);
+      await p.close();
+    }
   }
 
   // ===== Abschnitt 5: Vergleich (Luecken 5) =====
@@ -2638,7 +2909,7 @@ try {
     };
   });
   /* Warten, bis der Helfer die Handlung bekommen hat (ein Zustand, keine feste Zeit). */
-  const bis = async (f, ms = 3000) => { const ende = Date.now() + ms; while (!f() && Date.now() < ende) await new Promise((r) => setTimeout(r, 25)); };
+  const bis = async (f, ms = 3000) => { const ende = performance.now() + ms; while (!f() && performance.now() < ende) await new Promise((r) => setTimeout(r, 25)); };
   const zurGruppe = async (s, mitLogDatei = true) => {
     if (mitLogDatei) await mitLog(s);
     await bereich(s.page, "party");
@@ -2658,9 +2929,9 @@ try {
     assert(g.name && g.name.bottom <= Math.min(g.start.top, g.beitritt.top) + 1 && Math.abs(g.name.left - g.start.left) < 1 &&
       Math.abs(g.name.right - g.beitritt.right) < 1, "7.4 \u201eYour character\u201c als Zeile ueber beiden Feldern, so breit wie beide", { name: g.name });
     assert(g.woRolle === "radiogroup" && g.woName === "Where the party runs" &&
-      JSON.stringify(g.wo) === JSON.stringify([{ wo: "pc", text: "On this PC", an: "true" }, { wo: "server", text: "Own server", an: "false" }]) &&
+      JSON.stringify(g.wo) === JSON.stringify([{ wo: "pc", text: "On this PC", an: "true" }, { wo: "oeffentlich", text: "Public server", an: "false" }, { wo: "server", text: "Own server", an: "false" }]) &&
       !g.server && /firewall/i.test(g.hostNote) && g.host?.text === "Start party",
-      "7.2 Starten: On this PC | Own server, ohne Server der Satz zur Firewall, Knopf Start party", { wo: g.wo, server: g.server, note: g.hostNote, host: g.host });
+      "7.2 Starten: On this PC | Public server | Own server, ohne Server der Satz zur Firewall, Knopf Start party", { wo: g.wo, server: g.server, note: g.hostNote, host: g.host });
     assert(!g.board && !g.mitgl.length && /start/i.test(g.ohne) && /code/i.test(g.ohne) && !g.bsp.length,
       "7.9 ohne Gruppe: kein Board, keine Mitglieder, kein Beispiel - nur der Satz, wie man eine startet", { ohne: g.ohne, board: g.board, bsp: g.bsp });
     // 7.2: Eigener Server - das Feld fuer die Adresse erscheint, der Fokus bleibt auf der Wahl
@@ -2668,14 +2939,16 @@ try {
     await p.waitForFunction(() => document.querySelector('#pWo [data-wo="server"]').getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
     g = await gruppeBlick(p);
     const fokus = await p.evaluate(() => document.activeElement?.dataset?.wo);
-    assert(g.server && g.wo[1].an === "true" && g.wo[0].an === "false" && fokus === "server" && !/firewall/i.test(g.hostNote),
+    assert(g.server && g.wo[2].an === "true" && g.wo[0].an === "false" && fokus === "server" && !/firewall/i.test(g.hostNote),
       "7.2 Own server: Adresse im Feld, der Fokus bleibt auf der Wahl, kein Satz zur Firewall", { server: g.server, fokus, note: g.hostNote });
-    // Pfeiltasten wechseln wie in einer Radiogruppe
+    // Pfeiltasten wechseln wie in einer Radiogruppe: Own server -> Public server -> On this PC
+    await p.keyboard.press("ArrowLeft");
+    await p.waitForFunction(() => document.querySelector('#pWo [data-wo="oeffentlich"]').getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
     await p.keyboard.press("ArrowLeft");
     await p.waitForFunction(() => document.querySelector('#pWo [data-wo="pc"]').getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
     const links = await p.evaluate(() => ({ an: document.querySelector('#pWo [data-wo="pc"]').getAttribute("aria-checked"), fokus: document.activeElement?.dataset?.wo,
       tab: [...document.querySelectorAll("#pWo [role=radio]")].map((b) => b.tabIndex) }));
-    assert(links.an === "true" && links.fokus === "pc" && JSON.stringify(links.tab) === "[0,-1]", "7.2 Pfeiltaste nach links: On this PC, ein Tabstopp", links);
+    assert(links.an === "true" && links.fokus === "pc" && JSON.stringify(links.tab) === "[0,-1,-1]", "7.2 Pfeiltaste nach links: On this PC, ein Tabstopp", links);
     // ohne Namen gesperrt (der Name aus dem Log steht vorab darin), mit Namen: Starten auf diesem PC geht an /api/party/host
     const vorab = await p.inputValue("#pName");
     await p.fill("#pName", "");
@@ -2727,13 +3000,127 @@ try {
     await zurGruppe(s);
     await s.page.waitForFunction(() => document.querySelector('#pWo [data-wo="server"]')?.getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
     const g = await gruppeBlick(s.page);
-    assert(g.wo[1]?.an === "true" && g.server && g.serverWert === "203.0.113.9:8732", "7.2 ein eingetragener Gruppen-Server ist vorgewaehlt und steht im Feld", { wo: g.wo, wert: g.serverWert });
+    assert(g.wo[2]?.an === "true" && g.server && g.serverWert === "203.0.113.9:8732", "7.2 ein eingetragener Gruppen-Server ist vorgewaehlt und steht im Feld", { wo: g.wo, wert: g.serverWert });
     /* Fixrunde 1 (Befund 2) zog das Speichern des Gruppen-Servers hierher; seit Aufgabe 8 steht es wie im
        Entwurf (E:942) im Abschnitt Gruppe und Server der Einstellungen - die Proben dafuer, gleich streng, in
        Abschnitt 10 (10.9). Hier bleibt: das Feld traegt die gespeicherte Adresse, und Speichern gibt es nicht doppelt. */
     const p = s.page;
     const doppelt = await p.evaluate(() => ["#pServerSave", "#pServerStatus", "#pServerCheck", "#pServerOffen"].filter((x) => document.querySelector(x)));
     assert(!doppelt.length, "7.2 Speichern und Pruefen des Gruppen-Servers stehen nicht im Bereich Gruppe (nur in den Einstellungen, 10.9)", doppelt);
+    await p.close();
+  }
+
+  // --- #231: eine Adresse ohne https:// ist unverschluesselt: die Warnung steht am Feld (#231)
+  {
+    const s = await oeffne({ app: true, partyServer: "203.0.113.9:8732" });
+    await zurGruppe(s);
+    const p = s.page;
+    const warnung = (id) => p.evaluate((i) => {
+      const el = document.querySelector(i);
+      return { sichtbar: !!el?.getClientRects().length, text: el?.textContent.trim() ?? null, rolle: el?.getAttribute("role") ?? null };
+    }, id);
+    await p.click('#pWo [data-wo="server"]');
+    await p.waitForFunction(() => !!document.querySelector("#pServer")?.getClientRects().length, null, { timeout: 3000 }).catch(() => {});
+    let w = await warnung("#pServerKlar");
+    assert(w.sichtbar && /not encrypted/.test(w.text) && /https:\/\//.test(w.text) && w.rolle === "status",
+      "#231 Gruppe starten: eine Adresse ohne Schema ist unverschluesselt, die Warnung steht darunter (role=status, wird angesagt)", w);
+    assert((await p.getAttribute("#pServer", "aria-describedby")).includes("pServerKlar"), "#231 das Feld verweist auf die Warnung (aria-describedby)");
+    await p.fill("#pServer", "https://party.example");
+    w = await warnung("#pServerKlar");
+    assert(!w.sichtbar && w.text === "", "#231 Gruppe starten: mit https:// keine Warnung", w);
+    await p.fill("#pServer", "http://203.0.113.5:8732");
+    w = await warnung("#pServerKlar");
+    assert(w.sichtbar, "#231 Gruppe starten: mit http:// die Warnung", w);
+    await p.fill("#pServer", "");
+    w = await warnung("#pServerKlar");
+    assert(!w.sichtbar, "#231 Gruppe starten: leeres Feld, keine Warnung", w);
+    // Beitreten: leer gilt der eingetragene Server (ohne Schema), eine https-Adresse warnt nicht
+    w = await warnung("#pJoinKlar");
+    assert(w.sichtbar && /not encrypted/.test(w.text), "#231 Beitreten ohne Adresse: der eingetragene Server ohne https:// warnt", w);
+    await p.fill("#pJoinSrv", "https://party.example");
+    w = await warnung("#pJoinKlar");
+    assert(!w.sichtbar, "#231 Beitreten mit https://-Adresse: keine Warnung", w);
+    await p.fill("#pJoinSrv", "192.168.1.5:8733");
+    w = await warnung("#pJoinKlar");
+    assert(w.sichtbar, "#231 Beitreten mit Adresse ohne https://: Warnung", w);
+    // 560 px: kein waagerechtes Rollen
+    await p.setViewportSize({ width: 560, height: 860 });
+    const breit = await p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+    assert(breit, "#231 bei 560 px mit Warnung kein waagerechtes Rollen");
+    assert(!s.fehler.length, "#231 keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  // --- #321: Gruppe auf dem oeffentlichen Server - dritte Wahl, gespeichert wird erst auf den Klick, mit Bestaetigung
+  {
+    const OEFF = "https://guest.borometer.de";
+    const s = await oeffne({ app: true });
+    await zurGruppe(s);
+    const p = s.page;
+    const blick = () => p.evaluate(() => {
+      const q = (x) => document.querySelector(x), sicht = (e) => !!e?.getClientRects().length;
+      return { karte: sicht(q("#pOeff")), adresse: q("#pOeffAdr")?.textContent.trim() || "", hinweis: q("#pOeffHinweis")?.textContent.trim() || "",
+        knopf: sicht(q("#pOeffNimm")) ? q("#pOeffNimm").textContent.trim() : null, fertig: sicht(q("#pOeffDa")), feld: sicht(q("#pServerZeile")),
+        host: q("#pHost")?.textContent.trim(), quer: document.documentElement.scrollWidth > document.documentElement.clientWidth };
+    });
+    let g = await blick();
+    assert(!g.karte && s.party.length === 0, "#321 ohne Wahl keine Karte und keine Anfrage (nichts beim Oeffnen)", { g, party: s.party });
+    await p.click('#pWo [data-wo="oeffentlich"]');
+    await p.waitForFunction(() => !!document.querySelector("#pOeff")?.getClientRects().length, null, { timeout: 3000 }).catch(() => {});
+    g = await blick();
+    assert(g.karte && g.adresse === "guest.borometer.de" && /12 hours/.test(g.hinweis) && /memory/i.test(g.hinweis) && g.knopf === "Use this server" && !g.feld,
+      "#321 Public server: Adresse, Hinweis (nur im Speicher, 12 Stunden) und Knopf Use this server; kein Feld", g);
+    assert(s.party.length === 0, "#321 die Wahl allein speichert nichts und fragt nichts an", s.party);
+    const notiz = await p.evaluate(() => { const n = document.querySelector("#pHostNote"); return { sicht: !!n?.getClientRects().length, text: n?.textContent.trim() || "" }; });
+    assert(!notiz.sicht && notiz.text === "", "#321 beim oeffentlichen Server steht der Satz zum Port dieses PCs nicht da", notiz);
+    await p.fill("#pName", "Mitglied Eins");
+    await p.click("#pHost");
+    await new Promise((r) => setTimeout(r, 150));
+    assert(s.party.length === 0, "#321 Starten vor dem Bestaetigen: keine Anfrage", s.party);
+    await p.click("#pOeffNimm");
+    await bis(() => s.party.some((x) => x.path === "/api/party/server"));
+    const post = s.party.find((x) => x.path === "/api/party/server");
+    assert(post && post.body.server === OEFF && post.body.bestaetigt === true, "#321 der Klick speichert die Adresse mit bestaetigt: true", post);
+    await p.waitForFunction(() => !!document.querySelector("#pOeffDa")?.getClientRects().length, null, { timeout: 3000 }).catch(() => {});
+    g = await blick();
+    assert(g.fertig && g.knopf === null, "#321 danach steht „eingestellt“ statt des Knopfs", g);
+    await p.click("#pHost");
+    await bis(() => s.party.some((x) => x.path === "/api/party/create"));
+    const create = s.party.find((x) => x.path === "/api/party/create");
+    assert(create && create.body.server === OEFF, "#321 Starten nach dem Bestaetigen: /api/party/create mit der Adresse", s.party);
+    // Tastatur: Pfeiltaste nach rechts geht zu Own server, ein Tabstopp
+    await p.focus('#pWo [data-wo="oeffentlich"]');
+    await p.keyboard.press("ArrowRight");
+    await p.waitForFunction(() => document.querySelector('#pWo [data-wo="server"]').getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
+    const feldLeer = await p.inputValue("#pServer");
+    assert(feldLeer === "", "#321 Own server zeigt die oeffentliche Adresse nicht als eigene", feldLeer);
+    await p.click('#pWo [data-wo="oeffentlich"]');
+    await p.setViewportSize({ width: 560, height: 860 });
+    g = await blick();
+    assert(!g.quer, "#321 bei 560 px kein waagerechtes Rollen", g);
+    await p.close();
+  }
+  // --- #321: ein bereits gespeicherter Server bleibt unangetastet, Public server ist nur eine Wahl daneben
+  {
+    const s = await oeffne({ app: true, partyServer: "203.0.113.9:8732" });
+    await zurGruppe(s);
+    const p = s.page;
+    await p.waitForFunction(() => document.querySelector('#pWo [data-wo="server"]')?.getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
+    assert((await p.inputValue("#pServer")) === "203.0.113.9:8732" && s.party.length === 0, "#321 eigener Server bleibt gewaehlt und gespeichert, keine Anfrage");
+    await p.click('#pWo [data-wo="oeffentlich"]');
+    await p.click('#pWo [data-wo="server"]');
+    assert((await p.inputValue("#pServer")) === "203.0.113.9:8732" && !s.party.some((x) => x.path === "/api/party/server"),
+      "#321 Hin und Her durch die Wahl aendert die gespeicherte Adresse nicht", s.party);
+    await p.close();
+  }
+  // --- #321 gespeichert ist der oeffentliche Server: er ist vorgewaehlt, die Karte sagt „eingestellt“
+  {
+    const s = await oeffne({ app: true, partyServer: "https://guest.borometer.de" });
+    await zurGruppe(s);
+    const p = s.page;
+    await p.waitForFunction(() => document.querySelector('#pWo [data-wo="oeffentlich"]')?.getAttribute("aria-checked") === "true", null, { timeout: 3000 }).catch(() => {});
+    const z = await p.evaluate(() => ({ da: !!document.querySelector("#pOeffDa")?.getClientRects().length, nimm: !!document.querySelector("#pOeffNimm")?.getClientRects().length }));
+    assert(z.da && !z.nimm, "#321 gespeicherter oeffentlicher Server: vorgewaehlt, „eingestellt“, kein Knopf", z);
     await p.close();
   }
 
@@ -2915,9 +3302,9 @@ try {
     await zurGruppe(o);
     const h = await gruppeBlick(o.page);
     assert(h.ctx === "Noch keine Gruppe" && h.startTitel === "Gruppe starten" && h.beitrittTitel === "Gruppe beitreten" &&
-      JSON.stringify(h.wo.map((w) => w.text)) === JSON.stringify(["Auf diesem PC", "Eigener Server"]) && h.host?.text === "Gruppe starten" &&
+      JSON.stringify(h.wo.map((w) => w.text)) === JSON.stringify(["Auf diesem PC", "Öffentlicher Server", "Eigener Server"]) && h.host?.text === "Gruppe starten" &&
       h.join?.text === "Beitreten" && h.joinSrvLabel === "Server-Adresse optional" && /Firewall/.test(h.hostNote),
-      "7 Deutsch ohne Gruppe: Gruppe starten | Gruppe beitreten, Auf diesem PC | Eigener Server", h);
+      "7 Deutsch ohne Gruppe: Gruppe starten | Gruppe beitreten, Auf diesem PC | Öffentlicher Server | Eigener Server", h);
     await o.page.close();
   }
 
@@ -3350,8 +3737,8 @@ try {
     assert(b.scroll <= 0 && mittig(b) !== null && mittig(b) <= 48,
       "1.1 ueber die Hoehe verteilt: so viel Luft unten wie oben (Vorgabe: „unten so viel Platz“), ohne Rollen", { mittig: mittig(b), scroll: b.scroll, land: b.land, inhalt: b.inhalt });
     assert(b.marke === "BOROMETER" && b.spiel === "Throne and Liberty" && b.brand === "BOROMETER Throne and Liberty" && b.unter &&
-      JSON.stringify(b.palatino) === '["Throne and Liberty"]',
-      "1.2 Marke BOROMETER, darunter „Throne and Liberty“ - Palatino nur dort", { marke: b.marke, spiel: b.spiel, brand: b.brand, unter: b.unter, palatino: b.palatino });
+      JSON.stringify(b.palatino) === "[]",
+      "1.2 Marke BOROMETER, darunter „Throne and Liberty“ - keine Palatino mehr (eine Schrift, #342)", { marke: b.marke, spiel: b.spiel, brand: b.brand, unter: b.unter, palatino: b.palatino });
     assert(b.satz.startsWith("Borometer liest das Kampflog, das das Spiel nach jedem Kampf schreibt") && b.satzBreite <= 620,
       "1.3 der Satz des Entwurfs, hoechstens 620 Punkt breit", { satz: b.satz, breite: b.satzBreite });
     assert(b.ordner && b.ordner.text === "Log-Ordner wählen" && b.ordner.heiss && b.ordner.links && b.bsp && b.bsp.text === "Beispielkampf ansehen" && b.bsp.links,
@@ -3521,12 +3908,56 @@ try {
     }
   }
 
+  // --- 1.20 (#285): die Startseite wie ein festes Fenster - alles sichtbar, kein Rollen, von 1000 x 640 (zwei Spalten;
+  //     darunter und bis 900 Breite rollt sie weiter) ueber 1280 x 860 und 1617 x 1100
+  //     bis 2000 x 1480, Deutsch und Englisch, vier Themen, in jedem Zustand (Hinweis des Archivs auf Start, die Frage
+  //     nach dem Rundgang mit dem Satz des Archivs im Band, ohne und mit Ordner). Wartet auf Zustaende, nie auf Zeit.
+  {
+    const GROESSEN = [[1000, 640], [1280, 860], [1617, 1100], [2000, 1480]];
+    const ZUSTAENDE = [
+      ["Basis", { archivHinweis: 1 }, false],
+      ["Archiv-Hinweis", { archivHinweis: 0 }, false],
+      ["Archiv-Hinweis mit Ordner", { archivHinweis: 0 }, true],
+      ["Frage + Archiv", { archivHinweis: 0, firstStart: true, rundgangGesehen: false }, false],
+      // mit Ordner kommt die Frage nur noch nach „Spaeter“ (frageNoetig: ersterStart verlangt einen leeren Verlauf)
+      ["Frage + Archiv mit Ordner", { archivHinweis: 0, rundgangGesehen: false, rundgangSpaeter: 1 }, true],
+    ];
+    const NAME = { de: "Verstanden", en: "Got it" };
+    for (const lang of ["de", "en"]) for (const theme of ["dark", "light", "tnl", "glas"]) for (const [zustand, cfg, mitOrdner] of ZUSTAENDE) {
+      const s = await oeffne({ app: true, lang, breite: GROESSEN[0][0], hoehe: GROESSEN[0][1], ordner: mitOrdner ? work : null,
+        config: { theme, archivAn: true, ...cfg, ...(mitOrdner ? { logIndex: INDEX9 } : {}) } });
+      const p = s.page;
+      const frage = cfg.rundgangGesehen === false, hinweis = cfg.archivHinweis === 0;
+      if (mitOrdner) await p.waitForFunction(() => document.querySelectorAll("#landZuletzt .zr:not(#landBspZeile)").length > 0, null, { timeout: 3000 }).catch(() => {});
+      const okSel = frage ? "#rgFrageArchivOk" : "#landArchivOk";
+      if (hinweis) await p.waitForFunction((x) => { const e = document.querySelector(x); return !!e && e.getClientRects().length > 0; }, okSel, { timeout: 5000 }).catch(() => {});
+      for (const [breite, hoehe] of GROESSEN) {
+        await p.setViewportSize({ width: breite, height: hoehe });
+        await p.waitForFunction(([b, h]) => parseFloat(document.documentElement.style.getPropertyValue("--winh")) === h && innerWidth === b &&
+          document.querySelector("#land").getClientRects().length > 0, [breite, hoehe], { timeout: 5000 }).catch(() => {});
+        const m = await p.evaluate(([x, hinw]) => {
+          const land = document.querySelector("#land"), ok = document.querySelector(x);
+          const lr = land.getBoundingClientRect(), r = ok && ok.getClientRects().length ? ok.getBoundingClientRect() : null;
+          return { rollt: land.scrollHeight - land.clientHeight, okDa: hinw ? !!r : true,
+            okGanz: hinw ? !!r && r.top >= lr.top && r.bottom <= lr.bottom && r.left >= lr.left && r.right <= lr.right : true,
+            quer: document.documentElement.scrollWidth > innerWidth, band: !!document.querySelector("#rgFrage") && !document.querySelector("#rgFrage").hidden };
+        }, [okSel, hinweis]);
+        const wo = `${lang} ${theme} ${breite} × ${hoehe} ${zustand}`;
+        assert(m.rollt <= 0 && m.okDa && m.okGanz && !m.quer && (!frage || m.band),
+          `1.20 ${wo}: die Startseite rollt nicht (scrollHeight <= clientHeight), „${NAME[lang]}“ steht ganz im Bild`, m);
+      }
+      assert(!s.fehler.length, "1.20 keine Fehler", s.fehler);
+      await p.close();
+    }
+  }
+
   // ===== Abschnitt 10: Einstellungen (Luecken 10) =====
   const VERSION10 = JSON.parse(readFileSync(join(root, "package.json"), "utf8")).version.replace(/\.0$/, "");
   const clogMod = await esbuild.build({ stdin: { contents: 'export { BORO_CHANGELOG } from "./src/renderer/app/02-changelog";', resolveDir: root, loader: "ts" },
     bundle: true, format: "esm", platform: "node", write: false, logLevel: "silent", plugins: [bilderPlugin(root, bilderModus(root))] });
   const { BORO_CHANGELOG } = await import("data:text/javascript;base64," + Buffer.from(clogMod.outputFiles[0].text).toString("base64"));
-  const ABSCHNITTE = ["darst", "sprache", "groesse", "overlay", "logs", "gruppe", "dev", "info"];
+  // folgt Spezifikation Log-Archiv 2, 6 (#264): der Abschnitt Archiv steht nach dem Log-Ordner, zehn Abschnitte
+  const ABSCHNITTE = ["darst", "sprache", "groesse", "overlay", "logs", "archiv", "charaktere", "gruppe", "dev", "info"];
   const einstBlick = (p) => p.evaluate(() => {
     const q = (x) => document.querySelector(x);
     const r = (e) => e && e.getClientRects().length ? e.getBoundingClientRect().toJSON() : null;
@@ -3559,23 +3990,23 @@ try {
   const aktuell10 = (p) => p.evaluate(() => [...document.querySelectorAll("#einstNav button")].filter((b) => b.hasAttribute("aria-current")).map((b) => b.dataset.gruppe).join());
   const zuEinst = async (p) => { await bereich(p, "settings"); await p.waitForFunction(() => !document.querySelector("#einst").hidden, null, { timeout: 3000 }).catch(() => {}); };
 
-  // --- 10.1, 10.2: eine rollende Seite mit Sprungleiste und acht Abschnitten, kompakt
+  // --- 10.1, 10.2: eine rollende Seite mit Sprungleiste und zehn Abschnitten (Archiv seit #264), kompakt
   {
     const s = await oeffne({ app: true, lang: "de" });
     const p = s.page;
     await beispiel(p);
     await zuEinst(p);
     const e = await einstBlick(p);
-    assert(JSON.stringify(e.abschnitte.map((x) => x.h)) === JSON.stringify(["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Gruppe und Server", "Entwickler", "Info"]) &&
+    assert(JSON.stringify(e.abschnitte.map((x) => x.h)) === JSON.stringify(["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Archiv", "Charaktere", "Gruppe und Server", "Entwickler", "Info"]) &&
       e.abschnitte.every((x, i) => x.id === "eg-" + ABSCHNITTE[i] && x.hid === "egh-" + ABSCHNITTE[i] && x.lab === x.hid),
-      "10.2 acht Abschnitte in der Reihenfolge des Entwurfs, jeder eine Region mit seiner Ueberschrift", e.abschnitte.map((x) => x.id + ":" + x.h));
-    assert(e.abschnitte.length === 8 && e.abschnitte.every((x) => x.sicht) && e.abschnitte.every((x, i) => i === 0 || x.r.top >= e.abschnitte[i - 1].r.bottom - 1),
+      "10.2 zehn Abschnitte in der Reihenfolge des Entwurfs, jeder eine Region mit seiner Ueberschrift", e.abschnitte.map((x) => x.id + ":" + x.h));
+    assert(e.abschnitte.length === 10 && e.abschnitte.every((x) => x.sicht) && e.abschnitte.every((x, i) => i === 0 || x.r.top >= e.abschnitte[i - 1].r.bottom - 1),
       "10.1 eine rollende Seite: alle Abschnitte stehen untereinander, keiner ist verborgen", e.abschnitte.map((x) => x.r && Math.round(x.r.top)));
     assert(JSON.stringify(e.verborgen) === JSON.stringify(["einstNavWin", "eg-win"]),
       "10.1 ohne windows aus /api/config: nur der Abschnitt Windows und sein Eintrag verborgen (Windows-Einbindung 9)", e.verborgen);
     assert(JSON.stringify(e.nav.map((x) => x.k)) === JSON.stringify(ABSCHNITTE) && e.nav.every((x, i) => x.text === e.abschnitte[i]?.h && x.svg),
       "10.1 Sprungleiste: ein Knopf mit Symbol je Abschnitt, gleiche Namen und Reihenfolge", e.nav);
-    assert(e.nav.length === 8 && e.navR && e.abschnitte[0].r && e.navR.right <= e.abschnitte[0].r.left && JSON.stringify(e.aktuell) === '["darst"]',
+    assert(e.nav.length === 10 && e.navR && e.abschnitte[0].r && e.navR.right <= e.abschnitte[0].r.left && JSON.stringify(e.aktuell) === '["darst"]',
       "10.1 die Leiste links, am Anfang leuchtet Darstellung", { nav: e.navR, aktuell: e.aktuell });
     const breit = Math.max(...e.abschnitte.map((x) => x.r.width));
     const hoch = [...e.zeilen].sort((a, b) => a - b)[Math.floor(e.zeilen.length / 2)];
@@ -3842,7 +4273,7 @@ try {
     await p.waitForFunction(() => !!document.querySelector("#eServerStatus")?.getClientRects().length, null, { timeout: 3000 }).catch(() => {});
     const gespeichert = await stand();
     const post = s.party.find((x) => x.path === "/api/party/server");
-    assert(!!post && post.body.server === "198.51.100.7:8732" && !s.party.some((x) => x.path === "/api/party/create") && gespeichert.status && !gespeichert.offen,
+    assert(!!post && post.body.server === "198.51.100.7:8732" && post.body.bestaetigt === true && !s.party.some((x) => x.path === "/api/party/create") && gespeichert.status && !gespeichert.offen,
       "10.9 Save: POST /api/party/server mit der Adresse aus dem Feld, ohne eine Gruppe zu starten; danach gilt der Status ihr", { post, gespeichert });
     const checks = s.party.filter((x) => x.path === "/api/party/check").length;
     await p.click("#eServerCheck");
@@ -3864,6 +4295,64 @@ try {
       an: [...document.querySelectorAll("#einstNav button")].filter((b) => b.hasAttribute("aria-current")).map((b) => b.dataset.gruppe).join() }));
     assert(dort.einst && dort.fokus === "egh-gruppe" && dort.an === "gruppe", "10.9 der Weg springt zum Abschnitt Gruppe und Server", dort);
     assert(!s.fehler.length, "10.9: keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  // --- 10.13 (#231): die Warnung "unverschluesselt" am Feld Gruppen-Server der Einstellungen
+  {
+    const s = await oeffne({ app: true, partyServer: "203.0.113.9:8732" });
+    const p = s.page;
+    await p.setViewportSize({ width: 560, height: 860 });
+    const warnung = (id) => p.evaluate((i) => {
+      const el = document.querySelector(i);
+      return { sichtbar: !!el?.getClientRects().length, text: el?.textContent.trim() ?? null, rolle: el?.getAttribute("role") ?? null };
+    }, id);
+    await zuEinst(p);
+    let w = await warnung("#eServerKlar");
+    assert(w.sichtbar && /not encrypted/.test(w.text) && w.rolle === "status", "10.13 Einstellungen: die gespeicherte Adresse ohne https:// warnt (role=status)", w);
+    assert((await p.getAttribute("#eServer", "aria-describedby")).includes("eServerKlar"), "10.13 das Feld verweist auf die Warnung (aria-describedby)");
+    await p.fill("#eServer", "https://party.example");
+    w = await warnung("#eServerKlar");
+    assert(!w.sichtbar, "10.13 Einstellungen: mit https:// keine Warnung", w);
+    await p.fill("#eServer", "203.0.113.9:8732");
+    await p.click('#eSprache button[data-lang="de"]');
+    await p.waitForFunction(() => document.querySelector("#einstTitel").textContent === "Einstellungen", null, { timeout: 3000 }).catch(() => {});
+    w = await warnung("#eServerKlar");
+    assert(w.sichtbar && /unverschl/.test(w.text), "10.13 Einstellungen deutsch: die Warnung in der Sprache", w);
+    const breit = await p.evaluate(() => document.documentElement.scrollWidth <= document.documentElement.clientWidth);
+    assert(breit, "10.13 bei 560 px mit Warnung kein waagerechtes Rollen");
+    assert(!s.fehler.length, "10.13 keine Fehler", s.fehler);
+    await p.close();
+  }
+
+  // --- 10.14 (#249): Platzhalter und Hinweise nennen https, nicht IP:Port
+  {
+    const s = await oeffne({ app: true, partyServer: "203.0.113.9:8732" });
+    const p = s.page;
+    await zuEinst(p);
+    const ph = await p.evaluate(() => ["#eServer", "#pServer", "#pJoinSrv"].map((i) => document.querySelector(i)?.getAttribute("placeholder")));
+    assert(ph.every((x) => x === "e.g. https://party.myclan.org"), "10.14 Platzhalter (en): eine https-Adresse ohne Port, in allen drei Feldern", ph);
+    let w = await p.evaluate(() => document.querySelector("#eServerKlar").textContent.trim());
+    assert(/no longer work/.test(w) && /https:\/\//.test(w) && /clan/.test(w) && !/8732/.test(w),
+      "10.14 Hinweis (en): unverschluesselt, geht bald nicht mehr, nach der https-Adresse fragen", w);
+    await p.click('#eSprache button[data-lang="de"]');
+    await p.waitForFunction(() => document.querySelector("#einstTitel").textContent === "Einstellungen", null, { timeout: 3000 }).catch(() => {});
+    const phDe = await p.evaluate(() => document.querySelector("#eServer").getAttribute("placeholder"));
+    assert(phDe === "z. B. https://party.meinclan.de", "10.14 Platzhalter (de)", phDe);
+    w = await p.evaluate(() => document.querySelector("#eServerKlar").textContent.trim());
+    assert(/nicht mehr/.test(w) && /https:\/\//.test(w) && /Clan/.test(w) && !/8732/.test(w), "10.14 Hinweis (de)", w);
+    // keine Verbindung: IP-Adresse behaelt den Hinweis auf den Port, https nicht
+    const status = () => p.evaluate(() => document.querySelector("#eServerStatusText").textContent);
+    await p.click("#eServerCheck");
+    await p.waitForFunction(() => /Keine Verbindung/.test(document.querySelector("#eServerStatusText")?.textContent || ""), null, { timeout: 3000 }).catch(() => {});
+    const ip = await status();
+    assert(/Keine Verbindung/.test(ip) && /Port 8732/.test(ip), "10.14 keine Verbindung, IP-Adresse: der Hinweis auf Port 8732 bleibt", ip);
+    await p.fill("#eServer", "https://party.example");
+    await p.click("#eServerSave");
+    await p.waitForFunction(() => /party\.example/.test(document.querySelector("#eServerStatusText")?.textContent || ""), null, { timeout: 3000 }).catch(() => {});
+    const https = await status();
+    assert(/Keine Verbindung zu https:\/\/party\.example/.test(https) && !/8732|Port/.test(https), "10.14 keine Verbindung, https-Adresse: kein Hinweis auf Port 8732", https);
+    assert(!s.fehler.length, "10.14 keine Fehler", s.fehler);
     await p.close();
   }
 
@@ -3909,9 +4398,9 @@ try {
     /* folgt Spezifikation Update-Hinweis 2.4 (Entscheidung 02.10.): "Netz" als fuenfter Eintrag, und in Info der Schalter
        des Update-Hinweises; folgt Spezifikation Rundgang 02.10.2026, 2: dazu "Rundgang zeigen" - gleich streng:
        Liste und Bedienelemente genau, keines in der Sicherheit */
-    assert(JSON.stringify(d.sicher) === '["Liest","Schreibt","Lokaler Server","Netz","Spiel"]' && JSON.stringify(d.infoBedien) === '["eUpdatePruefen","eRundgang"]'
+    assert(JSON.stringify(d.sicher) === '["Liest","Schreibt","Lokaler Server","Netz","Spiel"]' && JSON.stringify(d.infoBedien) === '["eUpdatePruefen","eRundgang","eBereichHinweise"]'
       && d.sicherBedien === 0,
-      "10.12 Sicherheit steht in Info, ohne Bedienelemente; in Info nur der Schalter des Update-Hinweises und „Rundgang zeigen“", d);
+      "10.12 Sicherheit steht in Info, ohne Bedienelemente; in Info nur der Schalter des Update-Hinweises, „Rundgang zeigen“ und der Schalter der Hinweise zu den Bereichen", d);
     assert(!s.fehler.length, "10.10/10.11: keine Fehler", s.fehler);
     await p.close();
   }
@@ -3947,12 +4436,14 @@ try {
        nicht aus den Einstellungen) - gleich streng: Liste genau, sonst nichts;
        folgt Spezifikation Windows-Einbindung 8: lang kommt dazu (aus 66, die Sprache fuer die Texte des Hauptprozesses);
        folgt Spezifikation Windows-Einbindung 9 und 3.4: meldenKampf, meldenNurBest und trayBeimSchliessen kommen dazu, und
-       die Einstellungen schreiben sie, je an genau einer Stelle (der Autostart geht ueber /api/win, kein Schluessel) */
+       die Einstellungen schreiben sie, je an genau einer Stelle (der Autostart geht ueber /api/win, kein Schluessel);
+       folgt Spezifikation Log-Archiv 5, 6 (#264): archivAn und archivHinweis kommen dazu, aus 76 (archivSchalten,
+       archivHinweisQuittieren), nicht aus den Einstellungen - die rufen archivSchalten und schreiben selbst weiter nur die vier */
     const eigene = [...quelle.matchAll(/persistPref\(([^)]*)\)/g)].map((m) => m[1]);
-    assert(JSON.stringify(schluessel) === JSON.stringify(["compactAlpha", "devMode", "ghost", "lang", "logIndex", "meldenKampf", "meldenNurBest", "mergePhases", "minDur", "randlosGesehen",
-      "rundgangGesehen", "skillNames", "splitAfter", "theme", "themeResolved", "trayBeimSchliessen", "uiZoom", "updatePruefen", "ventiusTop"]) && lokal === 2 && !/localStorage\./.test(quelle)
-      && JSON.stringify(eigene) === JSON.stringify(['"updatePruefen", updateAn', '"meldenKampf", w.melden', '"meldenNurBest", w.nurBest', '"trayBeimSchliessen", w.tray']),
-      "kein neuer Speicherschluessel ausser updatePruefen, rundgangGesehen, lang und den drei Schaltern von Windows: 19 Schluessel - die alten 13, der Update-Hinweis, der Rundgang und Windows in /api/config, zwei in localStorage, die Einstellungen schreiben nur updatePruefen und die drei von Windows",
+    assert(JSON.stringify(schluessel) === JSON.stringify(["archivAn", "archivHinweis", "bereichHinweise", "bereicheGezeigt", "compactAlpha", "devMode", "ghost", "lang", "logIndex", "meldenKampf", "meldenNurBest", "mergePhases", "minDur", "randlosGesehen",
+      "rundgangGesehen", "rundgangSpaeter", "skillNames", "splitAfter", "theme", "themeResolved", "trayBeimSchliessen", "uiZoom", "updatePruefen", "ventiusTop"]) && lokal === 2 && !/localStorage\./.test(quelle)
+      && JSON.stringify(eigene) === JSON.stringify(['"bereichHinweise", state.bereichHinweise', '"updatePruefen", updateAn', '"meldenKampf", w.melden', '"meldenNurBest", w.nurBest', '"trayBeimSchliessen", w.tray']),
+      "kein neuer Speicherschluessel ausser updatePruefen, rundgangGesehen, lang, den drei Schaltern von Windows, (#265) rundgangSpaeter, bereicheGezeigt und bereichHinweise und den zwei des Archivs (#264): 24 Schluessel, zwei in localStorage, die Einstellungen schreiben nur updatePruefen, bereichHinweise und die drei von Windows",
       { schluessel, lokal, eigene });
   }
 
@@ -3964,11 +4455,11 @@ try {
     await zuEinst(p);
     const e = await einstBlick(p);
     const wo = `${breite} × ${hoehe}`;
-    assert(e.abschnitte.length === 8 && JSON.stringify(e.verborgen) === '["einstNavWin","eg-win"]' && !e.quer && !e.klein.length && !s.fehler.length, `10 ${wo}: acht Abschnitte (Windows verborgen), kein waagerechtes Rollen, Text mindestens 11 Punkt, keine Fehler`, { n: e.abschnitte.length, klein: e.klein, fehler: s.fehler });
+    assert(e.abschnitte.length === 10 && JSON.stringify(e.verborgen) === '["einstNavWin","eg-win"]' && !e.quer && !e.klein.length && !s.fehler.length, `10 ${wo}: zehn Abschnitte (Windows verborgen), kein waagerechtes Rollen, Text mindestens 11 Punkt, keine Fehler`, { n: e.abschnitte.length, klein: e.klein, fehler: s.fehler });
     const breit = Math.max(...e.abschnitte.map((x) => x.r?.width || 0));
-    assert(e.abschnitte.length === 8 && breit <= 820 && e.abschnitte.every((x) => x.sicht), `10 ${wo}: alle Abschnitte da, hoechstens 820 Punkt breit`, breit);
-    if (breite >= 1000) assert(e.nav.length === 8 && e.navR && e.navR.right <= e.abschnitte[0].r.left, `10 ${wo}: die Sprungleiste links`, e.navR);
-    else assert(e.nav.length === 8 && e.navR && e.navR.bottom <= e.abschnitte[0].r.top + 0.5, `10 ${wo}: die Sprungleiste als Zeile ueber der Seite`, e.navR);
+    assert(e.abschnitte.length === 10 && breit <= 820 && e.abschnitte.every((x) => x.sicht), `10 ${wo}: alle Abschnitte da, hoechstens 820 Punkt breit`, breit);
+    if (breite >= 1000) assert(e.nav.length === 10 && e.navR && e.navR.right <= e.abschnitte[0].r.left, `10 ${wo}: die Sprungleiste links`, e.navR);
+    else assert(e.nav.length === 10 && e.navR && e.navR.bottom <= e.abschnitte[0].r.top + 0.5, `10 ${wo}: die Sprungleiste als Zeile ueber der Seite`, e.navR);
     await p.close();
   }
 
@@ -3977,7 +4468,7 @@ try {
      260 ms). Gewartet wird, bis kein neuer Wunsch mehr kommt, dann steht der Viewport auf dem letzten. */
   const fensterWie = async (s) => {
     let n = -1;
-    for (const ende = Date.now() + 6000; Date.now() < ende;) {
+    for (const ende = performance.now() + 6000; performance.now() < ende;) {
       const jetzt = s.win.filter((b) => b.do === "resize").length;
       if (jetzt === n && jetzt > 0) break;
       n = jetzt;
@@ -4012,9 +4503,9 @@ try {
       kopfSicht: !!kb && kb.width > 2 && kb.height > 2, spaltenKoepfe: kopf ? kopf.querySelectorAll('[role="columnheader"]').length : 0,
       zeilen: ganz.slice(0, 5).map((z) => {
         const q = (s) => z.querySelector(s);
-        return { h: z.getBoundingClientRect().height, rang: sicht(q(".rank")), pfeil: sicht(q(".twist")), bild: r(q(bilder ? "img.sic" : ".sic.leer")), name: r(q(".nmt")),
-          schaden: r(q('[data-k="damage"]')), fill: r(q(".fill")), aus: q(".fill")?.classList.contains("aus"),
-          andere: ["dps", "share", "hits", "max", "critRate", "heavyRate"].filter((k) => sicht(q(`[data-k="${k}"]`))) };
+        return { h: z.getBoundingClientRect().height, b: z.getBoundingClientRect().toJSON(), rang: sicht(q(".rank")), pfeil: sicht(q(".twist")), bild: r(q(bilder ? "img.sic" : ".sic.leer")), name: r(q(".nmt")),
+          schaden: r(q('[data-k="damage"]')), anteil: r(q('[data-k="share"]')), fill: r(q(".fill")), aus: q(".fill")?.classList.contains("aus"),
+          andere: ["dps", "hits", "max", "critRate", "heavyRate"].filter((k) => sicht(q(`[data-k="${k}"]`))) };
       }) };
   }, BILDER);
   const kopfMass = (p) => p.evaluate(() => {
@@ -4042,13 +4533,15 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const z = await streifen(p);
     // folgt Entwurf E:1017ff. (300 Punkt breit); die Leiste liegt ueber der oberen Zeile und verlangt keine Breite (Pruefung W1)
     assert(w && w.w >= 300 && w.w <= 320, `11.2 ${lang}: das Fenster ist ein schmaler Streifen (300 bis 320 Punkt)`, w);
-    assert(z.zahl >= 12 && z.ganz === 5 && z.halb === 0, `11.2 ${lang}: Top 5 - genau fuenf ganze Zeilen im Streifen, keine angeschnittene sechste`, { zahl: z.zahl, ganz: z.ganz, halb: z.halb });
+    assert(w && w.h >= 250 && w.h <= 350, `11.2 ${lang}: Panel (Kompakt neu, #287): Leiste, Kopf, fuenf Zeilen und der Knopf, rund 300 Punkt hoch`, w);
+    assert(z.zahl >= 12 && z.ganz === 5 && z.halb === 0, `11.2 ${lang}: Top 5 - fuenf Zeilen, keine angeschnittene weitere (der Rest steht hinter dem Knopf)`, { zahl: z.zahl, ganz: z.ganz, halb: z.halb });
+    // #328: der Hinweis unter der Liste ist seit B (#348) der Knopf zum Aufklappen (vorher ein stiller Text); die Liste nennt ihren Ausschnitt
     const rest = await p.evaluate(() => {
-      const b = document.querySelector("#kRest"), haupt = [...document.querySelectorAll("#bars .row:not(.sub)")];
+      const b = document.querySelector("#kRest"), haupt = [...document.querySelectorAll("#bars .row:not(.sub)")], liste = document.querySelector("#bars");
       const r = b && !b.hidden && b.getClientRects().length ? b.getBoundingClientRect() : null;
       const dmg = haupt.map((z) => Number(z.dataset.dmg)), ges = dmg.reduce((a, x) => a + x, 0);
-      return { da: !!r, text: b ? b.querySelector(".kresttext").textContent : "", name: b ? b.getAttribute("aria-label") : "",
-        beschr: b && b.getAttribute("aria-describedby") ? (document.getElementById(b.getAttribute("aria-describedby")) || {}).textContent : "",
+      return { da: !!r, chip: b ? b.querySelector(".krestn").textContent : "", wort: b ? b.querySelector(".krestw").textContent : "", p: b ? b.querySelector(".krestp").textContent : "",
+        tag: b ? b.tagName : "", stumm: b ? b.getAttribute("aria-hidden") : "", auf: b ? b.getAttribute("aria-expanded") : "", knopfName: b ? b.getAttribute("aria-label") : "", name: liste.getAttribute("aria-label"),
         h: r ? r.height : 0, unten: r ? r.bottom : 0, fenster: innerHeight, alle: haupt.length,
         rest: dmg.slice(5).reduce((a, x) => a + x, 0) / (ges || 1) };
     });
@@ -4056,22 +4549,20 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const anteilZahl = (f) => f > 0 && f < 0.01 ? "< 1" : f < 1 && f > 0.99 ? "> 99" : String(Math.round(f * 100));
     const n = rest.alle - 5;
     const wort = lang === "de" ? "weitere" : "more";
-    assert(rest.alle > 5 && rest.da && rest.text.startsWith(`+${n} ${wort} \u00b7 `) && Math.abs(rest.h - 27) < 1 && rest.unten <= rest.fenster + 0.5,
-      `11.2 ${lang} (#160): die Restzeile "+${n} ${wort} \u00b7 x %" unter Zeile 5, 27 Punkt, ganz im Fenster`, rest);
-    assert(rest.text.endsWith(anteilZahl(rest.rest) + "\u00a0%".slice(lang === "de" ? 0 : 1)), `11.2 ${lang}: ihr Anteil ist der Schaden der Zeilen darunter`, rest);
-    assert(rest.beschr && rest.beschr === rest.text && rest.beschr.startsWith("+" + n), `11.2 ${lang}: aria-describedby zeigt auf den sichtbaren Text der Restzeile (Anteil und Schaden gehen dem Vorleser nicht verloren)`, rest);
-    assert(/^(\d+ weitere F\u00e4higkeiten in der Vollansicht zeigen|Show \d+ more skills in full view)$/.test(rest.name), `11.2 ${lang}: ihr Name sagt, was ein Klick tut`, rest);
+    assert(rest.alle > 6 && rest.da && rest.chip === `\u2193${n}` && rest.wort === wort && rest.tag === "BUTTON" && rest.stumm === null && rest.auf === "false" && rest.knopfName === (lang === "de" ? `Alle ${rest.alle} Zeilen zeigen` : `Show all ${rest.alle} rows`) && rest.h >= 20 && rest.h <= 26 && rest.unten <= rest.fenster + 0.5,
+      `11.2 ${lang} (#328): der Hinweis "\u2193${n} ${wort} \u00b7 x %" steht im Fluss unter der Liste, 22 Punkt hoch, ganz im Fenster, seit B (#348) der Knopf zum Aufklappen`, rest);
+    assert(rest.p === anteilZahl(rest.rest) + "\u00a0%".slice(lang === "de" ? 0 : 1), `11.2 ${lang}: sein Anteil ist der Schaden der Zeilen darunter`, rest);
+    assert(rest.name === (lang === "de" ? `F\u00e4higkeiten, Zeile 1 bis 5 von ${rest.alle}` : `Skills, rows 1 to 5 of ${rest.alle}`), `11.2 ${lang}: die Liste nennt ihren Ausschnitt (der Knopf traegt seinen eigenen Namen)`, rest);
     assert(!z.kopfSicht && z.spaltenKoepfe >= 2, `11.2 ${lang}: kein sichtbarer Spaltenkopf, fuer den Vorleser bleiben die Spaltenkoepfe`, z);
-    const zeilenGut = z.zeilen.every((x) => !x.rang && !x.pfeil && !x.andere.length && x.bild && Math.abs(x.bild.width - 16) < 0.6 && x.name && x.schaden &&
-      x.h <= 32 && x.fill && Math.abs(x.fill.height - 3) < 0.6 && x.fill.top >= x.name.bottom - 1 && Math.abs(x.fill.left - x.name.left) <= 2 &&
-      x.fill.right <= x.schaden.right + 1 && Math.abs((x.name.top + x.name.bottom) / 2 - (x.schaden.top + x.schaden.bottom) / 2) <= 4);
-    assert(zeilenGut && z.zeilen[0].aus && Math.abs(z.zeilen[0].fill.right - z.zeilen[0].schaden.right) <= 1,
-      `11.2 ${lang}: je Zeile Symbol, Name und Schaden, darunter die 3-Punkt-Spur ab dem Namen; Rang 1 laeuft bis an den Rand aus` + (BILDER ? "" : " (ohne Spielbilder: Platte statt Bild)"), z.zeilen);
+    const zeilenGut = z.zeilen.every((x) => !x.rang && !x.pfeil && !x.andere.length && x.bild && Math.abs(x.bild.width - 18) < 0.6 && x.name && x.name.width >= 30 && !x.schaden && x.anteil &&
+      x.h > 24 && x.h < 28 && x.fill && x.fill.left <= x.b.left + 0.5 && x.fill.height >= 18 && x.fill.right <= x.b.right + 0.5 &&
+      x.anteil.right <= x.b.right + 0.5 && x.bild.left >= x.b.left && x.name.left >= x.bild.right && x.anteil.left >= x.name.left);
+    assert(zeilenGut && z.zeilen[0].aus && Math.abs(z.zeilen[0].fill.right - z.zeilen[0].b.right) <= 1,
+      `11.2 ${lang}: je Zeile Symbol (18 Punkt), Name sichtbar, Anteil rechts, dahinter der Balken ab der Kante; kein Schaden in der Zeile; Rang 1 fuellt die Zeile` + (BILDER ? "" : " (ohne Spielbilder: Marke statt Bild)"), z.zeilen);
     const k = await kopfMass(p);
-    assert(k.bild && Math.abs(k.bild.width - 20) < 0.6 && k.name && k.bild.right <= k.name.left && k.meta && k.meta.top >= k.name.bottom - 1 &&
-      Math.abs(k.meta.left - k.name.left) <= 1 && k.dps && k.dps.left >= k.name.right && Math.abs(parseFloat(k.dpsFs) - 24) < 0.6 &&
-      k.einheit && k.einheitText === "DPS" && k.einheit.left >= k.dps.right - 1,
-      `11.2 ${lang}: Kopf mit Bossbild, Boss und darunter Uhrzeit \u00b7 Dauer, rechts DPS in 24 Punkt`, k);
+    assert(!k.bild && k.name && k.meta && k.dps && k.einheit && Math.abs(parseFloat(k.dpsFs) - 42) < 0.6 && k.name.left >= k.dps.right - 1 && k.meta.top >= k.name.bottom - 1 &&
+      Math.abs(k.meta.right - k.name.right) <= 1 && k.einheitText === "DPS" && k.einheit.top >= k.dps.bottom - 2 && k.einheit.left <= k.dps.left + 2,
+      `11.2 ${lang}: Kopf ohne Bossbild: links DPS in 42 Punkt mit "DPS" darunter, rechts Boss und darunter Uhrzeit \u00b7 Dauer`, k);
     // Uhrzeit vor der Dauer wie in der Faktenzeile (der Entwurf stellt die Dauer vorn, E:1024)
     assert(JSON.stringify(k.fakten) === JSON.stringify(["zeit", "dauer"]) && /^\d{1,2}:\d{2} \u00b7 \S+/.test(k.metaText),
       `11.2 ${lang}: unter dem Boss nur Uhrzeit \u00b7 Dauer`, { fakten: k.fakten, text: k.metaText });
@@ -4112,11 +4603,11 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       const rechts = Math.max(r(zahl).right, zr && zr.getClientRects().length ? r(zr).right : 0);
       const pr = pv.getClientRects().length ? r(pv) : null;
       return { da: !!pr, nameGanz: k(nm), faktenGanz: fakten.every(k), dauer: fakten.some((f) => f.dataset.f === "dauer"), anzahl: fakten.length,
-        pr: pr && { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom }, zahlUnten: r(zahl).bottom, zahlRechts: rechts, w: innerWidth, h: innerHeight };
+        pr: pr && { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom }, zahlUnten: r(zahl).bottom, zahlRechts: rechts, kurzRechts: zr && zr.getClientRects().length ? r(zr).right : 0, nameLinks: r(nm).left, w: innerWidth, h: innerHeight };
     });
     assert(vg.da && vg.nameGanz && vg.faktenGanz && vg.dauer && vg.anzahl >= 2 && vg.pr.l >= 0 && vg.pr.r <= vg.w + 0.5 && vg.pr.b <= vg.h + 0.5 &&
-      vg.pr.t >= vg.zahlUnten - 1 && Math.abs(vg.pr.r - vg.zahlRechts) <= 1,
-      `11.2 ${lang} (#157): der Vergleich unter der Zahl nimmt der linken Spalte nichts - Boss, Uhrzeit und Dauer ungekuerzt, er steht rechtsbuendig unter der Zahl`, vg);
+      vg.pr.t >= vg.zahlUnten - 1 && vg.pr.l >= vg.kurzRechts - 1 && vg.pr.r <= vg.nameLinks + 0.5,
+      `11.2 ${lang} (#157): der Vergleich steht unter der Zahl neben "DPS" und nimmt der rechten Spalte nichts - Boss, Uhrzeit und Dauer ungekuerzt`, vg);
     // Gruppenansicht ohne Lebende (body.partyEmpty): die Zahl und ihre Einheit bleiben aus, auch wenn .big sich im Streifen aufloest
     const zeigt = () => p.evaluate(() => ["#hDps", "#hDpsKurz"].map((q) => document.querySelector(q).getClientRects().length > 0));
     const ohneGruppe = await zeigt();
@@ -4147,10 +4638,9 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       return { skill: x.dataset.skill || x.querySelector(".nmt")?.textContent, leer: !!x.querySelector(".nm .sic.leer"), platte: r(".nm .sic"), name: r(".nmt"), fill: r(".fill") };
     }));
     const ohneSym = z.find((x) => /Testschlag/.test(x.skill || ""));
-    assert(!!ohneSym && ohneSym.leer && ohneSym.platte && Math.abs(ohneSym.platte.width - 16) < 0.6 && ohneSym.name && ohneSym.fill
-      && Math.abs(ohneSym.fill.left - ohneSym.name.left) <= 2 && ohneSym.platte.right <= ohneSym.name.left
-      && z.every((x) => !x.name || !x.fill || Math.abs(x.fill.left - x.name.left) <= 2),
-      "11.2 buendig ohne Symbol: die Platte eines Skills ohne Symbol steht im Kompakt wie das Bild, die Spur beginnt am Namen", z);
+    assert(!!ohneSym && ohneSym.leer && ohneSym.platte && Math.abs(ohneSym.platte.width - 18) < 0.6 && Math.abs(ohneSym.platte.height - 18) < 0.6 && ohneSym.fill
+      && z.every((x) => !x.platte || (Math.abs(x.platte.width - 18) < 0.6 && Math.abs(x.platte.height - 18) < 0.6)),
+      "11.2 ohne Symbol: die Platte eines Skills ohne Symbol ist so gross wie das Bild (18 Punkt), jede Zeile gleich", z);
     assert(!s.fehler.length, "11.2 buendig ohne Symbol: keine Fehler", s.fehler);
     await p.close();
   }
@@ -4242,7 +4732,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       const r = leiste.map((e) => e.getBoundingClientRect());
       const ueber = r.some((a, i) => r.some((b, j) => i < j && a.left < b.right - 0.5 && b.left < a.right - 0.5));
       return { live: !!document.querySelector("#btnWatch").getClientRects().length, geistImMenue: !!document.querySelector("#morePanel #btnGhost"),
-        max: !!document.querySelector("#winMax")?.getClientRects().length, absolut: leiste.every((e) => getComputedStyle(e).position === "absolute"),
+        max: !!document.querySelector("#winMax"), absolut: leiste.every((e) => getComputedStyle(e).position === "absolute"),
         inZeile: r.every((x) => x.top >= top.top - 0.5 && x.bottom <= top.bottom + 0.5), imFenster: r.every((x) => x.left >= 0 && x.right <= innerWidth + 0.5), ueber };
     });
     assert(!ort.live && ort.geistImMenue && !ort.max && ort.absolut && ort.inZeile && ort.imFenster && !ort.ueber,
@@ -4303,7 +4793,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     await d.page.close();
   }
 
-  // --- 11.6: ganze Tafel beim Vergroessern; die Lesezeile bleibt eine Zeile
+  // --- 11.6: auch in einem hohen Fenster zeigt die Liste fuenf Zeilen und rollt (#328); die Lesezeile bleibt eine Zeile
   {
     const s = await oeffne({ app: true, lang: "de", config: { randlosGesehen: true } });
     const p = s.page;
@@ -4311,9 +4801,10 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const w = await insKompakt(s);
     const lese = await kopfMass(p);
     await p.setViewportSize({ width: w.w, height: 720 });
-    await p.waitForFunction(() => document.querySelector("#bars").getBoundingClientRect().height > 400, null, { timeout: 3000 }).catch(() => {});
+    await p.waitForFunction(() => document.documentElement.style.getPropertyValue("--winh") === "720px", null, { timeout: 3000 });
     const z = await streifen(p);
-    assert(z.ganz === z.zahl && z.zahl >= 12, "11.6 vergroessert: die ganze Tafel steht da", { ganz: z.ganz, zahl: z.zahl });
+    const rollt = await p.evaluate(() => { const b = document.querySelector("#bars"); return b.scrollHeight > b.clientHeight + 20; });
+    assert(z.ganz === 5 && z.halb === 0 && z.zahl >= 12 && rollt, "11.6 hohes Fenster: fuenf ganze Zeilen, der Rest liegt zum Rollen darunter", { ganz: z.ganz, halb: z.halb, zahl: z.zahl, rollt });
     assert(lese.lese && lese.lese.height <= 20, "11.6 die Lesezeile (#39) bleibt eine Zeile", lese.lese);
     await p.close();
   }
@@ -4333,7 +4824,8 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       t: z.querySelector('[data-k="damage"]').textContent.trim(), w: z.querySelector(".fill").getBoundingClientRect().width })));
     const d = top.map((x) => zahl(x.t));
     const fallend = d.every((v, i) => i === 0 || v <= d[i - 1]);
-    const anteil = top.every((x, i) => Math.abs(x.w / top[0].w - d[i] / d[0]) < 0.02);
+    /* die Spur ist in der Platte nur 34 Punkt breit: unter 2 Punkt steht sie als 2 Punkt (min-width), darueber im Verhaeltnis zum Schaden */
+    const anteil = top.every((x, i) => Math.abs(x.w - Math.max(2, top[0].w * d[i] / d[0])) < 0.8);
     await p.evaluate(() => document.querySelector("#btnCompact").click());
     await p.waitForFunction(() => !document.body.classList.contains("compact"));
     const zurueck = await p.evaluate(() => document.querySelector('#ringOrdnenMenue [aria-checked="true"]')?.dataset.k);
@@ -4364,18 +4856,25 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
         const grund = (el) => { const kette = []; for (let e = el; e; e = e.parentElement) { if (getComputedStyle(e).display === "contents") continue;
           const c = parse(getComputedStyle(e).backgroundColor); if (c && c[3] > 0) kette.push(c); }
           let c = szene.concat(1); for (let i = kette.length - 1; i >= 0; i--) c = ueber(kette[i], c); return c; };
+        /* Kompakt neu, Panel (#287): keine Inseln mehr. Jeder Text und jede grosse Zahl traegt eine Kontur (Strich bei der Zahl, sonst der
+           Schatten mit Versatz, --kn-schatten); gemessen wird gegen den Grund an der Glyphenkante: die Kontur ueber dem Grund (Szene und Toenung).
+           Die Kontur ist dunkel (hell: weiss) und fast deckend (.85 bis .99), die Szene scheint durch sie kaum noch. */
+        const halo = (el, g) => { const cs = getComputedStyle(el); let a = 0, c = null;
+          if (parseFloat(cs.webkitTextStrokeWidth) > 0) { const sc = parse(cs.webkitTextStrokeColor); if (sc) { c = sc; a = sc[3]; } }
+          for (const m of cs.textShadow.matchAll(/rgba?\([^)]+\)/g)) { const sc = parse(m[0]); if (!sc) continue; c = c || sc; a = 1 - (1 - a) * (1 - sc[3]); }
+          return c ? ueber([c[0], c[1], c[2], a], g) : g; };
         // gemessen wird das Element, das den Text traegt (nicht sein Kasten)
         const was = { boss: "#hName .hnt", zeit: '#hMeta [data-f="zeit"] .wt', dauer: '#hMeta [data-f="dauer"]', dps: "#hDps", einheit: "#hDpsKurz", lese: "#hCompact > span",
-          name: "#bars .row:not(.sub) .nmt", zahl: '#bars .row:not(.sub) [data-k="damage"]' };
+          name: "#bars .row:not(.sub) .nmt", zahl: '#bars .row:not(.sub) [data-k="share"]' };
         const out = {};
         for (const [n, q] of Object.entries(was)) {
           const e = document.querySelector(q); if (!e || !e.getClientRects().length) { out[n] = null; continue; }
           let o = 1; for (let x = e; x; x = x.parentElement) o *= parseFloat(getComputedStyle(x).opacity);
-          const g = grund(e), f = parse(getComputedStyle(e).color);
+          const g = halo(e, grund(e)), f = parse(getComputedStyle(e).color);
           out[n] = { k: Math.round(k(ueber([f[0], f[1], f[2], f[3] * o], g), g) * 100) / 100, deckend: o === 1 && f[3] === 1, fs: parseFloat(getComputedStyle(e).fontSize) };
         }
         // der Live-Punkt (#158): Flaeche gegen den Grund, 3 : 1
-        { const m = document.querySelector("#hMeta"), b = getComputedStyle(m, "::before"), f = parse(b.backgroundColor), g = grund(m);
+        { const m = document.querySelector("#hMeta"), b = getComputedStyle(m, "::before"), f = parse(b.backgroundColor), ring = parse((/rgba?\([^)]+\)/.exec(b.boxShadow) || [""])[0]), g0 = grund(m), g = ring ? ueber(ring, g0) : g0;
           out.punkt = f ? { k: Math.round(k(ueber(f, g), g) * 100) / 100 } : null; }
         out.zahlFarbe = getComputedStyle(document.querySelector("#hDps")).color;
         out.glas = getComputedStyle(document.documentElement).getPropertyValue("--glass-a").trim();
@@ -4383,8 +4882,8 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       }, [szene_]);
       const teile = ["boss", "zeit", "dauer", "dps", "einheit", "lese", "name", "zahl"];
       const gut = teile.every((n) => m[n] && m[n].deckend && m[n].k >= (m[n].fs >= 24 ? 3 : 4.5)) && m.punkt && m.punkt.k >= 3 && (theme !== "light" || m.zahlFarbe === "rgb(109, 60, 0)");
-      // Toenung am Anschlag .65 (Entscheidung vom 29.09. (an Claude uebertragen)), vorher .5
-      assert(m.glas === "0.650" && gut, `11.7 ${theme}, ${wo}e Szene: bei 55 % Durchsicht (Toenung 0,65) alles deckend, Text mindestens 4,5 : 1, die Zahl 3 : 1, der Live-Punkt 3 : 1, im hellen Thema die Zahl #6d3c00 (#156)`, m);
+      // Toenung am Anschlag .10 (Kompakt neu, 14.10.2026: leichte Toenung .25; klarer seit #328, 27.10.2026); seit dem Panel (21.10.2026) liegt die Schrift auf ihrer Kontur statt auf Inseln
+      assert(m.glas === "0.100" && gut, `11.7 ${theme}, ${wo}e Szene: bei 55 % Durchsicht (Toenung 0,10, Schrift auf ihrer Kontur) alles deckend, Text mindestens 4,5 : 1, die Zahl 3 : 1, der Live-Punkt 3 : 1, im hellen Thema die Zahl #6d3c00 (#156)`, m);
       }
       await p.close();
     }
@@ -4940,6 +5439,17 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     // 13.4: Von/bis gilt fuer beide - 0:02 bis 0:12
     await p.click("#deineRot .viewbar [data-act='reset']").catch(() => {});
     await p.waitForFunction(() => /^1\.0/.test(document.querySelector("#deineRot .vlevel")?.textContent || ""), null, { timeout: 3000 }).catch(() => {});
+    /* 13.4 Zeichnet die Rotation zwischen "Von" und Enter neu (der Rueckschritt aendert die Breite des Rollbehaelters, der
+       ResizeObserver in 54 zeichnet dann noch einmal), durfte das getippte "Von" nicht verloren gehen. Auf dem Runner kam das
+       unter Last zufaellig (5 von 12 Laeufen, "von":"0:00"). Hier erzwingt der Test das Neuzeichnen: Von tippen, Bis tippen
+       (der Fokus steht im Bis-Feld), Zoom ein und aus per Skript (kein Fokuswechsel), dann Enter im Bis-Feld. */
+    await p.fill("#deineRot .vfrom", "0:03").catch(() => {}); await p.fill("#deineRot .vto", "0:11").catch(() => {});
+    await p.evaluate(() => { document.querySelector("#deineRot .viewbar [data-act='in']").click(); document.querySelector("#deineRot .viewbar [data-act='out']").click(); });
+    const getippt = await p.evaluate(() => ({ von: document.querySelector("#deineRot .vfrom").value, bis: document.querySelector("#deineRot .vto").value, fokus: document.activeElement?.className || "" }));
+    assert(getippt.von === "0:03" && getippt.bis === "0:11" && /vto/.test(getippt.fokus),
+      "13.4 ein Neuzeichnen vor Enter laesst das getippte Von und Bis stehen (nicht angewendet, nicht ueberschrieben)", getippt);
+    await p.click("#deineRot .viewbar [data-act='reset']").catch(() => {});
+    await p.waitForFunction(() => /^1.0/.test(document.querySelector("#deineRot .vlevel")?.textContent || "") && document.querySelector("#deineRot .vfrom")?.value === "0:00", null, { timeout: 3000 }).catch(() => {});
     await p.fill("#deineRot .vfrom", "0:02").catch(() => {}); await p.fill("#deineRot .vto", "0:12").catch(() => {}); await p.press("#deineRot .vto", "Enter").catch(() => {});
     await p.waitForFunction(() => !(document.querySelector("#stack")?.dataset.achse || "0:00").startsWith("0:00") &&
       document.querySelector("#deineRot .vfrom")?.value === "0:02", null, { timeout: 3000 }).catch(() => {});
@@ -5309,7 +5819,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
      (POST /api/config mit logIndex) die Kaempfe dieses Logs traegt. */
   const index15 = (s) => { const x = s.posts.filter((b) => b.logIndex).pop(); return x ? x.logIndex : null; };
   const kaempfe15 = (s) => Object.values(index15(s) || {}).flatMap((f) => f.fights || []).sort((a, b) => a.at - b.at);
-  const warte15 = async (p, bedingung, ms = 20000) => { for (const ende = Date.now() + ms; Date.now() < ende && !bedingung(); ) await p.waitForTimeout(100); return bedingung(); };
+  const warte15 = async (p, bedingung, ms = 20000) => { for (const ende = performance.now() + ms; performance.now() < ende && !bedingung(); ) await p.waitForTimeout(100); return bedingung(); };
   const laden15 = async (s, datei, ziel, anzahl) => {
     await s.page.setInputFiles("#fileInput", datei);
     await s.page.waitForFunction((z) => !document.querySelector("#app").hidden && (document.querySelector("#hName")?.textContent || "").includes(z), ziel, { timeout: 20000 });

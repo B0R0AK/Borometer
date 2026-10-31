@@ -350,3 +350,217 @@ export function haelften(sek: readonly number[]):
   if(x < HAELFTE_AB) return null;
   return {erste, zweite, x, staerker: zweite >= erste ? "zweite" : "erste"};
 }
+
+/* ---------- Werkbank (#218, Spezifikation 2026-10-07) ----------
+   Die Hitze eines Einsatzes: normal, stark, kritisch, kritisch stark - ab
+   der Haelfte seiner Treffer zaehlt eine Art. */
+export type Hitze = 0 | 1 | 2 | 3;
+export function hitze(kritAnteil: number, starkAnteil: number): Hitze {
+  const k = kritAnteil >= 0.5, s = starkAnteil >= 0.5;
+  return k && s ? 3 : k ? 2 : s ? 1 : 0;
+}
+
+/* Die staerksten fuenf Sekunden am Stueck (eigene Messung 07.10.2026: im
+   Median 19 % des Pulls, nur 28 % davon im Opener). Bei Gleichstand die
+   fruehere. */
+export const STRECKE_S = 5;
+export function staerksteStrecke(sek: readonly number[], l = STRECKE_S): { von: number; bis: number; summe: number } | null {
+  if(sek.length <= l) return null;
+  let s = 0;
+  for(let i = 0; i < l; i++) s += sek[i]!;
+  let best = s, von = 0;
+  for(let i = l; i < sek.length; i++){
+    s += sek[i]! - sek[i - l]!;
+    if(s > best){ best = s; von = i - l + 1; }
+  }
+  return {von, bis: von + l, summe: best};
+}
+
+/* Wo der Abstand zum besten Pull am staerksten waechst: das 15-s-Fenster mit
+   dem groessten Rueckstand, nur wenn der Pull am Ende hinten liegt und das
+   Fenster mindestens 10 % des ganzen Abstands traegt. Beide Reihen sind
+   Schaden je Sekunde ab Beginn; gezaehlt wird bis zum Ende der kuerzeren. */
+export const ABSTAND_FENSTER_S = 15, ABSTAND_MIN_ANTEIL = 0.10;
+export function abstandWaechst(ich: readonly number[], bester: readonly number[]): { von: number; bis: number; fehlt: number; ende: number } | null {
+  const n = Math.min(ich.length, bester.length), L = ABSTAND_FENSTER_S;
+  if(n < L) return null;
+  let ende = 0;
+  for(let i = 0; i < n; i++) ende += bester[i]! - ich[i]!;
+  if(ende <= 0) return null;
+  let d = 0;
+  for(let i = 0; i < L; i++) d += bester[i]! - ich[i]!;
+  let best = d, von = 0;
+  for(let i = L; i < n; i++){
+    d += (bester[i]! - ich[i]!) - (bester[i - L]! - ich[i - L]!);
+    if(d > best){ best = d; von = i - L + 1; }
+  }
+  if(best < ABSTAND_MIN_ANTEIL * ende) return null;
+  return {von, bis: von + L, fehlt: best, ende};
+}
+
+/* Laufzeit im Takt (#219: Toedliche Viper und Hauch der Verzweiflung ticken
+   fest einmal je Sekunde). Ein Lauf: Ticks hoechstens 1,5 s auseinander;
+   jeder Lauf zaehlt eine Sekunde ueber seinen letzten Tick hinaus. */
+export const TAKT_MS = 1000, TAKT_TOL = 0.04, TAKT_ANTEIL = 0.6, TAKT_MIN = 50, LAUF_LUFT_MS = 1500;
+export function imTakt(abstaende: readonly number[]): boolean {
+  if(abstaende.length < TAKT_MIN) return false;
+  const im = abstaende.filter(d => Math.abs(d - TAKT_MS) <= TAKT_MS * TAKT_TOL).length;
+  return im / abstaende.length >= TAKT_ANTEIL;
+}
+/* Ruling 13 (09.10.2026): im Takt UND in kurzen Laeufen. Ein Dauerschaden
+   tickt einige Sekunden je Einsatz; was im Sekundentakt ohne Ende trifft
+   (Median der Laeufe ueber 20 s), ist eine gedrueckte Faehigkeit.
+   laufLaengenMs: die Laengen der Laeufe (taktLaeufe) je Kampf und Ziel. Der
+   Median ist nach der Zeit gewichtet (die Laenge des Laufs, in dem die
+   mittlere Sekunde liegt): ein Pull voller Luecken zerfiele sonst in viele
+   kurze Stuecke und ueberstimmte die langen. */
+export const TAKT_LAUF_MAX_MS = 20000;
+export function taktMitLaeufen(abstaende: readonly number[], laufLaengenMs: readonly number[]): boolean {
+  if(!laufLaengenMs.length || !imTakt(abstaende)) return false;
+  const l = [...laufLaengenMs].sort((a, b) => a - b), halb = l.reduce((s, x) => s + x, 0) / 2;
+  let summe = 0, mitte = l[l.length - 1]!;
+  for(const x of l){ summe += x; if(summe >= halb){ mitte = x; break; } }
+  return mitte <= TAKT_LAUF_MAX_MS;
+}
+export function taktLaeufe(zeiten: readonly number[]): { laeufe: [number, number][]; lief: number } {
+  const laeufe: [number, number][] = [];
+  let a = -1, p = -1;
+  for(const t of zeiten){
+    if(a < 0){ a = t; p = t; continue; }
+    if(t - p > LAUF_LUFT_MS){ laeufe.push([a, p + TAKT_MS]); a = t; }
+    p = t;
+  }
+  if(a >= 0) laeufe.push([a, p + TAKT_MS]);
+  return {laeufe, lief: laeufe.reduce((s, [x, y]) => s + y - x, 0)};
+}
+
+/* Protest aus (Entscheidung vom 08.10.2026): mindestens 4 s kein eigener Treffer,
+   und in der Zeit trafen mindestens drei andere - sonst war der Boss weg,
+   nicht der Protest aus. Nicht in den ersten 3 s und den letzten 5 s, wie
+   die Luecken. Die Zeiten sind aufsteigend, in ms ab Beginn. */
+export const AUS_MIN_MS = 4000, AUS_FREMDE_MIN = 3;
+export function ausStrecken(eigene: readonly number[], fremde: readonly number[], dauerMs: number): [number, number][] {
+  const out: [number, number][] = [];
+  const anfang = LUECKE_ANFANG_S * 1000, ende = dauerMs - LUECKE_ENDE_S * 1000;
+  for(let i = 1; i < eigene.length; i++){
+    const a = eigene[i - 1]!, b = eigene[i]!;
+    if(b - a < AUS_MIN_MS || a < anfang || b > ende) continue;
+    let n = 0;
+    for(const t of fremde) if(t > a && t < b && ++n >= AUS_FREMDE_MIN) break;
+    if(n >= AUS_FREMDE_MIN) out.push([a, b]);
+  }
+  return out;
+}
+
+/* Welche Faehigkeit welches Fach bekommt: die staerkste Einsatz-Faehigkeit
+   (Ventius eingeschlossen) wird Hauptfach, die naechsten drei mit mindestens
+   0,8 % des Schadens mittlere Faecher, der Rest "Weitere". Laufzeit und
+   Passiv stehen fuer sich und werden nie Hauptfach - Passiv setzt du nicht
+   selbst ein (Entscheidung vom 08.10.2026). */
+export type FArt = "einsatz" | "ventius" | "takt" | "dicht" | "passiv";
+export interface FFaehigkeit { k: string; dmg: number; art: FArt }
+export const MITTEL_MIN_ANTEIL = 0.008, MITTEL_MAX = 3;
+export function faecherOrdnen(xs: readonly FFaehigkeit[]): { haupt: string | null; mittel: string[]; weitere: string[]; lauf: string[]; passiv: string[] } {
+  const ges = xs.reduce((s, x) => s + x.dmg, 0);
+  const nach = [...xs].sort((a, b) => b.dmg - a.dmg);
+  const ein = nach.filter(x => x.art === "einsatz" || x.art === "ventius");
+  const haupt = ein[0]?.k ?? null;
+  const rest = ein.slice(1);
+  const mittel = rest.filter(x => ges > 0 && x.dmg / ges >= MITTEL_MIN_ANTEIL).slice(0, MITTEL_MAX).map(x => x.k);
+  return {
+    haupt, mittel,
+    weitere: rest.filter(x => !mittel.includes(x.k)).map(x => x.k),
+    lauf: nach.filter(x => x.art === "takt" || x.art === "dicht").map(x => x.k),
+    passiv: nach.filter(x => x.art === "passiv").map(x => x.k),
+  };
+}
+
+/* Krit- und Stark-Rate der DIREKTEN Treffer (#269). Laufzeit (takt, dicht)
+   und Passiv machen viele Zeilen und wenig Schaden aus und kritisieren
+   anders als die Treffer, die du ausloest; sie zaehlen nicht in die Rate,
+   in die Gesamtzahl schon. Eine Faehigkeit mit mindestens NIE_KRIT_MIN
+   Treffern und ohne einen Krit kann nicht kritisch sein: sie bleibt aus der
+   Krit-Rate (null Prozent waere ein Urteil, das sie nicht verdient), in der
+   Stark-Rate bleibt sie. Ohne direkte Treffer (oder ohne eine, die kritisch
+   sein kann) ist die jeweilige Rate null. */
+export const NIE_KRIT_MIN = 20;
+export interface RateFach { art: FArt; hits: number; crit: number; heavy: number }
+export interface DirekteRaten { gesamt: number; direkt: number; krit: number | null; stark: number | null; nie: number }
+export function direkteRaten(xs: readonly RateFach[]): DirekteRaten {
+  let gesamt = 0, direkt = 0, heavy = 0, kHits = 0, kCrit = 0, nie = 0;
+  for(const x of xs){
+    gesamt += x.hits;
+    if(x.art !== "einsatz" && x.art !== "ventius") continue;
+    direkt += x.hits; heavy += x.heavy;
+    if(x.crit === 0 && x.hits >= NIE_KRIT_MIN){ nie++; continue; }
+    kHits += x.hits; kCrit += x.crit;
+  }
+  return {gesamt, direkt, krit: kHits ? kCrit / kHits : null, stark: direkt ? heavy / direkt : null, nie};
+}
+
+/* Die Faecher so ins Raster aus zwoelf Spalten legen, dass keine Zelle leer
+   bleibt (Spezifikation 3.4): geschlossen steht das Hauptfach links ueber so
+   viele Zeilen, wie mittlere Faecher daneben stehen; offen nimmt ein Fach die
+   ganze Breite, die geschlossenen mittleren teilen sich dann eine Zeile.
+   "allein": im schmalen Raster (zwei Spalten) bliebe das letzte einer
+   ungeraden Zahl allein und nimmt die volle Breite. */
+export interface Platz { k: string; spalte: string; zeile: string; allein: boolean }
+export function packen(haupt: string, mittel: readonly string[], offen: ReadonlySet<string>): Platz[] {
+  const zu = mittel.filter(k => !offen.has(k)), auf = mittel.filter(k => offen.has(k));
+  const hVoll = offen.has(haupt) || zu.length === 0;
+  const out: Platz[] = [{k: haupt, spalte: hVoll ? "1/-1" : "span 7", zeile: hVoll ? "auto" : "span " + zu.length, allein: false}];
+  zu.forEach((k, i) => out.push({k, spalte: hVoll ? "span " + 12 / zu.length : "span 5", zeile: "auto",
+    allein: zu.length % 2 === 1 && i === zu.length - 1}));
+  auf.forEach(k => out.push({k, spalte: "1/-1", zeile: "auto", allein: false}));
+  return out;
+}
+
+/* Was an einer Faehigkeit auffaellt (#270): der Satz der Zeile in der Werkbank.
+   Die Analyse soll sagen, was die Striche bedeuten, nicht nur zeigen, wann sie
+   standen. Drei Fragen, in dieser Folge: (1) gegenueber dem besten Pull im
+   selben Zeitraum - weniger Einsaetze, oder je Einsatz weniger; (2) eine Pause,
+   die zum eigenen Takt der Faehigkeit nicht passt (mindestens vier Einsaetze,
+   mindestens 15 s und mindestens drei Takte); (3) sonst nur Zahl und Takt.
+   Eine Pause, die in einer Luecke des ganzen Kampfes liegt (das Ziel war nicht
+   zu treffen, Unverwundbarkeit, Mechanik), ist keine: nur der Teil ausserhalb
+   der Luecken zaehlt, auch fuer den Takt. Eine Faehigkeit unter 0,8 % des
+   Schadens ist nie ein Befund. Zeiten in ms ab Kampfbeginn; Luecken in
+   Sekunden wie luecken(). `dauer` ist der Teil der Pause ausserhalb der Luecken, `spanne` die ganze Strecke zwischen den zwei Einsaetzen. Ein Befund ist keine Wertung (kein Rot, kein Gruen),
+   er nennt, was von der Regel abweicht. */
+export const ZEILE_KAUM_ANTEIL = 0.008, ZEILE_KAUM_MAX = 6, ZEILE_PAUSE_MIN_MS = 15000, ZEILE_PAUSE_TAKTE = 3,
+  ZEILE_BEZUG_MIN = 3, ZEILE_SCHWACH = 0.85;
+export type ZeilenArt = "keine" | "eins" | "kaum" | "takt" | "pause" | "weniger" | "schwach";
+export interface ZeilenBefund {
+  art: ZeilenArt; befund: boolean; pause: [number, number] | null;
+  at?: number; n?: number; je?: number; dauer?: number; spanne?: number; nb?: number; minus?: number;
+}
+export function zeilenBefund(einsaetze: readonly { t: number; dmg: number }[], T: number, anteil: number,
+    best: readonly { t: number; dmg: number }[] | null, lueckenS: readonly (readonly [number, number])[]): ZeilenBefund {
+  const e = [...einsaetze].sort((a, b) => a.t - b.t), n = e.length;
+  if(n === 0) return {art: "keine", befund: false, pause: null};
+  if(n === 1) return {art: "eins", befund: false, pause: null, at: e[0]!.t};
+  const aussen = (a: number, b: number) => {
+    let d = b - a;
+    for(const [g0, g1] of lueckenS) d -= Math.max(0, Math.min(b, g1*1000) - Math.max(a, g0*1000));
+    return Math.max(0, d);
+  };
+  const ab = e.slice(1).map((x, i) => aussen(e[i]!.t, x.t));
+  const je = median(ab);
+  const gewicht = anteil >= ZEILE_KAUM_ANTEIL;
+  if(gewicht && best && best.length){
+    const b = best.filter(c => c.t < T), nb = b.length;
+    if(nb >= ZEILE_BEZUG_MIN){
+      if(n <= nb*0.8 && nb - n >= 2) return {art: "weniger", befund: true, pause: null, n, nb};
+      const mb = median(b.map(c => c.dmg)), mn = median(e.map(c => c.dmg));
+      if(mb > 0 && mn < mb*ZEILE_SCHWACH) return {art: "schwach", befund: true, pause: null, minus: Math.round((1 - mn/mb)*100)/100};
+    }
+  }
+  if(gewicht && n >= 4){
+    let gi = 0; ab.forEach((x, i) => { if(x > ab[gi]!) gi = i; });
+    const dauer = ab[gi]!;
+    if(dauer >= Math.max(ZEILE_PAUSE_MIN_MS, je*ZEILE_PAUSE_TAKTE))
+      return {art: "pause", befund: true, pause: [e[gi]!.t, e[gi + 1]!.t], n, je, dauer, spanne: e[gi + 1]!.t - e[gi]!.t};
+  }
+  if(!gewicht && n < ZEILE_KAUM_MAX) return {art: "kaum", befund: false, pause: null, n};
+  return {art: "takt", befund: false, pause: null, n, je};
+}

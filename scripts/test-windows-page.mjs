@@ -69,10 +69,11 @@ const ALT = "TLCombatLog-20260920.txt";   // ein frueheres Log fuer den Auftrag 
    s.ordner, POST /api/gelesen in s.gelesen, /api/latest in s.latest (from),
    GET /api/log in s.logs. Zum Stellen: s.text (das wachsende Log), s.start
    (start in /api/state), s.counts (die Zaehler von /api/events). */
-async function oeffne({ app = true, kompakt = false, lang = "en", uhr = false, start = null, config = {}, grenze = 0, breite = 1280, hoehe = 860 } = {}) {
+async function oeffne({ app = true, kompakt = false, teil = null, lang = "en", uhr = false, start = null, config = {}, grenze = 0, breite = 1280, hoehe = 860,
+  vollStand = null, mica = false, logVerzug = 0, logExtra = "" } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
-  const s = { page, fehler: [], posts: [], win: [], ordner: [], gelesen: [], latest: [], logs: [],
-    text: Buffer.from(LOG), start, counts: { pin: 0, start: 0 }, config };
+  const s = { page, fehler: [], posts: [], schreib: [], win: [], ordner: [], gelesen: [], latest: [], logs: [],
+    text: Buffer.from(LOG), start, counts: { pin: 0, start: 0 }, config, vollStand };
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
   if (uhr) await page.clock.install();
@@ -80,8 +81,10 @@ async function oeffne({ app = true, kompakt = false, lang = "en", uhr = false, s
     const req = route.request(), url = new URL(req.url()), path = url.pathname;
     const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }).catch(() => {});
     const gesendet = () => JSON.parse(req.postData() || "{}");
+    // jede schreibende Anfrage ausser /api/win, mit Pfad (fuer "das abgerissene Fenster schreibt nichts")
+    if (req.method() !== "GET" && path !== "/api/win") s.schreib.push(path);
     if (path === "/api/state") return json({ dir: "C:\\Logs", file: LOGNAME, size: s.text.length, mtime: s.text.length,
-      nativeFrame: app, material: false, stayOnTop: false, start: s.start });
+      nativeFrame: app, material: false, stayOnTop: false, start: s.start, kompakt: s.vollStand, mica });
     if (path === "/api/latest") {
       // wie logs.ts latestAnswer: ab dem Byte from bis zum Ende, nur ganze Zeilen (hier endet jedes Stueck mit \n)
       const from = Number(url.searchParams.get("from"));
@@ -99,8 +102,9 @@ async function oeffne({ app = true, kompakt = false, lang = "en", uhr = false, s
     if (path === "/api/log") {
       const name = url.searchParams.get("name"), from = Number(url.searchParams.get("from") || 0);
       s.logs.push(name);
+      if (logVerzug) await schlafe(logVerzug);
       if (name !== ALT) return json({ ok: false }, 404);
-      const b = Buffer.from(LOG);
+      const b = Buffer.from(LOG + logExtra);
       return json({ file: ALT, from, to: b.length, size: b.length, text: b.subarray(from).toString("utf8") });
     }
     if (path === "/api/config" && req.method() === "GET") return json(s.config);
@@ -124,7 +128,7 @@ async function oeffne({ app = true, kompakt = false, lang = "en", uhr = false, s
     if (path.startsWith("/api/")) return json({ ok: true });
     return route.fulfill({ status: 200, contentType: "text/html; charset=utf-8", body: html }).catch(() => {});
   });
-  await page.goto("http://boro.test/index.html" + (app ? "?win=1" + (kompakt ? "&kompakt=1" : "") : ""));
+  await page.goto("http://boro.test/index.html" + (app ? "?win=1" + (kompakt ? "&kompakt=1" : "") + (teil ? "&teil=" + teil : "") : ""));
   await bisWahr(s, () => document.body.dataset.bereit === "ordner", "Seite fertig");
   return s;
 }
@@ -132,7 +136,7 @@ async function oeffne({ app = true, kompakt = false, lang = "en", uhr = false, s
    unter page.clock ruehrt sich dessen Takt nicht). Mit Uhr laeuft sie in
    kleinen Schritten mit, damit Takte der Seite kommen. */
 async function bisWahr(s, fn, was, arg, uhr = false) {
-  for (const ende = Date.now() + 20000; Date.now() < ende; ) {
+  for (const ende = performance.now() + 20000; performance.now() < ende; ) {
     if (await s.page.evaluate(fn, arg)) return true;
     if (uhr) await s.page.clock.runFor(100);
     await schlafe(50);
@@ -140,7 +144,7 @@ async function bisWahr(s, fn, was, arg, uhr = false) {
   throw new Error("Zeit abgelaufen: " + was);
 }
 async function bisNode(cond, was) {
-  for (const ende = Date.now() + 20000; Date.now() < ende; ) { if (cond()) return true; await schlafe(50); }
+  for (const ende = performance.now() + 20000; performance.now() < ende; ) { if (cond()) return true; await schlafe(50); }
   throw new Error("Zeit abgelaufen: " + was);
 }
 /* Die Wanduhr der Seite um ms vorstellen, in Sekundenschritten, und dazwischen
@@ -163,7 +167,7 @@ async function liveAn(s) {
 async function anhaengen(s, text) {
   const alt = s.text.length;
   s.text = Buffer.concat([s.text, Buffer.from(text)]);
-  for (const ende = Date.now() + 20000; Date.now() < ende && !s.latest.includes(alt); ) await laufe(s, 1000);
+  for (const ende = performance.now() + 20000; performance.now() < ende && !s.latest.includes(alt); ) await laufe(s, 1000);
   return s.latest.includes(alt);
 }
 
@@ -528,6 +532,446 @@ try {
     assert(m && m.einNurBest > m.einMelden + 8, `8.6 ${theme}: Nur bei neuem Bestwert steht eingerueckt unter Melden`, m);
     assert(!s.fehler.length, `8.6 ${theme}: keine Fehler`, s.fehler);
     await s.page.close();
+  }
+
+  // --- Tafelmenue (Windows Teil 2): Rechtsklick, Umschalt+F10, Kopieren, In Rotation zeigen
+  console.log("Tafelmenue (Teil 2)");
+  /* Wartet auf Zustand (nicht auf Zeit): bis ein POST an /api/win, den pred
+     erkennt, angekommen ist; Frist ueber performance.now() (#338). */
+  const warteAufPost = async (s, pred, was) => {
+    for (const ende = performance.now() + 20000; performance.now() < ende; ) {
+      if (s.win.some(pred)) return true;
+      await schlafe(25);
+    }
+    throw new Error("Zeit abgelaufen: " + was);
+  };
+  /* Live einschalten (liest den Auszug ganz); die Tafel steht, sobald der Bereich
+     Kampf frei ist und eine Zeile hat. */
+  const ladeKampf = async (s) => {
+    await s.page.evaluate(() => document.querySelector("#btnWatch").click());
+    await bisNode(() => s.latest.includes(0), "das erste ganze Laden");
+    await bisWahr(s, () => !document.querySelector('[data-tab="timeline"]').disabled, "Kampf geladen");
+    await s.page.evaluate(() => { document.querySelector('[data-tab="timeline"]').click(); });
+    await bisWahr(s, () => !!document.querySelector("#bars .row"), "Tafel mit Zeilen");
+  };
+  {
+    const s = await oeffne({ app: true, lang: "de" });
+    await ladeKampf(s);
+    await s.page.locator("#bars .row").first().click({ button: "right" });
+    await warteAufPost(s, (b) => b.do === "menue", "menue gesendet");
+    assert(s.win.some((b) => b.do === "menue" && b.art === "zeile" && !("label" in b)), "Rechtsklick auf die Zeile sendet menue/zeile ohne Text", s.win);
+    const vorher = await s.page.evaluate(() => document.querySelector(".tab.on")?.dataset.tab);
+    // die Wahl "In Rotation zeigen" kommt als Zaehler zurueck
+    s.counts.menuerotation = 1;
+    await bisWahr(s, () => document.querySelector(".tab.on")?.dataset.tab === "rotation", "Rotation offen");
+    assert(vorher !== "rotation", "vorher nicht in Rotation", vorher);
+    // die Faehigkeit einer Zeile mit Einsaetzen bleibt hervorgehoben, auch ohne Zeigen; ohne Einsaetze dimmt nichts
+    let n = 1, getroffen = false;
+    for (let i = 0; i < 8 && !getroffen; i++) {
+      await s.page.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await bisWahr(s, () => !!document.querySelector("#bars .row"), "Tafel mit Zeilen");
+      // zwei Anfragen binnen 400 ms sind eine: die Uhr der Seite abwarten
+      const frei = await s.page.evaluate(() => performance.now() + 450);
+      await bisWahr(s, (t) => performance.now() > t, "Menue-Abstand", frei);
+      const m = s.win.length;
+      await s.page.locator("#bars .row").nth(i).click({ button: "right" });
+      await bisNode(() => s.win.length > m, "menue gesendet (Zeile " + i + ")");
+      s.counts.menuerotation = ++n;
+      await bisWahr(s, () => document.querySelector(".tab.on")?.dataset.tab === "rotation", "Rotation offen");
+      const z = await s.page.evaluate(() => ({ hebt: document.querySelector("#rotBar")?.classList.contains("hebt"), an: document.querySelectorAll("#rotBar .an").length }));
+      assert(z.hebt === (z.an > 0), "hebt nur, wenn die Faehigkeit Einsaetze hat", z);
+      getroffen = z.an > 0;
+    }
+    assert(getroffen, "mindestens eine Zeile hebt ihre Faehigkeit in der Rotation hervor");
+    // der naechste Klick loest es
+    await s.page.evaluate(() => document.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
+    await bisWahr(s, () => !document.querySelector("#rotBar")?.classList.contains("hebt"), "Hervorhebung nach Klick geloest");
+    await s.page.close();
+  }
+  {
+    // Kopieren: Faehigkeit und Wert der Zeile landen in der Zwischenablage
+    const s = await oeffne({ app: true, lang: "de" });
+    /* http://boro.test ist kein sicherer Ursprung, dort gibt es navigator.clipboard
+       nicht (in der App ist es 127.0.0.1): ein Stand-in nimmt den Text entgegen. */
+    await s.page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+        writeText: (t) => { window.__kopiert = String(t); return Promise.resolve(); } } });
+    });
+    await s.page.reload();
+    await bisWahr(s, () => document.body.dataset.bereit === "ordner", "Seite fertig nach dem Neuladen");
+    await ladeKampf(s);
+    await s.page.locator("#bars .row").first().click({ button: "right" });
+    await warteAufPost(s, (b) => b.do === "menue", "menue gesendet");
+    s.counts.menuekopieren = 1;
+    await bisWahr(s, () => typeof window.__kopiert === "string", "Zwischenablage gefuellt");
+    const text = await s.page.evaluate(() => window.__kopiert);
+    assert(/\d/.test(text) && !/<|>/.test(text), "Kopiert: Faehigkeit und Wert als einfacher Text", text);
+    await s.page.close();
+  }
+  {
+    // Umschalt+F10 an der fokussierten Zeile oeffnet dasselbe Menue
+    const s = await oeffne({ app: true });
+    await ladeKampf(s);
+    await s.page.locator("#bars .row").first().focus();
+    await s.page.keyboard.press("Shift+F10");
+    await warteAufPost(s, (b) => b.do === "menue", "menue gesendet");
+    assert(s.win.some((b) => b.do === "menue"), "Umschalt+F10 sendet menue", s.win);
+    // F5: kommt dazu Chromiums eigenes contextmenu-Ereignis der Tastatur, bleibt es bei einem Aufruf
+    await s.page.evaluate(() => document.querySelector("#bars .row").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true })));
+    await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const n = s.win.filter((b) => b.do === "menue").length;
+    assert(n === 1, "Umschalt+F10 plus contextmenu: genau ein menue-Aufruf", n);
+    await s.page.close();
+  }
+  {
+    // F4: im Kompakt im selben Fenster zeigt der Rechtsklick auf eine Zeile kein Menue
+    const s = await oeffne({ app: true });
+    await ladeKampf(s);
+    await s.page.evaluate(() => {
+      document.body.classList.add("compact");
+      document.querySelector("#bars .row").dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true }));
+    });
+    await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert(!s.win.some((b) => b.do === "menue"), "im Kompakt kein menue-Aufruf", s.win);
+    await s.page.close();
+  }
+  {
+    // F1: Strg+C an der fokussierten Zeile kopiert wie "Kopieren" - nur ohne markierten Text
+    const s = await oeffne({ app: true, lang: "de" });
+    await s.page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: {
+        writeText: (t) => { window.__kopiert = String(t); return Promise.resolve(); } } });
+    });
+    await s.page.reload();
+    await bisWahr(s, () => document.body.dataset.bereit === "ordner", "Seite fertig nach dem Neuladen");
+    await ladeKampf(s);
+    await s.page.locator("#bars .row").first().focus();
+    // mit Markierung: Strg+C bleibt dem Browser
+    await s.page.evaluate(() => {
+      /* der Koerper erlaubt kein Markieren (user-select:none); code ist ausgenommen (styles.css) */
+      const n = document.createElement("code"); n.textContent = "markiert"; document.body.appendChild(n);
+      const r = document.createRange(); r.selectNodeContents(n);
+      const sel = getSelection(); sel.removeAllRanges(); sel.addRange(r);
+    });
+    await s.page.keyboard.press("Control+C");
+    await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert(await s.page.evaluate(() => window.__kopiert) === undefined, "Strg+C mit markiertem Text wird nicht abgefangen");
+    // ohne Markierung: die Zeile wird kopiert
+    await s.page.evaluate(() => getSelection().removeAllRanges());
+    await s.page.keyboard.press("Control+C");
+    await bisWahr(s, () => typeof window.__kopiert === "string", "Strg+C kopiert die Zeile");
+    const text = await s.page.evaluate(() => window.__kopiert);
+    assert(/\d/.test(text) && !/<|>/.test(text), "Strg+C: Faehigkeit und Wert als einfacher Text", text);
+    await s.page.close();
+  }
+  {
+    // F3: scheitert das Kopieren (Zwischenablage lehnt ab, Textfeld-Befehl gibt false), sagt es der Toast
+    const s = await oeffne({ app: true, lang: "de" });
+    await s.page.addInitScript(() => {
+      Object.defineProperty(navigator, "clipboard", { configurable: true, value: { writeText: () => Promise.reject(new Error("nein")) } });
+      document.execCommand = () => false;
+    });
+    await s.page.reload();
+    await bisWahr(s, () => document.body.dataset.bereit === "ordner", "Seite fertig nach dem Neuladen");
+    await ladeKampf(s);
+    await s.page.locator("#bars .row").first().click({ button: "right" });
+    await warteAufPost(s, (b) => b.do === "menue", "menue gesendet");
+    s.counts.menuekopieren = 1;
+    await bisWahr(s, () => document.getElementById("toast").textContent === "Kopieren hat nicht geklappt", "Toast zum Scheitern");
+    await s.page.close();
+  }
+  {
+    // Browser ohne App und Kompaktfenster: kein Aufruf, kein Menue
+    for (const opt of [{ app: false }, { app: true, kompakt: true }]) {
+      const s = await oeffne(opt);
+      await s.page.locator("body").click({ button: "right" });
+      // nichts zu erwarten: zwei gezeichnete Bilder abwarten, dann steht fest, dass kein Aufruf folgt
+      await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+      assert(!s.win.some((b) => b.do === "menue"), "kein menue-Aufruf (" + JSON.stringify(opt) + ")", s.win);
+      await s.page.close();
+    }
+  }
+
+  // --- Abreissen (Windows Teil 2): ein Bereich in ein eigenes Fenster
+  console.log("Abreissen (Teil 2)");
+  /* Der Stand, den die Vollansicht fuer eine Datei meldet (Name und Start des
+     gewaehlten Kampfs), aus dem ersten Fall unten - mit dem Namen ALT, den der
+     gestellte Helfer ueber /api/log ausliefert (derselbe Auszug). */
+  let vollDatei = null;
+  {
+    const s = await oeffne({ app: true, lang: "de" });
+    // auf Start (ohne Bereich) kein Knopf
+    const aufStart = await s.page.evaluate(() => document.querySelector("#btnAbreissen")?.hidden);
+    assert(aufStart === true, "auf Start kein Knopf zum Abreissen", aufStart);
+    await ladeKampf(s);
+    await s.page.evaluate(() => { document.querySelector('[data-tab="analysis"]').click(); });
+    await bisWahr(s, () => document.querySelector(".tab.on")?.dataset.tab === "analysis", "Analyse offen");
+    const name = await s.page.evaluate(() => document.querySelector("#btnAbreissen").getAttribute("aria-label"));
+    assert(name === "In eigenem Fenster", "der Knopf heisst fuer den Vorleser \"In eigenem Fenster\"", name);
+    await s.page.locator("#btnAbreissen").click();
+    await warteAufPost(s, (b) => b.do === "abreissen", "abreissen gesendet");
+    assert(s.win.some((b) => b.do === "abreissen" && b.teil === "analyse" && b.win === "main"), "Knopf sendet abreissen/analyse", s.win);
+    const iStand = s.win.findIndex((b) => b.do === "stand"), iAb = s.win.findIndex((b) => b.do === "abreissen");
+    assert(iStand >= 0 && iStand < iAb, "vor dem Abreissen geht der Stand der Vollansicht hinaus", s.win);
+    // die Vollansicht zeigt etwas anderes (Live aus: jetzt die Datei): der Stand geht wieder hinaus, das Fenster folgt
+    const vorher = s.win.filter((b) => b.do === "stand").length;
+    await s.page.evaluate(() => { document.querySelector("#btnWatch").click(); });
+    await bisNode(() => s.win.filter((b) => b.do === "stand").length > vorher, "Stand nach dem Ende von Live");
+    assert(s.win.filter((b) => b.do === "stand").at(-1).grund === "datei", "der neue Stand nennt die Datei", s.win.filter((b) => b.do === "stand"));
+    const gemeldet = s.win.filter((b) => b.do === "stand").at(-1);
+    assert(Number.isSafeInteger(gemeldet.kampf), "der Stand nennt den Start des gewaehlten Kampfs", gemeldet);
+    vollDatei = { grund: "datei", datei: ALT, kampf: gemeldet.kampf };
+    /* Gegenprobe zu "das abgerissene Fenster schreibt nichts": die Vollansicht schreibt fuer dasselbe Log
+       einen besten Pull (46, 3 s nach dem Ende von Live) - die Pruefung unten ist also nicht leer. */
+    await bisNode(() => s.schreib.includes("/api/best"), "Vollansicht schreibt den besten Pull");
+    assert(s.schreib.includes("/api/best"), "Gegenprobe: die Vollansicht schreibt fuer dieses Log /api/best", s.schreib);
+    // die Einstellungen sind kein Bereich zum Abreissen
+    await s.page.evaluate(() => { document.querySelector('[data-tab="settings"]').click(); });
+    await bisWahr(s, () => document.querySelector("#btnAbreissen").hidden === true, "kein Knopf in den Einstellungen");
+    await s.page.close();
+  }
+  {
+    // Kompakt im selben Fenster (ohne Kompaktfenster): der Streifen hat keinen Knopf zum Abreissen
+    const s = await oeffne({ app: true });
+    await ladeKampf(s);
+    await s.page.evaluate(() => { document.querySelector('[data-tab="analysis"]').click(); });
+    await bisWahr(s, () => !document.querySelector("#btnAbreissen").hidden, "Knopf in der Analyse");
+    await s.page.evaluate(() => { document.querySelector("#btnCompact").click(); });
+    await bisWahr(s, () => document.body.classList.contains("compact"), "Kompakt im selben Fenster");
+    const z = await s.page.evaluate(() => document.querySelector("#btnAbreissen").getClientRects().length);
+    assert(z === 0, "im Kompakt kein Knopf zum Abreissen", z);
+    await s.page.close();
+  }
+  {
+    // im Browser-Tab gibt es den Knopf nicht
+    const s = await oeffne({ app: false });
+    await ladeKampf(s).catch(() => {});
+    const z = await s.page.evaluate(() => document.querySelector("#btnAbreissen")?.hidden);
+    assert(z === true, "im Browser-Tab kein Knopf zum Abreissen", z);
+    await s.page.close();
+  }
+  for (const breite of [1280, 560]) {
+    // die Seite im Abriss-Fenster: nur dieser Bereich, ohne Bereichsleiste, schreibt nichts
+    const s = await oeffne({ app: true, teil: "analyse", lang: "de", breite, vollStand: vollDatei });
+    await bisWahr(s, () => !!document.querySelector("#app:not([hidden])"), "Abriss-Seite zeigt den Kampf");
+    const z = await s.page.evaluate(() => ({
+      teil: document.body.dataset.abriss,
+      bereich: document.querySelector(".tab.on")?.dataset.tab,
+      leiste: getComputedStyle(document.querySelector("#bereiche")).display,
+      knopf: getComputedStyle(document.querySelector("#btnAbreissen")).display,
+      live: getComputedStyle(document.querySelector("#btnWatch")).display,
+      einst: getComputedStyle(document.querySelector("#btnEinst")).display,
+      start: !document.querySelector("#land") || document.querySelector("#land").hidden,
+      breit: document.documentElement.scrollWidth <= window.innerWidth,
+      name: (() => { const n = document.querySelector("#abrissName");
+        return n ? { text: n.textContent.trim(), sichtbar: n.getClientRects().length > 0, imKopf: !!n.closest("header.top"),
+          rechts: n.getBoundingClientRect().right <= window.innerWidth } : null; })(),
+    }));
+    assert(z.teil === "analyse" && z.bereich === "analysis", "Abriss-Seite zeigt Analyse (" + breite + ")", z);
+    assert(z.name && z.name.text === "Analyse" && z.name.sichtbar && z.name.imKopf && z.name.rechts,
+      "der Kopf nennt den Bereich als Text (" + breite + ")", z.name);
+    assert(z.leiste === "none" && z.knopf === "none", "Abriss-Seite ohne Bereichsleiste und ohne Knopf (" + breite + ")", z);
+    assert(z.live === "none" && z.einst === "none", "Abriss-Seite ohne Live und Einstellungen im Kopf (" + breite + ")", z);
+    assert(z.start, "Abriss-Seite ohne Startseite (" + breite + ")", z);
+    assert(z.breit, "kein waagerechtes Rollen (" + breite + ")", z);
+    /* Die Wege der Analyse in andere Bereiche (Rotation: .inrot, Rekorde: .wbrk) fuehren im Fenster
+       nirgends hin: sie sind nicht zu sehen und nicht zu erreichen (keine Box). */
+    await bisWahr(s, () => !!document.querySelector("#p-analysis .inrot"), "Analyse mit Weg in die Rotation");
+    const wege = await s.page.evaluate(() => [...document.querySelectorAll("#p-analysis :is(.inrot, .wbrk), #histCmp")]
+      .map((b) => ({ k: b.className || b.id, boxen: b.getClientRects().length })));
+    assert(wege.length > 0 && wege.every((w) => w.boxen === 0), "Analyse: kein Weg in einen anderen Bereich zu sehen (" + breite + ")", wege);
+    // die Seite hat einen Augenblick gelebt: zwei gezeichnete Bilder, dann ist entschieden, was sie gesendet hat
+    await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    assert(s.win.every((b) => b.win === "abriss" && (b.do === "chrome" || b.do === "close")), "Abriss-Seite sendet nur close/chrome mit win=abriss", s.win);
+    assert(s.posts.length === 0 && s.schreib.length === 0, "Abriss-Seite schreibt nichts", s.schreib);
+    assert(!s.fehler.length, "keine Fehler in der Seite", s.fehler);
+    await s.page.close();
+  }
+  for (const teil of ["kampf", "rotation", "analyse", "vergleich"]) {
+    /* Das Fenster hat seine Standardgroesse (900 x 640): jeder Bereich beginnt oben, mit seinem Kopf - die Seite ist nicht
+       gerollt, und was in der Vollansicht oben steht (bei der Rotation der Satz und die Zoomleiste), ist zu sehen. */
+    const s = await oeffne({ app: true, teil, lang: "en", breite: 900, hoehe: 640, vollStand: vollDatei });
+    await bisWahr(s, (q) => !!document.querySelector(q), "Bereich gezeichnet",
+      { kampf: "#bars .row", rotation: "#rotBar > *", analyse: "#p-analysis .inrot", vergleich: "#p-compare *" }[teil]);
+    const z = await s.page.evaluate(() => {
+      const im = (q) => { const e = document.querySelector(q); if (!e) return null; const r = e.getBoundingClientRect();
+        return e.getClientRects().length > 0 && r.top >= 0 && r.bottom <= innerHeight; };
+      return { rollt: scrollY, name: im("#abrissName"), satz: im("#deineRotLead"), zoom: im('#p-rotation [data-act="apply"]') };
+    });
+    assert(z.rollt === 0 && z.name === true, "Abriss " + teil + " 900 x 640: beginnt oben, der Kopf nennt den Bereich", z);
+    if (teil === "rotation") assert(z.satz === true && z.zoom === true, "Abriss Rotation 900 x 640: Satz und Zoomleiste stehen im Bild", z);
+    await s.page.close();
+  }
+  {
+    /* Ein anderer Kampf der Vollansicht: das Fenster beginnt oben (es hat keine Bereichsleiste, die zurueckfuehrte),
+       auch wenn es vorher gerollt war. Der zweite Kampf kommt ans Ende des Logs; die Antwort des Helfers kommt spaet. */
+    const zweiter = ENDE + 120000;
+    const s = await oeffne({ app: true, teil: "rotation", lang: "en", breite: 900, hoehe: 640, vollStand: vollDatei, logExtra: kampf(zweiter, "Gegner Z"), logVerzug: 400 });
+    await bisWahr(s, () => !!document.querySelector("#rotBar > *"), "Rotation gezeichnet");
+    await s.page.evaluate(() => scrollTo(0, 40));
+    const gerollt = await s.page.evaluate(() => scrollY);
+    s.vollStand = { grund: "datei", datei: ALT, kampf: zweiter }; s.counts.kompaktstand = 1;
+    await bisWahr(s, () => scrollY === 0, "anderer Kampf: oben");
+    assert(gerollt > 0, "Gegenprobe: das Fenster war gerollt", gerollt);
+    await s.page.close();
+  }
+  for (const theme of ["dark", "light", "tnl", "glas"]) {
+    /* Die vier Themen bei 560 Punkt; im Rauchglas liegt das Fenster auf Acrylic (window.ts,
+       materialSetzen wie die Vollansicht): die Seite zeichnet denselben Glasgrund (html.mica). */
+    const s = await oeffne({ app: true, teil: "vergleich", breite: 560, config: { theme }, mica: theme === "glas", vollStand: vollDatei });
+    await bisWahr(s, (th) => document.documentElement.dataset.theme === th && !document.querySelector("#app").hidden, "Thema und Kampf", theme);
+    const z = await s.page.evaluate(() => ({
+      breit: document.documentElement.scrollWidth <= window.innerWidth,
+      mica: document.documentElement.classList.contains("mica"),
+      grund: getComputedStyle(document.body).backgroundColor,
+      html: getComputedStyle(document.documentElement).backgroundColor,
+    }));
+    assert(z.breit, "Abriss-Seite " + theme + " bei 560: kein waagerechtes Rollen", z);
+    const nameV = await s.page.evaluate(() => document.querySelector("#abrissName").textContent.trim());
+    assert(nameV === "Compare", "der Kopf nennt den Bereich (en, " + theme + ")", nameV);
+    if (theme === "glas") assert(z.mica && z.html === "rgba(0, 0, 0, 0)" && /0\.35\)$/.test(z.grund), "Abriss-Seite glas: der Glasgrund wie in der Vollansicht", z);
+    else assert(!z.mica, "Abriss-Seite " + theme + ": kein Glasgrund", z);
+    assert(s.posts.length === 0 && !s.schreib.length, "Abriss-Seite " + theme + ": schreibt nichts, auch das Thema nicht", s.schreib);
+    await s.page.close();
+  }
+  {
+    // unbekannter teil faellt auf die Vollansicht zurueck
+    const s = await oeffne({ app: true, teil: "einstellungen" });
+    const z = await s.page.evaluate(() => document.body.dataset.abriss ?? null);
+    assert(z === null, "unbekannter teil: keine Abriss-Seite", z);
+    await s.page.close();
+  }
+  {
+    // sie folgt dem Kampf der Vollansicht (Datei und Start aus /api/state, Bytes ueber /api/log)
+    const s = await oeffne({ app: true, teil: "kampf", lang: "de", vollStand: vollDatei, uhr: true });
+    await bisWahr(s, () => document.body.dataset.abriss === "kampf", "Abriss-Seite steht", undefined, true);
+    await bisWahr(s, () => !!document.querySelector("#bars .row"), "folgt: Tafel mit Zeilen", undefined, true);
+    assert(s.logs.includes(ALT), "folgt: holt die Datei der Vollansicht ueber /api/log", s.logs);
+    // Kampf speichern gehoert der Vollansicht: hier nicht zu sehen
+    const knoepfe = await s.page.evaluate(() => ["#btnSaveRun", "#bkSpeichern"].map((q) => document.querySelector(q).getClientRects().length));
+    assert(knoepfe.every((n) => n === 0), "kein Kampf speichern im abgerissenen Fenster", knoepfe);
+    const nameK = await s.page.evaluate(() => document.querySelector("#abrissName").textContent.trim());
+    assert(nameK === "Kampf", "der Kopf nennt den Bereich (de): Kampf", nameK);
+    // die Wege der Tafel in andere Bereiche (Analyse, Rotation, Vergleich) sind im Fenster nicht zu sehen
+    const wegeK = await s.page.evaluate(() => ["#urteilAnalyse", "#spurenAuf", "#btnBestPull"]
+      .map((q) => ({ q, boxen: document.querySelector(q)?.getClientRects().length ?? -1 })));
+    assert(wegeK.every((w) => w.boxen === 0), "Kampf: kein Weg in einen anderen Bereich zu sehen", wegeK);
+    // und wirkt nicht, wenn er doch ausgeloest wird (switchTab, 34): der Bereich bleibt
+    await s.page.evaluate(() => { document.querySelector("#urteilAnalyse").click(); });
+    await s.page.evaluate(() => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r))));
+    const tab = await s.page.evaluate(() => document.querySelector(".tab.on")?.dataset.tab);
+    assert(tab === "timeline", "ein Weg in einen anderen Bereich laesst das Fenster im Bereich Kampf", tab);
+    /* Der beste Pull schreibt 3 s nach dem Laden (46, planeSchreiben): die Uhr der
+       Seite laeuft darueber hinweg; eine Anfrage danach ist erst beantwortet, wenn
+       jede davor beim Helfer war. */
+    await s.page.clock.runFor(5000);
+    await s.page.evaluate(() => fetch("/api/state").then((r) => r.json()));
+    assert(s.schreib.length === 0, "folgt: keine schreibende Anfrage, auch nicht an /api/best", s.schreib);
+    // die Vollansicht ist jetzt ohne Kampf: das Fenster sagt es (Ereignis kompaktstand)
+    s.vollStand = { grund: "leer", datei: "", kampf: null };
+    s.counts.kompaktstand = 1;
+    await bisWahr(s, () => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden; }, "folgt: leerer Zustand", undefined, true);
+    const satz = await s.page.evaluate(() => document.querySelector("#abrissLeer").textContent.trim());
+    assert(satz === "Noch kein Kampf in der Vollansicht.", "der leere Zustand sagt es", satz);
+    assert(s.posts.length === 0, "auch beim Folgen keine Config", s.posts);
+    await s.page.close();
+  }
+  {
+    // Live in der Vollansicht: das Fenster liest dieselbe Datei mit (/api/latest), schreibt aber nichts
+    const s = await oeffne({ app: true, teil: "rotation", lang: "de", vollStand: { grund: "live", datei: "", kampf: null } });
+    await bisNode(() => s.latest.includes(0), "Live: das Fenster liest die Datei der Vollansicht");
+    await bisWahr(s, () => !document.querySelector("#app").hidden, "Live: der Kampf steht");
+    const tab = await s.page.evaluate(() => document.querySelector(".tab.on")?.dataset.tab);
+    assert(tab === "rotation", "Live: bleibt im Bereich Rotation", tab);
+    const nameR = await s.page.evaluate(() => document.querySelector("#abrissName").textContent.trim());
+    assert(nameR === "Rotation", "der Kopf nennt den Bereich (de): Rotation", nameR);
+    assert(s.posts.length === 0 && !s.schreib.length && !s.gelesen.length && !s.win.some((b) => b.do === "kampf"),
+      "Live: nichts geschrieben, kein Zuletzt gelesen, keine Meldung", { schreib: s.schreib, gelesen: s.gelesen, win: s.win });
+    await s.page.close();
+  }
+
+  // --- Folgefixes zum abgerissenen Fenster (#347, #350, #351, #352)
+  console.log("Abreissen: Folgefixes");
+  for (const [grund, wort, satzDe] of [["beispiel", "sample", "Beispielkampf"], ["archiv", "archive", "Archiv"]]) {
+    // #352: zeigt die Vollansicht ein Beispiel oder einen Archivkampf, sagt der Leertext das und nicht "kein Kampf"
+    const s = await oeffne({ app: true, teil: "kampf", lang: "en", vollStand: { grund, datei: "", kampf: null } });
+    await bisWahr(s, () => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden; }, "Leertext steht (" + grund + ")");
+    const satz = await s.page.evaluate(() => document.querySelector("#abrissLeer").textContent.trim());
+    assert(satz.toLowerCase().includes(wort) && !/no fight/i.test(satz), "#352 en: der Leertext nennt " + grund, satz);
+    await s.page.close();
+    const d = await oeffne({ app: true, teil: "kampf", lang: "de", vollStand: { grund, datei: "", kampf: null } });
+    await bisWahr(d, () => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden; }, "Leertext steht de (" + grund + ")");
+    const satzD = await d.page.evaluate(() => document.querySelector("#abrissLeer").textContent.trim());
+    assert(satzD.includes(satzDe) && !/Noch kein Kampf/.test(satzD), "#352 de: der Leertext nennt " + grund, satzD);
+    await d.page.close();
+  }
+  {
+    // #351: Strg+K, Strg+Pfeile und das Ablegen von Dateien gelten im abgerissenen Fenster nicht
+    const s = await oeffne({ app: true, teil: "kampf", lang: "en", vollStand: vollDatei });
+    await bisWahr(s, () => !!document.querySelector("#bars .row"), "Fenster zeigt den Kampf");
+    const z = await s.page.evaluate(() => {
+      const taste = (key) => { const e = new KeyboardEvent("keydown", { key, ctrlKey: true, bubbles: true, cancelable: true });
+        document.body.dispatchEvent(e); return e.defaultPrevented; };
+      const ablage = () => { const dt = new DataTransfer(); dt.items.add(new File(["x"], "a.txt"));
+        const ein = new DragEvent("dragenter", { dataTransfer: dt, bubbles: true, cancelable: true }); window.dispatchEvent(ein);
+        const an = document.querySelector("#dropOverlay").classList.contains("on");
+        const ab = new DragEvent("drop", { dataTransfer: dt, bubbles: true, cancelable: true }); window.dispatchEvent(ab);
+        return { overlay: an, abgefangen: ab.defaultPrevented }; };
+      // erst die Pfeile: ein offenes Suchfeld (Strg+K) laesst sie nicht wechseln
+      return { links: taste("ArrowLeft"), rechts: taste("ArrowRight"), k: taste("k"),
+        wahlOffen: !document.querySelector("#kampfwahl").hidden, ablage: ablage() };
+    });
+    assert(z.k === false && !z.wahlOffen, "#351: Strg+K tut im Fenster nichts", z);
+    assert(z.links === false && z.rechts === false, "#351: Strg+Pfeile wechseln den Kampf nicht", z);
+    assert(z.ablage.overlay === false && z.ablage.abgefangen === true, "#351: Ablegen zeigt keine Ablage, die Datei wird nicht geoeffnet (aber abgefangen)", z.ablage);
+    await s.page.close();
+    // Gegenprobe: in der Vollansicht gilt alles
+    const v = await oeffne({ app: true, lang: "en" });
+    await ladeKampf(v);
+    const g = await v.page.evaluate(() => {
+      const e = new KeyboardEvent("keydown", { key: "k", ctrlKey: true, bubbles: true, cancelable: true });
+      document.body.dispatchEvent(e);
+      const dt = new DataTransfer(); dt.items.add(new File(["x"], "a.txt"));
+      window.dispatchEvent(new DragEvent("dragenter", { dataTransfer: dt, bubbles: true, cancelable: true }));
+      return { k: e.defaultPrevented, overlay: document.querySelector("#dropOverlay").classList.contains("on") };
+    });
+    assert(g.k === true && g.overlay === true, "Gegenprobe: in der Vollansicht gelten Strg+K und die Ablage", g);
+    await v.page.close();
+  }
+  {
+    // #347: Live in der Vollansicht - das abgerissene Fenster liest mit, zeigt aber die Meldung "Live-Aufzeichnung" nicht
+    const s = await oeffne({ app: true, teil: "rotation", lang: "en", vollStand: { grund: "live", datei: "", kampf: null } });
+    await bisWahr(s, () => document.body.classList.contains("watching"), "Live im Fenster");
+    const an = await s.page.evaluate(() => document.querySelector("#watchPop").classList.contains("on"));
+    assert(an === false, "#347: keine Live-Meldung im abgerissenen Fenster", an);
+    await s.page.close();
+    // Gegenprobe: in der Vollansicht erscheint sie
+    const v = await oeffne({ app: true, lang: "en" });
+    await v.page.evaluate(() => document.querySelector("#btnWatch").click());
+    await bisWahr(v, () => document.querySelector("#watchPop").classList.contains("on"), "Gegenprobe: Meldung in der Vollansicht");
+    await v.page.close();
+  }
+  {
+    // #350: das Thema der Vollansicht erreicht ein offenes abgerissenes Fenster (Ereignis kompaktstand, dann /api/config)
+    const s = await oeffne({ app: true, teil: "kampf", lang: "en", config: { theme: "dark" }, vollStand: vollDatei });
+    await bisWahr(s, (th) => document.documentElement.dataset.theme === th, "Fenster im Thema dunkel", "dark");
+    s.config = { theme: "light" };
+    s.counts.kompaktstand = 1;
+    await bisWahr(s, (th) => document.documentElement.dataset.theme === th, "#350: das Fenster folgt dem Thema der Vollansicht", "light");
+    assert(s.posts.length === 0 && !s.schreib.length, "#350: das Fenster schreibt dabei nichts", s.schreib);
+    await s.page.close();
+    // und die Vollansicht schickt nach einem Themenwechsel den Stand, solange ein Fenster offen sein kann
+    const v = await oeffne({ app: true, lang: "en", config: { theme: "dark" } });
+    await ladeKampf(v);
+    await v.page.evaluate(() => { document.querySelector('[data-tab="analysis"]').click(); });
+    await bisWahr(v, () => !document.querySelector("#btnAbreissen").hidden, "Knopf in der Analyse");
+    await v.page.locator("#btnAbreissen").click();
+    await warteAufPost(v, (b) => b.do === "abreissen", "abreissen gesendet");
+    const vorher = v.win.filter((b) => b.do === "stand").length;
+    await v.page.evaluate(() => { document.querySelector('#themeRow button[data-theme="light"]').click(); });
+    await bisNode(() => v.win.filter((b) => b.do === "stand").length > vorher, "#350: Stand nach dem Themenwechsel");
+    assert(v.posts.some((p) => p.theme === "light"), "Themenwechsel wird gespeichert", v.posts);
+    await v.page.close();
   }
 } catch (err) {
   failed++;

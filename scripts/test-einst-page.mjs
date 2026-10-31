@@ -239,7 +239,9 @@ const ZAHNRAD = '#bereiche [data-tab="settings"]';
 
 try {
   // --- 1. Ohne Log, App, deutsch: das Zahnrad unten, der Ort, acht Abschnitte
-  // (folgt Entwurf, Neugestaltung Aufgabe 8, Luecken 10.2: statt fuenf Gruppen die acht Abschnitte des Entwurfs)
+  // (folgt Entwurf, Neugestaltung Aufgabe 8, Luecken 10.2: statt fuenf Gruppen die acht Abschnitte des Entwurfs;
+  // folgt Spezifikation Twinks 8, #251: dazu "Charaktere" nach dem Log-Ordner, neun Abschnitte)
+  // folgt Spezifikation Log-Archiv 2, 6 (#264): dazu "Archiv" nach dem Log-Ordner, zehn Abschnitte
   {
     const s = await oeffne({ app: true, lang: "de" });
     const p = s.page;
@@ -281,11 +283,11 @@ try {
     });
     assert(g.titel === "Einstellungen" && /Gilt sofort/.test(g.kopf || "") && /gespeichert in den Einstellungen von Borometer/.test(g.kopf || ""),
       "Kopf: „Einstellungen“, darunter „Gilt sofort“ und wo es gespeichert wird (ohne Pfad)", g);
-    assert(JSON.stringify(g.gruppen.map((x) => x.h)) === JSON.stringify(["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Gruppe und Server", "Entwickler", "Info"]),
-      "acht Abschnitte in dieser Reihenfolge: Darstellung, Sprache, Größe, Overlay, Log-Ordner, Gruppe und Server, Entwickler, Info", g.gruppen.map((x) => x.h));
+    assert(JSON.stringify(g.gruppen.map((x) => x.h)) === JSON.stringify(["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Archiv", "Charaktere", "Gruppe und Server", "Entwickler", "Info"]),
+      "zehn Abschnitte in dieser Reihenfolge: Darstellung, Sprache, Größe, Overlay, Log-Ordner, Archiv, Charaktere, Gruppe und Server, Entwickler, Info", g.gruppen.map((x) => x.h));
     assert(JSON.stringify(g.verborgen) === JSON.stringify(["einstNavWin", "eg-win"]),
       "ohne windows aus /api/config: nur der Abschnitt Windows und sein Eintrag verborgen (Windows-Einbindung 9)", g.verborgen);
-    const K = ["darst", "sprache", "groesse", "overlay", "logs", "gruppe", "dev", "info"];
+    const K = ["darst", "sprache", "groesse", "overlay", "logs", "archiv", "charaktere", "gruppe", "dev", "info"];
     assert(g.gruppen.every((x, i) => x.id === "eg-" + K[i] && x.hid === "egh-" + K[i] && x.lab === x.hid && x.ti === "-1" && x.inhalt),
       "jeder Abschnitt ist eine section mit h3 (aria-labelledby, tabindex -1) und Inhalt darunter", g.gruppen);
     assert(JSON.stringify(g.nav.map((x) => x[0])) === JSON.stringify(K) && g.nav.every((x, i) => x[1] === g.gruppen[i].h) && g.navName,
@@ -608,7 +610,7 @@ try {
       const sicht = (e) => !!e && e.getClientRects().length > 0;
       const g = q("#eg-logs");
       return {
-        pfad: q("#eOrdner")?.textContent.trim(), mono: q("#eOrdner") ? getComputedStyle(q("#eOrdner")).fontFamily : "",
+        pfad: q("#eOrdner")?.textContent.trim(), schrift: q("#eOrdner") ? getComputedStyle(q("#eOrdner")).fontFamily : "",
         aendern: sicht(q("#eOrdnerAendern")), browser: sicht(q("#eOrdnerBrowser")),
         gap: q("#eGap")?.value, min: q("#eMin")?.value, phasen: q("#ePhasen")?.getAttribute("aria-checked"),
         phasenRolle: q("#ePhasen")?.getAttribute("role"), phasenName: !!q("#ePhasen")?.getAttribute("aria-labelledby"),
@@ -622,8 +624,8 @@ try {
     });
     let z = await lies();
     // Ordner
-    assert(z.pfad === "C:\\TL\\CombatLogs" && /Mono|monospace|Consolas/i.test(z.mono) && z.aendern && !z.browser,
-      "Ordner: der Pfad aus /api/state in Mono, Knopf „Ändern“, kein Browser-Satz", z);
+    assert(z.pfad === "C:\\TL\\CombatLogs" && /Source Sans 3/.test(z.schrift) && z.aendern && !z.browser,
+      "Ordner: der Pfad aus /api/state in Source Sans 3, Knopf „Ändern“, kein Browser-Satz", z);
     await p.click("#eOrdnerAendern");
     await p.waitForSelector("#modalInput", { state: "visible" });
     await p.fill("#modalInput", "D:\\Spiele\\Logs");
@@ -729,8 +731,8 @@ try {
        Update-Hinweises unter der Version und "Rundgang zeigen", in dieser Reihenfolge) */
     assert(JSON.stringify(si.dt) === '["Liest","Schreibt","Lokaler Server","Netz","Spiel"]' && si.dd.length === 5 && si.dd.every((d) => d.length > 10),
       "Sicherheit: eine Liste mit fuenf Eintraegen - liest, schreibt, lokaler Server, Netz, Spiel", si);
-    assert(si.dd[2]?.includes("127.0.0.1") && si.code.includes("127.0.0.1") && si.dlBedien === 0 && JSON.stringify(si.bedien) === '["eUpdatePruefen","eRundgang"]',
-      "Sicherheit: 127.0.0.1 woertlich (als Code), keine Schalter und Knoepfe in der Liste; in Info nur der Schalter des Update-Hinweises und „Rundgang zeigen“", si);
+    assert(si.dd[2]?.includes("127.0.0.1") && si.code.includes("127.0.0.1") && si.dlBedien === 0 && JSON.stringify(si.bedien) === '["eUpdatePruefen","eRundgang","eBereichHinweise"]',
+      "Sicherheit: 127.0.0.1 woertlich (als Code), keine Schalter und Knoepfe in der Liste; in Info nur der Schalter des Update-Hinweises, „Rundgang zeigen“ und der Schalter der Hinweise zu den Bereichen", si);
     assert(/Gruppe/.test(si.dd[3] || "") && !/Questlog/.test(si.dd[3] || "") && /Update-Hinweis/.test(si.dd[3] || ""),
       "Sicherheit „Netz“: Gruppe und der Update-Hinweis; Questlog steht nicht mehr da (Abruf entfallen, #207)", si.dd[3]);
     assert(/Kampflog-Ordner/.test(si.dd[0] || "") && /nur lesend/.test(si.dd[0] || "") && /eigenen Dateien/.test(si.dd[0] || ""),
@@ -941,9 +943,9 @@ try {
          gezaehlt werden die sichtbaren; verborgen ist genau er */
       verborgen: [...document.querySelectorAll("#einst section.egruppe[hidden]")].map((g) => g.id),
       gruppen: [...document.querySelectorAll("#einst section.egruppe:not([hidden])")].map((g) => document.getElementById(g.getAttribute("aria-labelledby"))?.tagName) }));
-    assert(uk.h1.length === 1 && uk.titel === "H2" && uk.gruppen.length === 8 && uk.gruppen.every((x) => x === "H3") && uk.verborgen.join() === "eg-win",
-      "Ueberschriften: ein h1 im Dokument, „Einstellungen“ als h2, die acht Abschnitte als h3 (Windows verborgen)", uk);
-    for (const name of ["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Gruppe und Server", "Entwickler", "Info"]) {
+    assert(uk.h1.length === 1 && uk.titel === "H2" && uk.gruppen.length === 10 && uk.gruppen.every((x) => x === "H3") && uk.verborgen.join() === "eg-win",
+      "Ueberschriften: ein h1 im Dokument, „Einstellungen“ als h2, die zehn Abschnitte als h3 (Windows verborgen; Charaktere seit Twinks 8, Archiv seit #264)", uk);
+    for (const name of ["Darstellung", "Sprache", "Größe", "Overlay", "Log-Ordner", "Archiv", "Gruppe und Server", "Charaktere", "Entwickler", "Info"]) {
       const n = await p.getByRole("region", { name, exact: true }).count();
       assert(n === 1, `Vorleser: die Gruppe „${name}“ ist eine Region mit diesem Namen`, n);
     }
@@ -964,10 +966,15 @@ try {
     // folgt Spezifikation Rekorde 3: "Rekorde neu einlesen" als letzte Zeile des Log-Ordners;
     // der Schalter des Update-Hinweises in Info folgt der Spezifikation Update-Hinweis 2.4
     const muss = ["dark", "de", "en", "eZoom", "eSee", "eOben", "eOverlay", "eOrdnerAendern", "eOrdnerExplorer", "eLive", "eGap", "eMin", "ePhasen", "eSpeichern", "eLaden",
-      "eRekorde", "eServer", "eServerSave", "eServerCheck", "eDev", "eBeispielkampf", "eClog", "eUpdatePruefen",
+      "eRekorde",
+      // folgt Spezifikation Log-Archiv 2, 6 (#264): der Abschnitt Archiv mit Schalter und "Archivordner oeffnen"
+      "eArchiv", "eArchivOrdner",
+      "eServer", "eServerSave", "eServerCheck", "eDev", "eBeispielkampf", "eClog", "eUpdatePruefen",
       // folgt Spezifikation Rundgang 02.10.2026, 2: "Rundgang zeigen" in Info, nach dem Aenderungsprotokoll
       // und nach dem Schalter des Update-Hinweises, der unter der Version steht
-      "eRundgang"];
+      "eRundgang",
+      // folgt Spezifikation Rundgang erweitert 16.10.2026, 3.3: der Schalter "Hinweise zu den Bereichen" darunter
+      "eBereichHinweise"];
     assert(JSON.stringify(erwartet) === JSON.stringify(muss) && JSON.stringify(gegangen) === JSON.stringify(muss),
       "Tab erreicht jedes Bedienelement der Einstellungen, in der Reihenfolge der Zeilen", { erwartet, gegangen });
 

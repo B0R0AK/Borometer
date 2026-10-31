@@ -9,7 +9,7 @@ import { stackHit } from "./22-timeline-smoothing";
 import { renderRotation } from "./25-rotation";
 import { persistPref } from "./27-weapons-tab";
 import { renderAll } from "./32-history";
-import { syncRahmenKnoepfe, uiZoomFactor } from "./37-window-size-and-overlay";
+import { standErneut, syncRahmenKnoepfe, uiZoomFactor } from "./37-window-size-and-overlay";
 import { parseClock } from "./38-tooltips";
 import { einstNachfuehren } from "./57-einstellungen";
 
@@ -77,7 +77,9 @@ export function applyTheme(repaint: boolean, boot?: string){
 export function setzeThema(k: string){
   state.theme = k;
   applyTheme(true);
-  persistPref("theme", state.theme);
+  /* Ein offenes abgerissenes Fenster liest das Thema aus der Einstellung (#350): erst wenn sie
+     geschrieben ist, geht der Stand hinaus, der es dazu aufweckt. */
+  void persistPref("theme", state.theme).then(standErneut);
 }
 /* Der erste Anstrich nimmt das Thema, das der Starter eingesetzt hat.
    state.theme steht hier noch auf "dark", weil die gespeicherte Wahl erst mit
@@ -108,8 +110,11 @@ export function syncViewBars(a: number, b: number){
     // toFixed schreibt immer einen Punkt: im deutschen Fenster stand "1.5x"
     // neben einer Zeitleiste, die ihre Sekunden mit Komma schreibt.
     if(lvl) lvl.textContent = num1(state.rotZoom || 1)+"×";
-    if(f && document.activeElement !== f) f.value = clock(a);
-    if(to && document.activeElement !== to) to.value = clock(b);
+    /* Ein getipptes, noch nicht angewendetes Von/Bis (data-getippt, bis Enter, Anwenden, Zuruecksetzen oder den Fokus aus der
+       Leiste) bleibt stehen: zeichnet die Rotation dazwischen neu (Groessenaenderung), ueberschrieb sie sonst das Von,
+       sobald der Fokus im Bis-Feld stand (#224). */
+    if(f && document.activeElement !== f && !f.dataset.getippt) f.value = clock(a);
+    if(to && document.activeElement !== to && !to.dataset.getippt) to.value = clock(b);
   });
 }
 function applyRange(bar: HTMLElement){
@@ -120,6 +125,7 @@ function applyRange(bar: HTMLElement){
   if(b == null) b = T;
   if(b <= a){ toastFail(tt("rotation.badRange")); return; }
   state.rotFrom = Math.max(0, a); state.rotTo = Math.min(T, b);
+  bar.querySelectorAll<HTMLElement>(".vfrom,.vto").forEach(inp => delete inp.dataset.getippt);
   renderViews();
 }
 
@@ -160,11 +166,21 @@ export function setup(): void {
       const act = btn.dataset.act;
       if(act === "in") setZoom((state.rotZoom || 1) * 1.5);
       else if(act === "out") setZoom((state.rotZoom || 1) / 1.5);
-      else if(act === "reset"){ state.rotZoom = 1; state.rotFrom = null; state.rotTo = null; renderViews(); }
+      else if(act === "reset"){
+        state.rotZoom = 1; state.rotFrom = null; state.rotTo = null;
+        bar.querySelectorAll<HTMLElement>(".vfrom,.vto").forEach(inp => delete inp.dataset.getippt);
+        renderViews();
+      }
       else if(act === "apply") applyRange(bar);
     });
     bar.querySelectorAll<HTMLElement>(".vfrom,.vto").forEach(inp =>
       inp.onkeydown = e => { if(e.key === "Enter") applyRange(bar); });
+    // getippt, aber nicht angewendet: syncViewBars lasse es stehen, bis der Fokus die Leiste verlaesst
+    bar.addEventListener("input", e => { const t = e.target as HTMLElement; if(t.matches(".vfrom,.vto")) t.dataset.getippt = "1"; });
+    bar.addEventListener("focusout", e => {
+      if(bar.contains((e as FocusEvent).relatedTarget as Node | null)) return;
+      bar.querySelectorAll<HTMLElement>(".vfrom,.vto").forEach(inp => delete inp.dataset.getippt);
+    });
   });
   // scroll-wheel zoom, the way anyone expects a timeline to behave; a plain
   /* Und dieselben zwei Behaelter mit der Tastatur. Der Browser schiebt einen

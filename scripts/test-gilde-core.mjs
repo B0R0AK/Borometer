@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Der Kern der Gilde (src/renderer/gilde-core.ts), ohne Seite: Termine
-// rechnen (Wanduhr, Sommerzeit), Auswerten (Quote, Straehne, letzte
-// Teilnahme, entschuldigt zaehlt weder dafuer noch dagegen), Text, .ics
+// rechnen (Wanduhr, Sommerzeit), Auswerten (Quote, letzte Teilnahme; man ist da
+// oder nicht da, eine alte Marke "entschuldigt" aus der Datei zaehlt als nicht da), Text, .ics
 // (Spezifikation docs/superpowers/specs/2026-10-06-gilde-design.md, 3, 4, 6).
 // Namen sind erfunden.
 //
@@ -74,6 +74,13 @@ const mw = (id, name, waffen, extra = {}) => ({ ...m(id, name), waffen, ...extra
 eq(k.rolleVon(mw("a", "X", ["Staff", "Wand and Tome"], { rolle: "dps" })), "heal", "rolleVon: das Paar gewinnt gegen rolle");
 eq(k.rolleVon(mw("a", "X", [], { rolle: "tank" })), "tank", "rolleVon: ohne Paar gilt rolle");
 eq(k.rolleVon(mw("a", "X", ["Dagger"], { rolle: "" })), "", "rolleVon: eine Waffe, keine Rolle");
+// ein Heiler kann als Schaden zaehlen (Haekchen alsDps); fuer keine andere Rolle aendert es etwas
+eq(k.rolleVon(mw("a", "X", ["Longbow", "Wand and Tome"], { alsDps: true })), "dps", "rolleVon: ein Heiler mit Haekchen zaehlt als Schaden");
+eq(k.rolleVon(mw("a", "X", ["Staff", "Wand and Tome"], { alsDps: true })), "dps", "rolleVon: jeder Heiler, nicht nur der Sucher");
+eq(k.rolleVon(mw("a", "X", ["Longbow", "Wand and Tome"], { alsDps: false })), "heal", "rolleVon: Haekchen aus, Heiler bleibt Heiler");
+eq(k.rolleVon(mw("a", "X", ["Longbow", "Wand and Tome"])), "heal", "rolleVon: ohne Haekchen ein Heiler");
+eq(k.rolleVon(mw("a", "X", ["Greatsword", "Sword and Shield"], { alsDps: true })), "tank", "rolleVon: das Haekchen aendert bei einem Tank nichts");
+eq(k.rolleVon(mw("a", "X", [], { rolle: "heal", alsDps: true })), "heal", "rolleVon: ohne Paar gilt rolle, das Haekchen auch nicht");
 const fm = [
   mw("f1", "Testperson A", ["Dagger", "Longbow"], { notiz: "" }),
   mw("f2", "Testperson B", ["Staff", "Wand and Tome"], { rolle: "dps", notiz: "Ersatz am Sonntag" }),
@@ -90,6 +97,13 @@ eq(ids(k.filtern(fm, { rolle: "", suche: "ersatz" })), ["f2"], "filtern: Suche u
 eq(ids(k.filtern(fm, { rolle: "", suche: "TESTPERSON b" })), ["f2"], "filtern: Suche ueber Name, Gross-/Kleinschreibung egal");
 eq(ids(k.filtern(fm, { rolle: "", suche: "kugel" })), [], "filtern: ein geloestes Mitglied fehlt immer");
 eq(ids(k.filtern(fm, { rolle: "dps", suche: "testperson" })), ["f1"], "filtern: Rolle und Suche schneiden sich");
+// der Offspec (zweites Waffenpaar) wird mitgesucht, aendert die Rolle aber nicht
+const fo = [mw("o1", "Testperson E", ["Staff", "Wand and Tome"], { offspec: ["Dagger", "Crossbow"] }), mw("o2", "Testperson F", ["Staff", "Wand and Tome"])];
+eq(ids(k.filtern(fo, { rolle: "", suche: "skorpion" })), ["o1"], "filtern: Suche ueber die Klasse des Offspecs (deutsch)");
+eq(ids(k.filtern(fo, { rolle: "", suche: "scorpion" })), ["o1"], "filtern: Suche ueber die Klasse des Offspecs (englisch)");
+eq(ids(k.filtern(fo, { rolle: "", suche: "armbrust" })), ["o1"], "filtern: Suche ueber eine Waffe des Offspecs");
+eq(ids(k.filtern(fo, { rolle: "dps", suche: "" })), [], "filtern: der Offspec aendert die Rolle nicht");
+eq(ids(k.filtern([mw("a", "X", ["Longbow", "Wand and Tome"], { alsDps: true }), mw("b", "Y", ["Longbow", "Wand and Tome"])], { rolle: "dps", suche: "" })), ["a"], "filtern: ein Heiler mit Haekchen steht im Filter Schaden, ohne nicht");
 
 // --- Auswerten
 const g = (anwesend, mehr = {}) => ({ id: "gtest00001", name: "Testgilde",
@@ -99,7 +113,7 @@ const key = (d) => "rtest00001|" + d;
 const JETZT = "2026-10-26T12:00";
 
 const z0 = k.auswerten(g({}), null, JETZT);
-eq(z0.map((z) => [z.quote, z.straehne, z.letzte]), [[null, 0, null], [null, 0, null]], "ohne Haekchen: keine Quote, keine Straehne");
+eq(z0.map((z) => [z.quote, z.letzte]), [[null, null], [null, null]], "ohne Haekchen: keine Quote");
 
 const A = "mtest00001", B = "mtest00002";
 const an = {
@@ -109,10 +123,10 @@ const an = {
   [key("2026-10-25")]: { [A]: "da", [B]: "da" },
 };
 const z1 = k.auswerten(g(an), null, JETZT);
-eq(z1[0], { mitgliedId: A, da: 3, fehlt: 0, entschuldigt: 1, quote: 1, straehne: 3, letzte: "2026-10-25" },
-  "entschuldigt faellt aus Nenner und Zaehler, unterbricht die Straehne nicht");
-eq(z1[1], { mitgliedId: B, da: 3, fehlt: 1, entschuldigt: 0, quote: 0.75, straehne: 2, letzte: "2026-10-25" },
-  "fehlt beendet die Straehne, die Quote ist da / (da + fehlt)");
+eq(z1[0], { mitgliedId: A, da: 3, fehlt: 1, quote: 0.75, letzte: "2026-10-25" },
+  "eine alte Marke entschuldigt zaehlt als nicht da (man ist da oder nicht)");
+eq(z1[1], { mitgliedId: B, da: 3, fehlt: 1, quote: 0.75, letzte: "2026-10-25" },
+  "die Quote ist da / (da + fehlt)");
 eq(k.auswerten(g({ [key("2026-10-27")]: { [A]: "da" } }), null, JETZT)[0].da, 0, "ein Termin in der Zukunft zaehlt nicht");
 eq(k.auswerten(g({ [key("2026-10-11")]: { [A]: "offen", [B]: "offen" } }), null, JETZT)[0].da, 0, "nur offene Haekchen: der Termin zaehlt nicht als abgehakt");
 eq(k.auswerten(g({ ...an }, { reihen: [reihe({ ausnahmen: { "2026-10-11": { aus: true } } })] }), null, JETZT)[1].fehlt, 0, "ein ausgefallener Termin zaehlt nicht");
@@ -120,19 +134,59 @@ eq(k.auswerten(g(an, { mitglieder: [m(A, "Testperson A"), { ...m(B, "Testperson 
 const zwei = { id: "rtest00002", titel: "Training", start: "2026-10-07T19:00", zone: "Europe/Berlin", wdh: { art: "woche", tage: [] }, dauerMin: 60, erinnerungMin: 0, ausnahmen: {} };
 const g2 = g({ ...an, "rtest00002|2026-10-07": { [A]: "fehlt", [B]: "da" } }, { reihen: [reihe(), zwei] });
 eq(k.auswerten(g2, ["rtest00002"], JETZT).map((z) => [z.da, z.fehlt]), [[0, 1], [1, 0]], "je Reihe");
-eq(k.auswerten(g2, null, JETZT)[0].fehlt, 1, "gesamt zaehlt beide Reihen");
+eq(k.auswerten(g2, null, JETZT)[0].fehlt, 2, "gesamt zaehlt beide Reihen (die alte Entschuldigung zaehlt als nicht da, dazu das Training)");
+
+// --- Events an einem Tag, Datum tippen, Zaehler (Spezifikation Gilde-Punkte 4: Datumssuche, Zaehler im Termin)
+{
+  const ev = (id, titel, start, mehr = {}) => ({ id, titel, start, zone: "Europe/Berlin", wdh: { art: "woche", tage: [] }, dauerMin: 120, erinnerungMin: 0, ausnahmen: {}, ...mehr });
+  const raid = ev("rtest00001", "Raid", "2026-10-04T20:00", { ausnahmen: { "2026-10-11": { aus: true }, "2026-10-18": { zeit: "21:00" } } });   // Sonntag
+  const einmal = ev("rtest00002", "Einmal", "2026-10-10T19:00", { wdh: { art: "einmal", tage: [] } });
+  const tage = ev("rtest00003", "Tage", "2026-10-05T18:30", { wdh: { art: "tage", tage: [1, 3] } });                            // montags und mittwochs
+  const alt = ev("rtest00004", "Alt", "2026-10-04T20:00", { geloest: true });
+  const kurz = ev("rtest00005", "Kurz", "2026-10-04T17:00", { wdh: { art: "woche", tage: [], bis: "2026-10-20" } });
+  const gg = { id: "gtest00001", name: "Testgilde", mitglieder: [m("mtest00001", "Testperson A")], reihen: [raid, einmal, tage, alt, kurz], anwesend: {} };
+  const am = (d) => k.eventsAm(gg, d).map((x) => [x.reihe.titel, x.zeit, x.aus]);
+  eq(am("2026-10-04"), [["Raid", "20:00", false], ["Kurz", "17:00", false]], "eventsAm: wochentlich am Wochentag des Starts, geloeste nie");
+  eq(am("2026-10-11"), [["Raid", "20:00", true], ["Kurz", "17:00", false]], "eventsAm: ein ausgefallener Termin steht mit aus");
+  eq(am("2026-10-18"), [["Raid", "21:00", false], ["Kurz", "17:00", false]], "eventsAm: ein verschobener Termin zeigt die neue Uhrzeit");
+  eq(am("2026-10-10"), [["Einmal", "19:00", false]], "eventsAm: ein einmaliges Event nur an seinem Tag");
+  eq(am("2026-10-12"), [["Tage", "18:30", false]], "eventsAm: an Wochentagen (Montag)");
+  eq(am("2026-10-14"), [["Tage", "18:30", false]], "eventsAm: an Wochentagen (Mittwoch)");
+  eq(am("2026-10-13"), [], "eventsAm: ein Tag ohne Event");
+  eq(am("2026-10-03"), [], "eventsAm: vor dem Start gibt es nichts");
+  eq(am("2026-10-25"), [["Raid", "20:00", false]], "eventsAm: nach dem Ende der Wiederholung (bis 20.10.) steht Kurz nicht mehr da");
+  eq(k.eventsAm(gg, "2036-10-05").map((x) => x.reihe.titel), ["Raid"], "eventsAm: weit in der Zukunft, ohne Ende");
+  eq(k.eventsAm(gg, "2026-02-30"), [], "eventsAm: ein Tag, den es nicht gibt, liefert nichts");
+
+  eq(k.datumParse("10.09.2026", 2026), "2026-09-10", "datumParse: TT.MM.JJJJ");
+  eq(k.datumParse(" 10.09.2026 ", 2026), "2026-09-10", "datumParse: Leerzeichen am Rand egal");
+  eq(k.datumParse("10.9.2026", 2026), "2026-09-10", "datumParse: ohne fuehrende Null");
+  eq(k.datumParse("10.09.", 2027), "2027-09-10", "datumParse: ohne Jahr gilt das uebergebene");
+  eq(k.datumParse("10.09", 2027), "2027-09-10", "datumParse: ohne Jahr und letzten Punkt");
+  eq(k.datumParse("2026-09-10", 2020), "2026-09-10", "datumParse: JJJJ-MM-TT");
+  eq(k.datumParse("29.02.2028", 2026), "2028-02-29", "datumParse: Schaltjahr");
+  eq([k.datumParse("31.02.2026", 2026), k.datumParse("29.02.2026", 2026), k.datumParse("00.01.2026", 2026), k.datumParse("10.13.2026", 2026)], [null, null, null, null], "datumParse: Tage, die es nicht gibt");
+  eq([k.datumParse("", 2026), k.datumParse("abc", 2026), k.datumParse("10.09.26", 2026), k.datumParse("1.2.3.x", 2026), k.datumParse("2026/09/10", 2026)], [null, null, null, null, null], "datumParse: kein Datum");
+
+  // ein Zaehler macht den Termin zu einem abgehakten, auch ohne Haken
+  const tm = { reiheId: "rtest00001", datum: "2026-10-04", start: "2026-10-04T20:00", aus: false };
+  eq([k.abgehakt({ ...gg, zaehler: { "rtest00001|2026-10-04": { mtest00001: 3 } } }, tm), k.abgehakt({ ...gg, zaehler: { "rtest00001|2026-10-04": {} } }, tm), k.abgehakt(gg, tm)], [true, false, false],
+    "abgehakt: ein Zaehler zaehlt als Haken, ein leerer Eintrag und kein Eintrag nicht");
+  eq(k.abgehakt({ ...gg, anwesend: { "rtest00001|2026-10-04": { mtest00001: "da" } } }, tm), true, "abgehakt: ein Haken zaehlt weiter");
+}
 
 // --- Text
 const kurz = (d) => d.slice(8, 10) + "." + d.slice(5, 7) + ".";
-const w = { kopf: "Anwesenheit", reihe: "Raid", treffer: "", straehne: "Straehne", zuletzt: "zuletzt", entschuldigt: "entschuldigt", offen: "-", datum: kurz };
+const w = { kopf: "Anwesenheit", reihe: "Raid", treffer: "", zuletzt: "zuletzt", offen: "-", datum: kurz };
 const text = k.textAusgabe(z1, g(an), w);
 eq(text.split("\n")[0], "Testgilde \u00b7 Anwesenheit \u00b7 Raid", "Kopfzeile: Gilde, Kopf und Reihe; ohne Filter kein Treffersatz");
 eq(k.textAusgabe(z1, g(an), { ...w, reihe: "Alle Reihen", treffer: "1 von 2 Mitgliedern" }).split("\n")[0],
   "Testgilde \u00b7 Anwesenheit \u00b7 Alle Reihen \u00b7 1 von 2 Mitgliedern", "Kopfzeile: mit Filter steht der Treffersatz dabei");
 eq(k.textAusgabe(z1, g(an), { ...w, datum: (d) => d.slice(5, 7) + "/" + d.slice(8, 10) }).includes("zuletzt 10/25"), true, "das Datum kommt aus worte.datum (englisch 10/25)");
-eq(k.textAusgabe(z0, g({}), w).split("\n")[1], "Testperson A \u00b7 - \u00b7 Straehne 0 \u00b7 zuletzt -", "ohne Teilnahme: offen statt Quote und Datum");
-eq(text.includes("Testperson B \u00b7 75\u00a0% (3/4) \u00b7 Straehne 2 \u00b7 zuletzt 25.10."), true, "eine Zeile je Mitglied, geschuetztes Leerzeichen vor %");
-eq(text.includes("Testperson A \u00b7 100\u00a0% (3/3) \u00b7 Straehne 3 \u00b7 zuletzt 25.10. \u00b7 1 entschuldigt"), true, "die Zahl der Entschuldigungen steht dahinter");
+eq(k.textAusgabe(z0, g({}), w).split("\n")[1], "Testperson A \u00b7 - \u00b7 zuletzt -", "ohne Teilnahme: offen statt Quote und Datum");
+eq(text.includes("Testperson B \u00b7 75\u00a0% (3/4) \u00b7 zuletzt 25.10."), true, "eine Zeile je Mitglied, geschuetztes Leerzeichen vor %");
+eq(text.includes("Testperson A \u00b7 75\u00a0% (3/4) \u00b7 zuletzt 25.10."), true, "eine alte Entschuldigung steht als nicht da in der Quote");
+eq(/Straehne|entschuldigt/i.test(text), false, "der Text kennt weder Straehne noch entschuldigt");
 
 // --- .ics
 const leer = k.ics(g({}, { reihen: [reihe({ wdh: { art: "tage", tage: [] } })] }), "rtest00001", 0);

@@ -22,6 +22,7 @@
 *.txt             text eol=lf
 *.html            text eol=lf
 *.service         text eol=lf
+*.sh              text eol=lf
 LICENSE           text eol=lf
 .gitattributes    text eol=lf
 .gitignore        text eol=lf

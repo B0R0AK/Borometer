@@ -11,6 +11,7 @@
 // Run:  npm run test:analyse-core
 
 import * as esbuild from "esbuild";
+import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { bilderModus, bilderPlugin } from "./bilder-weiche.mjs";
@@ -247,7 +248,21 @@ const tr = (lang) => (key, vars) => {
     "analysis.start.weakerSecond", "analysis.start.stronger", "analysis.start.strongerSecond",
     "analysis.zumBeleg", "analysis.inRotation", "analysis.inRotation.luecke", "analysis.inRotation.schwach",
     "analysis.inRotation.start", "analysis.folgeRotation", "analysis.ganzerKampf",
-    "analysis.ref.best", "analysis.ref.second"];
+    "analysis.ref.best", "analysis.ref.second",
+    "analysis.wb.kampf", "analysis.wb.kampfWie", "analysis.wb.dps", "analysis.wb.meister",
+    "analysis.wb.gegenBest", "analysis.wb.keinBest", "analysis.wb.bestAm", "analysis.wb.desSchadens",
+    "analysis.wb.einsaetze", "analysis.wb.treffer", "analysis.wb.mehr", "analysis.wb.weniger",
+    "analysis.wb.laufzeit", "analysis.wb.laufzeitWie", "analysis.wb.weitere", "analysis.wb.passiv",
+    "analysis.wb.passivWie", "analysis.wb.aufheben", "analysis.wb.strecke", "analysis.wb.streckeSatz",
+    "analysis.wb.abstand", "analysis.wb.abstandSatz", "analysis.wb.ventUnter", "analysis.wb.ventAlle",
+    "analysis.wb.aus", "analysis.wb.ausKurz", "analysis.wb.meist", "analysis.wb.liefKurz", "analysis.wb.lief", "analysis.wb.passivSatz", "analysis.wb.ventNeutral",
+    "analysis.wb.ventAlleGanz", "analysis.wb.bisN", "analysis.wb.spanne", "analysis.wb.luecke",
+    "analysis.wb.sonst", "analysis.wb.diesePull", "analysis.wb.besterPull", "analysis.wb.nichtGespeichert",
+    "analysis.wb.spiegelSatz", "analysis.wb.zweitPull", "analysis.wb.zweitAm", "analysis.wb.geistLabel",
+    "analysis.wb.starkNicht", "analysis.inRotation.abstand",
+    "analysis.inRotation.abstandZweit", "analysis.wb.abstandSatzZweit", "analysis.wb.bestHier", "analysis.wb.zweitHier", "analysis.wb.salven", "analysis.wb.optimal", "analysis.wb.nachbeben",
+    "analysis.wb.jeSalve", "analysis.wb.rampe", "afuss.wb.bereit", "afuss.wb.zustand",
+    "afuss.wb.krit", "analysis.wb.ventAchse", "analysis.wb.medianSalve", "analysis.wb.spanneUeber"];
   eq(KEYS.filter((k) => core.I18N.de[k] === undefined || core.I18N.en[k] === undefined), [],
     "Texte: jeder Schluessel in DE und EN");
   const de = tr("de"), en = tr("en");
@@ -288,6 +303,23 @@ const tr = (lang) => (key, vars) => {
     boss: "B", dmg: "1M", pct: "2\u00a0%" })).join(" | ");
   eq(alleDeWerte.match(/\d(?: )?%|\d s\b|\ds\b/g), null, "DE: vor % und s steht das geschuetzte Leerzeichen");
   eq(de("analysis.start.label"), "Die ersten 10\u00a0s", "DE: \"Die ersten 10 s\" mit geschuetztem Leerzeichen");
+}
+
+
+// --- Werkbank-Texte: Wortlaut der Spezifikation 5.2, und nie ein rohes geschuetztes Leerzeichen im Quelltext
+{
+  const de = tr("de");
+  eq(de("analysis.wb.aus", { s: "12\u00a0s", ab: "0:20" }),
+    "12\u00a0s aus, ab 0:20, während andere Fähigkeiten weiter trafen. Vergessen einzuschalten?", "DE analysis.wb.aus");
+  eq(de("analysis.wb.lief", { s: "48\u00a0s", anteil: "40\u00a0%", n: 3 }),
+    "Lief 48\u00a0s, 40\u00a0% des Kampfes, in 3 Läufen.", "DE analysis.wb.lief");
+  eq(de("analysis.wb.ventUnter", { n: 4, von: "1:10", bis: "2:05", ist: 5, soll: 8, fehlen: 12 }),
+    "4 Salven nicht auf der optimalen Entfernung verwendet, zwischen 1:10 und 2:05. Sie erreichten 5 statt 8 Nachbeben, 12 Treffer weniger.",
+    "DE analysis.wb.ventUnter");
+  eq(de("analysis.wb.ventAlle", { n: 9, unlesbar: 2 }),
+    "Alle 9 lesbaren Salven auf der optimalen Entfernung; 2 ließen sich nicht lesen.", "DE analysis.wb.ventAlle");
+  const quelle = readFileSync(join(root, "src", "renderer", "app", "07-dictionary.ts"), "utf8");
+  eq(/\u00a0/.test(quelle), false, "Woerterbuch: kein rohes U+00A0 im Quelltext, nur der Escape");
 }
 
 /* Neugestaltung 28.09., Luecken 4.3 (Entwurf src.js leerzeit): eine Luecke
@@ -369,6 +401,190 @@ const tr = (lang) => (key, vars) => {
      "bild: kein Satz nennt Schwaechste oder Schlechteste");
   eq(Object.keys(core.I18N.en).filter((k) => /^bild\./.test(k)).sort(),
      Object.keys(core.I18N.de).filter((k) => /^bild\./.test(k)).sort(), "bild: jeder Satz in beiden Sprachen");
+}
+
+/* Werkbank (#218): Hitze eines Einsatzes, die staerksten 5 s, wo der Abstand zum besten Pull waechst. */
+{
+  eq([core.hitze(0, 0), core.hitze(0, 1), core.hitze(1, 0), core.hitze(1, 1), core.hitze(0.5, 0.49)], [0, 1, 2, 3, 2],
+    "hitze: normal, stark, kritisch, kritisch stark; ab der Haelfte zaehlt");
+  const sek = [1, 1, 1, 9, 9, 9, 9, 9, 1, 1, 1, 1];
+  eq(core.staerksteStrecke(sek), { von: 3, bis: 8, summe: 45 }, "staerksteStrecke: die fuenf hoechsten Sekunden am Stueck");
+  eq(core.staerksteStrecke([5, 5, 5]), null, "staerksteStrecke: kuerzer als 5 s - keine");
+  eq(core.staerksteStrecke([0, 2, 2, 2, 2, 2, 0, 2, 2, 2, 2, 2]), { von: 1, bis: 6, summe: 10 }, "staerksteStrecke: bei Gleichstand die fruehere");
+  const ich = Array(60).fill(100), best = Array(60).fill(100);
+  for (let i = 30; i < 45; i++) best[i] = 300;
+  eq(core.abstandWaechst(ich, best), { von: 30, bis: 45, fehlt: 3000, ende: 3000 }, "abstandWaechst: das 15-s-Fenster mit dem groessten Rueckstand");
+  eq(core.abstandWaechst(ich, ich), null, "abstandWaechst: kein Rueckstand - keine Fahne");
+  const vorn = Array(60).fill(200);
+  eq(core.abstandWaechst(vorn, best), null, "abstandWaechst: am Ende vorn - keine Fahne");
+  const verteilt = Array(60).fill(100), b2 = Array(60).fill(110);
+  eq(core.abstandWaechst(verteilt, b2), { von: 0, bis: 15, fehlt: 150, ende: 600 },
+    "abstandWaechst: gleichmaessiger Rueckstand - das erste Fenster, 25 % des Abstands");
+  const kurz = Array(10).fill(100);
+  eq(core.abstandWaechst(kurz, kurz.map((x) => x + 50)), null, "abstandWaechst: kuerzer als 15 s - keine Fahne");
+}
+
+/* Werkbank (#218): Laufzeit im Takt, Protest aus. */
+{
+  const takt = Array.from({ length: 60 }, (_, i) => (i % 10 === 9 ? 1100 : 1000));
+  eq(core.imTakt(takt), true, "imTakt: 90 % bei 1000 ms - Takt");
+  eq(core.imTakt(takt.slice(0, 40)), false, "imTakt: unter 50 Abstaenden - kein Takt");
+  eq(core.imTakt(Array.from({ length: 60 }, (_, i) => 300 + (i % 7) * 150)), false, "imTakt: Salven ohne festen Abstand - kein Takt");
+  eq(core.taktLaeufe([4000, 5000, 6000, 7000, 30000, 31000]), { laeufe: [[4000, 8000], [30000, 32000]], lief: 6000 },
+    "taktLaeufe: zwei Laeufe, je Lauf eine Sekunde dazu");
+  eq(core.taktLaeufe([]), { laeufe: [], lief: 0 }, "taktLaeufe: keine Ticks");
+  /* Ruling 13 (Fix-Runde Task 9): Takt nur mit kurzen Laeufen - ein Dauerschaden tickt in Laeufen von
+     einigen Sekunden; was den ganzen Kampf im Sekundentakt trifft, ist gedrueckt (Median der Laeufe <= 20 s) */
+  eq(core.TAKT_LAUF_MAX_MS, 20000, "TAKT_LAUF_MAX_MS: 20 s");
+  eq(core.taktMitLaeufen(Array(100).fill(1000), Array(20).fill(6000)), true, "taktMitLaeufen: 1000-ms-Ticks in Laeufen von 6 s - Takt");
+  eq(core.taktMitLaeufen(Array(89).fill(1000), [90000]), false, "taktMitLaeufen: 1000 ms durch einen Kampf von 90 s - kein Takt");
+  eq(core.taktMitLaeufen(Array(40).fill(1000), Array(8).fill(6000)), false, "taktMitLaeufen: unter 50 Abstaenden - kein Takt");
+  eq(core.taktMitLaeufen(Array(100).fill(1000), []), false, "taktMitLaeufen: ohne Laeufe - kein Takt");
+  /* gewichtet nach der Zeit: fuenf Pulls je 96 s am Stueck und ein Pull in vielen kurzen Stuecken - die
+     meisten Treffer liegen in den langen Laeufen, also gedrueckt, auch wenn die kurzen in der Zahl ueberwiegen */
+  eq(core.taktMitLaeufen(Array(500).fill(1000), [...Array(5).fill(96000), ...Array(30).fill(2000)]), false,
+    "taktMitLaeufen: die meiste Zeit in langen Laeufen - kein Takt, auch bei vielen kurzen");
+
+  const protest = [], fremd = [];
+  for (let t = 1000; t < 90000; t += 400) if (t < 20000 || t >= 32000) protest.push(t);
+  for (let t = 500; t < 90000; t += 700) fremd.push(t);
+  eq(core.ausStrecken(protest, fremd, 90000), [[19800, 32200]], "ausStrecken: 12,4 s aus, andere trafen weiter");
+  eq(core.ausStrecken(protest, fremd.filter((t) => t < 19800 || t > 32200), 90000), [],
+    "ausStrecken: in der Luecke traf nichts anderes - nicht aus (Boss weg)");
+  const kurzAus = protest.filter((t) => t < 40000 || t >= 43400);   // 39800 -> 43400: 3,6 s
+  eq(core.ausStrecken(kurzAus, fremd, 90000).some(([a]) => a > 39000), false, "ausStrecken: 3,6 s ist noch nicht aus");
+  const genau = protest.filter((t) => t < 40000 || t >= 43800);     // 39800 -> 43800: 4,0 s
+  eq(core.ausStrecken(genau, fremd, 90000).some(([a, b]) => a === 39800 && b === 43800), true, "ausStrecken: ab genau 4 s aus");
+  const frueh = [1000, ...Array.from({ length: 50 }, (_, i) => 6000 + i * 400)];
+  eq(core.ausStrecken(frueh, fremd, 90000), [], "ausStrecken: eine Luecke, die in den ersten 3 s beginnt, zaehlt nicht");
+  const spaet = [...Array.from({ length: 50 }, (_, i) => 60000 + i * 400), 89500];
+  eq(core.ausStrecken(spaet, fremd, 90000), [], "ausStrecken: eine Luecke, die in den letzten 5 s endet, zaehlt nicht");
+}
+
+/* Werkbank (#218): welches Fach wohin, und dass keine Zelle leer bleibt. */
+{
+  const xs = [
+    { k: "V", dmg: 9000, art: "ventius" }, { k: "M", dmg: 400, art: "einsatz" }, { k: "K", dmg: 110, art: "einsatz" },
+    { k: "S", dmg: 90, art: "einsatz" }, { k: "Q", dmg: 85, art: "einsatz" }, { k: "B", dmg: 50, art: "einsatz" },
+    { k: "P", dmg: 60, art: "dicht" }, { k: "T", dmg: 20, art: "takt" }, { k: "R", dmg: 160, art: "passiv" },
+  ];
+  eq(core.faecherOrdnen(xs), { haupt: "V", mittel: ["M", "K", "S"], weitere: ["Q", "B"], lauf: ["P", "T"], passiv: ["R"] },
+    "faecherOrdnen: Hauptfach, drei mittlere ab 0,8 %, Rest, Laufzeit und Passiv getrennt");
+  eq(core.faecherOrdnen([{ k: "R", dmg: 900, art: "passiv" }, { k: "P", dmg: 800, art: "dicht" }, { k: "M", dmg: 10, art: "einsatz" }]).haupt, "M",
+    "faecherOrdnen: Passiv und Laufzeit werden nie Hauptfach");
+  eq(core.faecherOrdnen([{ k: "M", dmg: 1000, art: "einsatz" }, { k: "K", dmg: 5, art: "einsatz" }]).mittel, [],
+    "faecherOrdnen: unter 0,8 % kein mittleres Fach");
+  eq(core.faecherOrdnen([]).haupt, null, "faecherOrdnen: leer");
+
+  // keine leere Zelle: jede Zeile des 12er-Rasters voll
+  const voll = (pl) => {
+    const cols = pl.map((p) => (p.spalte === "1/-1" ? 12 : +p.spalte.replace("span ", "")));
+    const haupt = pl[0], hRows = haupt.zeile === "auto" ? 1 : +haupt.zeile.replace("span ", "");
+    if (cols[0] === 12) { let rest = 0; for (const c of cols.slice(1)) { rest = (rest + c) % 12; } return rest === 0; }
+    const rechts = cols.slice(1, 1 + hRows);
+    return cols[0] === 7 && rechts.every((c) => c === 5) && cols.slice(1 + hRows).every((c) => c === 12);
+  };
+  for (const n of [0, 1, 2, 3]) for (const auf of [[], ["H"], ["m0"], ["H", "m1"]]) {
+    const m = ["m0", "m1", "m2"].slice(0, n), offen = new Set(auf.filter((k) => k === "H" || m.includes(k)));
+    const pl = core.packen("H", m, offen);
+    eq(voll(pl), true, `packen: ${n} mittlere, offen ${[...offen].join("+") || "keins"} - keine leere Zelle`);
+  }
+  eq(core.packen("H", ["a", "b"], new Set()).map((p) => [p.k, p.spalte, p.zeile]),
+    [["H", "span 7", "span 2"], ["a", "span 5", "auto"], ["b", "span 5", "auto"]], "packen: geschlossen links 7/12 ueber zwei Zeilen");
+  eq(core.packen("H", ["a", "b", "c"], new Set(["H"])).map((p) => p.spalte), ["1/-1", "span 4", "span 4", "span 4"],
+    "packen: Hauptfach offen - die mittleren teilen sich eine Zeile");
+  eq(core.packen("H", ["a", "b", "c"], new Set(["b"])).map((p) => p.k + ":" + p.spalte),
+    ["H:span 7", "a:span 5", "c:span 5", "b:1/-1"], "packen: ein offenes mittleres Fach nimmt die ganze Breite, am Ende");
+  eq(core.packen("H", ["a", "b", "c"], new Set()).map((p) => p.allein), [false, false, false, true],
+    "packen: das letzte von drei steht im schmalen Raster allein");
+}
+
+/* ---------- Krit- und Stark-Rate der direkten Treffer (#269) ----------
+   Erfundene Werte. Dauer- und verzoegerter Schaden (takt, dicht) und Passiv
+   treffen oft und haben einen anderen Krit-Anteil als die Treffer, die du
+   ausloest; die Rate nennt nur die direkten. Eine Faehigkeit, die ueber
+   genug Treffer nie kritisch traf, kann es nicht und zaehlt nicht in die
+   Krit-Rate (die Stark-Rate behaelt sie). */
+{
+  const fach = (art, hits, crit, heavy) => ({ art, hits, crit, heavy });
+  const xs = [
+    fach("einsatz", 100, 70, 60), fach("ventius", 50, 35, 30),
+    fach("takt", 1000, 400, 500), fach("dicht", 600, 250, 100), fach("passiv", 200, 0, 0),
+  ];
+  // die alte Zaehlung: alles mit, 755 von 1950 Treffern kritisch = 38,7 %, weit weg von den direkten 70 %
+  const alt = xs.reduce((s, x) => s + x.crit, 0) / xs.reduce((s, x) => s + x.hits, 0);
+  eq(nah(alt, 755 / 1950, 1e-9) && alt < 0.4, true, "Raten: die alte Zaehlung ueber alle Zeilen laege bei 38,7 %");
+  const r = core.direkteRaten(xs);
+  eq([r.gesamt, r.direkt], [1950, 150], "Raten: Gesamtzahl bleibt, direkte Treffer getrennt");
+  eq(nah(r.krit, 105 / 150, 1e-9) && nah(r.stark, 90 / 150, 1e-9), true, "Raten: 70 % kritisch, 60 % stark aus den direkten Treffern");
+  eq(r.nie, 0, "Raten: keine Faehigkeit, die nie kritisch ist");
+
+  // nie kritisch: genug Treffer, keine Krits - nicht in die Krit-Rate, wohl in die Stark-Rate
+  const m = core.direkteRaten([...xs, fach("einsatz", 40, 0, 20)]);
+  eq([m.gesamt, m.direkt, m.nie], [1990, 190, 1], "Raten: nie-kritische Faehigkeit zaehlt als direkt und wird gezaehlt");
+  eq(nah(m.krit, 105 / 150, 1e-9), true, "Raten: nie-kritische Faehigkeit bleibt aus der Krit-Rate");
+  eq(nah(m.stark, 110 / 190, 1e-9), true, "Raten: nie-kritische Faehigkeit bleibt in der Stark-Rate");
+
+  // zu wenige Treffer fuer ein Urteil "nie": Pech, nicht Eigenschaft
+  const w = core.direkteRaten([...xs, fach("einsatz", core.NIE_KRIT_MIN - 1, 0, 0)]);
+  eq([w.nie, nah(w.krit, 105 / (150 + core.NIE_KRIT_MIN - 1), 1e-9)], [0, true], "Raten: wenige Treffer ohne Krit zaehlen als Pech");
+
+  // nur Dauerschaden und Passiv: keine direkten Treffer, keine Rate
+  const nur = core.direkteRaten([fach("takt", 300, 120, 10), fach("passiv", 20, 0, 0)]);
+  eq([nur.gesamt, nur.direkt, nur.krit, nur.stark], [320, 0, null, null], "Raten: ohne direkte Treffer keine Rate");
+  // alles nie kritisch: keine Krit-Rate, die Stark-Rate steht
+  const nk = core.direkteRaten([fach("einsatz", 50, 0, 25)]);
+  eq([nk.krit, nk.stark, nk.nie], [null, 0.5, 1], "Raten: nur nie-kritische Faehigkeiten - Krit-Rate null, nicht 0 %");
+}
+
+/* Werkbank-Zeilen (#270): was an einer Faehigkeit auffaellt, aus ihren Einsaetzen (ms ab Kampfbeginn),
+   dem Anteil am Schaden, dem besten Pull (gleiche Zeitbasis) und den Luecken des ganzen Kampfes (Sekunden). */
+{
+  const e = (ts, dmg = 1000) => ts.map((t) => ({ t, dmg }));
+  const alle = (von, bis, ab, dmg = 1000) => { const r = []; for (let t = von; t <= bis; t += ab) r.push({ t, dmg }); return r; };
+  const T = 120000;
+  // kein Einsatz, ein Einsatz
+  eq(core.zeilenBefund([], T, 0.5, null, []).art, "keine", "Zeile: ohne Einsatz kein Satz");
+  eq(core.zeilenBefund(e([42000]), T, 0.5, null, []), { art: "eins", befund: false, pause: null, at: 42000 }, "Zeile: ein Einsatz nennt seine Zeit");
+  // gleichmaessig: Takt, kein Befund
+  const takt = core.zeilenBefund(alle(1000, 100000, 7000), T, 0.1, null, []);
+  eq([takt.art, takt.befund, takt.pause, takt.n, takt.je], ["takt", false, null, 15, 7000], "Zeile: gleichmaessig ist ein Takt ohne Befund");
+  // eine Pause weit ueber dem eigenen Takt ist ein Befund mit ihrer Strecke
+  const mitPause = core.zeilenBefund([...alle(1000, 50000, 7000), ...alle(100000, 112000, 7000)], T, 0.1, null, []);
+  eq([mitPause.art, mitPause.befund, mitPause.pause, mitPause.dauer], ["pause", true, [50000, 100000], 50000], "Zeile: eine Pause ueber drei Takte und 15 s ist ein Befund");
+  eq([mitPause.n, mitPause.je], [10, 7000], "Zeile: die Pause nennt Zahl und Takt der Einsaetze");
+  // eine Pause, die in einer Luecke des ganzen Kampfes liegt, ist keine: das Ziel war nicht zu treffen
+  const inLuecke = core.zeilenBefund([...alle(1000, 50000, 7000), ...alle(100000, 112000, 7000)], T, 0.1, null, [[50, 100]]);
+  eq([inLuecke.art, inLuecke.befund, inLuecke.pause], ["takt", false, null], "Zeile: eine Pause in einer Luecke des Kampfes ist kein Befund");
+  // nur zum Teil in einer Luecke: es zaehlt der Rest
+  const teil = core.zeilenBefund([...alle(1000, 50000, 7000), ...alle(100000, 112000, 7000)], T, 0.1, null, [[50, 90]]);
+  eq([teil.befund, teil.art], [false, "takt"], "Zeile: nur der Teil der Pause ausserhalb der Luecke zaehlt (hier 10 s, kein Befund)");
+  // liegt nur ein Teil der Pause in einer Luecke und der Rest ist lang genug, ist es ein Befund; die Spanne bleibt die ganze
+  eq([core.zeilenBefund([...alle(1000, 50000, 7000), ...alle(100000, 112000, 7000)], T, 0.1, null, [[50, 60]])].map((b) => [b.befund, b.dauer, b.spanne])[0],
+    [true, 40000, 50000], "Zeile: eine Pause teils in einer Luecke nennt Spanne und die Dauer ausserhalb");
+  eq(core.zeilenBefund([...alle(1000, 50000, 7000), ...alle(100000, 112000, 7000)], T, 0.1, null, []).spanne, 50000, "Zeile: ohne Luecke ist die Spanne die Dauer");
+  // zu wenige Einsaetze und zu kurze Pausen sind kein Befund
+  eq(core.zeilenBefund(e([1000, 40000, 80000]), T, 0.1, null, []).befund, false, "Zeile: unter vier Einsaetzen keine Pause");
+  eq(core.zeilenBefund(alle(0, 40000, 1000).concat(alle(52000, 70000, 1000)), T, 0.1, null, []).befund, false, "Zeile: eine Pause unter 15 s ist keine");
+  // kaum Gewicht: unter 0,8 % und wenige Einsaetze, nie ein Befund, auch nicht mit Pause oder Bezug
+  const kaum = core.zeilenBefund(e([1000, 2000, 3000, 90000]), T, 0.003, alle(0, 100000, 5000), []);
+  eq([kaum.art, kaum.befund, kaum.n], ["kaum", false, 4], "Zeile: unter 0,8 % mit wenigen Einsaetzen kaum Gewicht, nie Befund");
+  const vielWenig = core.zeilenBefund([...alle(1000, 50000, 2000), ...alle(100000, 112000, 2000)], T, 0.003, null, []);
+  eq([vielWenig.art, vielWenig.befund], ["takt", false], "Zeile: eine Faehigkeit unter 0,8 % ist nie ein Befund, auch mit Pause");
+  // der beste Pull im selben Zeitraum: weniger Einsaetze
+  const bestN = alle(0, 110000, 5000);          // 23 Einsaetze, alle vor T
+  const wenigerN = core.zeilenBefund(alle(1000, 100000, 10000), T, 0.1, bestN, []);
+  eq([wenigerN.art, wenigerN.befund, wenigerN.n, wenigerN.nb], ["weniger", true, 10, 23], "Zeile: weniger Einsaetze als im besten Pull im selben Zeitraum");
+  // nur der Zeitraum des Kampfes zaehlt vom besten Pull
+  const kurz = core.zeilenBefund(alle(0, 60000, 5000), 62000, 0.1, alle(0, 200000, 5000), []);
+  eq([kurz.befund, kurz.art], [false, "takt"], "Zeile: vom besten Pull zaehlen nur die Einsaetze im Zeitraum dieses Kampfes");
+  // gleich viele, aber schwaecher
+  const schwach = core.zeilenBefund(alle(0, 100000, 5000, 700), T, 0.1, alle(0, 100000, 5000, 1000), []);
+  eq([schwach.art, schwach.befund, schwach.minus], ["schwach", true, 0.3], "Zeile: je Einsatz weniger als im besten Pull");
+  const gleich = core.zeilenBefund(alle(0, 100000, 5000, 950), T, 0.1, alle(0, 100000, 5000, 1000), []);
+  eq([gleich.art, gleich.befund], ["takt", false], "Zeile: 5 % weniger je Einsatz ist kein Befund");
+  // ein Bezug mit unter drei Einsaetzen zaehlt nicht
+  eq(core.zeilenBefund(alle(0, 100000, 10000), T, 0.1, e([1000, 2000]), []).art, "takt", "Zeile: ein Bezug mit unter drei Einsaetzen zaehlt nicht");
 }
 
 console.log(failed ? "\n" + failed + " FAILED" : "\nall passed");

@@ -10,8 +10,11 @@ ExecStart=/usr/bin/python3 /opt/boro-party/boro_server.py
 Restart=on-failure
 RestartSec=3
 
-# it never reads a file or opens a socket outside its own port —
-# a locked-down user account is enough, no special permissions needed
+# it opens no socket outside its own port. The only files it writes are the
+# guilds (boro_gilde.py), in its own state folder /var/lib/boro-party; a
+# locked-down user account is enough, no special permissions needed
+StateDirectory=boro-party
+Environment=BORO_GILDE_DIR=/var/lib/boro-party/gilden
 DynamicUser=yes
 NoNewPrivileges=yes
 ProtectSystem=strict

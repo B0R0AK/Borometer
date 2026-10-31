@@ -25,6 +25,8 @@ const DE = {
   jumpLive: "Live-Aufzeichnung starten",
   jumpOrdner: "Log-Ordner öffnen",
   zuletzt: "Zuletzt gelesen",
+  menueKopieren: "Kopieren",
+  menueRotation: "In Rotation zeigen",
 };
 export type TextKey = keyof typeof DE;
 export const TEXTE: Record<Lang, Record<TextKey, string>> = {
@@ -40,6 +42,8 @@ export const TEXTE: Record<Lang, Record<TextKey, string>> = {
     jumpLive: "Start live logging",
     jumpOrdner: "Open log folder",
     zuletzt: "Recently read",
+    menueKopieren: "Copy",
+    menueRotation: "Show in rotation",
   },
 };
 
@@ -171,4 +175,92 @@ export function vorholen(w: Fenster | null): void {
   if (w.isMinimized()) w.restore();
   w.show();
   w.focus();
+}
+
+export interface Rect { x: number; y: number; width: number; height: number }
+/** A strip lifted off the bottom edge: where it stood (von) and where it was put (nach). */
+export interface Lift { von: number; nach: number }
+
+/*
+ * Where the compact strip stands after it was sized (#298). `b` are its outer
+ * bounds after sizing, `wa` its monitor's work area. A strip that now runs
+ * past the bottom is lifted by as much (never above the work area's top), and
+ * the spot it stood on is kept; when it shrinks again and still stands where
+ * it was put, it goes back as far as it fits. A strip the player moved in
+ * between (y is no longer `nach`) stays where it is, nothing jumps back.
+ */
+export function streifenLage(b: Rect, wa: Rect, lift: Lift | null): { y: number; lift: Lift | null } {
+  const wunsch = lift && b.y === lift.nach ? lift.von : b.y;
+  const y = Math.max(wa.y, Math.min(wunsch, wa.y + wa.height - b.height));
+  return { y, lift: y < wunsch ? { von: wunsch, nach: y } : null };
+}
+
+/**
+ * The compact window's floor (#348): the smallest content size the strip is
+ * still readable at, as the page measured it - its bar with all buttons for
+ * the width, the head, one row and the "more" button for the height. The
+ * page only names numbers; this decides what becomes of them. The floor is
+ * never above the strip itself (the window must be able to be that size), nor
+ * above the work area, and never below the window's own floor (180 x 24). Not
+ * a number pair, null: the window then keeps the floor it had.
+ */
+export function kompaktMinimum(min: unknown, w: number, h: number, wa: { width: number; height: number }): { w: number; h: number } | null {
+  if (!min || typeof min !== "object") return null;
+  const m = min as { w?: unknown; h?: unknown };
+  if (typeof m.w !== "number" || typeof m.h !== "number" || !isFinite(m.w) || !isFinite(m.h) || m.w <= 0 || m.h <= 0) return null;
+  return {
+    w: Math.max(180, Math.min(Math.floor(m.w), w, wa.width)),
+    h: Math.max(24, Math.min(Math.floor(m.h), h, wa.height)),
+  };
+}
+
+/* The native menu on a table row (spec Windows-Teil 2): the page names a kind
+   from this list, never what the menu says. */
+export const MENUE_ARTEN = ["zeile"] as const;
+export type MenueArt = (typeof MENUE_ARTEN)[number];
+export function menueArt(v: unknown): MenueArt | null {
+  return MENUE_ARTEN.find((a) => a === v) ?? null;
+}
+
+/* The only items the menu can have; each one is an id and a word from TEXTE. */
+export const MENUE_PUNKTE = ["kopieren", "rotation"] as const;
+export type MenuePunkt = (typeof MENUE_PUNKTE)[number];
+const MENUE_WORT: Record<MenuePunkt, TextKey> = { kopieren: "menueKopieren", rotation: "menueRotation" };
+export function menuePunkte(lang: unknown): { id: MenuePunkt; label: string }[] {
+  return MENUE_PUNKTE.map((id) => ({ id, label: wort(lang, MENUE_WORT[id]) }));
+}
+
+/* The areas that can be torn off into a window of their own. */
+export const ABRISS_TEILE = ["kampf", "rotation", "analyse", "vergleich"] as const;
+export type AbrissTeil = (typeof ABRISS_TEILE)[number];
+export function abrissTeil(v: unknown): AbrissTeil | null {
+  return ABRISS_TEILE.find((t) => t === v) ?? null;
+}
+
+/*
+ * What a window may do by hand, per view (#364, decided 31.10.2026). One
+ * BrowserWindow carries full view and the shrunk compact strip, so the same
+ * window switches between the two sets and back:
+ *  - voll: a fixed size (VOLL_W x VOLL_H in lage.ts). It cannot be dragged
+ *    bigger or smaller, nor maximised (title bar button, double click on the
+ *    title bar, Win+arrow). Smaller or bigger is the app's size setting.
+ *  - kompakt: dragged by hand down to the strip's floor (180 x 24), never
+ *    maximised.
+ *  - abriss: the torn-off window is a window like any other, dragged and
+ *    maximised.
+ * Anything else reads as full view, the strictest set.
+ */
+export const ANSICHTEN = ["voll", "kompakt", "abriss"] as const;
+export type Ansicht = (typeof ANSICHTEN)[number];
+export interface FensterOptionen {
+  resizable: boolean;
+  maximizable: boolean;
+  fullscreenable: boolean;
+  minWidth: number;
+  minHeight: number;
+}
+export function fensterOptionen(ansicht: unknown): FensterOptionen {
+  if (ansicht === "kompakt") return { resizable: true, maximizable: false, fullscreenable: false, minWidth: 180, minHeight: 24 };
+  if (ansicht === "abriss") return { resizable: true, maximizable: true, fullscreenable: true, minWidth: 320, minHeight: 240 };
+  return { resizable: false, maximizable: false, fullscreenable: false, minWidth: 180, minHeight: 24 };
 }

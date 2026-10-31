@@ -11,7 +11,10 @@ import { chooseServerDir, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from 
 import { sample } from "./40-sample-fight";
 import { serverEinstNachfuehren } from "./42-party";
 import { beispielGruppe, setzeEntwicklermodus, toggleChangelog } from "./43-more-menu-and-dev-mode";
-import { isWatching } from "./45-startup";
+import { isWatching, renderStart } from "./45-startup";
+import { renderCharaktere } from "./73-charaktere";
+import { alteLogsEinlesen, type EinlesenErgebnis } from "./75-alte-logs";
+import { archivAn, archivEinlesenGeht, archivHaken, archivSchalten, archivSchreibfehler } from "./76-archiv";
 
 /* ---------- Einstellungen (Neugestaltung 28.09., Luecken 10) ----------
    Ein Ort wie Start: state.einst zeigt section#einst statt Startseite und
@@ -21,8 +24,8 @@ import { isWatching } from "./45-startup";
    der Titelleiste gibt es nur noch als Element). Im Kompakt gibt es den Ort
    nicht.
    EINE rollende Seite wie im Entwurf (E:919-966): links die Sprungleiste
-   (#einstNav, haftet), rechts Titel und acht Abschnitte untereinander - im
-   eigenen Fenster unter Windows neun, mit "Windows" vor Info -, jeder
+   (#einstNav, haftet), rechts Titel und zehn Abschnitte untereinander - im
+   eigenen Fenster unter Windows elf, mit "Windows" vor Info -, jeder
    eine section mit h3 (der Titel ist h2, das h1 ist die Wortmarke). Ein
    Klick in der Leiste springt zum Abschnitt und setzt den Fokus auf seine
    Ueberschrift (einstSpringen); beim Rollen leuchtet der Abschnitt mit, der
@@ -39,6 +42,8 @@ export function renderEinst(): void {
   if(p.textContent !== satz) p.textContent = satz;
   const ver = $("#einstVer");
   if(typeof BORO_VERSION !== "undefined" && ver.textContent !== BORO_VERSION) ver.textContent = BORO_VERSION;
+  // der Abschnitt Charaktere (73): auch nach dem Sprachwechsel, der ueber renderAll hierher kommt
+  renderCharaktere();
 }
 
 /* ---------- die Bedienelemente ----------
@@ -57,7 +62,8 @@ export function renderEinst(): void {
    zeigen alle Orte immer denselben Stand, und es gibt nur einen Weg zu
    persistPref. Eigene Schluessel schreiben die Einstellungen nur diese:
    updatePruefen, den Schalter des Update-Hinweises, und die drei Schalter
-   des Abschnitts Windows (unten). */
+   des Abschnitts Windows (unten); den Schalter des Archivs schreibt
+   archivSchalten in 76 (archivAn, dazu archivHinweis). */
 
 /** Ein Schalter im Muster .esw: Zustand und Wort (An/Aus) setzen. */
 export function esSchalter(b: HTMLElement, an: boolean): void {
@@ -130,6 +136,97 @@ function logsNachfuehren(){
   if(bz.hidden === state.devMode) bz.hidden = !state.devMode;
 }
 
+/* Das Log-Archiv (Spezifikation Log-Archiv 2, 5, 6; #264): der Schalter
+   archivAn (Standard an; archivSchalten in 76 schreibt ihn und quittiert den
+   Erststart-Hinweis mit) und "Archivordner oeffnen". Die Seite schickt nur
+   den Wunsch, nie einen Pfad; der Helfer oeffnet seinen Ordner. Geht es
+   nicht, ein ruhiger Satz. Im Browser gibt es kein Archiv: dann der Satz
+   statt der Bedienung. */
+async function archivOrdnerOeffnen(){
+  try{
+    const r = await fetch("/api/archiv/ordner", {method:"POST",
+      headers:{"Content-Type":"application/json"}, body: "{}"});
+    const d = await r.json();
+    if(d && d.ok) return;
+  }catch{ /* keine Antwort: derselbe Satz */ }
+  toast(tt("einst.archivOrdnerNicht"), 7000, "ruhig");
+}
+function archivNachfuehren(){
+  for(const id of ["eArchivSatz", "eArchivSchalter", "eArchivOrdnerZeile"]){
+    const e = $("#" + id);
+    if(e.hidden === SERVED) e.hidden = !SERVED;
+  }
+  const b = $("#eArchivBrowser");
+  if(b.hidden !== SERVED) b.hidden = SERVED;
+  esSchalter($("#eArchiv"), archivAn());
+  // kann das Archiv nicht schreiben, ein ruhiger Satz hier (der Zustand kommt aus 76)
+  const f = $("#eArchivFehler"), weg = !(SERVED && archivSchreibfehler());
+  if(f.hidden !== weg) f.hidden = weg;
+  alteNachfuehren();
+}
+
+/* Alte Logs einlesen (Spezifikation Log-Archiv 8; #264): nur auf Klick liest 75 den Log-Ordner und das
+   Archiv (76) nimmt die Bosskaempfe auf. Aus, solange das Archiv aus oder der Hinweis auf Start offen ist -
+   ein Satz sagt warum (aria-describedby). Beim Lesen bleibt der Knopf im Fokus (nur aria-disabled, gesperrt
+   fiele der Fokus auf die Seite), daneben "Abbrechen"; der Stand ("12 von 104 Logs gelesen", danach das
+   Ergebnis) steht in einem status. Im Browser gibt es keinen Log-Ordner: dann steht die Zeile nicht. */
+type AlteLage = {art: "ruhe"} | {art: "frage"} | {art: "liest"; n: number; von: number} | {art: "liste"}
+  | {art: "fertig"; neu: number; schon: number; fehler: number; nichtGesendet: number; ab: boolean; halt: EinlesenErgebnis["halt"]};
+let alte: AlteLage = {art: "ruhe"};
+let alteHalt: AbortController | null = null;
+function alteText(l: AlteLage): string {
+  if(l.art === "frage") return t("einst.alteLogsFrage");
+  if(l.art === "liest") return t("einst.alteLogsLese", {n: l.n, von: l.von});
+  if(l.art === "liste") return t("einst.alteLogsListe");
+  /* Hielt das Archiv das Lesen an, steht zuerst warum und wie weit es kam; das Ergebnis nur, wenn etwas zu zaehlen war -
+     "0 neue Kaempfe aufgenommen" allein laese sich wie ein Erfolg. */
+  if(l.art === "fertig"){
+    const halt = l.halt ? t(l.halt.grund === "stand" ? "einst.alteLogsHaltStand" : l.halt.grund === "schreiben" ? "einst.alteLogsHaltSchreiben" : "einst.alteLogsHaltAus")
+      + " " + t("einst.alteLogsHaltNach", {n: l.halt.n, von: l.halt.von}) : "";
+    const gezaehlt = !l.halt || l.neu || l.schon;
+    return [l.ab ? t("einst.alteLogsAbgebrochen") : "", halt, gezaehlt ? t("einst.alteLogsErgebnis", {neu: l.neu, schon: l.schon}) : "",
+      l.fehler ? t("einst.alteLogsFehler", {n: l.fehler}) : "", l.nichtGesendet ? t("einst.alteLogsNichtGesendet", {n: l.nichtGesendet}) : ""].filter(Boolean).join(" ");
+  }
+  return "";
+}
+function alteNachfuehren(){
+  const zeile = $("#eAlteLogsZeile");
+  if(zeile.hidden === SERVED) zeile.hidden = !SERVED;
+  const b = $("#eAlteLogs") as HTMLButtonElement, ab = $("#eAlteLogsAb") as HTMLButtonElement;
+  const liest = !!alteHalt, geht = archivEinlesenGeht();
+  const aus = !liest && geht !== "ja";
+  if(b.disabled !== aus) b.disabled = aus;
+  const belegt = liest ? "true" : "false";
+  if(b.getAttribute("aria-disabled") !== belegt) b.setAttribute("aria-disabled", belegt);
+  // stand der Fokus auf "Abbrechen", das jetzt geht, steht er danach auf dem Knopf
+  const hatte = document.activeElement === ab;
+  if(ab.hidden === liest) ab.hidden = !liest;
+  if(hatte && ab.hidden) b.focus();
+  const g = $("#eAlteLogsGrund");
+  const grund = liest ? "" : geht === "aus" ? t("einst.alteLogsAus") : geht === "hinweis" ? t("einst.alteLogsHinweis") : "";
+  if(g.textContent !== grund) g.textContent = grund;
+  if(g.hidden !== !grund) g.hidden = !grund;
+  const besch = grund ? "eAlteLogsSatz eAlteLogsGrund" : "eAlteLogsSatz";
+  if(b.getAttribute("aria-describedby") !== besch) b.setAttribute("aria-describedby", besch);
+  const st = $("#eAlteLogsStand"), text = SERVED ? alteText(alte) : "";
+  if(st.textContent !== text) st.textContent = text;
+}
+async function alteLogsStarten(){
+  if(alteHalt || archivEinlesenGeht() !== "ja") return;
+  const halt = new AbortController();
+  alteHalt = halt;
+  alte = {art: "frage"};
+  alteNachfuehren();
+  try {
+    const e = await alteLogsEinlesen(halt.signal, (n, von) => { alte = {art: "liest", n, von}; alteNachfuehren(); });
+    alte = {art: "fertig", ...e, ab: halt.signal.aborted};
+  } catch {
+    alte = halt.signal.aborted ? {art: "fertig", neu: 0, schon: 0, fehler: 0, nichtGesendet: 0, ab: true, halt: null} : {art: "liste"};
+  }
+  alteHalt = null;
+  alteNachfuehren();
+}
+
 /* Der Update-Hinweis (Spezifikation Update-Hinweis 2.4): ein Schalter in
    Info, Standard aus; er schreibt updatePruefen nur als Wahrheitswert
    (persistPref, der Server nimmt nichts anderes). Gefragt wird allein im
@@ -193,7 +290,9 @@ export function einstNachfuehren(): void {
   const einst = document.getElementById("einst");
   if(!einst) return;
   logsNachfuehren();
+  archivNachfuehren();
   updateNachfuehren();
+  esSchalter($("#eBereichHinweise"), state.bereichHinweise !== false);
   winSchalter();
   bewegungNachfuehren();
   serverEinstNachfuehren();
@@ -326,6 +425,20 @@ function zeilenBinden(){
   $("#eBeispiel").onclick = () => beispielGruppe();
   $("#eBeispielkampf").onclick = () => sample();
   $("#eClog").onclick = () => toggleChangelog(true);
+  $("#eArchiv").onclick = () => {
+    archivSchalten(!archivAn());
+    einstNachfuehren();
+    renderStart();   // der Hinweis auf Start ist mit dem Schalter quittiert
+  };
+  $("#eArchivOrdner").onclick = () => void archivOrdnerOeffnen();
+  $("#eAlteLogs").onclick = () => void alteLogsStarten();
+  $("#eAlteLogsAb").onclick = () => { alteHalt?.abort(); };
+  /* Hinweise zu den Bereichen (74): Standard an; geschrieben wird nur der Wahrheitswert (persistPref, im Browser nichts). */
+  $("#eBereichHinweise").onclick = () => {
+    state.bereichHinweise = state.bereichHinweise === false;
+    persistPref("bereichHinweise", state.bereichHinweise);
+    einstNachfuehren();
+  };
   $("#eUpdatePruefen").onclick = () => {
     updateAn = !updateAn;
     persistPref("updatePruefen", updateAn);
@@ -441,6 +554,8 @@ export function einstOben(): void {
 
 // what this part did at the top level, run where it stands in the order
 export function setup(): void {
+  // kann das Archiv nicht schreiben (oder wieder), zeigt der Abschnitt Archiv es gleich (76)
+  archivHaken.geaendert = archivNachfuehren;
   einstBinden();
   renderEinst();
   einstNachfuehren();

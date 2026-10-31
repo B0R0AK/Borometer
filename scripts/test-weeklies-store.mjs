@@ -15,7 +15,7 @@
 // Run:  npm run test:weeklies-store
 
 import * as esbuild from "esbuild";
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -61,6 +61,14 @@ eq(ok(stand(...[1, 2, 3, 4, 5, 6].map((i) => profil("wtest0000" + i, "Test " + i
 eq(ok(stand(...[1, 2, 3, 4, 5, 6].map((i) => profil("wtest0000" + i, "Test " + i)), profil("wtest00007", "Test 7", { geloest: true }))),
   true, "sechs Charaktere und ein geloester siebter");
 eq(ok(mit((c) => { c.geloest = false; })), true, "geloest als false");
+eq(ok(stand(profil("wtest00001", "Eins", { log: "Tessa", main: true }), profil("wtest00002", "Zwei", { log: "Brann" }))), true,
+  "Charaktere mit Logname, einer davon Main");
+eq(ok(stand(profil("wtest00001", "Eins", { log: "Tessa" }), profil("wtest00002", "Zwei", { log: "Tessa", geloest: true }))), true,
+  "derselbe Logname bei einem aktiven und einem geloesten Charakter");
+eq(ok(stand(profil("wtest00001", "Eins", { log: "Tessa" }), profil("wtest00002", "Zwei"))), true, "ein Charakter ohne Logname neben einem mit");
+// eq compares JSON text, so the expected character is written in the key order the store emits (id, name, log, main, ...)
+eq(w.checkWeeklies(stand(profil("wtest00001", "Eins", { log: "Tessa", main: true })), leer),
+  stand({ id: "wtest00001", name: "Eins", log: "Tessa", main: true, zaehler: {}, aus: [], namen: {}, eigene: [] }), "log und main kommen unveraendert zurueck");
 eq(ok(mit((c) => { c.eigene[0].geloest = true; })), true, "ein geloester eigener Punkt");
 eq(ok(mit((c) => { c.name = "Ä".repeat(24); })), true, "ein Name mit 24 Zeichen und Umlaut");
 eq(ok(mit((c) => { c.zaehler.zitadelleNormal.seit = Date.now() + 3600000; c.vorwoche.reset = Date.now() + 3600000; })), true,
@@ -93,7 +101,7 @@ const falsch = [
   ["ein Name mit Richtungszeichen", mit((c) => { c.name = "Test‮"; })],
   ["ein Name als Zahl", mit((c) => { c.name = 5; })],
   ["geloest als Text", mit((c) => { c.geloest = "ja"; })],
-  ["ein fremdes Feld im Charakter", mit((c) => { c.log = "x"; })],
+  ["ein fremdes Feld im Charakter", mit((c) => { c.fremd = "x"; })],
   ["zaehler fehlt", mit((c) => { delete c.zaehler; })],
   ["ein Zaehler mit Stand 1000", mit((c) => { c.zaehler.zitadelleNormal.stand = 1000; })],
   ["ein Zaehler mit negativem Stand", mit((c) => { c.zaehler.zitadelleNormal.stand = -1; })],
@@ -139,6 +147,16 @@ const falsch = [
   ["151 Zaehler in der Vorwoche (illusionen und 150 mehr)", mit((c) => { for (let i = 0; i < 150; i++) c.vorwoche.zaehler["k" + i] = { stand: 0, seit: T }; })],
   ["ein Zaehler der Vorwoche mit Stand 1000", mit((c) => { c.vorwoche.zaehler.illusionen.stand = 1000; })],
   ["61 Charaktere", stand(...Array.from({ length: 61 }, (_, i) => profil("w" + String(i).padStart(9, "0"), "T", { geloest: true })))],
+  ["ein Logname mit 25 Zeichen", mit((c) => { c.log = "x".repeat(25); })],
+  ["ein leerer Logname", mit((c) => { c.log = ""; })],
+  ["ein Logname mit Leerraum am Rand", mit((c) => { c.log = " Tessa"; })],
+  ["ein Logname mit Steuerzeichen", mit((c) => { c.log = "Tes\u0007sa"; })],
+  ["ein Logname als Zahl", mit((c) => { c.log = 5; })],
+  ["main als Text", mit((c) => { c.main = "ja"; })],
+  ["main als false", mit((c) => { c.main = false; })],
+  ["zwei aktive Charaktere mit demselben Lognamen", stand(profil("wtest00001", "A", { log: "Tessa" }), profil("wtest00002", "B", { log: "Tessa" }))],
+  ["zwei Main", stand(profil("wtest00001", "A", { main: true }), profil("wtest00002", "B", { main: true }))],
+  ["ein geloester Charakter mit main", stand(profil("wtest00001", "A", { geloest: true, main: true }))],
 ];
 for (const [was, x] of falsch) eq(ok(x), false, "abgelehnt: " + was);
 
@@ -223,6 +241,28 @@ function aufLaenge(n) {
   eq(chk(stand(prof()), stand(prof({ raid: { zu: true, bei: true } }))) !== null, true, "zu darf fehlen (Ansichtszustand)");
 }
 
+// --- ignorierte Namen (Twinks #251, Spezifikation Twinks 6): geloest statt geloescht
+{
+  const chk = (x, alt = leer) => w.checkWeeklies(x, alt);
+  const I = (name, geloest) => ({ name, ...(geloest ? { geloest: true } : {}) });
+  eq(chk({ ...leer, ignoriert: [I("Mira")] })?.ignoriert, [I("Mira")], "ein ignorierter Name wird uebernommen");
+  eq("ignoriert" in chk(leer), false, "eine alte Datei ohne ignoriert bekommt keins");
+  for (const [name, bad] of [
+    ["leer", I("")], ["25 Zeichen", I("x".repeat(25))], ["Steuerzeichen", I("Mi\nra")], ["Leerzeichen am Rand", I(" Mira")],
+    ["kein Text", { name: 7 }], ["geloest kein Boolean", { name: "Mira", geloest: 1 }], ["fremdes Feld", { name: "Mira", extra: 1 }], ["kein Objekt", "Mira"],
+  ]) eq(chk({ ...leer, ignoriert: [bad] }), null, "ignorierter Name abgelehnt: " + name);
+  eq(chk({ ...leer, ignoriert: [I("Mira"), I("Mira", true)] }), null, "derselbe Name zweimal wird abgelehnt");
+  eq(chk({ ...leer, ignoriert: {} }), null, "ignoriert muss eine Liste sein");
+  const viele = (n) => Array.from({ length: n }, (_, i) => I("Name" + i));
+  eq(chk({ ...leer, ignoriert: viele(60) }) !== null, true, "60 ignorierte Namen gehen");
+  eq(chk({ ...leer, ignoriert: viele(61) }), null, "mehr als 60 werden abgelehnt");
+  const gespeichert = { v: 1, profile: [], ignoriert: [I("Mira")] };
+  eq(chk(leer, gespeichert), null, "ein gespeicherter ignorierter Name darf nicht fehlen (nie endgueltig loeschen)");
+  eq(chk({ ...leer, ignoriert: [] }, gespeichert), null, "auch eine leere Liste laesst ihn nicht weg");
+  eq(chk({ ...leer, ignoriert: [I("Mira", true)] }, gespeichert)?.ignoriert, [I("Mira", true)], "Nicht mehr ignorieren setzt geloest, der Name bleibt");
+  eq(chk({ ...leer, ignoriert: [I("Mira")] }, { v: 1, profile: [], ignoriert: [I("Mira", true)] })?.ignoriert, [I("Mira")], "wieder ignorieren nimmt geloest weg");
+}
+
 // --- die Datei
 try {
   eq(w.loadWeeklies(), leer, "ohne Datei: ein leerer Stand");
@@ -267,6 +307,69 @@ try {
   eq([w.loadWeeklies(), w.putWeeklies(leer)], [null, "unavailable"], "eine Datei einer anderen Version wird nicht ueberschrieben");
   w.createWeeklies();
   eq(JSON.parse(readFileSync(DATEI, "utf8")), { v: 2, profile: [] }, "createWeeklies laesst eine vorhandene Datei stehen");
+  // --- Gelöstes endgültig löschen (#240): nur Gelöstes, nur mit dem Namen, nur nach der Sicherung
+  {
+    const SDIR = join(ordner, "Borometer", "sicherungen");
+    const setze = (x) => writeFileSync(DATEI, JSON.stringify(x));
+    const datei = () => JSON.parse(readFileSync(DATEI, "utf8"));
+    const sich = () => (existsSync(SDIR) ? readdirSync(SDIR).sort() : []);
+    const zwei = profil("wtest00002", "Test Zwei", { geloest: true, zaehler: { zitadelleNormal: { stand: 2, seit: T } } });
+    const mitEigenem = (geloest) => profil("wtest00003", "Test Drei", {
+      zaehler: { eigen1: { stand: 1, seit: T }, umwandlungsstein: { stand: 5, seit: T } }, aus: ["eigen1"], namen: { eigen1: "Kiste", chaosprisma: "P" },
+      eigene: [{ schluessel: "eigen1", name: "Gildenkiste", menge: 2, takt: "tag", ...(geloest ? { geloest: true } : {}) },
+        { schluessel: "eigen2", name: "Andere", menge: 1, takt: "woche" }],
+      zu: { eigen1: { zu: true, bei: false }, umwandlungsstein: { zu: false, bei: true } },
+      vorwoche: { reset: T - 7 * 86400000, zaehler: { eigen1: { stand: 2, seit: T - 86400000 }, illusionen: { stand: 3, seit: T - 86400000 } } } });
+    rmSync(SDIR, { recursive: true, force: true });
+
+    // Charaktere
+    setze(stand(eins, zwei));
+    const vorher = readFileSync(DATEI, "utf8");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "falsch" }), { ok: false, grund: "name" }, "Charakter: ein falscher Name loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00001", name: "Test Eins" }), { ok: false, grund: "nicht-geloest" }, "Charakter: ein aktiver Charakter loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wfremd0001", name: "Test Eins" }), { ok: false, grund: "nicht-geloest" }, "Charakter: eine unbekannte Kennung loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "Test Zwei", extra: 1 }), { ok: false, grund: "abgelehnt" }, "ein Feld ausserhalb der Anfrage: abgelehnt");
+    eq(w.loescheWeekliesGeloest({ was: "alles", id: "wtest00002", name: "Test Zwei" }), { ok: false, grund: "abgelehnt" }, "eine unbekannte Art zu loeschen: abgelehnt");
+    eq(w.loescheWeekliesGeloest("wtest00002"), { ok: false, grund: "abgelehnt" }, "keine Anfrage der Form: abgelehnt");
+    eq([readFileSync(DATEI, "utf8") === vorher, sich()], [true, []], "alle Ablehnungen lassen Datei und Ordner unberuehrt");
+    const c1 = w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "  test ZWEI " });
+    eq([c1.ok, /^weeklies-vor-loeschen-\d{4}-\d{2}-\d{2}\.json$/.test(c1.sicherung)], [true, true], "Charakter: mit dem Namen (Gross/Klein und Rand egal) wird geloescht, die Sicherung hat einen Namen nach Datum");
+    eq(JSON.parse(readFileSync(join(SDIR, c1.sicherung), "utf8")), w.checkWeeklies(JSON.parse(vorher), leer), "Charakter: die Sicherung haelt die ganze Datei davor (wie der Speicher sie versteht)");
+    eq(datei().profile.map((p) => p.id), ["wtest00001"], "Charakter: der gelöschte ist weg, der aktive bleibt");
+    eq(w.loadWeeklies() !== null, true, "Charakter: die Datei laedt danach");
+    setze(stand(eins, zwei));
+    const c2 = w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "Test Zwei" });
+    eq([c2.ok, sich().length, sich().includes(c1.sicherung), c2.sicherung !== c1.sicherung], [true, 2, true, true], "Charakter: eine zweite Sicherung am selben Tag ueberschreibt die erste nicht");
+
+    // eigene Punkte
+    setze(stand(mitEigenem(true)));
+    const ev = readFileSync(DATEI, "utf8");
+    eq(w.loescheWeekliesGeloest({ was: "eigen", profil: "wtest00003", id: "eigen2", name: "Andere" }), { ok: false, grund: "nicht-geloest" }, "Eigener Punkt: ein aktiver loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "eigen", profil: "wtest00003", id: "eigen1", name: "falsch" }), { ok: false, grund: "name" }, "Eigener Punkt: ein falscher Name loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "eigen", profil: "wfremd0001", id: "eigen1", name: "Gildenkiste" }), { ok: false, grund: "nicht-geloest" }, "Eigener Punkt: ein unbekannter Charakter loescht nichts");
+    eq(w.loescheWeekliesGeloest({ was: "eigen", id: "eigen1", name: "Gildenkiste" }), { ok: false, grund: "abgelehnt" }, "Eigener Punkt: ohne Charakter: abgelehnt");
+    eq(readFileSync(DATEI, "utf8") === ev, true, "Eigener Punkt: die Ablehnungen lassen die Datei unberuehrt");
+    const e1 = w.loescheWeekliesGeloest({ was: "eigen", profil: "wtest00003", id: "eigen1", name: "Gildenkiste" });
+    eq(e1.ok, true, "Eigener Punkt: ein gelöster eigener Punkt wird mit dem Namen geloescht");
+    const d3 = datei().profile[0];
+    eq([d3.eigene.map((x) => x.schluessel), Object.keys(d3.zaehler), d3.aus, Object.keys(d3.namen), Object.keys(d3.zu), Object.keys(d3.vorwoche.zaehler)],
+      [["eigen2"], ["umwandlungsstein"], [], ["chaosprisma"], ["umwandlungsstein"], ["illusionen"]], "Eigener Punkt: weg samt Zaehler, Ausblendung, Name, Zu-Wahl und Zaehler der Vorwoche; alles andere bleibt");
+    eq(JSON.parse(readFileSync(join(SDIR, e1.sicherung), "utf8")), w.checkWeeklies(JSON.parse(ev), leer), "Eigener Punkt: die Sicherung haelt den Stand davor");
+    eq(w.loadWeeklies() !== null, true, "Eigener Punkt: die Datei laedt danach");
+
+    // die Sicherung geht nicht: dann wird nichts geloescht
+    setze(stand(eins, zwei));
+    const sv = readFileSync(DATEI, "utf8");
+    rmSync(SDIR, { recursive: true, force: true });
+    writeFileSync(SDIR, "ich bin eine Datei");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "Test Zwei" }), { ok: false, grund: "sicherung" }, "ohne Sicherung wird nichts geloescht");
+    eq(readFileSync(DATEI, "utf8") === sv, true, "ohne Sicherung bleibt die Datei, wie sie war");
+    rmSync(SDIR, { force: true });
+    writeFileSync(DATEI, "{kaputt");
+    eq(w.loescheWeekliesGeloest({ was: "charakter", id: "wtest00002", name: "Test Zwei" }), { ok: false, grund: "unavailable" }, "eine kaputte Datei: unavailable");
+    eq(readFileSync(DATEI, "utf8"), "{kaputt", "die kaputte Datei bleibt");
+    setze(stand(eins));
+  }
 } finally {
   rmSync(ordner, { recursive: true, force: true });
 }

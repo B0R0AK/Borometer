@@ -5,6 +5,7 @@ import { persistPref } from "./27-weapons-tab";
 import { switchTab } from "./34-menus-drop-and-tabs";
 import { kuerzelText, uiZoomFactor } from "./37-window-size-and-overlay";
 import { chooseServerDir, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";
+import { frageNoetig, naechstesSpaeter } from "../rundgang-core";
 
 /* ---------- Der Rundgang beim ersten Start (Spezifikation 02.10.2026) ----------
    Sechs Karten an den echten Bedienelementen: Log-Ordner, Live, Kampfwahl,
@@ -13,14 +14,20 @@ import { chooseServerDir, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from 
    bedienbar. Das Ziel bekommt fuer den Schritt einen Ring in --pick
    (.rgziel) und den Satz der Karte als Beschreibung.
 
-   Von selbst nur im eigenen Fenster der App, nie im Kompaktfenster und nie
-   im Kompakt-Rueckfall, und nur, wenn die Einstellungen geantwortet haben,
-   rundgangGesehen nicht true ist, es ein erster Start ist (der Hauptprozess
-   kannte keine Einstellung, logIndex leer; Pruefung M6), die Seite fertig
-   gezeichnet ist (body[data-bereit]) und auf Start steht. Ob er kam, steht
-   in #rundgang[data-von-selbst] ("ja"/"nein"), sobald es entschieden ist.
-   Auf Wunsch jederzeit ueber "Rundgang zeigen" (Einstellungen, Info), auch
-   im Browser; er wechselt nach Start und beginnt bei Schritt 1.
+   Er startet nie von selbst (Spezifikation 16.10.2026, #265): beim ersten Start
+   FRAGT ein Band ganz oben auf Start (#rgFrage), ob er laufen soll - Ja,
+   Spaeter, Nein. Das Band kommt nur im eigenen Fenster der App, nie im
+   Kompaktfenster und nie im Kompakt-Rueckfall, und nur, wenn die
+   Einstellungen geantwortet haben, die Frage nach rundgang-core.ts noetig ist
+   (rundgangGesehen nicht true; erster Start - der Hauptprozess kannte keine
+   Einstellung, logIndex leer; Pruefung M6 - oder schon einmal Spaeter, hoechstens
+   dreimal), die Seite fertig gezeichnet ist (body[data-bereit]) und auf Start
+   steht. Ob das Band kam, steht in #rundgang[data-von-selbst] ("ja"/"nein"),
+   sobald es entschieden ist. Ja startet den Rundgang, Spaeter merkt
+   rundgangSpaeter, Nein merkt rundgangGesehen. Auf Wunsch jederzeit ueber
+   "Rundgang zeigen" (Einstellungen, Info), auch im Browser; er wechselt nach
+   Start und beginnt bei Schritt 1. Das Band ist ein Band im Fluss, kein
+   Overlay: nichts liegt darueber, kein Fokus wird genommen.
 
    Gesehen heisst "Fertig" oder "Ueberspringen" (auch Esc in der Karte):
    dann, und nur in der App, wird rundgangGesehen gemerkt (schliessen). Der
@@ -75,6 +82,7 @@ let appFokus: HTMLElement | null = null;  // wohin F6 aus der Karte zuruecksprin
 let ordnerGewaehlt = false;
 let entschieden = false;
 let geplant = 0;
+let frageBand: HTMLElement | null = null;   // das Band der Frage auf Start
 
 /* Der Satz eines Schritts als HTML (die Woerterbuchtexte sind fest, der
    Pfad wird escaped). */
@@ -111,6 +119,57 @@ function ringAn(e: HTMLElement | null): void {
   zielBeschr = e.getAttribute("aria-describedby");
   e.classList.add("rgziel");
   e.setAttribute("aria-describedby", ((zielBeschr || "") + " rgSatz").trim());
+}
+
+/** Steht die Karte des Rundgangs? Fuer den Hinweis je Bereich (74): solange sie offen ist, kommt keiner. */
+export function rundgangOffen(): boolean { return nr >= 0 && !!karte && !karte.hidden; }
+/** Steht das Band der Frage? Es steht, bis jemand antwortet. */
+export function frageOffen(): boolean { return !!frageBand && !frageBand.hidden; }
+
+/* Das Band der Frage (einmal, in setup), als erstes Kind von #land. Die
+   Reihenfolge der Knoepfe ist die der Tabulatortaste: Nein, Spaeter, Ja.
+   #rgFrageZusatz ist die Stelle, an der das Log-Archiv (#264) seinen Satz
+   mit eigenem "Verstanden" andockt (45-startup.ts, archivImBand), solange
+   sein Hinweis nicht quittiert ist; sonst leer und versteckt. */
+function bauenFrage(): HTMLElement | null {
+  const land = document.querySelector("#land");
+  if(!land) return null;
+  const b = document.createElement("div");
+  b.id = "rgFrage"; b.className = "rgfrage"; b.hidden = true;
+  b.setAttribute("role", "region"); b.setAttribute("aria-labelledby", "rgFrageTitel");
+  b.innerHTML =
+    '<p class="rgftext"><b id="rgFrageTitel"></b> <span id="rgFrageSatz"></span> <span id="rgFrageZusatz" hidden></span></p>' +
+    '<div class="rgffuss">' +
+      '<button class="leise" type="button" id="rgFrageNein"></button>' +
+      '<span class="rgfrechts">' +
+        '<button class="btn sm" type="button" id="rgFrageSpaeter"></button>' +
+        '<button class="btn sm hot" type="button" id="rgFrageJa"></button>' +
+      '</span>' +
+    '</div>';
+  land.prepend(b);
+  return b;
+}
+function zeichnenFrage(): void {
+  if(!frageBand) return;
+  setzeText($("#rgFrageTitel"), t("frage.titel"));
+  setzeText($("#rgFrageSatz"), t("frage.satz"));
+  setzeText($("#rgFrageNein"), t("frage.nein"));
+  setzeText($("#rgFrageSpaeter"), t("frage.spaeter"));
+  setzeText($("#rgFrageJa"), t("frage.ja"));
+  frageBand.setAttribute("aria-label", t("frage.region"));
+}
+/** Das Band weg; war der Fokus darin, geht er auf "Log-Ordner waehlen" (sonst haengt er im Leeren) -
+    ausser nach "Rundgang zeigen": dann nimmt die Karte ihn. */
+function frageZu(fokusZurueck = true): void {
+  const band = frageBand;
+  if(!band) return;
+  const drin = band.contains(document.activeElement);
+  band.hidden = true;
+  if(!drin) return;
+  if(fokusZurueck){
+    const z = document.querySelector<HTMLElement>("#btnPickFolder");
+    if(z && z.getClientRects().length) z.focus({preventScroll: true});
+  } else (document.activeElement as HTMLElement).blur();   // der versteckte Knopf haelt ihn sonst noch einen Takt
 }
 
 /* Die Karte bauen (einmal, in setup) - die Texte setzt zeichnen(). Die
@@ -301,23 +360,35 @@ function schliessen(): void {
   if(zurueck) zurueck.focus({preventScroll: true});
 }
 
-/** Von selbst? Aus 41, sobald die Einstellungen da sind, und hier, wenn "bereit" kommt.
-    Entschieden wird einmal je Seite. */
+/** Kommt die Frage? Aus 41, sobald die Einstellungen da sind, und hier, wenn "bereit" kommt.
+    Entschieden wird einmal je Seite. Der Rundgang selbst startet nie von selbst. */
 export function rundgangVonSelbst(): void {
   if(entschieden || !karte) return;
   if(KOMPAKT_FENSTER || !OWN_WINDOW){ entschieden = true; karte.dataset.vonSelbst = "nein"; return; }
-  if(state.rundgangGesehen === null || state.ersterStart === null || !document.body.dataset.bereit) return;
+  if(state.rundgangGesehen === null || state.ersterStart === null || state.rundgangSpaeter === null || !document.body.dataset.bereit) return;
   entschieden = true;
   const kompakt = document.body.classList.contains("compact");
   const aufStart = !$("#land").hidden;
-  const ja = state.rundgangGesehen !== true && state.ersterStart === true && aufStart && !kompakt;
+  const ja = aufStart && !kompakt && frageNoetig({gesehen: state.rundgangGesehen, ersterStart: state.ersterStart, spaeter: state.rundgangSpaeter, fenster: true});
   karte.dataset.vonSelbst = ja ? "ja" : "nein";
-  if(ja) rundgangStarten(null);
+  if(ja && frageBand){ zeichnenFrage(); frageBand.hidden = false; }
 }
 
 // what this part did at the top level, run where it stands in the order
 export function setup(): void {
   karte = bauen();
+  frageBand = bauenFrage();
+  $("#rgFrageJa").addEventListener("click", () => { frageZu(false); rundgangStarten(null); });
+  $("#rgFrageSpaeter").addEventListener("click", () => {
+    state.rundgangSpaeter = naechstesSpaeter(state.rundgangSpaeter ?? 0);
+    persistPref("rundgangSpaeter", state.rundgangSpaeter);
+    frageZu();
+  });
+  $("#rgFrageNein").addEventListener("click", () => {
+    state.rundgangGesehen = true;
+    persistPref("rundgangGesehen", true);
+    frageZu();
+  });
   $("#rgWeiter").addEventListener("click", () => {
     if(nr >= SCHRITTE.length - 1) schliessen();
     else zeigen(nr + 1);
@@ -363,6 +434,7 @@ export function setup(): void {
         if(ordnerGewaehlt && serverDir){ ordnerGewaehlt = false; $("#rgWeiter").focus({preventScroll: true}); }
       }
     }
+    if(recs.some(r => r.attributeName === "lang")) zeichnenFrage();
     if(nr < 0) return;
     if(recs.some(r => r.attributeName === "lang")) zeichnen();
     else spaeter();

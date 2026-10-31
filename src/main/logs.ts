@@ -66,8 +66,16 @@ export interface FoundLog {
  * an entry of a fresh listing (logAnswer below).
  */
 export const LIST_MAX = 60;
+/*
+ * "Alte Logs einlesen" (spec Log-Archiv 8, #264): on a click, the page reads the
+ * whole folder into the archive, not only the newest 60. GET /api/logs?alle=1
+ * lists up to LIST_ALLE_MAX entries - the same names, sizes and times - and
+ * /api/log reads an entry of that longer listing. Still only the files of the
+ * folder, still only read.
+ */
+export const LIST_ALLE_MAX = 1000;
 
-export function listLogs(folder: string): FoundLog[] {
+export function listLogs(folder: string, max = LIST_MAX): FoundLog[] {
   if (!folder || !isDir(folder)) return [];
   const found: FoundLog[] = [];
   try {
@@ -84,7 +92,7 @@ export function listLogs(folder: string): FoundLog[] {
   }
   // stable: of two logs with the same time, the one read first stays first, as before
   found.sort((a, b) => b.mtimeMs - a.mtimeMs);
-  return found.slice(0, LIST_MAX);
+  return found.slice(0, max);
 }
 
 export function newestLog(folder: string): FoundLog | null {
@@ -170,14 +178,15 @@ export function latestAnswer(found: FoundLog, file: string | null, from: string 
  * GET /api/log?name=&from= (server.ts, spec Nachtraege N3): an older log of
  * the watched folder, in pieces of at most TAIL_MAX bytes like /api/latest -
  * the page asks again from "to" until it has the whole file. name is only
- * compared with the names of a fresh listing of the same folder; what is
+ * compared with the names of a fresh listing of the same folder (the long
+ * one, LIST_ALLE_MAX, so "Alte Logs einlesen" reaches every listed log); what is
  * read is the path that listing found, never one built from the request.
  * 404: not a log of the folder (any more); 400: asked wrong; 409: the log
  * is shorter than that.
  */
 export function logAnswer(folder: string, name: string | null, from: string | null):
   { status: number; body: LogTail | { ok: false; error: string } } {
-  const found = listLogs(folder).find((f) => f.name === name);
+  const found = listLogs(folder, LIST_ALLE_MAX).find((f) => f.name === name);
   if (!found) return { status: 404, body: { ok: false, error: "not a log in the folder" } };
   if (from === null || !/^(0|[1-9]\d{0,14})$/.test(from)) return { status: 400, body: { ok: false, error: "from is not a byte" } };
   const piece = readLogFrom(found, Number(from));

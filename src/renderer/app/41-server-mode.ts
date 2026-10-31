@@ -17,7 +17,7 @@ import { looksLikeRun } from "./34-menus-drop-and-tabs";
 import { askText } from "./36-dialog";
 import {
   applySeeThrough, clampSee, kompaktFensterStart, kopfHoehe, materialGemeldet, micaMerken, placeWindowChrome, randlosHinweis, setKompaktOffen,
-  setUiZoom, syncRahmenKnoepfe, syncWindowVars, winPost
+  setUiZoom, syncRahmenKnoepfe, syncWindowVars, vollStandHolen, winPost
 } from "./37-window-size-and-overlay";
 import { applyTheme } from "./39-themes";
 import { fightKey, pollParty, renderParty, serverStatusNachfuehren } from "./42-party";
@@ -27,6 +27,8 @@ import { setzeUpdate, updateNachfragen } from "./55-statusleiste";
 import { einstNachfuehren, updateSchalterStand } from "./57-einstellungen";
 import { rundgangVonSelbst } from "./63-rundgang";
 import { kampfZustand, wachstum, type KampfMarke } from "../kompakt-core";
+import { archivKonfig } from "./76-archiv";
+import { gezeigtBereinigt } from "../rundgang-core";
 import { gelesenMelden, kampfWache, spracheGelesen, startAuftragHolen } from "./66-windows";
 import type { SavedRun } from "../types";
 
@@ -44,7 +46,19 @@ export const OWN_WINDOW = /[?&]win=1(&|$)/.test(location.search);
    ohne Node und ohne Bruecke wie die grosse. Sie ist dann nur der Streifen.
    FENSTER nennt jeder Anfrage an /api/win, welches Fenster sie meint. */
 export const KOMPAKT_FENSTER = OWN_WINDOW && /[?&]kompakt=1(&|$)/.test(location.search);
-export const FENSTER = KOMPAKT_FENSTER ? "kompakt" : "main";
+/* Das Fenster zum Abreissen (Windows Teil 2): der Hauptprozess oeffnet es auf
+   ...?win=1&teil=<bereich>. Nur vier feste Namen gelten, alles andere ist die
+   Vollansicht. Die Seite zeigt dann diesen einen Bereich, folgt dem Kampf der
+   Vollansicht wie der Streifen (streifenFolgt, 23) und schreibt nichts. */
+const ABRISS_TEILE = ["kampf", "rotation", "analyse", "vergleich"] as const;
+export type AbrissTeilSeite = (typeof ABRISS_TEILE)[number];
+export const ABRISS_TEIL: AbrissTeilSeite | null = OWN_WINDOW && !KOMPAKT_FENSTER
+  ? (ABRISS_TEILE.find(n => new RegExp("[?&]teil=" + n + "(&|$)").test(location.search)) ?? null) : null;
+export const ABRISS_FENSTER = ABRISS_TEIL !== null;
+/* Der Reiter (data-tab) dieses Bereichs; switchTab (34) laesst im Fenster keinen anderen zu. */
+const ABRISS_TABS = { kampf: "timeline", rotation: "rotation", analyse: "analysis", vergleich: "compare" } as const;
+export const ABRISS_TAB: string | null = ABRISS_TEIL ? ABRISS_TABS[ABRISS_TEIL] : null;
+export const FENSTER = KOMPAKT_FENSTER ? "kompakt" : ABRISS_FENSTER ? "abriss" : "main";
 export let serverDir = "";
 let lastSig = "";
 /* Wie weit die Datei gelesen ist (Spezifikation Live-Leistung 3): der Name,
@@ -247,6 +261,18 @@ export function livePausieren(): boolean {
   return true;
 }
 export function liveFortsetzen(){ beginServedWatch(); }
+/** Beenden wie ein Klick auf Live (Windows Teil 2): das abgerissene Fenster, wenn die Vollansicht nicht mehr mitliest (23). */
+export function liveBeenden(){ if(watchTimer) stopServedWatch(); }
+/** Das abgerissene Fenster folgt dem Thema der Vollansicht (#350): bei jedem neuen Stand liest es die Einstellung noch einmal; schreiben tut es nie. */
+export async function abrissThemaHolen(){
+  try {
+    const c = await (await fetch("/api/config")).json();
+    const gueltig = [...document.querySelectorAll<HTMLElement>("#themeRow button")].some(b => b.dataset.theme === c.theme);
+    if(gueltig && c.theme !== state.theme){ state.theme = c.theme; applyTheme(true); }
+  } catch(err) {
+    // der Helfer ist gerade weg: beim naechsten Stand wieder
+  }
+}
 export async function chooseServerDir(){
   /* Der Beispielpfad ist Platzhalter, nicht Wert. Er stand vorbelegt und
      markiert im Feld ("C:\Users\you\..."), und ein Enter schickte einen
@@ -362,7 +388,7 @@ export function setup(): void {
       // force, because the saved value can equal what state already holds while
       // the page has never actually been zoomed to it
       if(typeof c.uiZoom === "number")
-        setUiZoom(c.uiZoom, {quiet:true, force:true, fromStart:true, keepWindow: c.windowPlaced === true});
+        setUiZoom(c.uiZoom, {quiet:true, force:true});
       // stored as the window alpha the launcher takes, shown as its complement
       if(typeof c.compactAlpha === "number" && c.compactAlpha <= 1 && c.compactAlpha > 0){
         state.seeThrough = clampSee(Math.round((1 - c.compactAlpha) * 100));
@@ -418,6 +444,10 @@ export function setup(): void {
       state.rundgangGesehen = c.rundgangGesehen === true;
       state.ersterStart = c.firstStart === true
         && !(c.logIndex && typeof c.logIndex === "object" && Object.keys(c.logIndex).length);
+      state.rundgangSpaeter = Number.isInteger(c.rundgangSpaeter) && c.rundgangSpaeter >= 0 && c.rundgangSpaeter <= 3 ? c.rundgangSpaeter : 0;
+      // im abgerissenen Fenster (Windows Teil 2) keine Hinweise je Bereich: sie gehoeren der Vollansicht (74)
+      state.bereichHinweise = c.bereichHinweise !== false && !ABRISS_FENSTER;
+      state.bereicheGezeigt = gezeigtBereinigt(c.bereicheGezeigt);
       rundgangVonSelbst();
       // die gespeicherte Sprache des Hauptprozesses; weicht die Seite ab, schreibt sie ihre (66)
       spracheGelesen(c.lang);
@@ -431,11 +461,16 @@ export function setup(): void {
       // der Update-Hinweis: aus, solange nicht ausdruecklich an (Spezifikation Update-Hinweis 2.4)
       updateSchalterStand(c.updatePruefen === true);
       // eingeschaltet: die Antwort von GitHub kann nach dem ersten /api/state kommen (55)
-      if(c.updatePruefen === true && !KOMPAKT_FENSTER) updateNachfragen();
+      if(c.updatePruefen === true && !KOMPAKT_FENSTER && !ABRISS_FENSTER) updateNachfragen();
       /* Das Kompaktfenster ist Kompakt von Anfang an, bevor die
          Einstellungen da waren: der Randlos-Hinweis kommt jetzt. */
       if(KOMPAKT_FENSTER) randlosHinweis();
       if(state.encounters.length && state.tab === "weapons") renderWeapons();
+      /* das Log-Archiv (76): an, solange archivAn nicht ausdruecklich false ist
+         (Spezifikation Log-Archiv 5); aufgenommen wird erst, wenn archivHinweis
+         den Erststart-Hinweis quittiert hat (6). Start und Einstellungen zeigen es. */
+      archivKonfig(c.archivAn, c.archivHinweis);
+      renderStart(); einstNachfuehren();
       konfigFertig(true);
     }).catch(() => konfigFertig(false));
     $("#btnWatch").onclick = $("#btnWatch2").onclick = toggleServedWatch;
@@ -477,12 +512,12 @@ export function setup(): void {
       // full view is never kept (remember:false), so this only ever fires
       // after an unexpected close while genuinely in use as an overlay
       /* Im Kompaktfenster nicht: es ist von selbst immer vorn. */
-      state.pinPref = !!s.stayOnTop && !KOMPAKT_FENSTER;
+      state.pinPref = !!s.stayOnTop && !KOMPAKT_FENSTER && !ABRISS_FENSTER;
       /* Kompakt als eigenes Fenster (N4): im grossen Fenster der App, wenn
          der Hauptprozess es kann (Windows mit Acrylic) - sonst schrumpft
          Kompakt das Fenster wie bisher. Das Kompaktfenster selbst startet so,
          wie es geoeffnet wurde (mit Live, durchklickbar). */
-      state.zweiFenster = !!s.kompaktFenster && OWN_WINDOW && !KOMPAKT_FENSTER;
+      state.zweiFenster = !!s.kompaktFenster && OWN_WINDOW && !KOMPAKT_FENSTER && !ABRISS_FENSTER;
       if(state.zweiFenster) setKompaktOffen(!!(s.kompakt && s.kompakt.offen));
       if(KOMPAKT_FENSTER){
         kompaktFensterStart(!!(s.kompakt && s.kompakt.durch));
@@ -490,6 +525,10 @@ export function setup(): void {
         /* sonst zeigt er, was die Vollansicht zeigt (Kompakt-Fix 01.10., 23) */
         else void streifenFolgt(s.kompakt);
       }
+      /* Das abgerissene Fenster (Windows Teil 2) folgt der Vollansicht ueber
+         denselben Weg wie bei jedem Ereignis kompaktstand (37, streifenFolgt
+         in 23) - jetzt, wo der Log-Ordner bekannt ist (Live liest dort mit). */
+      if(ABRISS_FENSTER) void vollStandHolen();
       /* Das Zeichen "Seite fertig" fuer die Seitentests (Neugestaltung
          28.09., Befund 2): der Ordnerstand der Startseite geht, das Zeichen
          bleibt - "ordner", wenn der Helfer einen Log-Ordner kennt, sonst

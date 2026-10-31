@@ -1,6 +1,45 @@
 BOROMETER — ÄNDERUNGSPROTOKOLL
 ==============================
 
+v2.0
+----
+Hinzugefügt
+  - Archiv der Bosskämpfe mit Suche, Bosskarten und Verlauf je Boss (#264, #288, #292)
+  - Alte Logs ins Archiv einlesen; Log öffnen fällt aufs Archiv zurück (#264)
+  - Kämpfe im Archiv lösen, mit Sicherung endgültig löschen (#264)
+  - Charaktere mit Logname und Main; Rekorde je Charakter (#251)
+  - Main steht in den Weeklies und im Kompaktstreifen vorn (#251)
+  - Analyse-Werkbank: ein Fach je Fähigkeit, Fahnen im Streifen, Kurve des besten Pulls (#218)
+  - Jede Fähigkeitszeile nennt, was auffällt; Legende und Achse darüber (#270)
+  - Krit- und Stark-Rate der direkten Treffer; Lücken-Marken mit Dauer (#269)
+  - Auge von Ventius: bester Einsatz je Boss jetzt in den Rekorden (#218)
+  - Gilde-Punkte: Konten, Regeln, inaktive Mitglieder, eigene Arten (#228)
+  - Gilde online: die Liste auf einem eigenen Server, nur https (#229)
+  - Gilden und Weeklies-Einträge lösen; mit Sicherung endgültig löschen (#237, #240)
+  - Gruppen-Server über https; Warnung bei unverschlüsselter Adresse (#231)
+  - Reiter Gruppe: Wahl „Öffentlicher Server“ für guest.borometer.de (#310, #321)
+  - Windows-Menü auf Tafelzeilen (Kopieren, In Rotation zeigen) (#168)
+  - Kampf, Rotation, Analyse oder Vergleich im eigenen Fenster öffnen (#168)
+  - Rundgang fragt zuerst; ein Hinweis je Bereich beim ersten Besuch (#265)
+  - Halle der Illusionen: Molgras und Murdock (#252)
+
+Angepasst
+  - Kompaktfenster neu: Panel, große Zahl, Reiter Kampf und Weeklies (#241, #287)
+  - Kompakt: ganze Kopfzeile als Griff, Mausrad, Mindestgröße, klareres Glas (#328, #348)
+  - Zwei Schriften in allen Fenstern: Anton und Source Sans 3 (#342)
+  - Große DPS-Zahl mit Kontur, scharf bei jedem Zoom; Balken mit Metall-Glanz (#284, #332)
+  - Startseite passt ohne Rollen ins Bild (#285)
+  - In der Oberfläche lässt sich mit der Maus nichts markieren, außer Eingabefelder (#286)
+  - Glutring: Text in der Mitte bleibt im Loch des Rings (#335)
+  - Schärfere Boss- und Symbolbilder (#258)
+  - Beispiel der Server-Adresse ist ein https-Name (#249)
+  - Anleitung auf den Stand von 2.0 gebracht (#355)
+  - Vollansicht hat feste Größe (Standard 1280 x 860): nicht ziehbar, nicht maximierbar, kein Vollbild; größer oder kleiner nur über die Skalierung in den Einstellungen; abgerissene Fenster bleiben ziehbar und maximierbar (#364)
+
+Behoben
+  - Analyse: Eine gedrückte Fahne lässt die Fächer nicht mehr zusammenfallen (#236)
+  - Kompaktfenster wächst am unteren Bildschirmrand nicht mehr aus dem Bild (#298)
+
 v1.10
 -----
   - Ein viertes Thema, Rauchglas. Unter Windows 11 liegt das große Fenster auf

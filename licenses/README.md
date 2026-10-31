@@ -10,15 +10,14 @@ unterliegt. Die Angaben sind aus den Dateien selbst gelesen, nicht abgeschrieben
 
 ## Schriften: SIL Open Font License 1.1
 
-Der Lizenztext liegt in [`OFL-1.1.txt`](OFL-1.1.txt). In `src/renderer/styles.css` (und damit in der gebauten `boro-meter.html`) sind fünf
+Der Lizenztext liegt in [`OFL-1.1.txt`](OFL-1.1.txt). In `src/renderer/styles.css` (und damit in der gebauten `boro-meter.html`) sind vier
 Ausschnitte (U+0000 bis U+00FF) als WOFF2 eingebettet. Die Vermerke stehen so in der
 Namenstabelle der eingebetteten Schnitte:
 
 | Familie | Urhebervermerk |
 |---|---|
-| Archivo Black | Copyright 2017 The Archivo Black Project Authors (https://github.com/Omnibus-Type/ArchivoBlack) |
-| IBM Plex Sans Condensed (Regular, Medium, SemiBold) | Copyright 2019 IBM Corp. All rights reserved. |
-| IBM Plex Mono | Copyright 2017 IBM Corp. All rights reserved. |
+| Anton | Copyright 2020 The Anton Project Authors (https://github.com/googlefonts/AntonFont.git) (Lizenztext: [`LICENSE-Anton-OFL.txt`](LICENSE-Anton-OFL.txt)) |
+| Source Sans 3 (Regular, SemiBold, Bold) | Google Inc. (Lizenztext: [`LICENSE-SourceSans3-OFL.txt`](LICENSE-SourceSans3-OFL.txt)) |
 
 Die OFL ist mit der GPL verträglich: die Schriften behalten ihre eigene Lizenz und
 färben nicht auf das Programm ab. Weitergeben darf man sie, solange dieser
@@ -46,20 +45,25 @@ halber, weil sie in der ausgelieferten `.exe` stecken:
 > Spielgrafik; die Release-Downloads betten sie ein (Datei `assets/spielbilder.ts` im
 > privaten Asset-Repo, beim Bauen eingesetzt). Ohne sie zeichnet die App eigene Marken.
 >
-> Was die Release-Downloads einbetten: 275 Fähigkeitssymbole aus dem Feed `getSkillSets` von questlog.gg (dazu „Fallende Blume“, WM_Common_SKILL_009, aus einem Bildschirmfoto von B0R0AK vom 01.10.2026),
+> Seit 16.10.2026 liegen alle questlog-Bilder in höherer Auflösung vor, einmalig von Hand von cdn.questlog.gg geholt (nur Bilddateien): Fähigkeits-, Kern- und Gegenstandssymbole mit 128 × 128, die Porträts der Gegner mit 192 × 192 (WebP); die Datei `assets/spielbilder.ts` ist damit rund 3,6 MB groß.
+>
+> Was die Release-Downloads einbetten: 275 Fähigkeitssymbole aus dem Feed `getSkillSets` von questlog.gg (dazu „Fallende Blume“, WM_Common_SKILL_009, seit 21.10.2026 mit 128 × 128 von cdn.questlog.gg, vorher aus einem Bildschirmfoto von B0R0AK vom 01.10.2026),
 > 34 Skillkern-Symbole von cdn.questlog.gg (28. und 30.09.2026) und 55 Gegnerbilder,
 > 27 davon verkleinerte Bildschirmfotos (17 davon aus Bildschirmfotos von B0R0AK aus dem Spiel
-> vom 03.10.2026, Kopf quadratisch ausgeschnitten, 96 × 96 WebP, zusammen 63,3 kB, rund 84 kB als Base64), eines (Vegamor als Ganzes, Bild `PT_NPC_M_Vagamont_Sprite` des NPC
+> vom 03.10.2026, Kopf quadratisch ausgeschnitten; seit 16.10.2026 15 davon neu aus den Originalfotos mit 192 × 192 WebP, Exodus kommt seit 21.10.2026 von cdn.questlog.gg mit 192 × 192; Minezerok kommt seit 16.10.2026 von cdn.questlog.gg (`PT_NPC_M_Lich_MaenZerokA`, 192 × 192); dazu Molgras und Murdock aus zwei Bosskarten von B0R0AK, 192 × 192; die 21 Fotos der Bosse zusammen rund 0,4 MB als Base64), eines (Vegamor als Ganzes, Bild `PT_NPC_M_Vagamont_Sprite` des NPC
 > `FD_L13_AB_M_SpiritTree_Vagamont_001`) am 01.10.2026 von cdn.questlog.gg; zusammen mit den übrigen Symbolen
 > rund 1,3 MB als Base64 (gezählt am 30.09.2026).
 > Dazu seit dem 01.10.2026 für die Weeklies (ebenfalls in `assets/spielbilder.ts`;
 > Neugestaltung „Wochenband“, später dazu Händler und Dimensionsprüfung):
 > **19 Gegenstandssymbole** von cdn.questlog.gg
-> (48 × 48 WebP, je mit ID und Pfad unter `throne-and-liberty/assets/` als Herkunft)
+> (128 × 128 WebP, je mit ID und Pfad unter `throne-and-liberty/assets/` als Herkunft)
 > und **4 Bossbilder** des Raids (Dragaryle, Zairos und Calanthia aus Bildschirmfotos
 > von B0R0AK aus dem Spiel vom 01.10.2026, Radeth aus einem Bildschirmfoto von B0R0AK
-> vom 02.10.2026, gezeigt in den Rekorden und im Meter), ausgeschnitten und verkleinert
-> (96 × 96 WebP); zusammen 56,6 kB, rund 77 kB als Base64. Halle der Illusionen, Portal der
+> vom 02.10.2026, gezeigt in den Rekorden und im Meter), ausgeschnitten und zuerst auf
+> 96 × 96 WebP verkleinert. Seit 29.10.2026 sind die vier Raid-Bilder, Verence, Marta,
+> Haylock und Gaudian (Halle der Illusionen) neu aus Bosskarten von B0R0AK
+> vom 27. und 29.10.2026 ausgeschnitten, gleicher Zuschnitt (Haylock etwas weiter gefasst), 192 × 192 WebP
+> (#258, #344); die vier Raid-Bilder zusammen 45,5 kB, rund 61 kB als Base64. Halle der Illusionen, Portal der
 > Unendlichkeit, das Regionszertifikat und die Dungeons der Dimensionsprüfung tragen
 > eigene gezeichnete Marken, kein Spielbild.
 >
@@ -111,7 +115,7 @@ Namen der Ausrüstungsteile in einem gespeicherten Plan.
 
 | Symbol | Herkunft | Lizenz |
 |---|---|---|
-| Übungspuppe (`fremd:target-practice` in `assets/spielbilder.ts`) | „Target practice“ von juicy_fish auf Flaticon, Stil „Juicy Fish Outline“, https://www.flaticon.com/free-icon/target-practice_5773977; von B0R0AK bereitgestellt am 01.10.2026, auf 96 px als WebP verkleinert | [Flaticon License](https://www.flaticon.com/legal): frei für private und kommerzielle Nutzung, **Namensnennung Pflicht** |
+| Übungspuppe (`fremd:target-practice` in `assets/spielbilder.ts`) | „Target practice“ von juicy_fish auf Flaticon, Stil „Juicy Fish Outline“, https://www.flaticon.com/free-icon/target-practice_5773977; von B0R0AK bereitgestellt am 01.10.2026, Originaldatei (512 px) am 26.10.2026 auf 192 px als WebP verkleinert | [Flaticon License](https://www.flaticon.com/legal): frei für private und kommerzielle Nutzung, **Namensnennung Pflicht** |
 
 Die Namensnennung, wie Flaticon sie verlangt:
 

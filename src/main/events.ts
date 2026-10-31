@@ -2,6 +2,8 @@
 // Copyright (C) 2026 B0R0AK
 // SPDX-License-Identifier: GPL-3.0-or-later
 
+import type { MenuePunkt } from "./windows-core";
+
 /*
  * Things that happen outside the page and that the page must act on: the
  * global hotkey, the two buttons in the taskbar preview, a resize by the
@@ -15,11 +17,12 @@
  * The weeklies add two (spec Weeklies neu): a reminder fell due and the page
  * is asked for a number ("erinnerung"), and its notification asks for the
  * weeklies to open ("weeklies").
+ * The native menu on a table row adds two (Windows Teil 2): `menuekopieren`, `menuerotation`.
  */
 
-export type EventName = "hotkey" | "compact" | "live" | "handsize" | "material" | "kompakt" | "kompakthand" | "kompaktstand" | "pin" | "start" | "erinnerung" | "weeklies";
+export type EventName = "hotkey" | "compact" | "live" | "handsize" | "material" | "kompakt" | "kompakthand" | "kompaktstand" | "pin" | "start" | "erinnerung" | "weeklies" | "menuekopieren" | "menuerotation";
 
-const COUNTS: Record<EventName, number> = { hotkey: 0, compact: 0, live: 0, handsize: 0, material: 0, kompakt: 0, kompakthand: 0, kompaktstand: 0, pin: 0, start: 0, erinnerung: 0, weeklies: 0 };
+const COUNTS: Record<EventName, number> = { hotkey: 0, compact: 0, live: 0, handsize: 0, material: 0, kompakt: 0, kompakthand: 0, kompaktstand: 0, pin: 0, start: 0, erinnerung: 0, weeklies: 0, menuekopieren: 0, menuerotation: 0 };
 const listeners = new Set<() => void>();
 
 export function bump(name: EventName): void {
@@ -35,4 +38,9 @@ export function eventCounts(): Record<EventName, number> {
 export function onEvent(fn: () => void): () => void {
   listeners.add(fn);
   return () => listeners.delete(fn);
+}
+
+/** An item of the native table menu was chosen (menue.ts): the page that showed it acts on it. */
+export function menueGewaehlt(id: MenuePunkt): void {
+  bump(id === "kopieren" ? "menuekopieren" : "menuerotation");
 }

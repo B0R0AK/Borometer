@@ -1,4 +1,4 @@
-import { artenAusBericht, artenZaehlen, bogenBei, boegen, farbeMitAlpha, FUGE, gewachsen, mitSchrift, ringMass, type ArtenBlock, type Bogen, type Kat, winkelNorm, zusammenfassen, zwischen } from "../glutring-core";
+import { artenAusBericht, artenZaehlen, bogenBei, boegen, farbeMitAlpha, FUGE, gewachsen, mitSchrift, ringMass, sehne, type ArtenBlock, type Bogen, type Kat, winkelNorm, zusammenfassen, zwischen } from "../glutring-core";
 import type { BarFigures, BarSubRow, Fight } from "../types";
 import { SERIES_N, seriesColor, state } from "./01-state";
 import { fmt, full } from "./03-helpers";
@@ -507,6 +507,69 @@ const farbenLesen = (): Farben => ({
   schein: parseFloat(cssv("--glutring-schein")) || 0, innenA: parseFloat(cssv("--glutring-innen")) || 0.5,
   ember: cssv("--ember") || "rgba(0,0,0,0)", rest: cssv("--series-rest"),
   tinte: cssv("--text"), leise: cssv("--dim"), linie: cssv("--ridge"), schrift: cssv("--sans")});
+/* Die Mitte haelt ihre Zeilen im Loch des Rings (#335): das Loch ist unter der
+   Zahl schmaler als oben, der Text war immer gleich breit. Jede Zeile der
+   Mitte (von oben nach unten) bekommt die groesste Breite, bei der ihr Text in
+   die Sehne des Lochs an seiner Stelle passt; er bricht darin um, nichts wird
+   gekuerzt. Ein Umbruch macht die Zeile hoeher und ihren Abstand von der Mitte
+   groesser, darum wird mit dem Text gemessen (jedes Zeilenrechteck gegen die
+   Sehne an seiner fernsten Kante), nicht gerechnet. Die Zahl bleibt auf dem
+   Mittelpunkt (Entscheidung 03.10.); passt eine Zeile bei keiner Breite, gilt
+   die mit dem kleinsten Ueberstand. */
+const MITTE_ZEILEN = "#ringMitte .big > :not(.v), #ringFokus, #ringMitteHinweis, #ringDu";
+function mitteEinpassen(){
+  if(!lage || !ringBild || !document.body.classList.contains("glut")) return;
+  const mitte = $("#ringMitte");
+  if(!mitte.getClientRects().length) return;
+  const {g} = lage, z = g.z, r0 = g.R * (ringBild.innen ? 0.73 : 0.70);
+  const buehne = $("#ringBuehne").getBoundingClientRect(), cx = buehne.left + g.cx, cy = buehne.top + g.cy;
+  // wie weit der Text der Zeile ueber die Sehne hinausragt (kleiner gleich 0: er passt); 7 Punkt Rand, einer mehr als die Probe
+  const ueberstand = (el: HTMLElement) => {
+    let ueber = -Infinity;
+    const lauf = document.createTreeWalker(el, NodeFilter.SHOW_TEXT);
+    for(let n = lauf.nextNode(); n; n = lauf.nextNode()){
+      if(!n.textContent || !n.textContent.trim()) continue;
+      const bereich = document.createRange();
+      bereich.selectNodeContents(n);
+      for(const q of bereich.getClientRects()){
+        if(q.width < 1) continue;
+        const halb = Math.max(Math.abs(q.left - cx), Math.abs(q.right - cx)), dy = Math.max(Math.abs(q.top - cy), Math.abs(q.bottom - cy));
+        ueber = Math.max(ueber, 2 * halb - sehne(r0, dy, 7 * z));
+      }
+    }
+    return ueber;
+  };
+  const zeilen = [...mitte.querySelectorAll<HTMLElement>(MITTE_ZEILEN)];
+  const einpassen = (): number => {
+    let schlecht = -Infinity;
+    for(const el of zeilen){ el.style.maxWidth = ""; el.style.whiteSpace = ""; }
+    for(const el of zeilen){
+      if(!el.getClientRects().length) continue;
+      schlecht = Math.max(schlecht, zeileEinpassen(el));
+    }
+    return schlecht;
+  };
+  const zeileEinpassen = (el: HTMLElement): number => {
+    let bestU = ueberstand(el), bestW = 0;
+    if(bestU <= 0) return bestU;
+    const natuerlich = el.getBoundingClientRect().width;
+    for(let k = 1; k <= 12; k++){
+      const w = Math.max(48 * z, natuerlich * (1 - k * 0.06));
+      el.style.maxWidth = w / z + "px"; el.style.whiteSpace = "normal";
+      const u = ueberstand(el);
+      if(u < bestU){ bestU = u; bestW = w; }
+      if(u <= 0 || w <= 48 * z) break;
+    }
+    if(bestW){ el.style.maxWidth = bestW / z + "px"; el.style.whiteSpace = "normal"; }
+    else { el.style.maxWidth = ""; el.style.whiteSpace = ""; }
+    return bestU;
+  };
+  // erst mit den Abstaenden, wie sie sind; reicht das nicht, stehen die Zeilen enger (.eng)
+  mitte.classList.remove("eng", "klein");
+  let rest = einpassen();
+  if(rest > 0){ mitte.classList.add("eng"); rest = einpassen(); }
+  if(rest > 0){ mitte.classList.add("klein"); einpassen(); }
+}
 function zeichneRing(){
   const cv = $<HTMLCanvasElement>("#ring");
   if(!ringBild || !document.body.classList.contains("glut")) return;
@@ -517,6 +580,7 @@ function zeichneRing(){
     if(neu.w < 1 || neu.h < 1) return;
     lage = {g: neu, q: dpr, schilder: null, farben: farbenLesen()};
     cv.width = Math.round(neu.w * dpr); cv.height = Math.round(neu.h * dpr);
+    mitteEinpassen();
   }
   const {g, q, farben} = lage;
   gesehen = true;
@@ -948,6 +1012,13 @@ export function setup(): void {
   menueBinden();
   // die Buehne aendert ihre Groesse mit dem Fenster und dem Raster: neu zeichnen, ohne neu zu rechnen
   if(typeof ResizeObserver !== "undefined") new ResizeObserver(() => { lage = null; zeichneRing(); }).observe($("#ringBuehne"));
+  /* Was in der Mitte steht, aendert sich ohne neue Groesse: ein Bogen wird
+     gezeigt, die Sprache wechselt, der Vergleich zum letzten Pull kommt an.
+     Dann wird die Breite neu eingepasst (mitteEinpassen schreibt nur die Breite,
+     die der Beobachter nicht sieht - keine Schleife). */
+  if(typeof MutationObserver !== "undefined")
+    new MutationObserver(() => mitteEinpassen()).observe($("#ringMitte"),
+      {childList: true, characterData: true, subtree: true, attributes: true, attributeFilter: ["hidden"]});
   /* Die Ecken des Ringfelds aendern ihre Groesse auch ohne neues Bild: der
      Verlauf kommt an (#hHist, 41), ein Knopf erscheint (syncBestBtn). Die
      Schilder weichen den Ecken aus (sperrflaechen), also wird die Lage dann

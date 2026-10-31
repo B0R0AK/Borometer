@@ -745,7 +745,7 @@ try {
     {
       const s = await oeffne({ app: true, helfer: { dir: "C:\\Logs", file: "TLCombatLog-1.txt", text: logText(VER) } });
       await laden(s.page);
-      for (const ende = Date.now() + 8000; Date.now() < ende && !s.posts.some((x) => x.logIndex); ) await s.page.waitForTimeout(100);
+      for (const ende = performance.now() + 8000; performance.now() < ende && !s.posts.some((x) => x.logIndex); ) await s.page.waitForTimeout(100);
       const idx = s.posts.filter((x) => x.logIndex).at(-1)?.logIndex ?? {};
       VER_INDEX = Object.fromEntries(Object.entries(idx).map(([k, e]) => [k, { ...e,
         fights: e.fights.map((f) => (f.name === "Vulcanus" ? { ...f, b: "pve0000000" } : f)) }]));
@@ -1363,6 +1363,60 @@ try {
     assert(m.unter === gesamt && m.u.top >= m.kopf.top - 0.5 && m.u.bottom <= m.kopf.bottom + 0.5 && m.u.bottom <= m.kurve.top + 0.5,
       `${lang}: "${gesamt}" steht im Kopf des Bands, ueber der Kurve`, m);
     assert(!s.fehler.length, `${lang} Kurvenfeld: keine Fehler`, s.fehler);
+    await p.close();
+  }
+
+  // --- 16. (#286) nichts in der Oberflaeche laesst sich mit der Maus markieren;
+  // Eingabefelder bleiben markierbar. Ziehen von Textanfang zu Textende und
+  // Dreifachklick in jedem Bereich, danach muss die Auswahl leer sein.
+  {
+    const s = await oeffne({ app: true, lang: "de" }); const p = s.page;
+    /* Erster und letzter sichtbarer Text im Fenster: Mittelpunkt links bzw. rechts des Textknotens */
+    const enden = () => p.evaluate(() => {
+      const w = document.createTreeWalker(document.body, NodeFilter.SHOW_TEXT);
+      const t = [];
+      for (let n = w.nextNode(); n; n = w.nextNode()) {
+        const e = n.parentElement;
+        if (!n.nodeValue.trim() || !e || e.closest("script,style,[hidden],input,textarea,code,#toast,button,a,select,summary,label,[role=tab],[role=button],[tabindex]")) continue;
+        const r = document.createRange(); r.selectNodeContents(n);
+        const b = r.getBoundingClientRect();
+        if (b.width < 8 || b.height < 6 || b.top < 0 || b.bottom > innerHeight || b.right > innerWidth) continue;
+        if (getComputedStyle(e).visibility === "hidden" || document.elementFromPoint(b.left + 2, b.top + b.height / 2) === null) continue;
+        t.push(b);
+      }
+      if (t.length < 2) return null;
+      const a = t[0], z = t[t.length - 1];
+      return { ax: a.left + 1, ay: a.top + a.height / 2, zx: z.right - 1, zy: z.top + z.height / 2 };
+    });
+    const markiert = () => p.evaluate(() => getSelection().toString());
+    const pruefe = async (name) => {
+      const e = await enden();
+      if (!e) { assert(false, `${name}: Text zum Ziehen gefunden`); return; }
+      await p.mouse.move(e.ax, e.ay); await p.mouse.down();
+      await p.mouse.move((e.ax + e.zx) / 2, (e.ay + e.zy) / 2, { steps: 6 }); await p.mouse.move(e.zx, e.zy, { steps: 6 }); await p.mouse.up();
+      assert(await markiert() === "", `#286 ${name}: Ziehen mit der Maus markiert nichts`, await markiert());
+      await p.mouse.click(e.ax, e.ay, { clickCount: 3 });
+      assert(await markiert() === "", `#286 ${name}: Dreifachklick markiert nichts`, await markiert());
+      await p.mouse.click(5, 5);
+    };
+    await pruefe("Start");
+    await beispiel(p);
+    for (const [tab, name] of [["start", "Kampf"], ["analysis", "Analyse"], ["rotation", "Rotation"], ["history", "Verlauf"],
+                               ["weeklies", "Weeklies"], ["archiv", "Archiv"], ["settings", "Einstellungen"]]) {
+      const da = await p.evaluate((t) => { const b = document.querySelector(`#bereiche [data-tab="${t}"]`); return !!b && b.getClientRects().length > 0; }, tab);
+      if (!da) { assert(false, `#286 ${name}: Reiter ist da`); continue; }
+      await bereich(p, tab);
+      await pruefe(name);
+    }
+    // Eingabefeld: tippen, Strg+A, die Auswahl ist nicht leer
+    await bereich(p, "start");
+    await p.keyboard.press("Control+k");
+    await p.waitForFunction(() => document.activeElement && document.activeElement.id === "kwSuche");
+    await p.keyboard.type("Boss");
+    await p.keyboard.press("Control+a");
+    const feld = await p.evaluate(() => { const f = document.querySelector("#kwSuche"); return f.value.slice(f.selectionStart, f.selectionEnd); });
+    assert(feld === "Boss", "#286 Eingabefeld: Text tippen und mit Strg+A markieren bleibt moeglich", feld);
+    assert(!s.fehler.length, "#286: keine Fehler", s.fehler);
     await p.close();
   }
 } finally {

@@ -35,7 +35,7 @@
 // Mit Edge: PARITY_CHROMIUM="C:/Program Files (x86)/Microsoft/Edge/Application/msedge.exe"
 
 import * as esbuild from "esbuild";
-import { mkdtempSync, readFileSync, rmSync } from "node:fs";
+import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -69,6 +69,8 @@ const bundle = async (entry, plugins = []) => {
   return import("data:text/javascript;base64," + Buffer.from(b.outputFiles[0].text).toString("base64"));
 };
 const wk = await bundle("src/main/weeklies.ts", [electron]);
+const WKDATEI = join(ordner, "Borometer", "boro-weeklies.json");
+mkdirSync(join(ordner, "Borometer"), { recursive: true });
 const kern = await bundle("src/renderer/weeklies-core.ts");
 /* folgt Spezifikation 10: die Groesse der Grundliste kommt aus dem Kern (keine feste Zahl), die Haendler und Kacheln in ihrer Folge */
 const N = kern.GRUNDLISTE.length;
@@ -128,13 +130,19 @@ function pruefen(data, stored, jetzt) {
 
 /* Der gestellte Helfer. lager.data ist die Datei; getStatus/postStatus stellen 503 oder 400,
    getStatus "abbruch" einen Netzfehler, "ohneDaten" ein {ok:true} ohne data. */
-const neuesLager = (data = LEER) => ({ data: structuredClone(data), posts: [], abgelehnt: [], getStatus: 200, postStatus: null });
-async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLager(), uhr = MI_0955, datei = false, thema = null } = {}) {
+const VERZUG = Number(process.env.BORO_TEST_VERZUG || 0);
+const neuesLager = (data = LEER) => ({ data: structuredClone(data), posts: [], fertig: 0, abgelehnt: [], getStatus: 200, postStatus: null });
+async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLager(), uhr = MI_0955, datei = false, thema = null, fest = true } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   // die Uhr der Seite: gestellte Zeit plus was seitdem verging; vorspulen() rechnet das Vorspulen dazu
   const s = { page, fehler: [], lager, uhr: { basis: uhr, echt: performance.now() } };
   page.on("pageerror", (e) => s.fehler.push(String(e)));
-  await page.clock.install({ time: uhr });
+  // Seit #224 ist fest der Normalfall: die Seite zeichnet im Minutentakt neu (59-weeklies.ts, planen), und ein Klick, dessen Maustaste vor dem Neuzeichnen
+  // faellt und danach loslaesst, geht verloren (der Knopf ist ersetzt). Lief die Seitenuhr mit der Zeit des Runners, traf das unter Last eine Probe
+  // zufaellig (Grundliste wiederherstellen, erster Haken, Anlegen). Mit stehender Uhr zeichnet nur neu, was die Probe selbst bewegt (nachPost, vorspulen).
+  // fest: die Seite laedt eine Minute vor der Zeit und steht dann genau auf uhr + 500 ms, angehalten; nur vorspulen() bewegt sie
+  // (sonst laeuft die Seitenuhr mit der Zeit des Runners weiter, und eine Minutenprobe haengt davon ab, wie lange das Laden dauerte)
+  await page.clock.install({ time: fest ? uhr - 60000 : uhr });
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
   if (datei) {
     await page.goto(DATEI);
@@ -142,6 +150,9 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLa
   } else {
     await page.route("http://boro.test/**", async (route) => {
       const req = route.request(), path = new URL(req.url()).pathname;
+      // BORO_TEST_VERZUG (nur zur Nachstellung von Last, #224): so viele ms antwortet der gestellte Helfer auf jede Anfrage hoechstens spaeter,
+      // zufaellig zwischen 0 und dem Wert; ohne den Wert aendert sich nichts
+      if (VERZUG && path !== "/api/events") await new Promise((r) => setTimeout(r, Math.random() * VERZUG));
       const json = (body, status = 200) => route.fulfill({ status, contentType: "application/json", body: JSON.stringify(body) }).catch(() => {});
       if (path === "/api/weeklies" && req.method() === "GET")
         return lager.getStatus === 200 ? json({ ok: true, data: lager.data }) : lager.getStatus === "abbruch" ? route.abort().catch(() => {})
@@ -149,13 +160,22 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLa
       if (path === "/api/weeklies") {
         const b = JSON.parse(req.postData() || "{}");
         lager.posts.push(b.data);
-        if (lager.postStatus) return json({ ok: false }, lager.postStatus);
+        // fertig zaehlt die beantworteten Posts: erst danach hat die Seite ihre Antwort und ist ruhig (nachPost wartet darauf)
+        const antwort = async (body, status) => { await json(body, status); lager.fertig++; };
+        if (lager.postStatus) return antwort({ ok: false }, lager.postStatus);
         const jetzt = seitenUhr(s);
         const bruch = regelBruch(b.data, jetzt);
         const clean = Object.keys(b).join() === "data" ? pruefen(b.data, lager.data, jetzt) : null;
-        if (!clean || bruch.length) { lager.abgelehnt.push({ bruch, data: b.data }); return json({ ok: false }, 400); }
+        if (!clean || bruch.length) { lager.abgelehnt.push({ bruch, data: b.data }); return antwort({ ok: false }, 400); }
         lager.data = clean;
-        return json({ ok: true });
+        return antwort({ ok: true });
+      }
+      if (path === "/api/weeklies-loeschen" && req.method() === "POST") {
+        // der echte Speicher: die Datei traegt den Stand des Lagers, loescheWeekliesGeloest arbeitet an ihr, das Lager liest sie zurueck
+        writeFileSync(WKDATEI, JSON.stringify(lager.data));
+        const gone = wk.loescheWeekliesGeloest(JSON.parse(req.postData() || "{}"));
+        if (gone.ok) lager.data = JSON.parse(readFileSync(WKDATEI, "utf8"));
+        return json(gone, gone.ok ? 200 : gone.grund === "unavailable" ? 503 : 400);
       }
       if (path === "/api/state") return json({ dir: "", file: "", nativeFrame: false, material: false, stayOnTop: false });
       if (path === "/api/config" && req.method() === "GET") return json(thema ? { theme: thema } : {});
@@ -171,19 +191,52 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager = neuesLa
   await page.click('#bereiche [data-tab="weeklies"]');
   await page.waitForFunction(() => !document.querySelector("#weeklies").hidden);
   if (!datei && lager.getStatus === 200) await page.waitForFunction(() => document.querySelector("#wkBody")?.dataset.lage === "da");
+  if (fest) { await page.clock.pauseAt(uhr + 500); s.uhr = { basis: uhr + 500, echt: performance.now(), fest: true }; }
   return s;
 }
 /* monotone Uhr: die Wanduhr springt in WSL2 (timesyncd) um ~1,2 s zurueck, die Seitenuhr (Playwright) laeuft monoton */
-const seitenUhr = (s) => s.uhr.basis + (performance.now() - s.uhr.echt);
+const seitenUhr = (s) => s.uhr.basis + (s.uhr.fest ? 0 : performance.now() - s.uhr.echt);
 async function vorspulen(s, ms) { await s.page.clock.fastForward(ms); s.uhr.basis += ms; }
 /* auf einen Zustand warten, nie auf eine feste Zeit */
 async function bis(fn, ms = 4000) {
-  const ende = Date.now() + ms;
-  while (Date.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
+  const ende = performance.now() + ms;
+  while (performance.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
   return !!(await fn());
 }
 const nPosts = (s) => s.lager.posts.length;
-const nachPost = async (s, n) => bis(() => s.lager.posts.length > n);
+/* Kein weiteres Speichern erwarten: die Seite sendet entprellt (200 ms). Die Uhr der Seite wird selbst weitergestellt, statt reale Zeit verstreichen zu
+   lassen, und ein Hin und Zurueck zum Helfer stellt sicher, dass ein gesendeter Post schon angekommen waere. */
+async function keinPost(s, ms = 500) {
+  await vorspulen(s, ms);
+  await s.page.evaluate(() => fetch("/api/state").then((r) => r.ok));
+}
+/* Auf das Speichern warten, und zwar auf das eigene: nach einer Aktion (Klick, Eingabe) kann ein fremder Post dazwischenkommen (ein Stand, den die
+   Seite schon vorher entprellt hatte), und ein Lesen der Datei direkt nach dem ersten neuen Post saehe dann den Stand vor der Aktion. Darum: ein neuer
+   Post ist da, danach wird die Uhr der Seite ueber die Entprellung (200 ms) gestellt, bis kein weiterer Post mehr kommt, und jeder ist beantwortet
+   und die Seite hat die Antwort verarbeitet (ein Hin und Zurueck zum Helfer; kein requestAnimationFrame: unter der gestellten Uhr ist es ein Zeitgeber, und ein
+   Vorspulen um Tage gleich danach blieb ohne Wirkung). Erst dann ist die Datei der Stand nach der Aktion und ein naechster Klick faellt nicht
+   auf ein Element, das gerade ersetzt wird. Die Entprellung selbst bleibt streng: keinPost und die Proben mit vorspulen() pruefen sie. */
+async function nachPost(s, n) {
+  const l = s.lager;
+  // gelingt es nicht, steht der Grund in der FAIL-Zeile (#224): kein Post, ein unbeantworteter oder dauernd neue
+  const aus = async (grund) => {
+    const seite = await s.page.evaluate(() => ({ lage: document.querySelector("#wkBody")?.dataset.lage, status: document.querySelector("#wkStatus")?.textContent,
+      feld: document.querySelector("#wkNeuName")?.value ?? null, fokus: (document.activeElement?.outerHTML || "").slice(0, 120), zeit: new Date().toISOString() })).catch((e) => String(e));
+    assert(false, "Speichern: kein ruhiger, beantworteter Post nach der Aktion (" + grund + ")", { n, posts: l.posts.length, fertig: l.fertig, abgelehnt: l.abgelehnt.length, seite });
+    return false;
+  };
+  const hinundzurueck = () => s.page.evaluate(() => fetch("/api/state").then((r) => r.ok));
+  // die Uhr der Seite steht (fest) oder laeuft: in beiden Faellen stellt die Probe sie ueber die Entprellung, das sendet, was ansteht
+  for (let i = 0; i < 40; i++) {
+    await vorspulen(s, 250);
+    await hinundzurueck();
+    const k = l.posts.length;
+    if (!(await bis(() => l.fertig === l.posts.length, 8000))) return await aus("Antwort bleibt aus");
+    await hinundzurueck();
+    if (k > n && l.posts.length === k) return true;
+  }
+  return await aus(l.posts.length > n ? "es kommen dauernd neue Posts" : "kein neuer Post");
+}
 
 /* Was der Bereich zeigt: Reiter, Gruppen, Punkte, Saetze. */
 const blick = (p) => p.evaluate(() => {
@@ -243,7 +296,8 @@ try {
     assert(b.lage === "gesperrt" && /nicht lesen/.test(b.satz) && !b.reiter.length && !b.neu && !gl.posts.length,
       `${wie} beim Lesen: ein ruhiger Satz (nicht „nur in der App“), keine Liste, nichts gesendet`, b);
     gl.getStatus = 200;
-    assert(await bis(() => s.page.evaluate(() => document.querySelector("#wkBody")?.dataset.lage === "da"), 15000),
+    // die Uhr der Seite steht (fest), das Warten der Seite (5 s) spult die Probe Sekunde fuer Sekunde vor, hoechstens 15 s
+    assert(await bis(async () => { await vorspulen(s, 1000); return s.page.evaluate(() => document.querySelector("#wkBody")?.dataset.lage === "da"); }, 15000),
       `${wie} beim Lesen: Borometer liest spaeter noch einmal und zeigt dann die Liste`);
     const n = nPosts(s);
     await s.page.click('input[data-wk-haken="korridorNormal"]');
@@ -799,7 +853,7 @@ try {
     assert(!wl.abgelehnt.length && !s.fehler.length, "Wochenband und Raster: jeder gesendete Stand gilt, keine Fehler", { a: wl.abgelehnt, f: s.fehler });
     await p.close();
     // die Woche der Zeitumstellung (So 25.10.2026, 3:00 -> 2:00): 169 Stunden, der Sonntag-Abschnitt beginnt bei 73 Stunden
-    const t = await oeffne({ lager: neuesLager({ v: 1, profile: [profil("wband00003", "Umstellung")] }), uhr: Date.UTC(2026, 9, 25, 11, 0) });
+    const t = await oeffne({ lager: neuesLager({ v: 1, profile: [profil("wband00003", "Umstellung")] }), uhr: Date.UTC(2026, 9, 25, 11, 0, 30) }); // 12:00:30, nicht 12:00:00: springt die Wanduhr der Runner um Sekunden zurueck, bliebe der Satz bei "12:00"
     const tq = t.page;
     const z = await tq.evaluate(() => { const b = document.querySelector("#wkBand"), bahn = b.querySelector(".wkbahn").getBoundingClientRect(), j = b.querySelector(".wkjetzt").getBoundingClientRect();
       const so = [...b.querySelectorAll(".wkbtag")].find((x) => x.classList.contains("heute"));
@@ -834,7 +888,10 @@ try {
     const sent = rl.posts.at(-1).profile[0];
     const r0 = kern.letzterReset(berlin(24, 9, 59), "woche");
     assert(sent.vorwoche && sent.vorwoche.reset === r0 && sent.vorwoche.zaehler.zitadelleNormal?.stand === 1 && sent.vorwoche.zaehler.illusionen?.stand === 2
-      && !("phantomstein" in sent.vorwoche.zaehler), "Vorwoche im gesendeten Stand: Zitadelle 1 und Illusionen 2 der Woche ab Do 17.09., ohne Tagespunkt", sent.vorwoche);
+      && !("phantomstein" in sent.vorwoche.zaehler), "Vorwoche im gesendeten Stand: Zitadelle 1 und Illusionen 2 der Woche ab Do 17.09., ohne Tagespunkt",
+      /* #224: ohne Vorwoche stand hier nur "undefined"; jetzt die beiden Uhren und die Posts dazu */
+      { vorwoche: sent.vorwoche, posts: rl.posts.length, seite: await p.evaluate(() => Date.now()), knoten: Math.round(seitenUhr(s)), reset: r0,
+        seit: Object.fromEntries(Object.entries(sent.zaehler).map(([k, z]) => [k, z.seit])) });
     assert(sent.zaehler.zitadelleNormal?.stand === 1 && sent.zaehler.illusionen?.stand === 2 && sent.zaehler.korridorNormal?.stand === 1,
       "die alten Zaehler bleiben im Stand, der neue kommt dazu", sent.zaehler);
     assert(!rl.abgelehnt.length && !s.fehler.length, "Reset: der gesendete Stand gilt, keine Fehler", { a: rl.abgelehnt, f: s.fehler });
@@ -983,7 +1040,7 @@ try {
       const w = await truhen();
       wege.push({ taste, ziel, f: w.fokus, tab: w.k.filter((x) => x.tab === 0).map((x) => x.i).join(), an: w.k.filter((x) => x.an === "true").length });
     }
-    await new Promise((r) => setTimeout(r, 300));
+    await keinPost(s);
     assert(wege.every((x) => x.f === String(x.ziel) && x.tab === String(x.ziel) && x.an === 4) && nPosts(s) === n0,
       "Truhen-Tastatur: Pfeile links/rechts, Pos1 und Ende wandern, am Rand bleibt der Fokus; der Tabstopp wandert mit, nichts gespeichert", wege);
     n = nPosts(s);
@@ -1037,7 +1094,9 @@ try {
     await vorspulen(u, 120000);
     await bis(async () => !(await st()).mo);
     x = await st();
-    assert(!x.mo && x.verb === 2, "Mo 10:01 (Montags-Reset): das Portal Mo–Mo ist 0, der Vererbungsstein bleibt", x);
+    assert(!x.mo && x.verb === 2, "Mo 10:01 (Montags-Reset): das Portal Mo–Mo ist 0, der Vererbungsstein bleibt",
+      /* #224: die Uhr der Seite und die des Tests, dazu was die Seite als Rest anzeigt */
+      { x, seite: await q.evaluate(() => Date.now()), knoten: Math.round(seitenUhr(u)), tag: (await blick(q)).tag });
     await bisZu(Date.UTC(2026, 9, 1, 7, 59));
     await bis(async () => (await blick(q)).tag.includes("1 Min"));
     x = await st();
@@ -1099,7 +1158,7 @@ try {
 
   // ===== Reset-Anzeige, Deutsch und Englisch, Minutentakt
   {
-    const s = await oeffne({ lager });
+    const s = await oeffne({ lager, fest: true });
     let b = await blick(s.page);
     // folgt Weeklies neu (125.1): der Wochen-Reset steht nur im Band, der Kopf nennt den taeglichen
     assert(b.woche === "Wochen-Reset Do ab 10:00 (deutsche Zeit) \u00b7 in 1\u00a0T 0\u00a0Std" && b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 5\u00a0Min",
@@ -1124,9 +1183,9 @@ try {
     await bis(async () => (await blick(s.page)).tag !== vorher);
     assert((await blick(s.page)).tag !== vorher, "Bereich wieder offen: die Anzeige stimmt sofort");
     await s.page.close();
-    const e = await oeffne({ lager, lang: "en" });
+    const e = await oeffne({ lager, lang: "en", fest: true });
     b = await blick(e.page);
-    const en = await e.page.evaluate(() => ({ neu: document.querySelector("#wkNeu")?.textContent || document.querySelector("#wkVoll")?.textContent,
+    const en =await e.page.evaluate(() => ({ neu: document.querySelector("#wkNeu")?.textContent || document.querySelector("#wkVoll")?.textContent,
       werk: [...document.querySelectorAll(".wkwerk button:not([data-wk-allezu])")].map((x) => x.textContent), titel: document.querySelector("#weekliesTitel")?.textContent }));
     assert(b.woche === "Weekly reset Thu from 10:00 (German time) \u00b7 in 1\u00a0d 0\u00a0h" && b.tag === "Daily reset 10:00 German time \u00b7 in 5\u00a0min",
       "English: weekly reset Thu from 10:00 in the band, daily reset in the header", { w: b.woche, t: b.tag });
@@ -1215,8 +1274,7 @@ try {
     await s.page.evaluate(() => dispatchEvent(new PageTransitionEvent("pagehide", { persisted: false })));
     assert(await bis(() => rl.data.profile[0].zaehler.zitadelleAlbtraum?.stand === 1, 5000) && !rl.abgelehnt.length,
       "im Entprell-Fenster verlassen: die letzte Aenderung geht sofort hinaus (pagehide, keepalive)", rl.data.profile[0].zaehler);
-    await s.page.clock.fastForward(1000);
-    await new Promise((r) => setTimeout(r, 300));
+    await keinPost(s, 1000);
     assert(nPosts(s) === n + 1, "pagehide: genau ein POST, das Entprellen sendet nicht noch einmal", { n, jetzt: nPosts(s) });
     await s.page.close();
   }
@@ -1245,7 +1303,8 @@ try {
     assert(/nicht gespeichert/.test(b.status) && /versucht es/.test(b.status) && punkt(b, "zitadelleSchwer").haken, "503: nicht gespeichert, Borometer versucht es wieder", b.status);
     l4.postStatus = null;
     n = nPosts(s);
-    assert(await bis(() => l4.data.profile[0].zaehler.zitadelleSchwer?.stand === 1, 15000), "503: der naechste Versuch speichert den ganzen Stand");
+    // die Seite versucht es nach 5 s noch einmal: die Probe spult die Seitenuhr Sekunde fuer Sekunde vor, hoechstens 15 s
+    assert(await bis(async () => { await vorspulen(s, 1000); return l4.data.profile[0].zaehler.zitadelleSchwer?.stand === 1; }, 15000), "503: der naechste Versuch speichert den ganzen Stand");
     await bis(async () => !(await blick(p)).status);
     b = await blick(p);
     assert(!b.status && l4.data.profile[0].zaehler.zitadelleNormal?.stand === 1, "danach ist der Satz weg, auch der Haken von vorher ist gespeichert", b.status);
@@ -1269,7 +1328,9 @@ try {
           const klein = texte.map((e) => ({ t: e.textContent.trim().slice(0, 30), px: parseFloat(getComputedStyle(e).fontSize) })).filter((x) => x.px < 11);
           // folgt Entwurf 01.10.: die Felder des Raid-Rasters sind Zeilen wie die Punkte
           const zeilen = [...w.querySelectorAll("li.wkpunkt, li.wkanp, .wkzelle")].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect());
-          const glow = [...w.querySelectorAll("*")].map((e) => getComputedStyle(e).textShadow).filter((x) => x && x !== "none");
+          /* Leuchtschatten = Schein ohne Versatz mit Weichzeichner; der Schatten der Schrift (#342) hat immer einen Versatz */
+          const glow = [...w.querySelectorAll("*")].map((e) => getComputedStyle(e).textShadow).filter((x) => x && x !== "none")
+            .filter((x) => x.replace(/rgba?\([^)]*\)/g, "|").split(",").some((t) => { const m = /(-?[\d.]+)px (-?[\d.]+)px ([\d.]+)px/.exec(t); return m && +m[1] === 0 && +m[2] === 0 && +m[3] > 0; }));
           return { quer: document.documentElement.scrollWidth > innerWidth, doc: document.documentElement.scrollHeight - innerHeight,
             klein, n: zeilen.length, hoch: Math.max(...zeilen.map((r) => r.height)), breit: Math.max(...zeilen.map((r) => r.width)), glow,
             rechts: Math.max(...[...w.querySelectorAll("*")].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect().right)),
@@ -1502,6 +1563,80 @@ try {
     && !bilder.wkHatBild("constructor") && !bilder.wkHatBild("toString") && !bilder.wkHatBild("illusionen"),
     "Bilder: nur eigene Schluessel tragen ein Bild, keine aus dem Prototyp (Pruefung N6)" + (BILDER ? "" : " (ohne Spielbilder: Marke)"));
   assert(!lager.abgelehnt.length, "ueber alles: kein gesendeter Stand brach eine Regel der Route oder liess Gespeichertes weg", lager.abgelehnt);
+  // ===== Gelöstes endgültig löschen (#240): Charaktere und eigene Punkte, mit Namen und Sicherung
+  {
+    const SDIR = join(ordner, "Borometer", "sicherungen");
+    const sich = () => (existsSync(SDIR) ? readdirSync(SDIR).sort() : []);
+    rmSync(SDIR, { recursive: true, force: true });
+    const daten = () => ({ v: 1, profile: [
+      profil("wloesch001", "Test Eins", { zaehler: { eigen1: { stand: 1, seit: berlin(22, 20) } }, namen: {},
+        eigene: [{ schluessel: "eigen1", name: "Gildenkiste", menge: 2, takt: "tag", geloest: true }, { schluessel: "eigen2", name: "Andere", menge: 1, takt: "woche" }] }),
+      profil("wloesch002", "Test Zwei", { geloest: true, zaehler: { zitadelleNormal: { stand: 1, seit: berlin(22, 20) } } })] });
+    const gl = neuesLager(daten());
+    const s = await oeffne({ lager: gl });
+    const p = s.page;
+    // Charaktere: die Liste der Gelösten
+    await p.click("[data-wk-geloeste]");
+    assert(await p.evaluate(() => document.querySelectorAll("#wkGeloeste [data-wk-loesch-frage]").length) === 1, "L1: in der Liste der Gelösten steht neben Zurück Endgültig löschen…");
+    await p.click('#wkGeloeste [data-wk-loesch-frage="charakter"]');
+    const fr = await p.evaluate(() => document.querySelector(".wkloeschfrage")?.textContent.replace(/\s+/g, " ").trim() || "");
+    assert(/„Test Zwei“ wird endgültig gelöscht/.test(fr) && /Sicherungsdatei im Ordner sicherungen/.test(fr) && /nicht rückgängig/.test(fr), "L1: die Frage nennt Löschen, Sicherung und dass es nicht rückgängig geht", fr);
+    assert(await p.evaluate(() => document.activeElement?.id === "wkLoeschName"), "L1: der Fokus steht im Namensfeld");
+    const ja = () => p.evaluate(() => document.querySelector("[data-wk-loesch-ja]")?.disabled);
+    assert((await ja()) === true, "L1: Endgültig löschen ist gesperrt, bis der Name stimmt");
+    await p.fill("#wkLoeschName", "Test");
+    assert((await ja()) === true && await p.evaluate(() => document.activeElement?.id === "wkLoeschName"), "L1: ein halber Name entsperrt nicht, der Fokus bleibt im Feld");
+    await p.click("[data-wk-loesch-nein]");
+    assert(!(await p.$("#wkLoeschName")) && gl.data.profile.length === 2 && !sich().length, "L1: Abbrechen schliesst die Frage, nichts gelöscht, keine Sicherung");
+    await p.click('#wkGeloeste [data-wk-loesch-frage="charakter"]');
+    await p.fill("#wkLoeschName", "  test ZWEI ");
+    assert((await ja()) === false, "L1: mit dem Namen (Gross/Klein und Rand egal) ist der Knopf frei");
+    await p.keyboard.press("Enter");
+    assert(await bis(() => gl.data.profile.length === 1), "L1: Enter löscht: der Charakter ist aus der Datei", gl.data.profile.map((x) => x.id));
+    assert(sich().length === 1 && /^weeklies-vor-loeschen-\d{4}-\d{2}-\d{2}\.json$/.test(sich()[0]), "L1: die Sicherungsdatei liegt im Ordner sicherungen", sich());
+    assert(JSON.parse(readFileSync(join(SDIR, sich()[0]), "utf8")).profile.length === 2, "L1: sie haelt den Stand davor, mit dem Charakter");
+    await p.waitForFunction(() => document.querySelector("#wkBody")?.dataset.lage === "da" && /endgültig gelöscht/.test(document.querySelector("#wkStatus")?.textContent || ""));
+    const satz = await p.evaluate(() => document.querySelector("#wkStatus")?.textContent || "");
+    assert(/„Test Zwei“ endgültig gelöscht\./.test(satz) && /weeklies-vor-loeschen-/.test(satz), "L1: der Satz nennt das Gelöschte und die Sicherungsdatei", satz);
+    assert(/endgültig gelöscht/.test(await p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "")), "L1: der Vorleser sagt es an");
+    assert(!(await p.$("[data-wk-geloeste]")), "L1: ohne Gelöste verschwindet der Knopf Gelöste");
+    // die Seite hat neu gelesen: ein Haken bringt den gelöschten Charakter nicht zurück
+    const n = nPosts(s);
+    await p.click('input[data-wk-haken="korridorNormal"]');
+    await nachPost(s, n);
+    assert(!gl.abgelehnt.length && gl.data.profile.length === 1, "L1: ein späterer Put bringt das Gelöschte nicht zurück und wird nicht abgelehnt", { a: gl.abgelehnt.length, n: gl.data.profile.length });
+    // eigene Punkte in Anpassen
+    await p.click("[data-wk-anpassen]");
+    assert(await p.evaluate(() => document.querySelectorAll('[data-wk-loesch-frage="eigen"]').length) === 1, "L2: bei dem gelösten eigenen Punkt steht Endgültig löschen…, nicht beim aktiven");
+    await p.click('[data-wk-loesch-frage="eigen"]');
+    assert(/„Gildenkiste“ wird endgültig gelöscht/.test(await p.evaluate(() => document.querySelector(".wkloeschfrage")?.textContent || "")), "L2: die Frage nennt den Punkt");
+    await p.fill("#wkLoeschName", "falsch");
+    assert((await ja()) === true, "L2: ein falscher Name entsperrt nicht");
+    await p.fill("#wkLoeschName", "Gildenkiste");
+    await p.click("[data-wk-loesch-ja]");
+    assert(await bis(() => (gl.data.profile[0].eigene || []).length === 1 && gl.data.profile[0].eigene[0].schluessel === "eigen2"), "L2: der gelöste Punkt ist weg, der aktive bleibt", gl.data.profile[0].eigene);
+    assert(!("eigen1" in gl.data.profile[0].zaehler), "L2: samt seinem Zähler");
+    assert(sich().length === 2, "L2: eine zweite Sicherung, die erste bleibt", sich());
+    assert(!s.fehler.length, "L: keine Seitenfehler", s.fehler);
+    await p.close();
+    // 560 px, vier Themen, Englisch
+    for (const thema of ["dark", "light", "tnl", "glas"]) {
+      const r = await oeffne({ lager: neuesLager(daten()), breite: 560, hoehe: 900, thema });
+      await r.page.click("[data-wk-geloeste]");
+      await r.page.click('#wkGeloeste [data-wk-loesch-frage="charakter"]');
+      const m = await r.page.evaluate(() => ({ sw: document.documentElement.scrollWidth, cw: document.documentElement.clientWidth }));
+      assert(m.sw <= m.cw, "L: " + thema + " 560 px: kein waagerechtes Rollen mit der Frage", m);
+      assert(!r.fehler.length, "L: " + thema + ": keine Seitenfehler", r.fehler);
+      await r.page.close();
+    }
+    const e = await oeffne({ lager: neuesLager(daten()), lang: "en" });
+    await e.page.click("[data-wk-geloeste]");
+    await e.page.click('#wkGeloeste [data-wk-loesch-frage="charakter"]');
+    assert(/will be deleted for good/.test(await e.page.evaluate(() => document.querySelector(".wkloeschfrage")?.textContent || "")), "L: Englisch: die Frage ist übersetzt");
+    await e.page.close();
+    const de = Object.keys(I18N.de).filter((k) => k.startsWith("weeklies.loeschen.")), en = Object.keys(I18N.en).filter((k) => k.startsWith("weeklies.loeschen."));
+    assert(de.length >= 12 && JSON.stringify(de.sort()) === JSON.stringify(en.sort()), "L: dieselben Schlüssel weeklies.loeschen.* in Deutsch und Englisch", { de: de.length, en: en.length });
+  }
 } finally {
   await browser.close();
   rmSync(ordner, { recursive: true, force: true });

@@ -469,6 +469,8 @@ function ablauf(teile) {
   eq(["Verence", "Marta", "Haylock", "Gaudian"].map((n) => [p.knownBoss(n), p.histKey(n), !!p.bossIcon(n)]),
     [[true, "Verence", true], [true, "Marta", true], [true, "Haylock", true], [true, "Gaudian", true]],
     "Verence, Marta, Haylock, Gaudian: Boss, eigener Schluessel, Bossbild");
+  eq(["Molgras", "Murdock"].map((n) => [p.knownBoss(n), p.histKey(n)]), [[true, "Molgras"], [true, "Murdock"]],
+    "Molgras, Murdock: Boss mit eigenem Schluessel (#252)");
   eq([p.knownBoss("Death Summoner"), p.histKey("Death Summoner"), p.bossIcon("Death Summoner")], [false, "Death Summoner", null],
     "Death Summoner ist Trash: kein Boss, kein Bossbild");
   const kaempfe = (boss, pause) => { frisch(8, true); ganz(zweiTeile(boss, pause));

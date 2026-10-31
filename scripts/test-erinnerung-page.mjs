@@ -59,19 +59,84 @@ const berlin = (tag, h, m = 0) => Date.UTC(2026, 8, tag, h - 2, m);
 const MI_0955 = berlin(23, 9, 55);
 const profil = (id, name, mehr = {}) => ({ id, name, zaehler: {}, aus: [], namen: {}, eigene: [], ...mehr });
 const seitenUhr = (s) => s.uhr.basis + (performance.now() - s.uhr.echt);
+/* Fristen mit performance.now(), nie mit Date.now(): auf den Linux-Runnern springt die Wanduhr um rund 8 s vor und zurueck, eine Frist nach
+   Date.now() liefe dann sofort ab (#224, #337; nachstellen mit node --import ./scripts/uhrsprung.mjs). */
 async function bis(fn, ms = 6000) {
-  const ende = Date.now() + ms;
-  while (Date.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
+  const ende = performance.now() + ms;
+  while (performance.now() < ende) { if (await fn()) return true; await new Promise((r) => setTimeout(r, 25)); }
   return !!(await fn());
+}
+/* Wann hat die Seite eine Antwort des Helfers verarbeitet (#337)? Der Helfer weiss nur, wann er geantwortet hat; danach muss die Antwort noch zur
+   Seite, und die Seite zeichnet den Dialog neu. Tippt die Probe schon vorher, kann das Neuzeichnen das Feld ersetzen, und die Eingabe geht verloren.
+   (Zwei Bilder abwarten hilft nicht: mit page.clock ist requestAnimationFrame gestellt und nur ein kurzer Zeitgeber.)
+   ruheSkript zaehlt in der Seite je Art ("GET /api/erinnerung"), wie viele Anfragen begonnen und wie viele fertig verarbeitet sind. Fertig heisst:
+   die Antwort ist da, ein Lesen des Inhalts (json, text) ist abgeschlossen, und danach ist eine ganze Aufgabe der Seite vergangen; was die Seite in den
+   Mikroaufgaben nach der Antwort tut (Zustand setzen, neu zeichnen), ist dann geschehen. Die eigene Aufgabe kommt aus einem MessageChannel, den die
+   gestellte Uhr nicht anfasst.
+   BORO_PROBE_VERZUG=<ms> haelt jede Antwort an /api/... vor der Seite so lange auf, nur zur Nachstellung von Last. */
+const VERZUG = Math.max(0, Number(process.env.BORO_PROBE_VERZUG || 0) || 0);
+function ruheSkript(verzug) {
+  if (window.__boroRuhe) return;
+  const ruhe = { begonnen: {}, fertig: {} };
+  window.__boroRuhe = ruhe;
+  const kanal = new MessageChannel(), schlange = [];
+  kanal.port1.onmessage = () => { const f = schlange.shift(); if (f) f(); };
+  const naechsteAufgabe = (f) => { schlange.push(f); kanal.port2.postMessage(0); };
+  // ohne die gestellte Uhr: so oft eine eigene Aufgabe, bis die Zeit nach performance.now vergangen ist
+  const echtWarten = (ms, f) => { const ende = performance.now() + ms; const w = () => (performance.now() >= ende ? f() : naechsteAufgabe(w)); naechsteAufgabe(w); };
+  const art = (eingabe, init) => {
+    try {
+      const req = eingabe instanceof Request ? eingabe : null;
+      const methode = String((init && init.method) || (req ? req.method : "GET")).toUpperCase();
+      const pfad = new URL(req ? req.url : String(eingabe), location.href).pathname;
+      return pfad.startsWith("/api/") ? methode + " " + pfad : null;
+    } catch { return null; }
+  };
+  const echtFetch = window.fetch;
+  window.fetch = function (eingabe, init) {
+    const k = art(eingabe, init);
+    const p = echtFetch.apply(this, arguments);
+    if (!k) return p;
+    ruhe.begonnen[k] = (ruhe.begonnen[k] || 0) + 1;
+    let gelesen = false, gemeldet = false;
+    const fertig = () => { if (gemeldet) return; gemeldet = true; naechsteAufgabe(() => { ruhe.fertig[k] = (ruhe.fertig[k] || 0) + 1; }); };
+    const spaeter = verzug > 0
+      ? p.then((r) => new Promise((ja) => echtWarten(verzug, () => ja(r))), (e) => new Promise((_, nein) => echtWarten(verzug, () => nein(e))))
+      : p;
+    return spaeter.then((r) => {
+      // liest die Seite den Inhalt, ist sie erst nach dem Lesen fertig; sonst nach dieser Aufgabe
+      for (const m of ["json", "text", "arrayBuffer", "blob"]) {
+        const echt = r[m].bind(r);
+        r[m] = () => { gelesen = true; const q = echt(); q.then(fertig, fertig); return q; };
+      }
+      naechsteAufgabe(() => { if (!gelesen) fertig(); });
+      return r;
+    }, (e) => { fertig(); throw e; });
+  };
+}
+/* Wartet, bis die Seite von jeder Art in alle alles verarbeitet hat, was sie begonnen hat, und von jeder Art in mindestens wenigstens so viele. */
+async function verarbeitet(page, alle, { mindestens = {}, ms = 8000 } = {}) {
+  try {
+    await page.waitForFunction(({ alle, mindestens }) => {
+      const r = window.__boroRuhe;
+      if (!r) return false;
+      const f = (k) => r.fertig[k] || 0;
+      return alle.every((k) => f(k) >= (r.begonnen[k] || 0)) && Object.entries(mindestens).every(([k, n]) => f(k) >= n);
+    }, { alle, mindestens }, { timeout: ms, polling: 20 });
+    return true;
+  } catch { return false; }
 }
 /* Der gestellte Helfer: die Datei (data), die Anfragen und naechsten Zeiten des Hauptprozesses (erin), die Zaehler (counts) und alles, was die Seite
    an /api/erinnerung geschickt hat (antworten). */
-const neuesLager = (data) => ({ data: structuredClone(data), posts: [], abgelehnt: [], erin: { anfragen: [], naechste: {} }, counts: {}, antworten: [] });
+const neuesLager = (data) => ({ data: structuredClone(data), posts: [], abgelehnt: [], erin: { anfragen: [], naechste: {} }, counts: {}, antworten: [],
+  /* wie viele Posts der Helfer beantwortet hat */
+  postFertig: 0 });
 async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager, uhr = MI_0955, datei = false, thema = null, app = false } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   const s = { page, fehler: [], lager, uhr: { basis: uhr, echt: performance.now() } };
   page.on("pageerror", (e) => s.fehler.push(String(e)));
   await page.clock.install({ time: uhr });
+  await page.addInitScript(ruheSkript, VERZUG);
   await page.addInitScript((l) => { try { localStorage.clear(); localStorage.setItem("boroLang", l); } catch { /* blockiert */ } }, lang);
   if (datei) {
     await page.goto(DATEI);
@@ -89,6 +154,7 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager, uhr = MI
         try { clean = wk.checkWeeklies(b.data, lager.data); } finally { Date.now = echt; }
         if (!clean) { lager.abgelehnt.push(b.data); return json({ ok: false }, 400); }
         lager.data = clean;
+        lager.postFertig = lager.posts.length;
         return json({ ok: true });
       }
       if (path === "/api/erinnerung" && req.method() === "GET") return json({ ok: true, anfragen: lager.erin.anfragen, naechste: lager.erin.naechste });
@@ -112,7 +178,26 @@ async function oeffne({ lang = "de", breite = 1280, hoehe = 860, lager, uhr = MI
   return s;
 }
 const nPosts = (s) => s.lager.posts.length;
-const nachPost = async (s, n) => bis(() => s.lager.posts.length > n);
+/* Auf das Speichern warten, und zwar auf das eigene: der Post ist beim Helfer angekommen UND beantwortet, und die Seite hat die Antwort verarbeitet.
+   Danach fragt sie bei offenem Dialog /api/erinnerung (haken.gespeichert) und zeichnet ihn mit der Antwort neu; auch das muss geschehen sein (in der
+   Seite gezaehlt, ruheSkript). Erst dann ist der Dialog ruhig: eine Eingabe davor kann in ein Feld gehen, das gleich ersetzt wird, und ginge
+   verloren (#337). */
+const nachPost = async (s, n) => {
+  const l = s.lager;
+  if (!(await bis(() => l.posts.length > n && l.postFertig === l.posts.length))) return false;
+  return verarbeitet(s.page, ["POST /api/weeklies", "GET /api/erinnerung"], { mindestens: { "POST /api/weeklies": l.posts.length } });
+};
+/* Die Glocke oeffnet den Dialog; er fragt sofort /api/erinnerung und zeichnet sich mit der Antwort neu. Gewartet wird, bis die Seite sie verarbeitet hat. */
+async function glocke(s) {
+  await s.page.click("#wkGlocke");
+  return verarbeitet(s.page, ["GET /api/erinnerung"]);
+}
+/* Kein Speichern erwarten: die Seite sendet entprellt (200 ms); die Uhr der Seite wird selbst weitergestellt, statt reale Zeit zu verstreichen, und
+   ein Hin und Zurueck zum Helfer stellt sicher, dass ein gesendeter Post schon da waere. */
+async function keinPost(s) {
+  await s.page.clock.fastForward(500); s.uhr.basis += 500;
+  await s.page.evaluate(() => fetch("/api/state").then((r) => r.ok));
+}
 const ansage = (p) => p.evaluate(() => document.querySelector("#wkAnsage")?.textContent || "");
 
 try {
@@ -129,9 +214,9 @@ try {
     const el = neuesLager(data);
     const s = await oeffne({ lager: el, app: true });
     const p = s.page;
-    const glocke = await p.evaluate(() => { const g = document.querySelector("#wkGlocke"); return { da: !!g && !g.hidden, text: g?.textContent, vh: g?.getAttribute("aria-label"), pop: g?.getAttribute("aria-haspopup") }; });
-    assert(glocke.da && glocke.text === "Erinnerungen0" && glocke.vh === "Erinnerungen, 0 eingeschaltet" && glocke.pop === "dialog", "Glocke im Kopf: \u201eErinnerungen\u201c mit der Zahl der eingeschalteten", glocke);
-    await p.click("#wkGlocke");
+    const kopf = await p.evaluate(() => { const g = document.querySelector("#wkGlocke"); return { da: !!g && !g.hidden, text: g?.textContent, vh: g?.getAttribute("aria-label"), pop: g?.getAttribute("aria-haspopup") }; });
+    assert(kopf.da && kopf.text === "Erinnerungen0" && kopf.vh === "Erinnerungen, 0 eingeschaltet" && kopf.pop === "dialog", "Glocke im Kopf: \u201eErinnerungen\u201c mit der Zahl der eingeschalteten", kopf);
+    await glocke(s);
     const dlg = await p.evaluate(() => { const d = document.querySelector('#wkErinSchein [role="dialog"]'); return { da: !!d && !d.closest("[hidden]"), modal: d?.getAttribute("aria-modal"), fokusIn: !!d?.contains(document.activeElement),
       name: document.getElementById(d?.getAttribute("aria-labelledby") || "")?.textContent, hinweis: document.querySelector(".wkehrlich")?.textContent || "", knopfImHinweis: !!document.querySelector(".wkehrlich button") }; });
     assert(dlg.da && dlg.modal === "true" && dlg.fokusIn && dlg.name === "Erinnerungen", "Dialog: modal, mit Namen, der Fokus liegt darin", dlg);
@@ -152,7 +237,7 @@ try {
     assert(JSON.stringify(el.data.erinnerungen[0].tage) === "[2,3]" && /Mi dazu/.test(await ansage(p)), "Wochentag dazu: Mi, angesagt", el.data.erinnerungen[0].tage);
     n = nPosts(s); await p.click('[data-er-tag="2"]'); await nachPost(s, n);
     assert(JSON.stringify(el.data.erinnerungen[0].tage) === "[3]" && /Di weg/.test(await ansage(p)), "Wochentag weg: Di, angesagt", el.data.erinnerungen[0].tage);
-    n = nPosts(s); await p.click('[data-er-tag="3"]'); await new Promise((r) => setTimeout(r, 400));
+    n = nPosts(s); await p.click('[data-er-tag="3"]'); await keinPost(s);
     assert(nPosts(s) === n && JSON.stringify(el.data.erinnerungen[0].tage) === "[3]", "der letzte Wochentag l\u00e4sst sich nicht abw\u00e4hlen", el.data.erinnerungen[0].tage);
     const pr = await p.evaluate(() => [...document.querySelectorAll("[data-er-tag]")].map((b) => b.getAttribute("aria-pressed")));
     assert(pr.length === 7 && pr.filter((x) => x === "true").length === 1, "Wochentage: sieben Knöpfe mit aria-pressed, einer gedrückt", pr);
@@ -163,7 +248,7 @@ try {
     assert(el.data.erinnerungen[0].text === "Weeklies: noch {n} offen", "Text mit {n} gespeichert", el.data.erinnerungen[0].text);
     const maxl = await p.evaluate(() => document.querySelector("[data-er-text]").maxLength);
     assert(maxl === 120, "Text: h\u00f6chstens 120 Zeichen", maxl);
-    n = nPosts(s); await p.fill("[data-er-text]", "   "); await p.press("[data-er-text]", "Enter"); await new Promise((r) => setTimeout(r, 400));
+    n = nPosts(s); await p.fill("[data-er-text]", "   "); await p.press("[data-er-text]", "Enter"); await keinPost(s);
     assert(nPosts(s) === n && el.data.erinnerungen[0].text === "Weeklies: noch {n} offen", "ein leerer Text wird nicht \u00fcbernommen");
     n = nPosts(s); await p.click("[data-er-nur]"); await nachPost(s, n);
     assert(el.data.erinnerungen[0].nurOffen === false, "\u201eNur melden, wenn noch etwas offen ist\u201c l\u00e4sst sich ausschalten", el.data.erinnerungen[0].nurOffen);
@@ -197,7 +282,7 @@ try {
     // nach Neuladen: die Erinnerung steht in der Datei, die Charaktere sind unberuehrt
     await p.close();
     const t = await oeffne({ lager: el, app: true });
-    await t.page.click("#wkGlocke");
+    await glocke(t);
     const nach = await t.page.evaluate(() => ({ zeilen: document.querySelectorAll("[data-er-zeile]").length, zeit: document.querySelector("[data-er-zeit]")?.value, glocke: document.querySelector("#wkGlocke").textContent }));
     assert(nach.zeilen === 1 && nach.zeit === "19:30" && nach.glocke === "Erinnerungen1" && el.data.profile.length === 3, "nach Neuladen: die Erinnerung ist da, die Charaktere auch", nach);
     // zwoelf sind das Hoechste
@@ -215,8 +300,9 @@ try {
   {
     const el = neuesLager({ ...data, erinnerungen: [{ id: "eabcdefghi", an: true, tage: [2], zeit: "18:00", text: "Offen: {n}", nurOffen: true }] });
     const s = await oeffne({ lager: el, app: true });
-    // erst muss der erste Stand der Zaehler gelesen sein (die Seite fragt mit ?now=1), dann zaehlt der Hauptprozess hoch
-    await new Promise((r) => setTimeout(r, 1500));
+    // erst muss der erste Stand der Zaehler gelesen sein (die Seite fragt mit ?now=1), dann zaehlt der Hauptprozess hoch; gewartet wird, bis die
+    // Seite diese erste Antwort verarbeitet hat (statt einer festen Zeit)
+    await verarbeitet(s.page, [], { mindestens: { "GET /api/events": 1 } });
     el.erin.anfragen = [{ id: "eabcdefghi" }];
     el.counts = { erinnerung: 1 };
     await bis(() => el.antworten.length >= 1, 8000);
@@ -230,7 +316,7 @@ try {
     b.erin.anfragen = [{ id: "eabcdefghi" }];
     b.counts = { erinnerung: 1 };
     const sb = await oeffne({ lager: b, app: false });
-    await sb.page.click("#wkGlocke");
+    await glocke(sb);
     await new Promise((r) => setTimeout(r, 2500));
     const hint = await sb.page.evaluate(() => document.querySelector(".wkehrlich")?.textContent || "");
     assert(!b.antworten.length && /Im Browser gibt es keine Windows-Meldung/.test(hint), "im Browser: keine Antwort, und der Hinweis sagt, dass es dort keine Windows-Meldung gibt", { a: b.antworten.length, hint });
@@ -240,7 +326,7 @@ try {
   // ===== Datei-Modus (ohne Helfer): nur der Satz, keine Liste
   {
     const s = await oeffne({ datei: true });
-    await s.page.click("#wkGlocke");
+    await glocke(s);
     const d = await s.page.evaluate(() => ({ satz: document.querySelector('[role="dialog"] .wksatz:not(:first-of-type)')?.textContent || document.querySelector('[role="dialog"]').textContent, neu: !!document.querySelector("[data-er-neu]"), zeilen: document.querySelectorAll("[data-er-zeile]").length }));
     assert(!d.neu && !d.zeilen && /Im Browser gibt es keine Windows-Meldung/.test(d.satz), "ohne Helfer: der Dialog sagt, dass es im Browser keine Meldung gibt, keine Liste", d);
     assert(!s.fehler.length, "Datei-Modus: keine Fehler", s.fehler);
@@ -251,7 +337,7 @@ try {
   {
     const el = neuesLager({ ...data, erinnerungen: [{ id: "eabcdefghi", an: true, tage: [2], zeit: "18:00", text: "x {n}", nurOffen: true }] });
     const s = await oeffne({ lager: el, lang: "en", app: true });
-    await s.page.click("#wkGlocke");
+    await glocke(s);
     const en = await s.page.evaluate(() => ({ g: document.querySelector("#wkGlocke").textContent, h: document.querySelector(".wkehrlich").textContent, t: [...document.querySelectorAll("[data-er-tag]")].map((b) => b.textContent).join(),
       neu: document.querySelector("[data-er-neu]").textContent, nur: document.querySelector("#wkErinSchein .wknur")?.textContent.trim() }));
     assert(en.g === "Reminders1" && /only while Borometer is running/.test(en.h) && /local time/.test(en.h) && en.t === "Mon,Tue,Wed,Thu,Fri,Sat,Sun" && en.neu === "+ Reminder" && /Only notify while something is open/.test(en.nur), "English: Reminders, the notice, weekdays, + Reminder", en);
@@ -268,7 +354,7 @@ try {
       const el = neuesLager({ ...data, erinnerungen: [{ id: "eabcdefghi", an: true, tage: [1, 2, 3, 4, 5, 6, 0], zeit: "18:00", text: "Ein langer Text, der die Zeile ausfuellt und nicht ueberlaufen darf, {n}", nurOffen: true },
         { id: "eabcdefghj", an: false, tage: [2], zeit: "21:30", text: "Zweite", nurOffen: false }] });
       const s = await oeffne({ lager: el, breite: 560, hoehe: 900, thema, lang, app: true });
-      await s.page.click("#wkGlocke");
+      await glocke(s);
       const m = await s.page.evaluate(() => { const d = document.querySelector(".wkdlg"), sc = document.querySelector("#wkErinSchein");
         return { dlgInnen: d.scrollWidth <= d.clientWidth + 1, schein: sc.scrollWidth <= sc.clientWidth + 1, doc: document.documentElement.scrollWidth <= document.documentElement.clientWidth,
           rechts: d.getBoundingClientRect().right <= innerWidth + 0.5 }; });

@@ -7,7 +7,7 @@ import { oeffneDateien } from "./23-kampfwahl";
 import { persistPref } from "./27-weapons-tab";
 import { histVerdict } from "./32-history";
 import { winPost } from "./37-window-size-and-overlay";
-import { KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
 import { isWatching } from "./45-startup";
 import { waereBest } from "./46-best-pull";
 import type { Fight } from "../types";
@@ -32,7 +32,7 @@ const gemeldet = new Set<number>();
 let wache: { start: number; n: number; seit: number; datei: string; neu: boolean } | null = null;
 
 function darf(): boolean {
-  return SERVED && OWN_WINDOW && !KOMPAKT_FENSTER && isWatching() && state.origin === "watch";
+  return SERVED && OWN_WINDOW && !KOMPAKT_FENSTER && !ABRISS_FENSTER && isWatching() && state.origin === "watch";
 }
 
 /** Prueft den neuesten Kampf; aus jedem Live-Takt (41) und dem Sekundentakt (wacheStarten). */
@@ -83,7 +83,7 @@ function melde(seg: Fight){
 
 /** Der Sekundentakt der Wache, solange die Seite im eigenen Fenster laeuft (3.1). */
 export function wacheStarten(){
-  if(!SERVED || !OWN_WINDOW || KOMPAKT_FENSTER) return;
+  if(!SERVED || !OWN_WINDOW || KOMPAKT_FENSTER || ABRISS_FENSTER) return;
   setInterval(() => kampfWache(), 1000);
 }
 
@@ -97,7 +97,7 @@ const kompaktIstOffen = () => state.zweiFenster ? state.kompaktOffen : document.
    und kommt mit dem naechsten Ereignis oder Neuladen wieder. */
 let auftragLaeuft = false, auftragNochmal = false;
 export async function startAuftragHolen(): Promise<void> {
-  if(!SERVED || !OWN_WINDOW || KOMPAKT_FENSTER) return;
+  if(!SERVED || !OWN_WINDOW || KOMPAKT_FENSTER || ABRISS_FENSTER) return;
   if(auftragLaeuft){ auftragNochmal = true; return; }
   auftragLaeuft = true;
   try {
@@ -126,7 +126,7 @@ export async function startAuftragHolen(): Promise<void> {
    der Auftrag "log" (23). Derselbe Name gleich noch einmal geht nicht hin. */
 let zuletztGemeldet = "";
 export function gelesenMelden(name: string){
-  if(!SERVED || KOMPAKT_FENSTER || !name || name === zuletztGemeldet) return;
+  if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER || !name || name === zuletztGemeldet) return;
   zuletztGemeldet = name;
   fetch("/api/gelesen", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify({name})}).catch(() => {});
 }
@@ -142,7 +142,7 @@ export function spracheGelesen(lang: unknown){
 }
 /** Die Sprache fuer die Texte des Hauptprozesses: nach dem Lesen der Einstellungen und bei jedem Wechsel (31). */
 export function spracheMelden(){
-  if(!OWN_WINDOW || KOMPAKT_FENSTER || spracheGespeichert === undefined) return;
+  if(!OWN_WINDOW || KOMPAKT_FENSTER || ABRISS_FENSTER || spracheGespeichert === undefined) return;
   const l = state.lang === "de" ? "de" : "en";
   if(l === spracheGespeichert) return;
   spracheGespeichert = l;

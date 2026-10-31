@@ -9,7 +9,7 @@ import { $, esc } from "./18-interface-basics";
 import { renderCompare } from "./28-compare";
 import { renderRuns } from "./30-fight-list";
 import { looksLikeRun, switchTab } from "./34-menus-drop-and-tabs";
-import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
 import { partyEinsaetze } from "./42-party";
 import { isWatching, syncCompareBtn } from "./45-startup";
 import { bauHinweisSatz, bezugVonRef, type Bezug } from "./47-paar";
@@ -276,7 +276,7 @@ function planeSchreiben(){
   /* Das Kompaktfenster schreibt keinen besten Pull (N4, Pruefung W3): sein
      Stand ist der vom Start, und putBest ersetzt je Boss - ein besserer Pull
      aus der Vollansicht ginge verloren. */
-  if(!SERVED || KOMPAKT_FENSTER || !geladen || !offen.size || schreibTimer) return;
+  if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER || !geladen || !offen.size || schreibTimer) return;
   schreibTimer = setTimeout(bestFlush, 3000);
 }
 /* Beim Schliessen (keepalive) teilen sich alle Anfragen zusammen 64 KiB,

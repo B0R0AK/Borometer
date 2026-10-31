@@ -34,6 +34,10 @@ export interface Fortschritt {
 export interface LetzteWoche { id: string; name: string; n: number; g: number }
 export interface WeeklyProfil {
   id: string; name: string; geloest?: boolean;
+  /** der Angreifername, wie das Log ihn schreibt (Spezifikation Twinks 2) */
+  log?: string;
+  /** der Main: hoechstens einer, nie ein geloester */
+  main?: true;
   zu?: Record<string, ZuWahl>;
   zaehler: Record<string, Zaehler>;
   aus: string[]; namen: Record<string, string>;

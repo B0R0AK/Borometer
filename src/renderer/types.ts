@@ -17,6 +17,7 @@ import type { dungeonOf, openBoss, stats } from "./app/06-blocks-and-places";
 import type { ventiusPass } from "./app/15-weapons-and-ventius";
 import type { perSecond, summarise } from "./app/16-fight-analysis";
 import type { autoPair } from "./app/42-party";
+import type { CharEintrag } from "./charaktere-core";
 
 export type Lang = "de" | "en";
 
@@ -299,6 +300,8 @@ export interface HistFight {
    *  Shown in the history, but never your best pull (bossPulls, verlaufPulls, rekordKaempfe). A number, never a name;
    *  absent for your own fights and for entries written before 06.10.2026 */
   g?: number;
+  /** the character the fight belongs to (spec Twinks 3): the id of a Weeklies profile ("w" and nine characters) when the attacker's name matched its log name, "" when the characters were known and none matched. Never a name. Absent when no characters were entered or before 15.10.2026 */
+  ch?: string;
 }
 
 /** The fight history kept across logs (the rail's "history"). */
@@ -341,6 +344,10 @@ export interface AppState {
   gap: number;
   minDur: number;
   player: string;
+  /** every Weeklies character that has a log name, the active ones first, then the detached ones (a detached character keeps its fights, spec Twinks 3); kept by 59-weeklies.ts; ids and log names stay on this page, never sent anywhere */
+  charaktere: CharEintrag[];
+  /** true once the weeklies were read (59-weeklies.ts): only then does the list above say which characters there are. Before that, the history keeps the stored ch and zv as they are (spec Twinks 3) */
+  charaktereBekannt: boolean;
   sortSkills: SortOrder;
   sortTargets: SortOrder;
   tab: string;
@@ -353,6 +360,8 @@ export interface AppState {
   rekorde: boolean;
   /** Gilde steht (Spezifikation Gilde 5, 68-gilde.ts): ein Ort wie die Weeklies */
   gilde: boolean;
+  /** Archiv steht (Spezifikation Log-Archiv 7, 76-archiv.ts): ein Ort wie die Rekorde */
+  archiv: boolean;
   /** Kampf-Tafel (56-tafel.ts): der Zeitverlauf der Kurve ist aufgeklappt (Kurve bis 540 Punkt mit den vier staerksten Faehigkeiten) */
   zeitAuf: boolean;
   /** Kampf-Tafel: die Faehigkeit, deren Spur die Kurve zeigt (Zeigen oder Fokus in der Tafel), sonst "" */
@@ -433,6 +442,12 @@ export interface AppState {
   randlosGesehen: boolean | null;
   /** Rundgang beim ersten Start beendet oder uebersprungen (Spezifikation 02.10.2026); null, bis /api/config antwortet */
   rundgangGesehen: boolean | null;
+  /** wie oft bei der Frage zum Rundgang "Spaeter" gewaehlt wurde, 0 bis 3 (Spezifikation 16.10.2026); null, bis /api/config antwortet */
+  rundgangSpaeter: number | null;
+  /** der Schalter "Hinweise zu den Bereichen" (Standard an); null, bis /api/config antwortet */
+  bereichHinweise: boolean | null;
+  /** die Bereiche, deren Hinweis schon kam (Kennungen); null, bis /api/config antwortet */
+  bereicheGezeigt: string[] | null;
   /** eine neue Installation: der Hauptprozess meldet einen ersten Start (firstStart) und logIndex ist leer; null, bis /api/config antwortet */
   ersterStart: boolean | null;
   /** der Abschnitt Windows der Einstellungen (Windows-Einbindung 9): da nur im eigenen Fenster unter Windows; null, bis /api/config windows bringt */
@@ -444,6 +459,7 @@ export interface AppState {
   _cols?: any[];
   _heroDps?: number | null;
   _heroToken?: number;
+  _heroLaeuft?: boolean;
   assignFight: string;
   blocks?: FightBlock[];
   eventTypes?: string[];
@@ -515,13 +531,10 @@ export interface ModalOptions {
   okLabel?: string;
 }
 
-/** How a view setting is applied: quietly (not saved), forced, from the start. */
+/** How a view setting is applied: quietly (not saved), forced. */
 export interface ViewOptions {
   quiet?: boolean;
   force?: boolean;
-  fromStart?: boolean;
-  /** beim Start: das Fenster steht schon an seiner gemerkten Lage, nicht neu setzen */
-  keepWindow?: boolean;
 }
 
 /** One press of Eye of Ventius on one target, as ventiusCasts() groups the hits. */
@@ -617,6 +630,8 @@ export interface SkillCast {
   dmg: number;
   hits: number;
   crit: number;
+  /** starke Treffer; fehlt bei Einsaetzen aus der Gruppe */
+  heavy?: number;
 }
 
 /** A cast drawn in the rotation chart, where the pointer can find it again. */

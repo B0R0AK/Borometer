@@ -15,6 +15,12 @@
  * counters. Detaching ("geloest") marks, it never removes; there is no way
  * to empty this file from the page. Nothing here reads the combat log or
  * sends anything anywhere.
+ *
+ * One narrow exception (the owner, 14.10.2026, issue #240): the person may
+ * remove what they detached themselves (a character with "geloest", an own
+ * point with "geloest") for good, through loescheWeekliesGeloest() only, only with the
+ * name typed in, and only after a backup of the whole file lies in the folder
+ * "sicherungen" (written "wx", never over a file, never removed).
  */
 
 import * as fs from "node:fs";
@@ -53,8 +59,10 @@ const NAME_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,24}$/u;
 /** the name of an own or a renamed point */
 const TEXT_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,60}$/u;
 const TAKTE = ["woche", "tag"];
-const FILE_KEYS = ["v", "profile", "erinnerungen"];
-const PROFILE_KEYS = ["id", "name", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];
+const FILE_KEYS = ["v", "profile", "erinnerungen", "ignoriert"];
+const LOESCHEN_KEYS = ["was", "id", "name", "profil"];
+const LOESCHEN_WAS = ["charakter", "eigen"];
+const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];
 const OWN_KEYS = ["schluessel", "name", "menge", "takt", "geloest"];
 const COUNTER_KEYS = ["stand", "seit"];
 const LAST_WEEK_KEYS = ["reset", "zaehler"];
@@ -70,12 +78,20 @@ const TIME_RX = /^([01]\d|2[0-3]):[0-5]\d$/;
 const REMINDER_TEXT_RX = /^[^\p{Cc}\p{Cf}\p{Zl}\p{Zp}]{1,120}$/u;
 const REMINDER_KEYS = ["id", "an", "tage", "zeit", "text", "nurOffen", "geloest"];
 const ZU_KEYS = ["zu", "bei"];
+/** attacker names the person chose to ignore (spec Twinks 6): a name like a character's, detached instead of removed */
+const IGNORED_KEYS = ["name", "geloest"];
+const MAX_IGNORED = 60;
 
 export type Takt = "woche" | "tag";
 export interface Counter { stand: number; seit: number }
 export interface OwnPoint { schluessel: string; name: string; menge: number; takt: Takt; geloest?: boolean }
 export interface Profile {
-  id: string; name: string; geloest?: boolean;
+  id: string; name: string;
+  /** the attacker name as the combat log writes it; the fights of the log are assigned by it (spec Twinks 2) */
+  log?: string;
+  /** the one character that is the main; at most one, never a detached one */
+  main?: true;
+  geloest?: boolean;
   zaehler: Record<string, Counter>;
   aus: string[]; namen: Record<string, string>;
   eigene: OwnPoint[];
@@ -84,7 +100,8 @@ export interface Profile {
 }
 export interface ZuWahl { zu: boolean; bei: boolean }
 export interface Reminder { id: string; an: boolean; tage: number[]; zeit: string; text: string; nurOffen: boolean; geloest?: boolean }
-export interface WeekliesFile { v: 1; profile: Profile[]; erinnerungen?: Reminder[] }
+export interface Ignored { name: string; geloest?: boolean }
+export interface WeekliesFile { v: 1; profile: Profile[]; erinnerungen?: Reminder[]; ignoriert?: Ignored[] }
 
 const isRec = (x: unknown): x is Record<string, unknown> => !!x && typeof x === "object" && !Array.isArray(x);
 const only = (o: Record<string, unknown>, keys: string[]) => Object.keys(o).every((k) => keys.includes(k));
@@ -141,10 +158,24 @@ function remindersOf(x: unknown): Reminder[] | null {
   return out.filter((r) => !r.geloest).length > MAX_REMINDERS_ACTIVE ? null : out;
 }
 
+/** The ignored names (spec Twinks 6), each rebuilt: at most 60, no name twice; null when anything is off. */
+function ignoredOf(x: unknown): Ignored[] | null {
+  if (!Array.isArray(x) || x.length > MAX_IGNORED) return null;
+  const out: Ignored[] = [];
+  for (const e of x) {
+    if (!isRec(e) || !only(e, IGNORED_KEYS) || !textOk(e.name, NAME_RX) || !flagOk(e.geloest)) return null;
+    if (out.some((q) => q.name === e.name)) return null;
+    out.push({ name: e.name, ...(e.geloest === undefined ? {} : { geloest: e.geloest as boolean }) });
+  }
+  return out;
+}
+
 /** One character, rebuilt from the fields the schema names; null when anything is off. */
 function profileOf(x: unknown): Profile | null {
   if (!isRec(x) || !only(x, PROFILE_KEYS)) return null;
   if (typeof x.id !== "string" || !ID_RX.test(x.id) || !textOk(x.name, NAME_RX) || !flagOk(x.geloest)) return null;
+  if (x.log !== undefined && !textOk(x.log, NAME_RX)) return null;
+  if (x.main !== undefined && x.main !== true) return null;
   const zaehler = countersOf(x.zaehler);
   if (!zaehler) return null;
   const aus = x.aus;
@@ -165,7 +196,9 @@ function profileOf(x: unknown): Profile | null {
     eigene.push({ schluessel, name: e.name, menge: e.menge, takt: e.takt as Takt,
       ...(e.geloest === undefined ? {} : { geloest: e.geloest as boolean }) });
   }
-  const p: Profile = { id: x.id, name: x.name, ...(x.geloest === undefined ? {} : { geloest: x.geloest as boolean }),
+  const p: Profile = { id: x.id, name: x.name,
+    ...(x.log === undefined ? {} : { log: x.log as string }), ...(x.main === undefined ? {} : { main: true as const }),
+    ...(x.geloest === undefined ? {} : { geloest: x.geloest as boolean }),
     zaehler, aus: [...aus], namen, eigene };
   if (x.zu !== undefined) {
     const zu = zuOf(x.zu);
@@ -200,10 +233,19 @@ export function checkWeeklies(next: unknown, stored: WeekliesFile): WeekliesFile
     profile.push(p);
   }
   if (profile.filter((p) => !p.geloest).length > MAX_ACTIVE) return null;
+  // one main at most, and never a detached one; no attacker name twice among the active characters (spec Twinks 2)
+  const active = profile.filter((p) => !p.geloest);
+  if (active.filter((p) => p.main).length > 1 || profile.some((p) => p.main && p.geloest)) return null;
+  const logs = active.flatMap((p) => (p.log === undefined ? [] : [p.log]));
+  if (new Set(logs).size !== logs.length) return null;
   const erinnerungen = next.erinnerungen === undefined ? undefined : remindersOf(next.erinnerungen);
   if (erinnerungen === null) return null;
   // a stored reminder may be detached, never left out (never deleted for good)
   if (!(stored.erinnerungen ?? []).every((old) => (erinnerungen ?? []).some((r) => r.id === old.id))) return null;
+  const ignoriert = next.ignoriert === undefined ? undefined : ignoredOf(next.ignoriert);
+  if (ignoriert === null) return null;
+  // an ignored name may be detached ("no longer ignore"), never left out
+  if (!(stored.ignoriert ?? []).every((old) => (ignoriert ?? []).some((e) => e.name === old.name))) return null;
   for (const old of stored.profile) {
     const p = profile.find((q) => q.id === old.id);
     if (!p) return null;
@@ -217,7 +259,7 @@ export function checkWeeklies(next: unknown, stored: WeekliesFile): WeekliesFile
       if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null;
     }
   }
-  return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }) };
+  return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }), ...(ignoriert === undefined ? {} : { ignoriert }) };
 }
 
 /*
@@ -282,4 +324,71 @@ export function putWeeklies(data: unknown): PutResult {
   const clean = checkWeeklies(data, read.data);
   if (!clean) return "refused";
   return saveWeeklies(clean) ? "saved" : "unavailable";
+}
+
+/** The reasons loescheWeekliesGeloest() says no; the file is untouched in every one of them. */
+export type LoeschenGrund = "abgelehnt" | "nicht-geloest" | "name" | "sicherung" | "unavailable";
+export type LoeschenErgebnis = { ok: true; sicherung: string } | { ok: false; grund: LoeschenGrund };
+
+const nameGleich = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+const ohneKey = <T>(o: Record<string, T>, key: string): Record<string, T> => Object.fromEntries(Object.entries(o).filter(([k]) => k !== key));
+
+/** The state without the detached thing asked for, or the reason that it may not go. Nothing is written here. */
+function ohne(alt: WeekliesFile, was: string, id: string, name: string, profil: string | undefined): WeekliesFile | LoeschenGrund {
+  if (was === "charakter") {
+    const p = alt.profile.find((x) => x.id === id);
+    if (!p || !p.geloest) return "nicht-geloest";
+    if (!nameGleich(name, p.name)) return "name";
+    return { ...alt, profile: alt.profile.filter((x) => x !== p) };
+  }
+  const p = alt.profile.find((x) => x.id === profil);
+  const e = p?.eigene.find((x) => x.schluessel === id);
+  if (!p || !e || !e.geloest) return "nicht-geloest";
+  if (!nameGleich(name, e.name)) return "name";
+  const neu: Profile = { ...p, eigene: p.eigene.filter((x) => x !== e), zaehler: ohneKey(p.zaehler, id), aus: p.aus.filter((k) => k !== id), namen: ohneKey(p.namen, id) };
+  if (p.zu) neu.zu = ohneKey(p.zu, id);
+  if (p.vorwoche) neu.vorwoche = { reset: p.vorwoche.reset, zaehler: ohneKey(p.vorwoche.zaehler, id) };
+  return { ...alt, profile: alt.profile.map((x) => (x === p ? neu : x)) };
+}
+
+/** The backup before anything goes: the whole file, in the folder "sicherungen", beside others, never over one. */
+function sichere(text: string): string | null {
+  const dir = settingsPath("sicherungen");
+  try {
+    fs.mkdirSync(dir, { recursive: true });
+  } catch {
+    return null;
+  }
+  const tag = new Date().toISOString().slice(0, 10);
+  for (const i of Array.from({ length: 99 }, (_, k) => k + 1)) {
+    const name = "weeklies-vor-loeschen-" + tag + (i === 1 ? "" : "-" + i) + ".json";
+    try {
+      fs.writeFileSync(dir + "/" + name, text, { encoding: "utf8", flag: "wx" });
+      return name;
+    } catch (err) {
+      if ((err as NodeJS.ErrnoException)?.code !== "EEXIST") return null;
+    }
+  }
+  return null;
+}
+
+/**
+ * Removes for good what the person detached: a character or an own point. Only that, only with the name typed in, only
+ * after the backup lies in "sicherungen". Everything else the file holds stays; the page can never remove anything
+ * through putWeeklies().
+ */
+export function loescheWeekliesGeloest(req: unknown): LoeschenErgebnis {
+  if (!isRec(req) || !only(req, LOESCHEN_KEYS) || typeof req.was !== "string" || !LOESCHEN_WAS.includes(req.was) || typeof req.id !== "string" || typeof req.name !== "string"
+    || (req.profil !== undefined && typeof req.profil !== "string") || (req.was === "eigen") !== (req.profil !== undefined)) {
+    return { ok: false, grund: "abgelehnt" };
+  }
+  const read = readWeekliesFile();
+  if ("corrupt" in read) return { ok: false, grund: "unavailable" };
+  const neu = ohne(read.data, req.was, req.id, req.name, req.profil);
+  if (typeof neu === "string") return { ok: false, grund: neu };
+  const clean = checkWeeklies(neu, { v: 1, profile: [] });
+  if (!clean) return { ok: false, grund: "abgelehnt" };
+  const sicherung = sichere(JSON.stringify(read.data));
+  if (!sicherung) return { ok: false, grund: "sicherung" };
+  return saveWeeklies(clean) ? { ok: true, sicherung } : { ok: false, grund: "unavailable" };
 }

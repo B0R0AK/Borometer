@@ -100,15 +100,18 @@ const DUNGEONS: Dungeon[] = [
    bosses:[["Silent Gatekeeper Vahelon", "Stiller Torwächter Vahelon"],
            ["Quente, Executor of the Seal", "Quente, Vollstrecker des Siegels"]]},
   /* Halle der Illusionen (Issue #183): ein eigener Dungeon ohne Sterne,
-     dessen Bosse woechentlich wechseln - bis 07.10. Verence und Marta, ab
-     08.10. Haylock und Gaudian, in beiden Clients gleich geschrieben. Zwei
+     dessen sechs Bosse woechentlich in Paaren wechseln - bis 07.10. Verence und
+     Marta, ab 08.10. Haylock und Gaudian, das dritte Paar ist Molgras und
+     Murdock (Reihenfolge der Wochen nicht bekannt). In beiden Clients gleich
+     geschrieben; Molgras und Murdock stammen von den Bosskarten (Issue #252),
+     noch nicht in einem Log gesehen. Zwei
      Bosse eines Runs, keine zwei Schreibweisen eines Bosses: darum je einer
      eine Gruppe in `bosses`. Death Summoner davor ist Trash (Auskunft vom
      05.10.). Pausen hat hoechstens Marta, etwa 5 s, unter "Trennen nach";
      ab 20 s Stille ist es ein Wipe wie bei King Khanzaizin. */
   {separat:true, en:"Halls of Illusion", de:"Halle der Illusionen",
-   boss:["Verence","Marta","Haylock","Gaudian"],
-   bosses:[["Verence"], ["Marta"], ["Haylock"], ["Gaudian"]],
+   boss:["Verence","Marta","Haylock","Gaudian","Molgras","Murdock"],
+   bosses:[["Verence"], ["Marta"], ["Haylock"], ["Gaudian"], ["Molgras"], ["Murdock"]],
    wipeGap:20},
   /* The twelve-player raid, which is three parts under one name. The part is
      what a block actually is, so the part names the heading and the raid sits

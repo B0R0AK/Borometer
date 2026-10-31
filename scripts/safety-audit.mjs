@@ -25,9 +25,12 @@ const mainDir = process.env.AUDIT_MAIN_DIR || join(root, "src", "main");
 const rendererDir = process.env.AUDIT_RENDERER_DIR || join(root, "src", "renderer");
 const pageDir = process.env.AUDIT_PAGE_DIR || join(rendererDir, "app");
 const serverPath = join(root, "BoroPartyServer", "boro_server.py");
+const gildePyPath = process.env.AUDIT_GILDE_PY || join(root, "BoroPartyServer", "boro_gilde.py");
 // the full image data and the two scripts of the image switch, overridable for audit-negative.mjs
 const assetsDir = process.env.AUDIT_ASSETS_DIR || join(root, "assets");
 const scriptsDir = process.env.AUDIT_SCRIPTS_DIR || join(root, "scripts");
+// the folder of public-only files exists in the working repo, not in the public export; overridable for audit-negative.mjs
+const oeffentlichDir = process.env.AUDIT_OEFFENTLICH_DIR || join(root, "oeffentlich");
 // the page audit asks esbuild what the bundle is made of; missing, that rule fails
 let esbuild = null;
 try { esbuild = await import("esbuild"); } catch { /* reported by the rule */ }
@@ -332,8 +335,15 @@ function auditMain() {
     "config.ts": ["target", 'CONFIG_PATH + ".tmp"'],
     "server.ts": ["target"],
     "best.ts": ["BEST_PATH", 'BEST_PATH + ".tmp"'],
-    "weeklies.ts": ["WEEKLIES_PATH", 'WEEKLIES_PATH + ".tmp"'],
-    "gilde.ts": ["GILDE_PATH", 'GILDE_PATH + ".tmp"'],
+    "weeklies.ts": ["WEEKLIES_PATH", 'WEEKLIES_PATH + ".tmp"', 'dir + "/" + name'],
+    "gilde.ts": ["GILDE_PATH", 'GILDE_PATH + ".tmp"', 'dir + "/" + name'],
+    // guild online (13c): its one file, written beside and renamed; and a backup file, "wx", never over another
+    "gilde-online.ts": ['GILDE_ONLINE_PATH + ".tmp"', "pfad"],
+    // the log archive (13d, #264): its directory beside and renamed, the empty one "wx" on start, and one
+    // fight's gzip file beside and renamed (datei is pinned in 13d to join(ARCHIV_DIR, gzName(e.k))). The backup
+    // before fights go for good (#264 Teil 4) writes through a descriptor, not here: fs.openSync(ziel, "wx") in
+    // kopiere (listed in 1c, the body pinned in 13d.8c), kopiere called only with join(SICHERUNGEN_DIR, ordner, ...)
+    "archiv.ts": ['ARCHIV_INDEX + ".tmp"', 'datei + ".tmp"', "ARCHIV_INDEX"],
   };
   const bad = [];
   for (const [file, src] of Object.entries(code)) {
@@ -375,6 +385,14 @@ function auditMain() {
     "best.ts": ['fs.readFileSync(BEST_PATH, "utf8")'],
     "weeklies.ts": ['fs.readFileSync(WEEKLIES_PATH, "utf8")'],
     "gilde.ts": ['fs.readFileSync(GILDE_PATH, "utf8")'],
+    "gilde-online.ts": ['fs.readFileSync(GILDE_ONLINE_PATH, "utf8")'],
+    // the log archive (13d, #264): its directory, and one fight's file by the hash of its key (gzName, pinned in 13d)
+    // and, for the backup before fights go for good (#264 Teil 4, pinned in 13d.8c): each copy opened "wx" (never
+    // over a file) to be written, fsynced and closed, then read back (ziel, kopiere's target in the new backup folder);
+    // the directory and each fight's file as bytes; and the backup's folders opened "r" only to fsync them (pfad)
+    "archiv.ts": ['fs.readFileSync(ARCHIV_INDEX, "utf8")', "fs.readFileSync(join(ARCHIV_DIR, gzName(k)))",
+      'fs.openSync(ziel, "wx")', "fs.readFileSync(ziel)", 'fs.openSync(pfad, "r")', "fs.readFileSync(ARCHIV_INDEX)",
+      "fs.readFileSync(join(ARCHIV_DIR, gzName(e.k)))"],
     "config.ts": ["fs.existsSync(target)", "fs.statSync(legacy)", 'fs.readFileSync(legacy, "utf8")',
       'fs.readFileSync(CONFIG_PATH, "utf8")'],
     // readdirSync(folder) and lstatSync(full) are listLogs(), the one listing
@@ -420,12 +438,21 @@ function auditMain() {
     "readSync", "closeSync", "writeFileSync", "renameSync", "mkdirSync"]);
   const MODULES = new Set(["electron", "node:dgram", "node:fs", "node:http", "node:os", "node:path"]);
   const FS_IMPORT = 'import * as fs from "node:fs";';
+  // the log archive (13d, #264) packs with gzip and names its files by a hash: node:zlib and node:crypto,
+  // in archiv.ts alone, each on this one line - in any other file, or in any other form, they trip
+  const ARCHIV_MODULES = { "node:zlib": 'import * as zlib from "node:zlib";', "node:crypto": 'import { createHash } from "node:crypto";' };
   const fsStray = [];
   for (const f of files) {
     const imports = [...code[f].matchAll(/^[ \t]*import\b[^\n]*\bfrom\s*"([^"\n]*)";?[ \t]*$/gm)];
     for (const m of imports) {
       if (m[1] === "node:fs" && m[0].trim() !== FS_IMPORT) fsStray.push(`${f}: ${m[0].trim()}`);
-      if (!m[1].startsWith("./") && !MODULES.has(m[1])) fsStray.push(`${f}: ${m[0].trim()}`);
+      const archivOk = f === "archiv.ts" && Object.hasOwn(ARCHIV_MODULES, m[1]) && m[0].trim() === ARCHIV_MODULES[m[1]];
+      if (!m[1].startsWith("./") && !MODULES.has(m[1]) && !archivOk) fsStray.push(`${f}: ${m[0].trim()}`);
+    }
+    // zlib and crypto by name in a string: only the one import line each, in archiv.ts
+    const archivNames = (toks[f].strings ?? []).filter((s) => /(^|:)(zlib|crypto)(\/|$)/.test(s));
+    if (archivNames.length && (f !== "archiv.ts" || archivNames.slice().sort().join() !== "node:crypto,node:zlib")) {
+      fsStray.push(`${f}: strings ${archivNames.join(", ")}`);
     }
     for (const m of code[f].matchAll(/\b(?:require|import)\s*\(\s*["'`]([^"'`\n]*)/g)) fsStray.push(`${f}: ${m[0]}`);
     // "fs", "node:fs/promises", "original-fs" - any other way to name a file system module
@@ -438,8 +465,13 @@ function auditMain() {
     for (let at = code[f].indexOf(FS_IMPORT); at >= 0; at = code[f].indexOf(FS_IMPORT, at + 1)) {
       rest = rest.slice(0, at) + " ".repeat(FS_IMPORT.length) + rest.slice(at + FS_IMPORT.length);
     }
+    // unlinkSync: in archiv.ts alone, and there once, at the one place 1d and 13d.8 pin (the second exception
+    // to "never delete for good", #264 Teil 4); writeSync and fsyncSync: in archiv.ts alone, for the backup's copies
+    // on their "wx" descriptor and its folders (counted in 13d.5, the bodies pinned in 13d.8c) - elsewhere they trip
+    const ARCHIV_FS = ["unlinkSync", "writeSync", "fsyncSync"];
     for (const m of rest.matchAll(/\bfs\b(\s*\.\s*(\w+)\s*\(?)?/g)) {
-      if (!m[2] || !FS_CALLS.has(m[2]) || !m[0].endsWith("(")) fsStray.push(`${f}: ${norm(m[0])}`);
+      const ok = m[2] && (FS_CALLS.has(m[2]) || (f === "archiv.ts" && ARCHIV_FS.includes(m[2])));
+      if (!ok || !m[0].endsWith("(")) fsStray.push(`${f}: ${norm(m[0])}`);
     }
   }
   check(!fsStray.length, "main reaches the file system only through fs.<listed call>( on the one import of node:fs",
@@ -450,15 +482,22 @@ function auditMain() {
   //         an fsp, not under a name imported on its own (import { unlinkSync }),
   //         and not even as a string (fs["unlink"]). Read on the code view, so
   //         a comment may explain, but code and literals may not name them.
+  //         One exception (CLAUDE.md, the second exception, 16.10./26.10.2026, #264 Teil 4): a fight the
+  //         person detached and confirmed goes for good from the archive, after the checked backup. That is one
+  //         call, written exactly so, once in all of main: fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k))) in
+  //         archiv.ts - where it stands and what comes before it is pinned in 13d.8. Anything else still trips.
   const deleting = [];
+  const ARCHIV_UNLINK = "fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k)));";
   for (const f of files) {
     for (const m of code[f].matchAll(/\b(?:unlink|rm|rmdir|truncate)(?:Sync)?\b/g)) {
-      deleting.push(`${f}: ${norm(code[f].slice(Math.max(0, m.index - 24), m.index + m[0].length + 24))}`);
+      const archivAusnahme = f === "archiv.ts" && m[0] === "unlinkSync" && code[f].slice(m.index - 3, m.index - 3 + ARCHIV_UNLINK.length) === ARCHIV_UNLINK;
+      if (!archivAusnahme) deleting.push(`${f}: ${norm(code[f].slice(Math.max(0, m.index - 24), m.index + m[0].length + 24))}`);
     }
   }
-  check(!deleting.length,
-    "the main process never deletes a file (no unlink, rm, rmdir or truncate, sync or not, by any name)",
-    `found: ${deleting.join(" | ")}`);
+  const archivUnlinks = [...(code["archiv.ts"] ?? "").matchAll(/\bunlinkSync\b/g)].length;
+  check(!deleting.length && archivUnlinks <= 1,
+    "the main process never deletes a file (no unlink, rm, rmdir or truncate, sync or not, by any name), but for the one fs.unlinkSync of a detached fight's file in archiv.ts",
+    `found: ${deleting.join(" | ")}${archivUnlinks > 1 ? ` | archiv.ts: unlinkSync ${archivUnlinks}x` : ""}`);
 
   // the settings folder, where the stores live, is named only where a store
   // is declared: settingsPath in paths.ts and once per store file, SETTINGS_DIR
@@ -467,17 +506,28 @@ function auditMain() {
   // except CONFIG_PATH shown as text; no path is climbed up from with dirname
   // or ".."; process.env only by name, and only these names.
   const settingsStray = [];
-  const STORE_FILES = ["best.ts", "weeklies.ts", "gilde.ts", "config.ts"];
+  // archiv.ts (13d, #264): the import and its one folder, ARCHIV_DIR - twice, like best.ts
+  const STORE_FILES = ["best.ts", "weeklies.ts", "gilde.ts", "gilde-online.ts", "config.ts", "archiv.ts"];
   for (const f of files) {
     if (f === "paths.ts") continue;
     const sp = counts(f, /\bsettingsPath\b/g);
-    if (sp !== (STORE_FILES.includes(f) ? 2 : 0)) settingsStray.push(`${f}: settingsPath ${sp}x`);
+    // guild online: the import, its store file and the folder of its backups; the guild: its file and the folder of its backups before removing (#240);
+    // the archive: the import, its folder and the folder of its backups before removing (SICHERUNGEN_DIR, #264 Teil 4)
+    if (sp !== ((f === "gilde-online.ts" || f === "gilde.ts" || f === "weeklies.ts" || f === "archiv.ts") ? 3 : STORE_FILES.includes(f) ? 2 : 0)) settingsStray.push(`${f}: settingsPath ${sp}x`);
     const sd = counts(f, /\bSETTINGS_DIR\b/g);
     if (sd !== (f === "main.ts" ? 2 : 0)) settingsStray.push(`${f}: SETTINGS_DIR ${sd}x`);
     if (/\bgetPath\b/.test(bare[f])) settingsStray.push(`${f}: getPath`);
-    for (const [name, owner] of [["BEST_PATH", "best.ts"], ["WEEKLIES_PATH", "weeklies.ts"], ["GILDE_PATH", "gilde.ts"]]) {
+    for (const [name, owner] of [["BEST_PATH", "best.ts"], ["WEEKLIES_PATH", "weeklies.ts"], ["GILDE_PATH", "gilde.ts"], ["GILDE_ONLINE_PATH", "gilde-online.ts"], ["ARCHIV_INDEX", "archiv.ts"]]) {
       if (f !== owner && new RegExp(`\\b${name}\\b`).test(bare[f])) settingsStray.push(`${f}: ${name}`);
     }
+    // the archive's folder: owned by archiv.ts; outside it only server.ts, in its import and the one
+    // shell.openPath of /api/archiv/ordner (pinned in 5c) - two mentions, nowhere else
+    const ad = counts(f, /\bARCHIV_DIR\b/g);
+    if (f !== "archiv.ts" && ad !== (f === "server.ts" ? 2 : 0)) settingsStray.push(`${f}: ARCHIV_DIR ${ad}x`);
+    // the archive's backups' folder likewise: outside archiv.ts only server.ts, in its import and the one
+    // shell.openPath of /api/archiv/sicherungen (pinned in 5c)
+    const sd2 = counts(f, /\bSICHERUNGEN_DIR\b/g);
+    if (f !== "archiv.ts" && sd2 !== (f === "server.ts" ? 2 : 0)) settingsStray.push(`${f}: SICHERUNGEN_DIR ${sd2}x`);
   }
   if (counts("main.ts", /\bSETTINGS_DIR\b/g) && (code["main.ts"] ?? "").split('path.join(SETTINGS_DIR, "electron")').length !== 2) {
     settingsStray.push("main.ts: SETTINGS_DIR not only for Electron's folder");
@@ -508,7 +558,7 @@ function auditMain() {
 
   // a store's file name is written out once, in its declaration - and no
   // file in main holds a piece of one ("boro-week" + "lies.json")
-  const STORE_NAMES = { "best.ts": 1, "weeklies.ts": 1, "gilde.ts": 1, "config.ts": 2, "paths.ts": 1 };
+  const STORE_NAMES = { "best.ts": 1, "weeklies.ts": 1, "gilde.ts": 1, "gilde-online.ts": 1, "config.ts": 2, "paths.ts": 1 };
   const nameStray = files
     .map((f) => [f, [...code[f].matchAll(/boro-/gi)].length])
     .filter(([f, k]) => k !== (STORE_NAMES[f] ?? 0))
@@ -763,21 +813,26 @@ function auditMain() {
   //         hoechstens TAIL_MAX je Antwort), nur Dateien, hoechstens 60. Die
   //         beiden Faelle stehen wortwoertlich im GET-Pfad, der POST-Pfad
   //         nennt keinen; jeder Aufruf der drei in server.ts fragt STATE.dir.
+  //         "Alte Logs einlesen" (Spezifikation Log-Archiv 8, #264): mit
+  //         ?alle=1 listet /api/logs bis LIST_ALLE_MAX (1000), und /api/log
+  //         vergleicht mit dieser langen Auflistung. Die Grenze ist eine feste
+  //         Zahl, die Anfrage waehlt nur zwischen den beiden Konstanten, und
+  //         listLogs wird nur mit nichts, LIST_MAX oder LIST_ALLE_MAX gerufen.
   const LIST_LOGS = "if (!folder || !isDir(folder)) return []; const found: FoundLog[] = []; try { for (const name of "
     + "fs.readdirSync(folder)) { const lower = name.toLowerCase(); if (!LOG_PATTERNS.some((ext) => lower.endsWith(ext))) "
     + "continue; const full = path.join(folder, name); const stat = fs.lstatSync(full); if (!stat.isFile()) continue; "
     + "found.push({ name, full, size: stat.size, mtime: Math.floor(stat.mtimeMs / 1000), mtimeMs: stat.mtimeMs }); } } "
-    + "catch { return []; } found.sort((a, b) => b.mtimeMs - a.mtimeMs); return found.slice(0, LIST_MAX);";
-  const LOG_ANSWER = "const found = listLogs(folder).find((f) => f.name === name); if (!found) return { status: 404, body: "
+    + "catch { return []; } found.sort((a, b) => b.mtimeMs - a.mtimeMs); return found.slice(0, max);";
+  const LOG_ANSWER = "const found = listLogs(folder, LIST_ALLE_MAX).find((f) => f.name === name); if (!found) return { status: 404, body: "
     + "{ ok: false, error: \"not a log in the folder\" } }; if (from === null || !/^(0|[1-9]\\d{0,14})$/.test(from)) return "
     + "{ status: 400, body: { ok: false, error: \"from is not a byte\" } }; const piece = readLogFrom(found, Number(from)); "
     + "if (!piece) return { status: 409, body: { ok: false, error: \"the log is shorter than that\" } }; return { status: 200, body: piece };";
-  const LOGS_CASE = "const files = listLogs(STATE.dir).map((f) => ({ name: f.name, size: f.size, mtime: f.mtime })); "
+  const LOGS_CASE = "const files = listLogs(STATE.dir, q.get(\"alle\") === \"1\" ? LIST_ALLE_MAX : LIST_MAX).map((f) => ({ name: f.name, size: f.size, mtime: f.mtime })); "
     + "return reply(res, { ok: true, files });";
   const LOG_CASE = "try { const { status, body } = logAnswer(STATE.dir, q.get(\"name\"), q.get(\"from\")); if (status === 200 && \"to\" in body) leseFortschritt(currentWindow(), body.to, body.size); return reply(res, body, status); } "
     + "catch { return text(res, \"\", 500); }";
   const tageStray = [];
-  const listBodyLogs = bodyOf(logs, "export function listLogs(folder: string): FoundLog[] {");
+  const listBodyLogs = bodyOf(logs, "export function listLogs(folder: string, max = LIST_MAX): FoundLog[] {");
   if (listBodyLogs !== LIST_LOGS) tageStray.push(`listLogs() is now: ${listBodyLogs}`);
   const newestBody = bodyOf(logs, "export function newestLog(folder: string): FoundLog | null {");
   if (newestBody !== "return listLogs(folder)[0] ?? null;") tageStray.push(`newestLog() is now: ${newestBody}`);
@@ -785,6 +840,19 @@ function auditMain() {
     + "  { status: number; body: LogTail | { ok: false; error: string } } {");
   if (logAnswerBody !== LOG_ANSWER) tageStray.push(`logAnswer() is now: ${logAnswerBody}`);
   if (!/^export const LIST_MAX = 60;$/m.test(logs) || counts("logs.ts", /\bLIST_MAX\b/g) !== 2) tageStray.push("LIST_MAX is not 60, once");
+  // the long listing (Log-Archiv 8): 1000, a number; named in logs.ts only where declared and in logAnswer
+  if (!/^export const LIST_ALLE_MAX = 1000;$/m.test(logs) || counts("logs.ts", /\bLIST_ALLE_MAX\b/g) !== 2) tageStray.push("LIST_ALLE_MAX is not 1000, declared and used once");
+  // in server.ts both caps only in the import and the case /api/logs, and the query's alle read only there
+  if (counts("server.ts", /\bLIST_ALLE_MAX\b/g) !== 2 || counts("server.ts", /\bLIST_MAX\b/g) !== 2) tageStray.push("server.ts names LIST_MAX or LIST_ALLE_MAX elsewhere");
+  if ([...(code["server.ts"] ?? "").matchAll(/["'`]alle["'`]/g)].length !== 1) tageStray.push("server.ts reads alle elsewhere");
+  // every listLogs call in logs.ts and server.ts: the folder alone, or with a cap by its name (server.ts: the case /api/logs as written)
+  const LANG_WAHL = "q.get(\"alle\") === \"1\" ? LIST_ALLE_MAX : LIST_MAX";
+  for (const f of ["logs.ts", "server.ts"]) {
+    for (const c of callsOf(f, /(?<!\bfunction\s+)\b(listLogs)\s*\(/g)) {
+      const zweites = (c.args ?? "").split(",").slice(1).join(",").trim();
+      if (zweites !== "" && zweites !== "LIST_ALLE_MAX" && !(f === "server.ts" && zweites === LANG_WAHL)) tageStray.push(`${f}: listLogs(${c.args})`);
+    }
+  }
   // only *.txt and *.log, as written, used only in listLogs (Pruefung N3, W2)
   if (!/^const LOG_PATTERNS = \["\.txt", "\.log"\];$/m.test(logs) || counts("logs.ts", /\bLOG_PATTERNS\b/g) !== 2) {
     tageStray.push("LOG_PATTERNS is not [\".txt\", \".log\"], once");
@@ -972,7 +1040,7 @@ function auditMain() {
     const stateful = ["updateConfig(", "STATE.dir =", "fetchJson(", "/api/dir", "/api/party/check", "/api/party/curve",
       "writeFileSync(", "shell.", "putBest(", "saveBest(", "putBuild(", "saveBuilds(",
       "putWeeklies(", "saveWeeklies(", "createWeeklies(", "putGilde(", "saveGilde(", "createGilde(",
-      "checkUpdate(", "setUpdate("].filter((w) => getBody.includes(w));
+      "archiviere(", "createArchiv(", "checkUpdate(", "setUpdate("].filter((w) => getBody.includes(w));
     check(!stateful.length, "no GET route changes state or reaches out (dir, settings, party server)", `found: ${stateful}`);
     check(['case "/api/dir":', 'case "/api/party/check":', 'case "/api/party/curve":'].every((c) => postBody.includes(c)),
       "/api/dir, party/check and party/curve are handled in the POST path");
@@ -987,6 +1055,27 @@ function auditMain() {
     "every /api request passes the origin check before it is read or answered");
   check(server.split("apiRefusal(").length === 3,
     "the origin check is defined once and asked once, from handle()");
+  // 5b.2 (#264): a request body is capped. MAX_BODY stays 8 MiB and is readJson's default; the one
+  // route that may send more is /api/archiv/aufnehmen (a whole fight, up to 8M characters before
+  // escaping), with 24 MiB. readJson is called once in server.ts with exactly that choice and once in
+  // party.ts with the default; nowhere else, and with no other second argument.
+  {
+    const httpCode = code["http.ts"] ?? "";
+    const capCalls = files.flatMap((f) => callsOf(f, /\b(readJson)\s*\(/g).map((c) => `${f}: ${c.args}`));
+    const CAP_CALLS = ["http.ts: req: http.IncomingMessage, max = MAX_BODY", "party.ts: req",
+      'server.ts: req, url.pathname === "/api/archiv/aufnehmen" ? 24 * 1024 * 1024 : undefined'];
+    check(JSON.stringify(capCalls.slice().sort()) === JSON.stringify(CAP_CALLS)
+        && /^const MAX_BODY = 8 \* 1024 \* 1024;$/m.test(httpCode) && counts("http.ts", /\bMAX_BODY\b/g) === 2
+        && /^export function readJson\(req: http\.IncomingMessage, max = MAX_BODY\): Promise<ReadResult> \{$/m.test(httpCode)
+        && counts("http.ts", /\bmax\b/g) === 2 && httpCode.includes("if (size > max) {")
+        // readJson under its own name only: the two import lines as written (no alias), and the name
+        // nowhere but in its definition, those imports and the two calls (no const r = readJson)
+        && /^import \{ errorName, fetchJson, HttpError, listenFrom, readJson, send, serverAddress, serverBase, type Json \} from "\.\/http";$/m.test(code["server.ts"] ?? "")
+        && /^import \{ errorName, fetchJson, HttpError, listenFrom, readJson, send, serverBase, type Json \} from "\.\/http";$/m.test(code["party.ts"] ?? "")
+        && files.every((f) => counts(f, /\breadJson\b/g) === ({ "http.ts": 1, "server.ts": 2, "party.ts": 2 }[f] ?? 0)),
+      "a request body is capped at 8 MiB (MAX_BODY); only /api/archiv/aufnehmen may send up to 24 MiB",
+      `readJson: ${capCalls.join(" | ")}`);
+  }
 
   // --- 5c. the file manager opens only the folders named here (spec
   //         Nachtraege N1). /api/folder/open takes a key, never a path: the
@@ -1030,16 +1119,35 @@ function auditMain() {
   const SHELL_NAMES = /\b(openPath|openExternal|trashItem|showItemInFolder|beep)\b/g;
   const named = {};
   for (const f of files) for (const m of code[f].matchAll(SHELL_NAMES)) named[`${f}: ${m[1]}`] = (named[`${f}: ${m[1]}`] ?? 0) + 1;
-  check(JSON.stringify(named) === JSON.stringify({ "server.ts: openPath": 1, "window.ts: openExternal": 2 }),
+  // openPath three times in server.ts: /api/folder/open and, since the log archive (#264), /api/archiv/ordner and
+  // /api/archiv/sicherungen (the backups' folder, #264 Teil 4)
+  check(JSON.stringify(named) === JSON.stringify({ "server.ts: openPath": 3, "window.ts: openExternal": 2 }),
     "openPath, openExternal, trashItem, showItemInFolder and beep are named only at their fixed places",
     `found: ${JSON.stringify(named)}`);
   const shellOk = (u) => u.use === "shell.openPath(" || u.use === "shell.openExternal(";
   check(shellUses.every(shellOk), "main reaches shell only as shell.openPath( and shell.openExternal(",
     `found: ${shellUses.filter((u) => !shellOk(u)).map((u) => `${u.f}: ${u.use}`).join(" | ")}`);
   const folderCase = (server.match(/\n    case "\/api\/folder\/open": \{([\s\S]*?)\n    \}\n/) || [null, null])[1];
+  const archivOrdnerCase = (server.match(/\n    case "\/api\/archiv\/ordner": \{([\s\S]*?)\n    \}\n/) || [null, null])[1];
+  const archivSicherungenCase = (server.match(/\n    case "\/api\/archiv\/sicherungen": \{([\s\S]*?)\n    \}\n/) || [null, null])[1];
   const openPaths = shellUses.filter((u) => u.use === "shell.openPath(");
-  check(folderCase !== null && openPaths.length === 1 && openPaths[0].f === "server.ts" && folderCase.includes("shell.openPath("),
-    "shell.openPath is called once, in the /api/folder/open case", `found in: ${openPaths.map((u) => u.f).join(", ")}`);
+  const openPathsIn = (body) => (body ?? "").split("shell.openPath(").length - 1;
+  check(folderCase !== null && archivOrdnerCase !== null && archivSicherungenCase !== null && openPaths.length === 3 && openPaths.every((u) => u.f === "server.ts")
+      && openPathsIn(folderCase) === 1 && openPathsIn(archivOrdnerCase) === 1 && openPathsIn(archivSicherungenCase) === 1,
+    "shell.openPath is called once, in the /api/folder/open case, once in the /api/archiv/ordner case and once in the /api/archiv/sicherungen case",
+    `found in: ${openPaths.map((u) => u.f).join(", ")}`);
+  // the backups' folder word for word (#264 Teil 4): the path is SICHERUNGEN_DIR, made if missing; the request gives nothing
+  const ARCHIV_SICHERUNGEN_CASE = "createSicherungen(); const error = await shell.openPath(SICHERUNGEN_DIR); "
+    + "if (error) return reply(res, { ok: false, error }, 500); return reply(res, { ok: true });";
+  check(archivSicherungenCase !== null && norm(archivSicherungenCase) === ARCHIV_SICHERUNGEN_CASE,
+    "/api/archiv/sicherungen opens only SICHERUNGEN_DIR, never a path from the request",
+    `case: ${archivSicherungenCase === null ? "missing" : norm(archivSicherungenCase)}`);
+  // the archive's folder word for word (#264): the path is ARCHIV_DIR, made if missing by createArchiv(); the request gives nothing
+  const ARCHIV_ORDNER_CASE = "createArchiv(); const error = await shell.openPath(ARCHIV_DIR); "
+    + "if (error) return reply(res, { ok: false, error }, 500); return reply(res, { ok: true });";
+  check(archivOrdnerCase !== null && norm(archivOrdnerCase) === ARCHIV_ORDNER_CASE,
+    "/api/archiv/ordner opens only ARCHIV_DIR, never a path from the request",
+    `case: ${archivOrdnerCase === null ? "missing" : norm(archivOrdnerCase)}`);
   const externals = shellUses.filter((u) => u.use === "shell.openExternal(");
   check(externals.every((u) => u.f === "window.ts"), "shell.openExternal is called only in window.ts",
     `found in: ${externals.map((u) => u.f).join(", ")}`);
@@ -1346,7 +1454,10 @@ function auditMain() {
     `setBackgroundMaterial(${materials.join(") | (")})`);
   const setzen = argsOf(win, "materialSetzen")
     .filter((a) => a !== "win: BrowserWindow, compact: boolean, theme: unknown");
-  check(setzen.length > 0 && setzen.every((a) => /^(win|kw), (true|false|compact|state\.compact), (sent\.theme|cfg\.themeResolved|loadConfig\(\)\.themeResolved)$/.test(a)),
+  // the torn-off window (Windows-Teil 2) only once, by its own name, never as compact
+  check(setzen.length > 0 && setzen.every((a) => /^(win|kw), (true|false|compact|state\.compact), (sent\.theme|cfg\.themeResolved|loadConfig\(\)\.themeResolved)$/.test(a)
+        || a === "aw, false, cfg.themeResolved")
+      && setzen.filter((a) => a.startsWith("aw")).length === 1,
     "materialSetzen() gets a window, a yes/no for compact and a theme name - nothing else from a request",
     `materialSetzen(${setzen.join(") | (")})`);
   // #189: full view's glass ground is Acrylic, Mica is gone - materialFor()
@@ -1402,8 +1513,13 @@ function auditMain() {
   // genauer: jeder Schluessel der Liste, der auf "Gesehen" endet, steht in
   // BOOLEAN_KEYS - ein neuer Hinweis kann nicht still beliebige Werte tragen.
   check(configPost.includes('for (const key of CONFIG_KEYS) {\n        if (key in sent && (!BOOLEAN_KEYS.includes(key) || typeof sent[key] === "boolean")) changes[key] = sent[key];\n      }')
-      && /^const BOOLEAN_KEYS = \["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung"\];$/m.test(code["server.ts"] ?? ""),
-    "POST /api/config takes a true/false key (randlosGesehen, rundgangGesehen, updatePruefen, meldenKampf, meldenNurBest, trayBeimSchliessen, gildeErinnerung) only as true or false");
+      && /^const BOOLEAN_KEYS = \["randlosGesehen", "rundgangGesehen", "updatePruefen", "meldenKampf", "meldenNurBest", "trayBeimSchliessen", "gildeErinnerung", "gildeOnline", "bereichHinweise", "archivAn"];$/m.test(code["server.ts"] ?? ""),
+    "POST /api/config takes a true/false key (randlosGesehen, rundgangGesehen, updatePruefen, meldenKampf, meldenNurBest, trayBeimSchliessen, gildeErinnerung, gildeOnline, bereichHinweise, archivAn) only as true or false");
+  // the log archive's notice (#264): archivHinweis is the version it was acknowledged in, a whole number
+  // of at least 0 and nothing else; the line that drops anything else stands once, before the write
+  check(configKeys.includes('"archivHinweis"') && configPost.split("\n").map((l) => l.trim()).filter((l) => l === 'if ("archivHinweis" in changes && !(Number.isSafeInteger(changes.archivHinweis) && (changes.archivHinweis as number) >= 0)) delete changes.archivHinweis;').length === 1
+      && configPost.indexOf("delete changes.archivHinweis;") < configPost.indexOf("updateConfig(changes);"),
+    "POST /api/config takes archivHinweis only as a whole number of at least 0");
   const booleanKeys = ((code["server.ts"] ?? "").match(/^const BOOLEAN_KEYS = \[([^\]]*)\];$/m) || [null, ""])[1]
     .split(",").map((k) => k.trim()).filter(Boolean);
   // Pruefung Rundgang G3: auch "Seen" und in jeder Schreibweise (gesehen, SEEN)
@@ -1441,15 +1557,20 @@ function auditMain() {
     for (const m of bare[f].matchAll(/\bwebContents\b/g)) {
       const member = (bare[f].slice(m.index).match(/^webContents\.(\w+)\(/) || [null, ""])[1];
       const event = (code[f].slice(m.index).match(/^webContents\.(?:on|once)\("([^"\n]*)",/) || [null, null])[1];
-      if (f !== "window.ts" || !/(?:^|[^\w$.])(?:win|kw)\.$/.test(bare[f].slice(Math.max(0, m.index - 5), m.index)) || !WC_MEMBERS.has(member)
-          || ((member === "on" || member === "once") && !WC_EVENTS.has(event))) {
+      const owner = (bare[f].slice(Math.max(0, m.index - 5), m.index).match(/(?:^|[^\w$.])(win|kw|aw)\.$/) || [null, null])[1];
+      // the torn-off window (Windows-Teil 2) only waits for its page to show: once, the two load events
+      if (f !== "window.ts" || !owner || !WC_MEMBERS.has(member)
+          || ((member === "on" || member === "once") && !WC_EVENTS.has(event))
+          || (owner === "aw" && !(member === "once" && (event === "did-finish-load" || event === "did-fail-load")))) {
         wcStray.push(`${f}: ${norm(code[f].slice(Math.max(0, m.index - 4), m.index + 40))}`);
       }
     }
     for (const s of [...(toks[f].strings ?? []), ...(toks[f].texts ?? [])]) if (/webContents/i.test(s)) wcStray.push(`${f}: "${s}"`);
   }
+  const awContents = [...(bare["window.ts"] ?? "").matchAll(/\baw\.webContents\b/g)].length;
+  if (awContents !== 2) wcStray.push(`aw.webContents named ${awContents}x`);
   check(!wcStray.length,
-    "webContents is used only as win.webContents or kw.webContents in window.ts, with the listed members and the listed events",
+    "webContents is used only as win.webContents, kw.webContents or aw.webContents (once, its two load events) in window.ts, with the listed members and the listed events (no context-menu)",
     `found: ${wcStray.join(" | ")}`);
   const APP_EVENTS = new Set(["will-quit", "activate", "window-all-closed", "second-instance", "before-quit"]);
   const appStray = [];
@@ -1512,13 +1633,18 @@ function auditMain() {
   //         carry the handler that opens no further window; /api/win names a
   //         window only as "main" or "kompakt"; pin, see-through and
   //         click-through stay one handler each, for whichever window is named.
+  //         Windows-Teil 2 (29.10.2026): a third window, torn off from full
+  //         view (const aw), held to the same rules; every count below grew
+  //         by exactly that one window and nothing else.
   const mainTs = code["main.ts"] ?? "";
   const winBare = bare["window.ts"] ?? "";
   const newWindows = files.flatMap((f) => [...bare[f].matchAll(/\bnew\s+BrowserWindow\b/g)].map(() => f));
   const otherHosts = files.filter((f) => /\b(BrowserView|WebContentsView|webviewTag)\b|\bwebContents\s*\.\s*create\b|<webview/.test(bare[f] + code[f]));
-  check(newWindows.length === 2 && newWindows.every((f) => f === "window.ts") && !otherHosts.length
-      && /\n  const win = new BrowserWindow\(\{\n/.test(win) && /\n  const kw = new BrowserWindow\(\{\n/.test(win),
-    "at most two windows, both in window.ts (full view and the compact window), and no other page host",
+  // Windows-Teil 2 (29.10.2026): a third, the torn-off window (const aw), and no more
+  check(newWindows.length === 3 && newWindows.every((f) => f === "window.ts") && !otherHosts.length
+      && /\n  const win = new BrowserWindow\(\{\n/.test(win) && /\n  const kw = new BrowserWindow\(\{\n/.test(win)
+      && /\n  const aw = new BrowserWindow\(\{\n/.test(win),
+    "at most three windows, all in window.ts (full view, the compact window and the torn-off window), and no other page host",
     `new BrowserWindow in: ${newWindows.join(", ")}; other hosts in: ${otherHosts.join(", ")}`);
   // each window's options, braces balanced, from its "new BrowserWindow({"
   const optionsOf = (src, head) => {
@@ -1533,12 +1659,13 @@ function auditMain() {
     return src.slice(from, i + 1);
   };
   const SEITE_DEF = "const SEITE = Object.freeze({ nodeIntegration: false, contextIsolation: true, sandbox: true, spellcheck: false, backgroundThrottling: false });";
-  const winOpts = [optionsOf(win, "const win = new BrowserWindow({"), optionsOf(win, "const kw = new BrowserWindow({")];
+  const winOpts = [optionsOf(win, "const win = new BrowserWindow({"), optionsOf(win, "const kw = new BrowserWindow({"),
+    optionsOf(win, "const aw = new BrowserWindow({")];
   const prefsIn = files.flatMap((f) => [...bare[f].matchAll(/\bwebPreferences\b/g)].map(() => f));
-  check(win.split(SEITE_DEF).length === 2 && [...winBare.matchAll(/\bSEITE\b/g)].length === 3
+  check(win.split(SEITE_DEF).length === 2 && [...winBare.matchAll(/\bSEITE\b/g)].length === 4
       && winOpts.every((o) => o !== null && [...o.matchAll(/\bwebPreferences\b/g)].length === 1 && /\n    webPreferences: SEITE,\n/.test(o))
-      && prefsIn.length === 2 && prefsIn.every((f) => f === "window.ts"),
-    "both windows take the same fixed web preferences (SEITE: sandbox, contextIsolation, no nodeIntegration, no preload)",
+      && prefsIn.length === 3 && prefsIn.every((f) => f === "window.ts"),
+    "all three windows take the same fixed web preferences (SEITE: sandbox, contextIsolation, no nodeIntegration, no preload)",
     `webPreferences in: ${prefsIn.join(", ")}; SEITE named ${[...winBare.matchAll(/\bSEITE\b/g)].length}x`);
   // the page: main.ts builds its url from the server's port on 127.0.0.1,
   // createWindow keeps that origin, and the compact window loads the same
@@ -1546,7 +1673,20 @@ function auditMain() {
   const loads = files.flatMap((f) => [...code[f].matchAll(/\.\s*(loadURL|loadFile)\s*\(([^)]*)\)/g)].map((m) => `${f}: ${m[1]}(${m[2].trim()})`));
   const createCalls = [...mainTs.matchAll(/\bcreateWindow\(([^)]*)\)/g)].map((m) => m[1]);
   const originSets = [...winBare.matchAll(/\bseite\s*\.\s*origin\s*(=(?![=>])|\+=)/g)].length;
-  check(JSON.stringify(loads) === JSON.stringify(["window.ts: loadURL(url)", "window.ts: loadURL(`${seite.origin}/?win=1&kompakt=1`)"])
+  // the torn-off window's area: only a word of ABRISS_TEILE, as written, through abrissTeil()
+  const coreSrc = code["windows-core.ts"] ?? "";
+  const abreissenCase = block("abreissen");
+  const ABREISSEN_CASE = "{ const teil = abrissTeil(sent.teil); if (teil === null || win !== state.win) return fail(\"unknown part\"); "
+    + "return openAbriss(teil) ? ok({ offen: true }) : fail(\"no window here\"); }";
+  check(JSON.stringify(loads) === JSON.stringify(["window.ts: loadURL(url)", "window.ts: loadURL(`${seite.origin}/?win=1&kompakt=1`)",
+        "window.ts: loadURL(`${seite.origin}/?win=1&teil=${teil}`)"])
+      && win.includes("\nfunction openAbriss(teil: AbrissTeil): boolean {\n")
+      && /\nexport const ABRISS_TEILE = \["kampf", "rotation", "analyse", "vergleich"\] as const;\n/.test(coreSrc)
+      && coreSrc.includes("\nexport function abrissTeil(v: unknown): AbrissTeil | null {\n  return ABRISS_TEILE.find((t) => t === v) ?? null;\n}")
+      && [...(bare["windows-core.ts"] ?? "").matchAll(/\bABRISS_TEILE\b/g)].length === 3
+      && win.split('case "abreissen":').length === 2 && norm(abreissenCase ?? "") === ABREISSEN_CASE
+      && [...winBare.matchAll(/\bopenAbriss\(/g)].length === 2 && [...winBare.matchAll(/\babrissTeil\(/g)].length === 1
+      && [...winBare.matchAll(/\bsent\s*\.\s*teil\b/g)].length === 1
       && /\n  const port = await startServer\(pagePath\(\)\);\n  const url = `http:\/\/127\.0\.0\.1:\$\{port\}\/`;\n/.test(mainTs)
       && /\n  const winUrl = `\$\{url\}\?win=1`;\n/.test(mainTs)
       && JSON.stringify(createCalls) === JSON.stringify(["winUrl, icon, startArt", "winUrl, icon"])
@@ -1554,19 +1694,21 @@ function auditMain() {
       && /\nexport function createWindow\(url: string, iconPath: string, start: "normal" \| "minimiert" \| "verborgen" = "normal"\): BrowserWindow \{\n/.test(win)
       && originSets === 1 && /\n  const origin = new URL\(url\)\.origin;\n  seite\.origin = origin;\n/.test(win)
       && !files.some((f) => f !== "window.ts" && /\bseite\b/.test(bare[f])),
-    "both windows load only the app's own page from 127.0.0.1 (full view ?win=1, the compact window ?win=1&kompakt=1)",
-    `loads: ${loads.join(" | ")}; createWindow(${createCalls.join(") | (")}); seite.origin set ${originSets}x`);
+    "all three windows load only the app's own page from 127.0.0.1 (full view ?win=1, the compact window ?win=1&kompakt=1, the torn-off window ?win=1&teil= one of ABRISS_TEILE)",
+    `loads: ${loads.join(" | ")}; createWindow(${createCalls.join(") | (")}); seite.origin set ${originSets}x; abreissen: ${norm(abreissenCase ?? "no case")}`);
   const eigene = fnBody(win, "function nurEigeneSeite\\(win: BrowserWindow, origin: string\\): void");
   const handlers = files.flatMap((f) => [...bare[f].matchAll(/\bsetWindowOpenHandler\b/g)].map(() => f));
   const createBody = fnBody(win, "export function createWindow\\(url: string, iconPath: string, start: \"normal\" \\| \"minimiert\" \\| \"verborgen\" = \"normal\"\\): BrowserWindow");
   const openBody = fnBody(win, "function openKompakt\\(start: \\{ live: boolean; durch: boolean \\}\\): boolean");
+  const abrissBody = fnBody(win, "function openAbriss\\(teil: AbrissTeil\\): boolean");
   check(eigene !== null && handlers.length === 1 && handlers[0] === "window.ts"
       && /\n  win\.webContents\.setWindowOpenHandler\(\(\{ url: target \}\) => \{\n    if \(external\(target\)\) void shell\.openExternal\(target\);\n    return \{ action: "deny" \};\n  \}\);/.test(eigene)
       && /win\.webContents\.on\("will-navigate", /.test(eigene)
-      && [...winBare.matchAll(/\bnurEigeneSeite\(/g)].length === 3
+      && [...winBare.matchAll(/\bnurEigeneSeite\(/g)].length === 4
       && createBody !== null && createBody.includes("\n  nurEigeneSeite(win, origin);\n")
-      && openBody !== null && openBody.includes("\n  nurEigeneSeite(kw, seite.origin);\n"),
-    "no window opens another: both have the open handler that denies (nurEigeneSeite)",
+      && openBody !== null && openBody.includes("\n  nurEigeneSeite(kw, seite.origin);\n")
+      && abrissBody !== null && abrissBody.includes("\n  nurEigeneSeite(aw, seite.origin);\n"),
+    "no window opens another: all three have the open handler that denies (nurEigeneSeite)",
     `setWindowOpenHandler in: ${handlers.join(", ")}; nurEigeneSeite named ${[...winBare.matchAll(/\bnurEigeneSeite\(/g)].length}x`);
   // the field "win": read once, only the two names pass, and the compact
   // window gets only its own short list of actions
@@ -1575,18 +1717,21 @@ function auditMain() {
   check(winField === 1
       && JSON.stringify(welchesUses) === JSON.stringify([
         'const welches = sent.win ?? "main";',
-        'if (welches !== "main" && welches !== "kompakt") return fail("unknown window");',
+        'if (welches !== "main" && welches !== "kompakt" && welches !== "abriss") return fail("unknown window");',
         'if (welches === "kompakt" && !KOMPAKT_AKTIONEN.includes(action)) return fail("not for the compact window");',
-        'const win = welches === "kompakt" ? kompaktWindow() : currentWindow();'])
+        'if (welches === "abriss" && !ABRISS_AKTIONEN.includes(action)) return fail("not for the torn-off window");',
+        'const win = welches === "kompakt" ? kompaktWindow() : welches === "abriss" ? abrissWindow() : currentWindow();'])
       && /\nconst KOMPAKT_AKTIONEN = \["kompakt", "close", "resize", "pin", "seethrough", "clickthrough"\];\n/.test(win)
-      && [...winBare.matchAll(/\bKOMPAKT_AKTIONEN\b/g)].length === 2,
-    "/api/win names a window only as \"main\" or \"kompakt\", and the compact window takes only its own actions",
+      && [...winBare.matchAll(/\bKOMPAKT_AKTIONEN\b/g)].length === 2
+      && /\nconst ABRISS_AKTIONEN = \["close", "chrome"\];\n/.test(win)
+      && [...winBare.matchAll(/\bABRISS_AKTIONEN\b/g)].length === 2,
+    "/api/win names a window only as \"main\", \"kompakt\" or \"abriss\", and the compact and the torn-off window take only their own actions",
     `sent.win/sent[...] ${winField}x; welches: ${welchesUses.join(" | ")}`);
   const caseCount = (name) => [...win.matchAll(new RegExp(`\\bcase\\s+"${name}"\\s*:`, "g"))].length;
   check(["pin", "seethrough", "clickthrough"].every((n) => caseCount(n) === 1)
-      && /\n  const win = welches === "kompakt" \? kompaktWindow\(\) : currentWindow\(\);\n  if \(!win\) return fail\("no window"\);\n  try \{\n    switch \(action\) \{\n/.test(win)
+      && /\n  const win = welches === "kompakt" \? kompaktWindow\(\) : welches === "abriss" \? abrissWindow\(\) : currentWindow\(\);\n  if \(!win\) return fail\("no window"\);\n  try \{\n    switch \(action\) \{\n/.test(win)
       && [...winBare.matchAll(/\bswitch\s*\(/g)].length === 1,
-    "pin, see-through and click-through are handled once, for the window named (the rules of 6/7 hold for both)",
+    "pin, see-through and click-through are handled once, for the window named (the rules of 6/7 hold for each)",
     `cases: pin ${caseCount("pin")}, seethrough ${caseCount("seethrough")}, clickthrough ${caseCount("clickthrough")}`);
   const kompaktCase = block("kompakt");
   const kompaktCalls = kompaktCase === null ? [] : [...kompaktCase.matchAll(/\b(\w+)\s*\(/g)].map((m) => m[1]).filter((c) => c !== "if");
@@ -1600,7 +1745,7 @@ function auditMain() {
   // spread of each window, so no second webPreferences can follow SEITE
   const OPTION_KEYS = ["title", "width", "height", "minWidth", "minHeight", "titleBarStyle", "titleBarOverlay",
     "backgroundColor", "icon", "show", "webPreferences", "alwaysOnTop", "skipTaskbar", "minimizable", "maximizable", "fullscreenable"];
-  const PLACE_SPREADS = ["...(platz ? { x: platz.x, y: platz.y } : {})", "...(p ? { x: p.x, y: p.y } : {})"];
+  const PLACE_SPREADS = ["...(platz ? { x: platz.x, y: platz.y } : {})", "...(p ? { x: p.x, y: p.y } : {})", "...(p ? { x: p.x, y: p.y } : {})"];
   const topEntries = (o) => {
     const out = [];
     let depth = 0, from = 1;
@@ -1619,8 +1764,25 @@ function auditMain() {
     return !m || !OPTION_KEYS.includes(m[1]);
   }).map((e) => `window ${n}: ${e.slice(0, 60)}`));
   check(!strayOptions.length,
-    "both windows' options are plain named keys from a fixed list (no computed, quoted or spread key beside SEITE)",
+    "all three windows' options are plain named keys from a fixed list (no computed, quoted or spread key beside SEITE)",
     `found: ${strayOptions.join(" | ")}`);
+  // #364 (31.10.2026): full view has a fixed size - not dragged, not maximised. It is built without maximise and
+  // fullscreen and made fixed in createWindow; compact makes the same window draggable and backToFull makes it fixed
+  // again, both through ansichtSetzen (three flags from fensterOptionen, nothing else). Nothing maximises a window
+  // (the action is gone), and the torn-off window keeps the defaults (its exact options are pinned below).
+  const ANSICHT_SETZEN = "\n  const o = fensterOptionen(ansicht);\n  win.setResizable(o.resizable);\n  win.setMaximizable(o.maximizable);\n"
+    + "  win.setFullScreenable(o.fullscreenable);";
+  const ansichtCalls = argsOf(win, "ansichtSetzen").filter((a) => a !== "win: BrowserWindow, ansicht: Ansicht");
+  const kernVoll = (code["windows-core.ts"] ?? "").includes("  return { resizable: false, maximizable: false, fullscreenable: false, minWidth: 180, minHeight: 24 };");
+  check(winOpts[0] !== null && /\n    maximizable: false,\n/.test(winOpts[0]) && /\n    fullscreenable: false,\n/.test(winOpts[0])
+      && !/\bmaximizable\s*:\s*true|\bresizable\s*:\s*true/.test(winOpts[0])
+      && fnBody(win, "function ansichtSetzen\\(win: BrowserWindow, ansicht: Ansicht\\): void") === ANSICHT_SETZEN
+      && JSON.stringify(ansichtCalls) === JSON.stringify(['win, "voll"', 'win, "voll"', 'win, "kompakt"'])
+      && [...winBare.matchAll(/\bansichtSetzen\b/g)].length === 4
+      && !/\.\s*(maximize|setMaximizable)\s*\(/.test(winBare.replace(ANSICHT_SETZEN, "")) && block("maximize") === null
+      && kernVoll,
+    "full view has a fixed size: built without maximise and fullscreen, fixed in createWindow and in backToFull, draggable only in compact, and nothing maximises it",
+    `options: ${winOpts[0] === null ? "none" : topEntries(winOpts[0]).join(" | ")}; ansichtSetzen(${ansichtCalls.join(") | (")}); maximise calls: ${[...winBare.matchAll(/\.\s*(maximize|setMaximizable)\s*\(/g)].length}`);
   // Pruefung N4, W2: winAction reads the request only as sent.<name> (no
   // destructuring, no index), and no window is looked up by number, content
   // or focus anywhere in the main process
@@ -1634,6 +1796,8 @@ function auditMain() {
   const SEITE_LINES = ['const seite = { origin: "", icon: "" };', "seite.origin = origin;", "seite.icon = iconPath;",
     "if (!kompaktMoeglich() || !seite.origin) return false;", "icon: seite.icon,", "nurEigeneSeite(kw, seite.origin);",
     "void kw.loadURL(`${seite.origin}/?win=1&kompakt=1`);",
+    "if (!currentWindow() || !seite.origin) return false;", "icon: seite.icon,", "nurEigeneSeite(aw, seite.origin);",
+    "void aw.loadURL(`${seite.origin}/?win=1&teil=${teil}`);",
     "const gezeigt = meldeKampf(currentWindow(), seite.icon, sent.titel, sent.satz, sent.best);"];
   const seiteLines = [...win.matchAll(/[^\n]*\bseite\b[^\n]*/g)].map((m) => m[0].trim());
   check(JSON.stringify(seiteLines) === JSON.stringify(SEITE_LINES),
@@ -1653,6 +1817,42 @@ function auditMain() {
         + "  const offen = kompaktWindow();\n  if (offen) {\n    offen.showInactive();\n    offen.moveTop();\n    return true;\n  }\n"),
     "one compact window at a time: an open one is shown again, kompakt.win is set to the new one and cleared when it closes",
     `kompakt.win: ${kompaktWinLines.join(" | ")}; other uses: ${kompaktOdd.join(" | ")}`);
+  // Windows-Teil 2 (29.10.2026): one torn-off window at a time, made only as
+  // written - framed like full view, not on top, the same SEITE, the open
+  // handler, only the app's page with one area of ABRISS_TEILE. The same
+  // area brings it forward, another replaces it; it closes with full view,
+  // abriss.win is set to the new one and cleared when it closes. In "chrome"
+  // it sets its own buttons and material and leaves full view's header be.
+  const OPEN_ABRISS = "\n  if (!currentWindow() || !seite.origin) return false;\n  const offen = abrissWindow();\n"
+    + "  if (offen && abriss.teil === teil) {\n    offen.show();\n    offen.focus();\n    return true;\n  }\n  offen?.close();\n"
+    + "  const cfg = loadConfig();\n  \n  const p = platzAbriss(teilAus(loadConfig().fenster, \"abriss\"), monitore(), hauptmonitor());\n"
+    + "  const aw = new BrowserWindow({\n    title: \"Borometer\",\n    width: p ? p.w : 900,\n    height: p ? p.h : 640,\n"
+    + "    ...(p ? { x: p.x, y: p.y } : {}),\n    minWidth: 320,\n    minHeight: 240,\n    titleBarStyle: \"hidden\",\n"
+    + "    titleBarOverlay: overlayFor(cfg.themeResolved),\n    backgroundColor: backgroundFor(cfg.themeResolved),\n"
+    + "    icon: seite.icon,\n    show: false,\n    \n    webPreferences: SEITE,\n  });\n"
+    + "  abriss.win = aw;\n  abriss.teil = teil;\n  materialSetzen(aw, false, cfg.themeResolved);\n  borderInTheme(aw, cfg.themeResolved);\n"
+    + "  const zeigen = (): void => {\n    if (!aw.isDestroyed() && !aw.isVisible()) aw.show();\n  };\n"
+    + "  aw.webContents.once(\"did-finish-load\", zeigen);\n  aw.webContents.once(\"did-fail-load\", zeigen);\n"
+    + "  aw.on(\"move\", () => abrissMerker.ereignis());\n  aw.on(\"resize\", () => abrissMerker.ereignis());\n"
+    + "  aw.on(\"close\", () => abrissMerker.jetzt());\n"
+    + "  aw.on(\"closed\", () => {\n    if (abriss.win === aw) {\n      abriss.win = null;\n      abriss.teil = null;\n    }\n  });\n"
+    + "  nurEigeneSeite(aw, seite.origin);\n  void aw.loadURL(`${seite.origin}/?win=1&teil=${teil}`);\n  return true;";
+  const ABRISS_WIN_LINES = ["return abriss.win && !abriss.win.isDestroyed() ? abriss.win : null;", "abriss.win = aw;",
+    "if (abriss.win === aw) {", "abriss.win = null;", "if (win === abriss.win) {"];
+  const abrissWinLines = [...win.matchAll(/[^\n]*\babriss\s*\.\s*win\b[^\n]*/g)].map((m) => m[0].trim());
+  const abrissOdd = [...winBare.matchAll(/\babriss\b(?!\s*\.\s*(win|teil)\b)/g)].map((m) => winBare.slice(m.index, m.index + 20));
+  const chromeCase = block("chrome");
+  check(abrissBody === OPEN_ABRISS
+      && win.includes("\nconst abriss = { win: null as BrowserWindow | null, teil: null as AbrissTeil | null };\n")
+      && JSON.stringify(abrissWinLines) === JSON.stringify(ABRISS_WIN_LINES) && abrissOdd.length === 1
+      && [...winBare.matchAll(/\babriss\s*\.\s*teil\b/g)].length === 3
+      && createBody !== null && createBody.includes("\n    kompaktWindow()?.close();\n    abrissWindow()?.close();\n  });\n")
+      && chromeCase !== null && chromeCase.includes("\n        win.setTitleBarOverlay(overlayFor(sent.theme, sent.height));\n"
+        + "        \n        if (win === abriss.win) {\n          borderInTheme(win, sent.theme);\n          materialSetzen(win, false, sent.theme);\n"
+        + "          break;\n        }\n        state.header = sent.height;\n")
+      && [...winBare.matchAll(/\bopenAbriss\b/g)].length === 2,
+    "one torn-off window at a time, made only as written: the same area is brought forward, another replaces it, it closes with full view",
+    `abriss.win: ${abrissWinLines.join(" | ")}; other uses: ${abrissOdd.join(" | ")}; openAbriss: ${JSON.stringify(abrissBody)}; chrome: ${JSON.stringify(chromeCase)}`);
   // Pruefung N4, K3: nothing takes the guards off a window's page again or
   // slips a preload in through its session
   const unguard = files.flatMap((f) => [...bare[f].matchAll(/\b(removeAllListeners|removeListener|setPreloads|registerPreloadScript)\b|\bsession\s*\.\s*(set|register)\w*/g)]
@@ -1669,7 +1869,7 @@ function auditMain() {
   // compares it with a fresh listing - section 2b's N3 rules).
   const B = String.fromCharCode(92);
   const STAND_DEFS = [
-    'const STAND_GRUENDE = ["leer", "live", "datei", "fremd", "andere", "beispiel", "mehrere"];',
+    'const STAND_GRUENDE = ["leer", "live", "datei", "fremd", "andere", "beispiel", "mehrere", "archiv"];',
     'const vollStand = { grund: "leer", datei: "", kampf: null as number | null };',
     "const LOG_NAME = /^[^" + B + B + "/:*?\"<>|" + B + "u0000-" + B + "u001f]{1,200}" + B + ".(txt|log)$/i;",
   ];
@@ -1686,7 +1886,7 @@ function auditMain() {
   // "pfad" passed on beside the stand) is a change the audit sees
   const KOMPAKT_STAND = "\n  return { offen: kompaktWindow() !== null, live: kompakt.start.live, durch: kompakt.start.durch,\n"
     + "    grund: vollStand.grund, datei: vollStand.datei, kampf: vollStand.kampf };";
-  const SENT_FIELDS = ["alpha", "an", "art", "best", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "nr", "on", "remember", "satz", "theme", "titel", "w", "win"];
+  const SENT_FIELDS = ["alpha", "an", "art", "best", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "min", "nr", "on", "remember", "satz", "teil", "theme", "titel", "w", "win"];
   const sentFields = [...new Set([...winBare.matchAll(/\bsent\s*\.\s*(\w+)/g)].map((m) => m[1]))].sort();
   const standOk = fnBody(win, "export function kompaktStand\\(\\): \\{ offen: boolean; live: boolean; durch: boolean; grund: string; datei: string; kampf: number \\| null \\}") === KOMPAKT_STAND
     && JSON.stringify(sentFields) === JSON.stringify(SENT_FIELDS);
@@ -1748,12 +1948,31 @@ function auditMain() {
       && JSON.stringify(nKeys) === JSON.stringify(["title", "body", "icon", "actions"]),
     "Notification only in notify.ts", `elsewhere: ${notifiers}; keys: ${nKeys.join(",")}`);
   // the tray (spec Windows-Einbindung 4): one file, one icon, items that raise an event, show the window or quit
-  const trayUsers = files.filter((f) => f !== "tray.ts" && /\bTray\b|buildFromTemplate|popUpContextMenu/.test(bare[f]));
+  // menue.ts (the table row menu) may build one template too; it may not touch Tray or popUpContextMenu
+  const trayUsers = files.filter((f) => f !== "tray.ts" && !(f === "menue.ts" && !/\bTray\b|popUpContextMenu/.test(bare[f]))
+    && /\bTray\b|buildFromTemplate|popUpContextMenu/.test(bare[f]));
   const tr = code["tray.ts"] ?? "";
   const menuUses = files.flatMap((f) => [...bare[f].matchAll(/\bMenu\s*\.\s*(\w+)/g)].map((m) => `${f}: ${m[1]}`));
   check(!trayUsers.length && [...tr.matchAll(/new Tray\(/g)].length === 1
-      && menuUses.every((u) => u === "main.ts: setApplicationMenu" || u === "tray.ts: buildFromTemplate"),
+      && menuUses.every((u) => u === "main.ts: setApplicationMenu" || u === "tray.ts: buildFromTemplate" || u === "menue.ts: buildFromTemplate")
+      && menuUses.filter((u) => u === "menue.ts: buildFromTemplate").length <= 1,
     "Tray and its menu only in tray.ts", `elsewhere: ${trayUsers}; Menu: ${menuUses.join(", ")}`);
+  // The native table menu: one file, one popup, items only from the fixed list.
+  const popups = files.flatMap((f) => [...bare[f].matchAll(/\.\s*popup\s*\(/g)].map(() => f));
+  const menueSrc = code["menue.ts"] ?? "";
+  // the two lines of zeigeMenue() word for word, and the one case that calls it: full view only, a kind from menueArt()
+  const MENUE_CASE = "{ if (win !== state.win) return fail(\"only for full view\"); if (menueArt(sent.art) === null) return fail(\"unknown menu\"); "
+    + "zeigeMenue(win); return ok(); }";
+  check(popups.join() === "menue.ts"
+      && /\.map\(\(p\) => \(\{ label: p\.label, click: \(\) => menueGewaehlt\(p\.id\) \}\)\)/.test(menueSrc)
+      && menueSrc.includes("menuePunkte(loadConfig().lang)")
+      && fnBody(menueSrc, "export function zeigeMenue\\(win: BrowserWindow\\): void") === "\n  const items = menuePunkte(loadConfig().lang).map((p) => ({ label: p.label, click: () => menueGewaehlt(p.id) }));\n"
+        + "  Menu.buildFromTemplate(items).popup({ window: win });"
+      && win.split('case "menue":').length === 2 && norm(block("menue") ?? "") === MENUE_CASE
+      && [...allBare.matchAll(/\bzeigeMenue\b/g)].length === 3
+      && !/clipboard/i.test(all),
+    "the native table menu is shown in menue.ts once, its items are menuePunkte() with a click that only calls menueGewaehlt, and no clipboard in main",
+    `popup in: ${popups.join(", ")}`);
   // every way to hear a click: the two tray.on calls as written, five menu items, nothing else
   const trayOn = [...tr.matchAll(/\btray\s*\.\s*on\(/g)].length;
   const clickForms = [...tr.matchAll(/\bclick\b/g)].length;
@@ -1825,8 +2044,19 @@ function auditMain() {
       // GET /api/config gives it back only as "de", "en" or null (Windows-Einbindung 8, Fixrunde 1 zu Aufgabe 8)
       && serverSrc.includes('\n        lang: cfg.lang === "de" || cfg.lang === "en" ? cfg.lang : null,\n')
       && [...serverSrc.matchAll(/\bcfg\.lang\b/g)].length === 3
-      && /^const FIRST_START = isFirstStart\(loadConfig\(\),\n  \[\.\.\.CONFIG_KEYS\.filter\(\(k\) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang"\)/m.test(serverSrc),
+      // archivHinweis (#264) entsteht durch das Bestaetigen eines Hinweises, auch in der Karte der
+      // Rundgang-Frage, nicht durch eine Wahl; archivAn zaehlt. Die ganze Zeile ist festgelegt.
+      && /^const FIRST_START = isFirstStart\(loadConfig\(\),\n  \[\.\.\.CONFIG_KEYS\.filter\(\(k\) => k !== "themeResolved" && k !== "rundgangGesehen" && k !== "lang" && k !== "rundgangSpaeter" && k !== "bereicheGezeigt" && k !== "archivHinweis"\), "log_dir", "partyServer", "stayOnTop"\]\);$/m.test(serverSrc),
     "lang is stored only as de or en", "");
+  // Rundgang erweitert (#265, Spezifikation 5.1 und 6): die Frage merkt nur eine ganze Zahl 0 bis 3,
+  // die Hinweise nur eine kurze Liste von Kennungen (je ein paar Kleinbuchstaben, einmal, hoechstens
+  // zwoelf); beide entstehen ohne Wahl, also zaehlen sie beim ersten Start nicht (FIRST_START oben).
+  // Der Hauptprozess nennt keinen Bereich beim Namen: welche Kennungen es gibt, weiss die Seite.
+  check(serverSrc.includes('if ("rundgangSpaeter" in changes && !(typeof changes.rundgangSpaeter === "number" && Number.isInteger(changes.rundgangSpaeter) && changes.rundgangSpaeter >= 0 && changes.rundgangSpaeter <= 3)) delete changes.rundgangSpaeter;')
+      && serverSrc.includes('if (Array.isArray(changes.bereicheGezeigt)) changes.bereicheGezeigt = areaIds(changes.bereicheGezeigt);\n        else delete changes.bereicheGezeigt;')
+      && serverSrc.includes('return [...new Set(v.filter((x): x is string => typeof x === "string" && /^[a-z]{3,12}$/.test(x)))].slice(0, 12);')
+      && [...serverSrc.matchAll(/\bareaIds\(/g)].length === 3,
+    "rundgangSpaeter is stored only as a whole number 0 to 3, bereicheGezeigt only as a short list of area ids (areaIds)");
   // Kompakt-Fix 2 (01.10.2026): the compact window has a maximum - twice the
   // largest strip the page measured, only ever growing - set in one place
   // and only from the compact window's resize; full view gets none. How the
@@ -1840,10 +2070,15 @@ function auditMain() {
     + "  const a = screen.getDisplayMatching(kw.getBounds()).workArea;\n"
     + "  streifen.grenze.w = Math.min(a.width, Math.max(streifen.grenze.w, KOMPAKT_MAX_FAKTOR * w));\n"
     + "  streifen.grenze.h = Math.min(a.height, Math.max(streifen.grenze.h, KOMPAKT_MAX_FAKTOR * h));\n"
+    + "  minimumSetzen(kw, min, w, h, a);\n"
     + "  if (streifen.vorMenue) return;\n"
-    + "  grenzeSetzen(kw, streifen.grenze.w, streifen.grenze.h);\n  if (art === \"streifen\") sizeBySelf(kw, w, h);";
+    + "  grenzeSetzen(kw, streifen.grenze.w, streifen.grenze.h);\n  if (art !== \"streifen\") return;\n  sizeBySelf(kw, w, h);\n"
+    // #298: a strip that grew past the work area's bottom is lifted (streifenLage), as the menu is;
+    // the audit sees the two comment lines of window.ts blanked to their indent
+    + "  \n  \n  const b = kw.getBounds();\n  const lage = streifenLage(b, a, streifen.lift);\n  streifen.lift = lage.lift;\n"
+    + "  if (lage.y !== b.y) positionBySelf(kw, { x: b.x, y: lage.y });";
   const RESIZE_KOMPAKT = "\n        if (win !== state.win) {\n          const art = STREIFEN_ARTEN.find((a) => a === sent.art) ?? \"streifen\";\n"
-    + "          if (w > 0 && h > 0) streifenGroesse(win, Math.max(w, MIN_ACTION_W), Math.max(h, MIN_ACTION_H), art);\n"
+    + "          if (w > 0 && h > 0) streifenGroesse(win, Math.max(w, MIN_ACTION_W), Math.max(h, MIN_ACTION_H), art, sent.min);\n"
     + "          break;\n        }\n";
   const GRENZE_LINES = ["streifen.grenze = { w: 0, h: 0 };",
     "streifen.grenze.w = Math.min(a.width, Math.max(streifen.grenze.w, KOMPAKT_MAX_FAKTOR * w));",
@@ -1852,6 +2087,9 @@ function auditMain() {
     "grenzeSetzen(kw, Math.max(streifen.grenze.w, nw), Math.max(streifen.grenze.h, nh));",
     "if (streifen.grenze.w > 0) grenzeSetzen(kw, streifen.grenze.w, streifen.grenze.h);"];
   const grenzeLines = [...win.matchAll(/[^\n]*\bstreifen\s*\.\s*grenze\b[^\n]*/g)].map((m) => m[0].trim());
+  // #327: a new strip starts without a lift remembered from an earlier one
+  const LIFT_LINES = ["streifen.lift = null;", "const lage = streifenLage(b, a, streifen.lift);", "streifen.lift = lage.lift;"];
+  const liftLines = [...win.matchAll(/[^\n]*\bstreifen\s*\.\s*lift\b[^\n]*/g)].map((m) => m[0].trim());
   const resizeCase = block("resize");
   // Gutachten M4: setMaximumSize named once in all of main - so no .call,
   // .apply or second handle beside the one call - and in the files that
@@ -1867,16 +2105,32 @@ function auditMain() {
   check(maxMentions.length === 1 && maxMentions[0] === "window.ts" && !computedNames.length
       && JSON.stringify(maxCalls) === JSON.stringify(["window.ts: w + ow - cw, h + oh - ch"]) && !maxOptions.length
       && fnBody(win, "function grenzeSetzen\\(kw: BrowserWindow, w: number, h: number\\): void") === GRENZE_SETZEN
-      && fnBody(win, "function streifenGroesse\\(kw: BrowserWindow, w: number, h: number, art: string\\): void") === STREIFEN_GROESSE
+      && fnBody(win, "function streifenGroesse\\(kw: BrowserWindow, w: number, h: number, art: string, min: unknown\\): void") === STREIFEN_GROESSE
       && /\nconst KOMPAKT_MAX_FAKTOR = 2;\n/.test(win) && nennt("KOMPAKT_MAX_FAKTOR") === 3
       && /\nconst STREIFEN_ARTEN = \["streifen", "hand", "menue", "zurueck"\];\n/.test(win) && nennt("STREIFEN_ARTEN") === 2
       && nennt("grenzeSetzen") === 4 && nennt("streifenGroesse") === 2
       && resizeCase !== null && resizeCase.split(RESIZE_KOMPAKT).length === 2
-      && [...winBare.matchAll(/\bsent\s*\.\s*art\b/g)].length === 1
-      && JSON.stringify(grenzeLines) === JSON.stringify(GRENZE_LINES),
+      // sent.art is read twice: the resize case above and the table menu's kind, checked by menueArt()
+      && [...winBare.matchAll(/\bsent\s*\.\s*art\b/g)].length === 2
+      && [...winBare.matchAll(/\bmenueArt\(sent\.art\) === null\b/g)].length === 1
+      && JSON.stringify(grenzeLines) === JSON.stringify(GRENZE_LINES)
+      && JSON.stringify(liftLines) === JSON.stringify(LIFT_LINES),
     "the compact window has a maximum: twice the largest strip the page measured, set in one place, never for full view",
     `setMaximumSize(${maxCalls.join(") | (")}) named in ${maxMentions.join(", ")}; options: ${maxOptions.join(", ")}; `
-    + `computed names: ${computedNames.join(" | ")}; grenze: ${grenzeLines.join(" | ")}`);
+    + `computed names: ${computedNames.join(" | ")}; grenze: ${grenzeLines.join(" | ")}; lift: ${liftLines.join(" | ")}`);
+  // #348 (30.10.2026): the compact window has a floor - the smallest size the strip is readable at. The page names two
+  // numbers (min), kompaktMinimum (windows-core, pure) decides what becomes of them, and one call sets it, from the compact
+  // window's resize only; full view gets none, and nothing else reads sent.min.
+  const MINIMUM_SETZEN = "\n  const m = kompaktMinimum(min, w, h, wa);\n  if (!m) return;\n  const [ow = 0, oh = 0] = kw.getSize();\n"
+    + "  const [cw = 0, ch = 0] = kw.getContentSize();\n  kw.setMinimumSize(m.w + ow - cw, m.h + oh - ch);";
+  const minMentions = files.flatMap((f) => [...bare[f].matchAll(/\bsetMinimumSize\b/g)].map(() => f));
+  const minCalls = files.flatMap((f) => [...code[f].matchAll(/setMinimumSize\s*\(([^)]*)\)/g)].map((m) => `${f}: ${m[1].trim()}`));
+  check(minMentions.length === 1 && minMentions[0] === "window.ts" && JSON.stringify(minCalls) === JSON.stringify(["window.ts: m.w + ow - cw, m.h + oh - ch"])
+      && fnBody(win, "function minimumSetzen\\(kw: BrowserWindow, min: unknown, w: number, h: number, wa: \\{ width: number; height: number \\}\\): void") === MINIMUM_SETZEN
+      && [...winBare.matchAll(/\bsent\s*\.\s*min\b/g)].length === 1 && nennt("minimumSetzen") === 2 && nennt("kompaktMinimum") === 2
+      && /\nexport function kompaktMinimum\(/.test(code["windows-core.ts"] ?? "") && !computedNames.length,
+    "the compact window has a floor: the page names two numbers, kompaktMinimum clamps them, one call sets it, never for full view",
+    `setMinimumSize(${minCalls.join(") | (")}) named in ${minMentions.join(", ")}`);
   // Kompakt-Fix 3 (01.10.2026): the strip's menu - the compact window grows
   // for it while it is open, never smaller and never off its monitor's work
   // area, and comes back to the size (and place) from before when it closes.
@@ -1895,7 +2149,7 @@ function auditMain() {
     "if (!streifen.vorMenue) streifen.vorMenue = { w: o.width, h: o.height, x: o.x, y: o.y, gehoben: false };",
     "streifen.vorMenue.gehoben = true;", "const v = streifen.vorMenue;", "streifen.vorMenue = null;"];
   const vorMenueLines = [...win.matchAll(/[^\n]*\bstreifen\s*\.\s*vorMenue\b[^\n]*/g)].map((m) => m[0].trim());
-  const POSITION_CALLS = ["kw, { x: o.x, y: Math.max(a.y, o.y - ueber) }", "win, p"];
+  const POSITION_CALLS = ["kw, { x: b.x, y: lage.y }", "kw, { x: o.x, y: Math.max(a.y, o.y - ueber) }", "win, p"];
   const BOUNDS_CALLS = ["kw, { x: b.x, y: v.gehoben ? v.y : b.y, w: v.w, h: v.h, max: false }", "win, g"];
   const boundsCalls = argsOf(win, "boundsBySelf").filter((a) => a !== "win: BrowserWindow, g: LageGross");
   const positionCalls = argsOf(win, "positionBySelf").filter((a) => a !== "win: BrowserWindow, p: LageKompakt");
@@ -2220,7 +2474,7 @@ function auditMain() {
     const P = "WEEKLIES_PATH", TMP = 'WEEKLIES_PATH + ".tmp"';
     const defs = [...wk.matchAll(/\bconst WEEKLIES_PATH\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
     check(defs.length === 1 && defs[0] === 'settingsPath("boro-weeklies.json")'
-        && [...wkBare.matchAll(/\bsettingsPath\b/g)].length === 2,
+        && [...wkBare.matchAll(/\bsettingsPath\b/g)].length === 3,
       "weeklies live in one fixed file in the settings folder (settingsPath imported and used once)", `found: ${defs.join(" | ")}`);
     check(!/fetchJson|readLog|STATE\.dir|shell\.|\bfetch\b|require\s*\(|import\s*\(|\bprocess\b|\bglobal\b|\bglobalThis\b|\bReflect\b|\bFunction\b/
         .test(wkBare), "weeklies.ts reads no log and sends nothing");
@@ -2231,20 +2485,20 @@ function auditMain() {
     check(lines.length === 2 && lines.every((l) => IMPORTS.includes(l)) && !wStray.length,
       "weeklies.ts imports only node:fs and ./paths", `found: ${[...lines, ...wStray].join(" | ")}`);
     const fsMentions = [...wkBare.matchAll(/\bfs\b[.\w]*/g)].map((m) => m[0]);
-    const fsCalls = [...wkBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync)\(/g)].length;
+    const fsCalls = [...wkBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync|mkdirSync)\(/g)].length;
     // the import line names fs once without a method
     check(fsMentions.filter((m) => m === "fs").length === 1 && fsCalls === fsMentions.length - 1 && fsCalls > 0,
       "weeklies.ts uses node:fs only to read, write and rename (no delete, descriptor, copy or stream)",
       `found: ${fsMentions.join(" | ")}`);
     const ops = [...wk.matchAll(/\bfs\.(readFileSync|writeFileSync)\(\s*([^,)]+)/g)];
-    check(ops.length > 0 && ops.every((m) => [P, TMP].includes(m[2].trim())),
+    check(ops.length > 0 && ops.every((m) => [P, TMP, 'dir + "/" + name'].includes(m[2].trim())),
       "weeklies.ts reads and writes only WEEKLIES_PATH and its temp file", `found: ${ops.map((m) => m[0]).join(" | ")}`);
     // the two writes as written: the whole state into the temp file, and the
     // empty file on the first start, only when there is none
     const writes = [...wk.matchAll(/\bfs\.writeFileSync\([^;]*;/g)].map((m) => m[0]);
-    check(writes.length === 2
+    check(writes.length === 3
         && writes[0] === 'fs.writeFileSync(WEEKLIES_PATH + ".tmp", JSON.stringify(all), "utf8");'
-        && writes[1] === 'fs.writeFileSync(WEEKLIES_PATH, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });',
+        && writes[2] === 'fs.writeFileSync(dir + "/" + name, text, { encoding: "utf8", flag: "wx" });' && writes[1] === 'fs.writeFileSync(WEEKLIES_PATH, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });',
       "the weeklies file is written whole through its temp file, or created once and never over a file that is there",
       `found: ${writes.join(" | ")}`);
     const renames = [...wk.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)];
@@ -2273,18 +2527,55 @@ function auditMain() {
       + " const profile: Profile[] = []; for (const x of next.profile) { const p = profileOf(x);"
       + " if (!p || profile.some((q) => q.id === p.id)) return null; profile.push(p); }"
       + " if (profile.filter((p) => !p.geloest).length > MAX_ACTIVE) return null;"
+      // Twinks (#251): one main at most, never a detached one, no log name twice among the active characters
+      + " const active = profile.filter((p) => !p.geloest);"
+      + " if (active.filter((p) => p.main).length > 1 || profile.some((p) => p.main && p.geloest)) return null;"
+      + " const logs = active.flatMap((p) => (p.log === undefined ? [] : [p.log]));"
+      + " if (new Set(logs).size !== logs.length) return null;"
       + " const erinnerungen = next.erinnerungen === undefined ? undefined : remindersOf(next.erinnerungen);"
       + " if (erinnerungen === null) return null;"
       + " if (!(stored.erinnerungen ?? []).every((old) => (erinnerungen ?? []).some((r) => r.id === old.id))) return null;"
+      // Twinks (#251, spec Twinks 6): an ignored name may be detached, never left out
+      + " const ignoriert = next.ignoriert === undefined ? undefined : ignoredOf(next.ignoriert);"
+      + " if (ignoriert === null) return null;"
+      + " if (!(stored.ignoriert ?? []).every((old) => (ignoriert ?? []).some((e) => e.name === old.name))) return null;"
       + " for (const old of stored.profile) { const p = profile.find((q) => q.id === old.id); if (!p) return null;"
       + " if (!Object.keys(old.zaehler).every((k) => Object.hasOwn(p.zaehler, k))) return null;"
       + " if (!old.eigene.every((e) => p.eigene.some((f) => f.schluessel === e.schluessel))) return null;"
       + " if (old.vorwoche) { const week = p.vorwoche; if (!week || week.reset < old.vorwoche.reset) return null;"
       + " if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null; } }"
-      + " return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }) };";
-    check(chk === CHK && [...wkBare.matchAll(/\bcheckWeeklies\b/g)].length === 3,
+      + " return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }), ...(ignoriert === undefined ? {} : { ignoriert }) };";
+    check(chk === CHK && [...wkBare.matchAll(/\bcheckWeeklies\b/g)].length === 4,
       "checkWeeklies refuses a state that leaves out a stored character, own point, counter or last week, and keeps detached ones",
       `found: ${chk}`);
+    // Twinks (#251, spec Twinks 2): a character may carry the attacker name of the log (log) and the main mark (main).
+    // The log name is a name like the character's own (NAME_RX, at most 24 characters, no control or format
+    // character, trimmed) and stays in this file; main is only true. Each is read and built in exactly one place.
+    const wkLines = wk.split("\n").map((l) => l.trim());
+    const WK_TWINK = [
+      'const NAME_RX = /^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]{1,24}$/u;',
+      'const textOk = (x: unknown, rx: RegExp): x is string => typeof x === "string" && rx.test(x) && x.trim() === x;',
+      'const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];',
+      "if (x.log !== undefined && !textOk(x.log, NAME_RX)) return null;",
+      "if (x.main !== undefined && x.main !== true) return null;",
+      "...(x.log === undefined ? {} : { log: x.log as string }), ...(x.main === undefined ? {} : { main: true as const }),"];
+    check(WK_TWINK.every((l) => wkLines.filter((w) => w === l).length === 1)
+        && [...wkBare.matchAll(/\bx\.log\b/g)].length === 4 && [...wkBare.matchAll(/\bx\.main\b/g)].length === 3
+        && [...wkBare.matchAll(/\.log\s*=(?!=)|\.main\s*=(?!=)/g)].length === 0,
+      "weeklies.ts takes a character's log name only as a checked name (NAME_RX, trimmed) and main only as true, each in one place",
+      `missing: ${WK_TWINK.filter((l) => wkLines.filter((w) => w === l).length !== 1).join(" | ")}`);
+    // Twinks (#251, spec Twinks 6): an ignored attacker name is a name like a character's (NAME_RX, trimmed), at most
+    // 60 of them, none twice, each rebuilt from name and geloest in one place; ignoredOf as written
+    const ign = ((wk.match(/\nfunction ignoredOf\(x: unknown\): Ignored\[\] \| null \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const IGN = "if (!Array.isArray(x) || x.length > MAX_IGNORED) return null; const out: Ignored[] = []; for (const e of x) {"
+      + " if (!isRec(e) || !only(e, IGNORED_KEYS) || !textOk(e.name, NAME_RX) || !flagOk(e.geloest)) return null;"
+      + " if (out.some((q) => q.name === e.name)) return null;"
+      + " out.push({ name: e.name, ...(e.geloest === undefined ? {} : { geloest: e.geloest as boolean }) }); } return out;";
+    check(ign === IGN && wkLines.filter((l) => l === 'const IGNORED_KEYS = ["name", "geloest"];').length === 1
+        && wkLines.filter((l) => l === "const MAX_IGNORED = 60;").length === 1 && [...wkBare.matchAll(/\bignoredOf\b/g)].length === 2
+        && [...wkBare.matchAll(/\.ignoriert\s*(?:\?\?|\|\||&&)?=(?!=)/g)].length === 0,
+      "weeklies.ts takes an ignored name only as a checked name (NAME_RX, trimmed), at most 60, none twice, built in one place",
+      `ignoredOf: ${ign}`);
     // putWeeklies as written: size first, then the stored state, then
     // checkWeeklies against it, and only its result is saved
     const put = ((wk.match(/export function putWeeklies\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1])
@@ -2293,7 +2584,7 @@ function auditMain() {
       + ' const read = readWeekliesFile(); if ("corrupt" in read) return "unavailable";'
       + ' const clean = checkWeeklies(data, read.data); if (!clean) return "refused";'
       + ' return saveWeeklies(clean) ? "saved" : "unavailable";';
-    check(put === PUT && [...wkBare.matchAll(/\bsaveWeeklies\b/g)].length === 2,
+    check(put === PUT && [...wkBare.matchAll(/\bsaveWeeklies\b/g)].length === 3,
       "putWeeklies checks size and schema before it writes, and writes only what checkWeeklies returned", `found: ${put}`);
     check(/^const MAX_TEXT = 262144;$/m.test(wk) && /^const MAX_ACTIVE = 6;$/m.test(wk)
         && [...wkBare.matchAll(/\bMAX_TEXT\b/g)].length === 2 && [...wkBare.matchAll(/\bMAX_ACTIVE\b/g)].length === 2
@@ -2303,10 +2594,34 @@ function auditMain() {
         && ["MAX_PROFILES", "MAX_OWN", "MAX_KEYS", "MAX_COUNT", "AHEAD"]
           .every((n) => [...wkBare.matchAll(new RegExp(`\\b${n}\\s*=`, "g"))].length === 1),
       "weeklies are capped (MAX_TEXT 262144 characters, MAX_ACTIVE 6 characters not detached, MAX_PROFILES 60, MAX_OWN 100, MAX_KEYS 150, MAX_COUNT 999, AHEAD one day), each bound once");
+    // 13.x (#240, owner 14.10.2026): the one narrow way to remove what the person detached themselves (a character, an own point). Only
+    // loescheGeloest removes anything, it asks first (a real request, the thing is detached, the name is right) and lays the backup of
+    // the whole file in "sicherungen" before it saves; the backup is written "wx" and nothing ever removes it; putWeeklies stays as strict.
+    const WLOE = ((wk.match(/\nexport function loescheWeekliesGeloest\(req: unknown\): LoeschenErgebnis \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const WLOE_WANT = "if (!isRec(req) || !only(req, LOESCHEN_KEYS) || typeof req.was !== \"string\" || !LOESCHEN_WAS.includes(req.was) || typeof req.id !== \"string\" || typeof req.name !== \"string\""
+      + " || (req.profil !== undefined && typeof req.profil !== \"string\") || (req.was === \"eigen\") !== (req.profil !== undefined)) { return { ok: false, grund: \"abgelehnt\" }; }"
+      + " const read = readWeekliesFile(); if (\"corrupt\" in read) return { ok: false, grund: \"unavailable\" };"
+      + " const neu = ohne(read.data, req.was, req.id, req.name, req.profil); if (typeof neu === \"string\") return { ok: false, grund: neu };"
+      + " const clean = checkWeeklies(neu, { v: 1, profile: [] }); if (!clean) return { ok: false, grund: \"abgelehnt\" };"
+      + " const sicherung = sichere(JSON.stringify(read.data)); if (!sicherung) return { ok: false, grund: \"sicherung\" };"
+      + " return saveWeeklies(clean) ? { ok: true, sicherung } : { ok: false, grund: \"unavailable\" };";
+    const WSIC = ((wk.match(/\nfunction sichere\(text: string\): string \| null \{([\s\S]*?)\n\}\n/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const WSIC_WANT = "const dir = settingsPath(\"sicherungen\"); try { fs.mkdirSync(dir, { recursive: true }); } catch { return null; }"
+      + " const tag = new Date().toISOString().slice(0, 10);"
+      + " for (const i of Array.from({ length: 99 }, (_, k) => k + 1)) { const name = \"weeklies-vor-loeschen-\" + tag + (i === 1 ? \"\" : \"-\" + i) + \".json\";"
+      + " try { fs.writeFileSync(dir + \"/\" + name, text, { encoding: \"utf8\", flag: \"wx\" }); return name; } catch (err) { if ((err as NodeJS.ErrnoException)?.code !== \"EEXIST\") return null; } } return null;";
+    const WOHNE = (wk.match(/\nfunction ohne\(alt: WeekliesFile, was: string, id: string, name: string, profil: string \| undefined\): WeekliesFile \| LoeschenGrund \{([\s\S]*?)\n\}\n/) || [null, ""])[1].replace(/\s+/g, " ");
+    check(WLOE === WLOE_WANT && WSIC === WSIC_WANT
+        && WOHNE.includes("if (!p || !p.geloest) return \"nicht-geloest\"; if (!nameGleich(name, p.name)) return \"name\";")
+        && WOHNE.includes("if (!p || !e || !e.geloest) return \"nicht-geloest\"; if (!nameGleich(name, e.name)) return \"name\";")
+        && [...wkBare.matchAll(/\bloescheWeekliesGeloest\b/g)].length === 1 && [...wkBare.matchAll(/\bsichere\b/g)].length === 2 && [...wkBare.matchAll(/\bohne\b/g)].length === 2,
+      "weeklies.ts removes for good only through loescheWeekliesGeloest: a real request, a thing the person detached, the right name, and the backup in sicherungen (written wx, never removed) before it saves",
+      "found: " + WLOE + " | " + WSIC);
     const WEEKLIES_STRINGS = new Set(["node:fs", "./paths", "boro-weeklies.json", ".tmp", "utf8", "ENOENT", "wx",
-      "woche", "tag", "v", "profile", "id", "name", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche",
+      "woche", "tag", "v", "profile", "id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche",
       "schluessel", "menge", "takt", "stand", "seit", "reset",
-      "erinnerungen", "zu", "bei", "an", "tage", "zeit", "text", "nurOffen",
+      "was", "profil", "charakter", "eigen", "abgelehnt", "nicht-geloest", "sicherung", "sicherungen", "weeklies-vor-loeschen-", "", "-", ".json", "/", "EEXIST",
+      "erinnerungen", "zu", "bei", "an", "tage", "zeit", "text", "nurOffen", "ignoriert",
       "object", "string", "boolean", "data", "corrupt", "saved", "refused", "unavailable"]);
     const tw = toks["weeklies.ts"];
     const wOdd = tw.error ? ["(not tokenised)"] : tw.strings.filter((x) => !WEEKLIES_STRINGS.has(x)).map((x) => JSON.stringify(x));
@@ -2320,7 +2635,7 @@ function auditMain() {
       + modRefs(f, "weeklies")]));
   const serverBare = bare["server.ts"] ?? "";
   check(Object.entries(wkNames).every(([f, k]) => f === "server.ts" || k === 0)
-      && (wk === undefined || (/^import \{ createWeeklies, loadWeeklies, putWeeklies \} from "\.\/weeklies";$/m.test(serverCode)
+      && (wk === undefined || (/^import \{ createWeeklies, loadWeeklies, loescheWeekliesGeloest, putWeeklies \} from "\.\/weeklies";$/m.test(serverCode)
         && ["putWeeklies", "loadWeeklies", "createWeeklies"]
           .every((n) => [...serverBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === (n === "loadWeeklies" ? 3 : 2))
         && wkNames["server.ts"] === 8)),
@@ -2333,9 +2648,10 @@ function auditMain() {
     // other string of the server names the weeklies
     const ts = toks["server.ts"];
     const wkStrings = ts.error ? ["(not tokenised)"] : ts.strings.filter((x) => /weekl/i.test(x));
-    check(wkStrings.filter((x) => x === "/api/weeklies").length === 2
-        && wkStrings.every((x) => x === "/api/weeklies" || x === "./weeklies")
-        && (getBody ?? "").includes('case "/api/weeklies":') && (postBody ?? "").includes('case "/api/weeklies":'),
+    check(wkStrings.filter((x) => x === "/api/weeklies").length === 2 && wkStrings.filter((x) => x === "/api/weeklies-loeschen").length === 1
+        && wkStrings.every((x) => x === "/api/weeklies" || x === "./weeklies" || x === "/api/weeklies-loeschen")
+        && (getBody ?? "").includes('case "/api/weeklies":') && (postBody ?? "").includes('case "/api/weeklies":')
+        && (postBody ?? "").split('case "/api/weeklies-loeschen":').length === 2,
       "the weeklies route is /api/weeklies, one GET and one POST case", `found: ${wkStrings.join(" | ")}`);
     const wGet = (((getBody ?? "").match(/case "\/api\/weeklies": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
     check(wGet === "const weeklies = loadWeeklies(); return weeklies ? reply(res, { ok: true, data: weeklies }) : reply(res, { ok: false }, 503);",
@@ -2343,10 +2659,303 @@ function auditMain() {
     const wPost = (((postBody ?? "").match(/case "\/api\/weeklies": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
     check(wPost === 'const put = putWeeklies(sent.data); return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);',
       "/api/weeklies's POST case calls putWeeklies(sent.data) once and nothing else", `found: ${wPost}`);
+    const wLoe = (((postBody ?? "").match(/case "\/api\/weeklies-loeschen": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    check(wLoe === 'const gone = loescheWeekliesGeloest(sent); return reply(res, gone, gone.ok ? 200 : gone.grund === "unavailable" ? 503 : 400);'
+        && [...serverBare.matchAll(/\bloescheWeekliesGeloest\b/g)].length === 2,
+      "/api/weeklies-loeschen's POST case calls loescheWeekliesGeloest(sent) once and nothing else (#240)", `found: ${wLoe}`);
     const start = (serverCode.match(/export async function startServer\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
     check([...serverBare.matchAll(/\bcreateWeeklies\(/g)].length === 1
-        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createGilde\(\);\n  return port;$/.test(start),
+        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createArchiv\(\);\n\s*createGilde\(\);\n  return port;$/.test(start),
       "createWeeklies is called once, from startServer, once the server listens", `found in startServer: ${/createWeeklies/.test(start)}`);
+  }
+
+  // --- 13d. the log archive (#264, spec 2026-10-16-log-archiv-design.md, 10):
+  //          the lines of a boss fight, packed with gzip, one file per fight in
+  //          the folder "archiv" of the settings folder, and one directory file
+  //          (index.json). Taken in only from a POST of the page, checked field
+  //          by field; never sent anywhere, and in this change nothing in it is
+  //          removed (detaching and deleting come with a later change, which
+  //          brings its own rule). The file name is a hash of the key, so no key
+  //          can name a path. Rules 13d.1-13d.12 hold archiv.ts; the page's side
+  //          (rules 3 and 4 of the spec) is in auditPage, the export below.
+  const av = code["archiv.ts"];
+  const avBare = bare["archiv.ts"] ?? "";
+  // 13d.1
+  check(av !== undefined && /^export function archiviere\(req: unknown\): PutResult \{$/m.test(av),
+    "archiv.ts is there to audit, with archiviere(req)");
+  if (av !== undefined) {
+    const avLines = av.split("\n").map((l) => l.trim());
+    const once = (l) => avLines.filter((x) => x === l).length === 1;
+    // 13d.2: one folder in the settings folder, its directory file in it, each declared once
+    // (#264 Teil 4) and its backups before removing in one more, "sicherungen" beside it, as the weeklies' and the guild's
+    check(once('export const ARCHIV_DIR = settingsPath("archiv");') && once('export const ARCHIV_INDEX = join(ARCHIV_DIR, "index.json");')
+        && once('export const SICHERUNGEN_DIR = settingsPath("sicherungen");')
+        && [...avBare.matchAll(/\bsettingsPath\b/g)].length === 3
+        && [...avBare.matchAll(/\b(?:ARCHIV_DIR|ARCHIV_INDEX|SICHERUNGEN_DIR)\s*=(?!=)/g)].length === 3,
+      "the archive lives in one fixed folder in the settings folder (ARCHIV_DIR, settingsPath imported and used for it and SICHERUNGEN_DIR), its directory in it");
+    // 13d.3 (spec rule 1): nothing leaves this computer from here
+    const avOut = avBare.match(/fetchJson|readLog|STATE\.dir|shell\.|\bfetch\b|require\s*\(|import\s*\(|\bprocess\b|\bglobal\b|\bglobalThis\b|\bReflect\b|\bFunction\b|\b(?:http|https|http2|net|tls|dgram|dns|undici)\b|\bWebSocket\b|\bXMLHttpRequest\b|\bEventSource\b/g) || [];
+    check(!avOut.length, "archiv.ts reads no log and sends nothing: no fetch, no http, https, net, dgram or tls",
+      `found: ${avOut.join(" | ")}`);
+    // 13d.4: exactly these imports
+    const AV_IMPORTS = ['import * as fs from "node:fs";', 'import * as zlib from "node:zlib";', 'import { createHash } from "node:crypto";',
+      'import { join } from "node:path";', 'import { settingsPath } from "./paths";'];
+    const avImp = [...av.matchAll(/^[ \t]*import\b[^\n]*$/gm)].map((m) => m[0].trim());
+    const avRest = AV_IMPORTS.reduce((s, l) => s.split(l).join(""), av);
+    const avStray = [...avRest.matchAll(/\bimport\b[^\n]*|\bfrom\s*["'`][^\n]*|\bexport\s*\*|\bexport\s*\{[^}]*\}\s*from\b/g)].map((m) => m[0]);
+    check(JSON.stringify(avImp) === JSON.stringify(AV_IMPORTS) && !avStray.length,
+      "archiv.ts imports only node:fs, node:zlib (gzip), createHash of node:crypto, join of node:path and ./paths",
+      `found: ${[...avImp, ...avStray].join(" | ")}`);
+    // 13d.5: fs only to read, write, rename and make its folder; zlib only to pack and unpack; the hash only as sha256.
+    // Since #264 Teil 4 each call counted: 5 reads (the directory as text and as bytes, a fight to show, a fight to back
+    // up, a copy read back), 3 writes, 2 renames, 5 folders made (the archive twice, the backups' folder three times,
+    // once of it a new one), and the one unlink of 13d.8. The backup's copies through a descriptor (Fix-Runde 1): two
+    // opens ("wx" for a copy, "r" for a folder), one writeSync, two fsyncSync, two closeSync. The hash twice: a
+    // fight's file name and the backup's check.
+    const avFs = [...avBare.matchAll(/\bfs\b(\s*\.\s*(\w+)\s*\(?)?/g)].map((m) => norm(m[0]));
+    const avZ = [...avBare.matchAll(/\bzlib\b(\s*\.\s*(\w+)\s*\(?)?/g)].map((m) => norm(m[0]));
+    const AV_FS = { "fs": 1, "fs.readFileSync(": 5, "fs.writeFileSync(": 3, "fs.renameSync(": 2, "fs.mkdirSync(": 5, "fs.unlinkSync(": 1,
+      "fs.openSync(": 2, "fs.writeSync(": 1, "fs.fsyncSync(": 2, "fs.closeSync(": 2 };
+    const avFsZahl = avFs.reduce((z, x) => ({ ...z, [x]: (z[x] ?? 0) + 1 }), {});
+    const PRUEFSUMME = 'const pruefsumme = (b: Buffer) => createHash("sha256").update(b).digest("hex");';
+    check(JSON.stringify(Object.entries(avFsZahl).sort()) === JSON.stringify(Object.entries(AV_FS).sort())
+        && avZ.filter((x) => x === "zlib").length === 1 && avZ.filter((x) => x !== "zlib").every((x) => x === "zlib.gzipSync(" || x === "zlib.gunzipSync(")
+        && counts("archiv.ts", /\bcreateHash\b/g) === 3 && av.split('createHash("sha256")').length === 3 && once(PRUEFSUMME),
+      "archiv.ts uses fs only to read, write, rename and make its folder (and the one unlink of 13d.8), each as often as listed, zlib only to pack and unpack, and the hash only as sha256",
+      `found: ${[...avFs, ...avZ].join(" | ")}`);
+    // 13d.6 (spec rule 2): only under its own folder - a fight's file is named by the hash of its key,
+    // never by the key; every join starts at ARCHIV_DIR, the folder is made only as ARCHIV_DIR
+    const GZ_NAME = 'const gzName = (k: string) => "k-" + createHash("sha256").update(k).digest("hex").slice(0, 16) + ".gz";';
+    const avJoins = callsOf("archiv.ts", /\b(join)\s*\(/g).map((c) => c.args);
+    const avMkdirs = callsOf("archiv.ts", /\bfs\s*\.\s*(mkdirSync)\s*\(/g).map((c) => c.args);
+    // (#264 Teil 4) the backup goes only into SICHERUNGEN_DIR: one new folder in it (no recursive: never one that is
+    // there), named by the day and a number, and in it the directory and each fight's file under the same hashed name.
+    // Every join, every folder made, in the order of the file.
+    const AV_JOINS = ['ARCHIV_DIR, "index.json"', "ARCHIV_DIR, gzName(e.k)", "SICHERUNGEN_DIR, name", 'SICHERUNGEN_DIR, ordner, "index.json"',
+      "ARCHIV_DIR, gzName(e.k)", "SICHERUNGEN_DIR, ordner, gzName(e.k)", "SICHERUNGEN_DIR, ordner", "ARCHIV_DIR, gzName(e.k)", "ARCHIV_DIR, gzName(k)"];
+    const AV_MKDIRS = ["ARCHIV_DIR, { recursive: true }", "SICHERUNGEN_DIR, { recursive: true }", "join(SICHERUNGEN_DIR, name)",
+      "SICHERUNGEN_DIR, { recursive: true }", "ARCHIV_DIR, { recursive: true }"];
+    check(once(GZ_NAME) && counts("archiv.ts", /\bgzName\b/g) === 6
+        // datei as a variable (not a field: x.datei, datei:) only in its declaration, the write and the rename
+        && once("const datei = join(ARCHIV_DIR, gzName(e.k));") && [...avBare.matchAll(/(?<![.\w$])datei\b(?!\s*\??:)/g)].length === 4
+        && JSON.stringify(avJoins) === JSON.stringify(AV_JOINS) && JSON.stringify(avMkdirs) === JSON.stringify(AV_MKDIRS),
+      "archiv.ts writes only under ARCHIV_DIR (and its backup only into a new folder in SICHERUNGEN_DIR), a fight's file named by the hash of its key (k-<sha256>.gz), never by the key",
+      `join: ${avJoins.join(" | ")}; mkdir: ${avMkdirs.join(" | ")}`);
+    // 13d.7: the three writes and two renames as written: beside and renamed, or once "wx" on the first start (a backup
+    // copy goes through its "wx" descriptor, 1c and 13d.8c, #264 Teil 4)
+    const avWrites = [...av.matchAll(/\bfs\.writeFileSync\([^;]*;/g)].map((m) => m[0]);
+    const avRenames = [...av.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)].map((m) => m[1].trim());
+    check(JSON.stringify(avWrites) === JSON.stringify([
+      'fs.writeFileSync(ARCHIV_INDEX + ".tmp", JSON.stringify(all), "utf8");',
+      'fs.writeFileSync(datei + ".tmp", zlib.gzipSync(Buffer.from(req.text, "utf8")));',
+      'fs.writeFileSync(ARCHIV_INDEX, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });'])
+        && JSON.stringify(avRenames) === JSON.stringify(['ARCHIV_INDEX + ".tmp", ARCHIV_INDEX', 'datei + ".tmp", datei']),
+      "the archive's files are written whole beside and renamed, or the directory created once and never over a file that is there",
+      `found: ${[...avWrites, ...avRenames].join(" | ")}`);
+    // 13d.8 (#264 Teil 4, spec 2026-10-26-archiv-loeschen-design.md, 7; CLAUDE.md, the second exception): replaces
+    // "archiv.ts removes nothing" and stays as strict everywhere else. Not one rm, rmdir, truncate, trashItem or delete,
+    // not even as a word; exactly one unlink, written fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k))), and it stands in
+    // loescheArchivGeloest. That function, the backup and every helper it leans on are pinned word for word, so the
+    // order cannot change: the request (1-500 keys, none twice, the confirmation a short text), the directory read
+    // (a broken one is never touched), every fight detached (geloest === true), the typed confirmation (one fight:
+    // boss and the fight's day as the list shows it, from the UTC fields of at; several: their count), the backup - a new folder in sicherungen, each copy "wx", read
+    // back and compared by size and SHA-256 -, the directory written without them, and only then the unlink.
+    const avKoerper = (sig) => {
+      const at = av.indexOf(sig);
+      if (at < 0) return null;
+      const end = av.indexOf("\n}\n", at);
+      return end < 0 ? null : norm(av.slice(at + sig.length, end));
+    };
+    const avZahl = (n) => [...avBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length;
+    // 13d.8a: one removal, at its place
+    const avGone = av.match(/\b(?:unlink|rm|rmdir|rmSync|rmdirSync|unlinkSync|truncate\w*|trashItem)\b|\bdelete\s/g) || [];
+    const LOE_SIG = "export function loescheArchivGeloest(req: unknown): LoeschErgebnis {";
+    const LOE = avKoerper(LOE_SIG) ?? "";
+    check(JSON.stringify(avGone) === JSON.stringify(["unlinkSync"]) && once("fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k)));")
+        && LOE.split("fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k)));").length === 2 && avZahl("loescheArchivGeloest") === 1,
+      "archiv.ts removes in one place only: one fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k))) in loescheArchivGeloest (no rm, rmdir, truncate or delete)",
+      `found: ${avGone.join(" | ")}`);
+    // 13d.8b: the conditions before it, in their order
+    const LOE_WANT = 'if (!isRec(req) || !only(req, LOESCHEN_KEYS) || typeof req.bestaetigung !== "string" || req.bestaetigung.length > 200) return { ok: false, grund: "abgelehnt" };'
+      + ' const ks = ksOf(req.ks); if (!ks) return { ok: false, grund: "abgelehnt" };'
+      + ' const read = readIndex(); if ("corrupt" in read) return { ok: false, grund: "unavailable" };'
+      + " const da = new Map(read.data.kaempfe.map((e) => [e.k, e]));"
+      + " const offen = ks.filter((k) => da.get(k)?.geloest !== true);"
+      + ' if (offen.length) return { ok: false, grund: "nicht-geloest", kaempfe: offen };'
+      + " const weg = ks.map((k) => da.get(k)!);"
+      + ' if (!bestaetigt(req.bestaetigung, weg)) return { ok: false, grund: "bestaetigung" };'
+      + " const sicherung = sichereArchiv(weg); const mitDatei = sicherung.mitDatei;"
+      + ' if (!mitDatei) return sicherung.ordner ? { ok: false, grund: "sicherung", sicherung: sicherung.ordner } : { ok: false, grund: "sicherung" };'
+      + " const raus = new Set(ks);"
+      + " try { writeIndex({ v: 1, kaempfe: read.data.kaempfe.filter((e) => !raus.has(e.k)) }); }"
+      + ' catch { return { ok: false, grund: "unavailable", sicherung: sicherung.ordner }; }'
+      + " const ergebnis = weg.map((e): [string, LoeschStand] => {"
+      + ' if (!mitDatei.has(e.k)) return [e.k, "ohne-datei"];'
+      + ' try { fs.unlinkSync(join(ARCHIV_DIR, gzName(e.k))); return [e.k, "geloescht"]; } catch { return [e.k, "datei-bleibt"]; } });'
+      + " return { ok: true, sicherung: sicherung.ordner, ergebnis: Object.fromEntries(ergebnis) };";
+    const KS_WANT = 'if (!Array.isArray(x) || x.length < 1 || x.length > MAX_KS) return null; if (!x.every((k) => typeof k === "string" && K_RX.test(k))) return null;'
+      + " return new Set(x).size === x.length ? (x as string[]) : null;";
+    const BEST_WANT = 'const soll = weg.length === 1 ? weg[0]!.boss + " " + logDatum(weg[0]!.at) : String(weg.length);'
+      + " return eingabe.trim().toLowerCase() === soll.toLowerCase();";
+    // the day of the fight as the archive's list shows it (decision 26.10.2026): at is the log's wall clock stored as UTC, so
+    // only its UTC fields - no Intl, no time zone, no local getDate/getMonth/getFullYear anywhere in archiv.ts
+    const LOGDATUM_WANT = 'const d = new Date(at);'
+      + ' return String(d.getUTCDate()).padStart(2, "0") + "." + String(d.getUTCMonth() + 1).padStart(2, "0") + "." + String(d.getUTCFullYear());';
+    const avZone = avBare.match(/\bIntl\b|\bBERLIN\b|Europe\/|timeZone|\btoLocale\w*|\.get(?:Date|Month|FullYear|Hours|Day|Timezone\w*)\s*\(|\bberlin\w*/gi) || [];
+    const reihe = ['grund: "abgelehnt"', "readIndex()", "da.get(k)?.geloest !== true", 'grund: "nicht-geloest"', "bestaetigt(", "sichereArchiv(",
+      'grund: "sicherung"', "writeIndex(", "fs.unlinkSync("].map((s) => LOE.indexOf(s));
+    check(LOE === LOE_WANT && reihe.every((x, i) => x >= 0 && (i === 0 || x > reihe[i - 1]))
+        && avKoerper("function ksOf(x: unknown): string[] | null {") === KS_WANT
+        && avKoerper("function bestaetigt(eingabe: string, weg: ArchivKampf[]): boolean {") === BEST_WANT
+        && avKoerper("function logDatum(at: number): string {") === LOGDATUM_WANT && !avZone.length
+        && once('const LOESCHEN_KEYS = ["ks", "bestaetigung"];') && once("const MAX_KS = 500;")
+        && avZahl("ksOf") === 3 && avZahl("bestaetigt") === 2 && avZahl("logDatum") === 2
+        && avZahl("LOESCHEN_KEYS") === 2 && avZahl("MAX_KS") === 2 && avZahl("writeIndex") === 4,
+      "loescheArchivGeloest removes only after every condition, in this order: the request, a detached fight each, the typed confirmation, the checked backup, the directory written; then the unlink",
+      `found: ${LOE}; time zone: ${avZone.join(" | ")}`);
+    // 13d.8c: the backup - only into a new folder in sicherungen, every copy opened "wx", written whole, forced onto the
+    // disk (fsync) and closed, then read back and compared by size and SHA-256; then the new folder and sicherungen
+    // fsynced, where the system can (ORDNER_OHNE_SYNC: Windows; any other error fails the backup) - all of it before
+    // writeIndex (13d.8b). Nothing in it removes anything (and nothing anywhere removes a backup: 1d and 13d.8a).
+    const SICH_WANT = "try { fs.mkdirSync(SICHERUNGEN_DIR, { recursive: true }); } catch { return nichts(\"\"); }"
+      + " const tag = new Date().toISOString().slice(0, 10); let ordner = \"\";"
+      + " for (const i of Array.from({ length: 99 }, (_, n) => n + 1)) { const name = \"archiv-vor-loeschen-\" + tag + (i === 1 ? \"\" : \"-\" + i);"
+      + " try { fs.mkdirSync(join(SICHERUNGEN_DIR, name)); ordner = name; break; }"
+      + " catch (err) { if ((err as NodeJS.ErrnoException)?.code !== \"EEXIST\") return nichts(\"\"); } }"
+      + " if (!ordner) return nichts(\"\"); const mitDatei = new Set<string>();"
+      + " try { if (!kopiere(fs.readFileSync(ARCHIV_INDEX), join(SICHERUNGEN_DIR, ordner, \"index.json\"))) return nichts(ordner);"
+      + " for (const e of weg) { let original: Buffer;"
+      + " try { original = fs.readFileSync(join(ARCHIV_DIR, gzName(e.k))); }"
+      + " catch (err) { if ((err as NodeJS.ErrnoException)?.code === \"ENOENT\") continue; return nichts(ordner); }"
+      + " if (!kopiere(original, join(SICHERUNGEN_DIR, ordner, gzName(e.k)))) return nichts(ordner); mitDatei.add(e.k); }"
+      + " if (!ordnerDauerhaft(join(SICHERUNGEN_DIR, ordner)) || !ordnerDauerhaft(SICHERUNGEN_DIR)) return nichts(ordner); }"
+      + " catch { return nichts(ordner); } return { ordner, mitDatei };";
+    const KOP_WANT = 'try { const fd = fs.openSync(ziel, "wx");'
+      + " try { for (let n = 0; n < original.length;) { const w = fs.writeSync(fd, original, n, original.length - n); if (w <= 0) return false; n += w; }"
+      + " fs.fsyncSync(fd); } finally { fs.closeSync(fd); }"
+      + " const kopie = fs.readFileSync(ziel);"
+      + " return kopie.length === original.length && pruefsumme(kopie) === pruefsumme(original); } catch { return false; }";
+    const ORDNER_WANT = 'try { const fd = fs.openSync(pfad, "r"); try { fs.fsyncSync(fd); } finally { fs.closeSync(fd); } return true; }'
+      + ' catch (err) { return ORDNER_OHNE_SYNC.includes((err as NodeJS.ErrnoException)?.code ?? ""); }';
+    const SICH = avKoerper("function sichereArchiv(weg: ArchivKampf[]): Sicherung {") ?? "";
+    const KOP = avKoerper("function kopiere(original: Buffer, ziel: string): boolean {") ?? "";
+    const ORDNER = avKoerper("function ordnerDauerhaft(pfad: string): boolean {") ?? "";
+    check(SICH === SICH_WANT && KOP === KOP_WANT && ORDNER === ORDNER_WANT
+        && once('const ORDNER_OHNE_SYNC = ["EPERM", "EISDIR", "EINVAL", "EBADF", "ENOTSUP"];')
+        && once("const nichts = (ordner: string): Sicherung => ({ ordner, mitDatei: null });")
+        && avKoerper("export function createSicherungen(): void {") === "try { fs.mkdirSync(SICHERUNGEN_DIR, { recursive: true }); } catch { }"
+        && avZahl("sichereArchiv") === 2 && avZahl("kopiere") === 3 && avZahl("pruefsumme") === 3 && avZahl("ziel") === 3
+        && avZahl("ordnerDauerhaft") === 3 && avZahl("ORDNER_OHNE_SYNC") === 2 && avZahl("nichts") === 9 && avZahl("pfad") === 2
+        && avZahl("SICHERUNGEN_DIR") === 8 && avZahl("createSicherungen") === 1 && !/unlink|\brm|rmdir|truncate|delete/.test(SICH + KOP + ORDNER),
+      "the backup before removing goes only into a new folder in sicherungen, each copy opened wx, written, fsynced and closed, read back and compared by size and SHA-256, the folders fsynced where the system can, and removes nothing",
+      `found: ${SICH} | ${KOP} | ${ORDNER}`);
+    // 13d.8d (spec 7.3): loeseArchiv changes the flag geloest and nothing else - no other field, no fight's file
+    const LOES_WANT = 'if (!isRec(req) || !only(req, LOESEN_KEYS) || typeof req.geloest !== "boolean") return { ok: false, grund: "abgelehnt" };'
+      + ' const ks = ksOf(req.ks); if (!ks) return { ok: false, grund: "abgelehnt" }; const wollen = req.geloest;'
+      + ' const read = readIndex(); if ("corrupt" in read) return { ok: false, grund: "unavailable" };'
+      + " const da = new Map(read.data.kaempfe.map((e) => [e.k, e]));"
+      + ' const ergebnis = ks.map((k): [string, LoesenStand] => [k, !da.has(k) ? "unbekannt" : (da.get(k)!.geloest === true) === wollen ? "schon" : "ok"]);'
+      + ' const setzen = new Set(ergebnis.filter(([, s]) => s === "ok").map(([k]) => k));'
+      + " if (setzen.size) { const neu = { v: 1 as const, kaempfe: read.data.kaempfe.map((e) => (setzen.has(e.k) ? nurFlag(e, wollen) : e)) };"
+      + ' if (JSON.stringify(neu).length > MAX_VERZEICHNIS) return { ok: false, grund: "abgelehnt" };'
+      + ' try { writeIndex(neu); } catch { return { ok: false, grund: "unavailable" }; } }'
+      + " return { ok: true, ergebnis: Object.fromEntries(ergebnis) };";
+    const MIT_WANT = "const { geloest: _alt, ...rest } = e; return geloest ? { ...rest, geloest: true } : rest;";
+    check(avKoerper("export function loeseArchiv(req: unknown): LoesenErgebnis {") === LOES_WANT
+        && avKoerper("function nurFlag(e: ArchivKampf, geloest: boolean): ArchivKampf {") === MIT_WANT
+        && once('const LOESEN_KEYS = ["ks", "geloest"];') && avZahl("LOESEN_KEYS") === 2
+        && avZahl("loeseArchiv") === 1 && avZahl("nurFlag") === 2,
+      "loeseArchiv changes only the flag geloest (set true, or the field taken away) and touches no fight's file",
+      `found: ${avKoerper("export function loeseArchiv(req: unknown): LoesenErgebnis {")}`);
+    // 13d.9: the caps, each bound once (spec 4): 8M characters a fight, 50000 fights, 16M characters of directory
+    check(once("const MAX_ROH = 8 * 1024 * 1024;") && once("export const MAX_EINTRAEGE = 50000;") && once("export const MAX_VERZEICHNIS = 16 * 1024 * 1024;")
+        && ["MAX_ROH", "MAX_EINTRAEGE", "MAX_VERZEICHNIS"].every((n) => [...avBare.matchAll(new RegExp(`\\b${n}\\s*=(?!=)`, "g"))].length === 1)
+        && av.includes("req.text.length > MAX_ROH") && av.includes("{ maxOutputLength: MAX_ROH * 4 }")
+        && av.includes("read.data.kaempfe.length >= MAX_EINTRAEGE") && av.includes("JSON.stringify(neu).length > MAX_VERZEICHNIS"),
+      "the archive is capped: 8M characters a fight (unpacked at most 4x), 50000 fights, 16M characters of directory");
+    // 13d.10: a fight's character only as an id, never a name (CH_RX as in weeklies.ts)
+    check(once("const CH_RX = /^w[0-9a-z]{9}$/;") && av.includes('if (x.ch !== undefined && (typeof x.ch !== "string" || !CH_RX.test(x.ch))) return null;'),
+      "archiv.ts takes a fight's character only as an id (w and nine letters or digits), never a name");
+    // 13d.11: only its own fixed strings, no template
+    const AV_STRINGS = new Set(["node:fs", "node:zlib", "node:crypto", "node:path", "./paths", "archiv", "index.json",
+      "v", "kaempfe", "k", "platz", "boss", "at", "dps", "dmg", "dur", "c", "ch", "datei", "zeilen", "geloest", "eintrag", "text",
+      "object", "string", "number", "boolean", "utf8", "ENOENT", "data", "corrupt", "saved", "refused", "unavailable",
+      ".tmp", "k-", "sha256", "hex", ".gz", "\\n", "wx",
+      // #264 Teil 4: detaching and removing, the backup's folder and name, the fight's day (TT.MM.JJJJ) for the confirmation
+      "ks", "bestaetigung", "ok", "schon", "unbekannt", "abgelehnt", "nicht-geloest", "sicherung", "geloescht", "ohne-datei", "datei-bleibt",
+      "sicherungen", "archiv-vor-loeschen-", "", "-", "EEXIST", "0", ".", " ",
+      // Fix-Runde 1: a folder opened "r" only to fsync it, and the answers of a system that cannot
+      "r", "EPERM", "EISDIR", "EINVAL", "EBADF", "ENOTSUP"]);
+    const ta = toks["archiv.ts"];
+    const aOdd = ta.error ? ["(not tokenised)"] : ta.strings.filter((x) => !AV_STRINGS.has(x)).map((x) => JSON.stringify(x));
+    check(!aOdd.length && !(ta.templates > 0), "archiv.ts holds only its own fixed strings and no template",
+      `found: ${aOdd.join(" | ")}${ta.templates ? ` and ${ta.templates} template(s)` : ""}`);
+  }
+  // 13d.12: only the local server reaches the archive - one import line, each name in its calls; the
+  // ways out (update, party, its HTTP helper, guild online) never name it, not even in a string
+  const avNames = Object.fromEntries(files.filter((f) => f !== "archiv.ts")
+    .map((f) => [f, [...bare[f].matchAll(/\b(archiviere|loadArchiv|leseArchivKampf|createArchiv|ARCHIV_DIR|ARCHIV_INDEX|gzName|loeseArchiv|loescheArchivGeloest|createSicherungen|SICHERUNGEN_DIR|sichereArchiv)\b/g)].length
+      + modRefs(f, "archiv")]));
+  const avServer = bare["server.ts"] ?? "";
+  const avMany = (n) => [...avServer.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length;
+  // #264 Teil 4: loeseArchiv and loescheArchivGeloest in one call each (their routes), createSicherungen and
+  // SICHERUNGEN_DIR once each, in the case that opens the backups' folder
+  check(Object.entries(avNames).every(([f, k]) => f === "server.ts" || k === 0)
+      && (av === undefined || (/^import \{ ARCHIV_DIR, archiviere, createArchiv, createSicherungen, leseArchivKampf, loadArchiv, loescheArchivGeloest, loeseArchiv, SICHERUNGEN_DIR \} from "\.\/archiv";$/m.test(serverCode)
+        && avMany("archiviere") === 2 && avMany("loadArchiv") === 2 && avMany("leseArchivKampf") === 2 && avMany("createArchiv") === 3
+        && avMany("ARCHIV_DIR") === 2 && avMany("loeseArchiv") === 2 && avMany("loescheArchivGeloest") === 2 && avMany("createSicherungen") === 2
+        && avMany("SICHERUNGEN_DIR") === 2 && avNames["server.ts"] === 20)),
+    "only the local server imports archiv.ts: archiviere, loadArchiv and leseArchivKampf in one call each, createArchiv on start and before the folder opens, loeseArchiv and loescheArchivGeloest in one call each",
+    `mentions: ${Object.entries(avNames).filter(([, k]) => k).map(([f, k]) => `${f} ${k}`).join(", ")}`);
+  const avOutward = ["update.ts", "party.ts", "http.ts", "gilde-online.ts", "gilde.ts", "weeklies.ts"].filter((f) => /archiv/i.test(code[f] ?? ""));
+  check(!avOutward.length, "the update notice, the party, its HTTP helper and the guild never name the archive",
+    `found in: ${avOutward.join(", ")}`);
+  if (av !== undefined) {
+    // 13d.13: the routes - four, each one case; no other string of the server names the archive
+    const ts = toks["server.ts"];
+    const avStrings = ts.error ? ["(not tokenised)"] : ts.strings.filter((x) => /archiv/i.test(x));
+    const AV_ROUTE_STRINGS = ["./archiv", "/api/archiv/aufnehmen", "/api/archiv/aufnehmen", "/api/archiv/kampf", "/api/archiv/liste",
+      // archivHinweis dreimal: CONFIG_KEYS, die Pruefung im POST, die Ausnahme in FIRST_START (#264)
+      "/api/archiv/loeschen", "/api/archiv/loesen", "/api/archiv/ordner", "/api/archiv/sicherungen",
+      "archivAn", "archivAn", "archivHinweis", "archivHinweis", "archivHinweis"];
+    // #264 Teil 4: loesen, loeschen and sicherungen are POST cases only, each once
+    check(JSON.stringify(avStrings.slice().sort()) === JSON.stringify(AV_ROUTE_STRINGS)
+        && (getBody ?? "").split('case "/api/archiv/liste":').length === 2 && (getBody ?? "").split('case "/api/archiv/kampf":').length === 2
+        && (postBody ?? "").split('case "/api/archiv/aufnehmen":').length === 2 && (postBody ?? "").split('case "/api/archiv/ordner":').length === 2
+        && ["loesen", "loeschen", "sicherungen"].every((r) => (postBody ?? "").split(`case "/api/archiv/${r}":`).length === 2),
+      "the archive's routes are GET /api/archiv/liste and /api/archiv/kampf, POST /api/archiv/aufnehmen, /ordner, /loesen, /loeschen and /sicherungen, and no other string of the server names the archive",
+      `found: ${avStrings.join(" | ")}`);
+    const caseOf = (body, route) => norm(((body ?? "").match(new RegExp(`case "${route.replace(/\//g, "\\/")}": \\{\\n([\\s\\S]*?)\\n    \\}`)) || [null, ""])[1]);
+    check(caseOf(getBody, "/api/archiv/liste") === "const archiv = loadArchiv(); return archiv ? reply(res, { ok: true, data: archiv }) : reply(res, { ok: false }, 503);",
+      "/api/archiv/liste's GET case answers only loadArchiv(), 503 when it could not read", `found: ${caseOf(getBody, "/api/archiv/liste")}`);
+    check(caseOf(getBody, "/api/archiv/kampf") === 'const k = q.get("k"); if (typeof k !== "string" || !k || k.length > 300) return reply(res, { ok: false }, 404); '
+        + "const lines = leseArchivKampf(k); return lines === null ? reply(res, { ok: false }, 404) : text(res, lines);",
+      "/api/archiv/kampf's GET case reads one fight by its key (at most 300 characters, as K_RX in archiv.ts) and nothing else", `found: ${caseOf(getBody, "/api/archiv/kampf")}`);
+    check(caseOf(postBody, "/api/archiv/aufnehmen") === "if (loadConfig().archivAn === false) return reply(res, { ok: false }, 409); "
+        + 'const put = archiviere(sent); return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);',
+      "/api/archiv/aufnehmen's POST case takes nothing while the archive is off, and otherwise calls archiviere(sent) once",
+      `found: ${caseOf(postBody, "/api/archiv/aufnehmen")}`);
+    // #264 Teil 4: the two cases hand the request to archiv.ts as it came and answer what it says - nothing filled in,
+    // nothing else done; a refusal the page shows (nicht-geloest, bestaetigung, sicherung) is 200 with ok: false
+    check(caseOf(postBody, "/api/archiv/loesen") === 'const los = loeseArchiv(sent); return reply(res, los, los.ok ? 200 : los.grund === "unavailable" ? 503 : 400);'
+        && caseOf(postBody, "/api/archiv/loeschen") === "const gone = loescheArchivGeloest(sent); "
+          + 'return reply(res, gone, gone.ok ? 200 : gone.grund === "abgelehnt" ? 400 : gone.grund === "unavailable" ? 503 : 200);',
+      "/api/archiv/loesen and /api/archiv/loeschen's POST cases call loeseArchiv(sent) and loescheArchivGeloest(sent) once and nothing else",
+      `found: ${caseOf(postBody, "/api/archiv/loesen")} | ${caseOf(postBody, "/api/archiv/loeschen")}`);
+    const aStart = (serverCode.match(/export async function startServer\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
+    check([...aStart.matchAll(/\bcreateArchiv\(/g)].length === 1 && /\n\s*createWeeklies\(\);\n\s*createArchiv\(\);\n\s*createGilde\(\);\n  return port;$/.test(aStart),
+      "createArchiv is called once from startServer, once the server listens (and once before its folder opens)");
+  }
+  // 13d.14 (spec rule 4): the export never takes the archive's files - no export script names the archive,
+  // its directory or a fight's file
+  {
+    const exportScripts = existsSync(scriptsDir) ? readdirSync(scriptsDir).filter((f) => /^export-.*\.mjs$/.test(f)) : [];
+    const exportNamers = exportScripts.filter((f) => /archiv(?!o)|index\.json|\bk-[*0-9a-f]*\.gz|\.gz\b/i.test(readFileSync(join(scriptsDir, f), "utf8")));
+    // the working repo (oeffentlich/ present) must have export scripts; the public export has none, which is fine,
+    // but any script found there still must not name the archive
+    check((exportScripts.length > 0 || !existsSync(oeffentlichDir)) && !exportNamers.length,
+      "no export script (scripts/export-*.mjs) names the archive, archiv-index.json, index.json or a fight's k-*.gz",
+      `found in: ${exportNamers.join(", ")}`);
   }
 
   // --- 13b. the guild (boro-gilde.json, spec Gilde 7 and 8, 06.10.2026):
@@ -2373,7 +2982,7 @@ function auditMain() {
     const defs = [...gd.matchAll(/\bconst GILDE_PATH\s*=\s*([^;]+);/g)].map((m) => m[1].trim());
     check(defs.length === 1 && defs[0] === 'settingsPath("boro-gilde.json")'
         && /^export const GILDE_PATH = settingsPath\("boro-gilde\.json"\);$/m.test(gd)
-        && [...gdBare.matchAll(/\bsettingsPath\b/g)].length === 2,
+        && [...gdBare.matchAll(/\bsettingsPath\b/g)].length === 3,
       "the guild lives in one fixed file in the settings folder (GILDE_PATH defined once, settingsPath imported and used once)",
       `found: ${defs.join(" | ")}`);
     // 13b.3
@@ -2388,8 +2997,8 @@ function auditMain() {
       "gilde.ts imports only node:fs and ./paths", `found: ${[...lines, ...gStray].join(" | ")}`);
     // 13b.5: the import line names fs once without a method
     const fsMentions = [...gdBare.matchAll(/\bfs\b[.\w]*/g)].map((m) => m[0]);
-    const fsCalls = [...gdBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync)\(/g)].length;
-    check(fsMentions.filter((m) => m === "fs").length === 1 && fsCalls === fsMentions.length - 1 && fsCalls === 4,
+    const fsCalls = [...gdBare.matchAll(/\bfs\.(readFileSync|writeFileSync|renameSync|mkdirSync)\(/g)].length;
+    check(fsMentions.filter((m) => m === "fs").length === 1 && fsCalls === fsMentions.length - 1 && fsCalls === 6,
       "gilde.ts uses node:fs only to read, write and rename (no delete, descriptor, copy or stream)",
       `found: ${fsMentions.join(" | ")}`);
     // 13b.6: one read, two writes, one rename - and GILDE_PATH never shadowed
@@ -2398,7 +3007,7 @@ function auditMain() {
     // of readGildeFile
     const ops = [...gd.matchAll(/\bfs\.(readFileSync|writeFileSync)\(\s*([^,)]+)/g)];
     const renames = [...gd.matchAll(/\bfs\.renameSync\(([^)]*)\)/g)];
-    check(ops.length === 3 && ops.every((m) => [P, TMP].includes(m[2].trim()))
+    check(ops.length === 4 && ops.every((m) => [P, TMP, 'dir + "/" + name'].includes(m[2].trim()))
         && gd.split('fs.readFileSync(GILDE_PATH, "utf8")').length === 2
         && renames.length === 1 && renames[0][1].trim() === TMP + ", " + P
         && [...gdBare.matchAll(/\bGILDE_PATH\b/g)].length === 6
@@ -2408,9 +3017,9 @@ function auditMain() {
     // 13b.7: the two writes as written - the whole state into the temp file,
     // and the empty file on the first start, only when there is none
     const writes = [...gd.matchAll(/\bfs\.writeFileSync\([^;]*;/g)].map((m) => m[0]);
-    check(writes.length === 2
+    check(writes.length === 3
         && writes[0] === 'fs.writeFileSync(GILDE_PATH + ".tmp", JSON.stringify(all), "utf8");'
-        && writes[1] === 'fs.writeFileSync(GILDE_PATH, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });'
+        && writes[2] === 'fs.writeFileSync(dir + "/" + name, text, { encoding: "utf8", flag: "wx" });' && writes[1] === 'fs.writeFileSync(GILDE_PATH, JSON.stringify(empty()), { encoding: "utf8", flag: "wx" });'
         && /\nexport function createGilde\(\): void \{\n  try \{\n    fs\.writeFileSync\(GILDE_PATH, JSON\.stringify\(empty\(\)\), \{ encoding: "utf8", flag: "wx" \}\);\n  \} catch \{/.test(gd)
         && /^const empty = \(\): GildeFile => \(\{ v: 1, gilde: null \}\);$/m.test(gd),
       "the guild file is written whole through its temp file, or created once (empty) and never over a file that is there",
@@ -2428,17 +3037,41 @@ function auditMain() {
     const chk = ((gd.match(/\nexport function checkGilde\(next: unknown, stored: GildeFile\): GildeFile \| null \{([\s\S]*?)\n\}/) || [null, ""])[1])
       .replace(/\s+/g, " ").trim();
     const CHK = "if (!isRec(next) || !only(next, FILE_KEYS) || next.v !== 1) return null;"
-      + " if (next.gilde === null) return stored.gilde ? null : empty();"
-      + " const g = gildeOf(next.gilde); if (!g) return null; const old = stored.gilde;"
-      + " if (old) { if (old.id !== g.id) return null;"
-      + " if (!old.mitglieder.every((m) => g.mitglieder.some((n) => n.id === m.id))) return null;"
+      + " const g = next.gilde === null ? null : gildeOf(next.gilde); if (next.gilde !== null && !g) return null;"
+      + " const parked = next.geloeste === undefined ? undefined : geloesteOf(next.geloeste); if (parked === null) return null;"
+      + " const all = [...(g ? [g] : []), ...(parked ?? []).map((e) => e.gilde)];"
+      + " if (new Set(all.map((x) => x.id)).size !== all.length) return null;"
+      + " if (all.some((x) => JSON.stringify({ v: 1, gilde: x }).length > MAX_GILDE_TEXT)) return null;"
+      + " for (const old of [...(stored.gilde ? [stored.gilde] : []), ...(stored.geloeste ?? []).map((e) => e.gilde)]) {"
+      + " const n = all.find((x) => x.id === old.id); if (!n || lostGilde(old, n)) return null; }"
+      + " for (const e of stored.geloeste ?? []) { const n = parked?.find((p) => p.gilde.id === e.gilde.id); if (n && n.am !== e.am) return null; }"
+      + " return { v: 1, gilde: g, ...(parked === undefined ? {} : { geloeste: parked }) };";
+    const lg = ((gd.match(/\nfunction lostGilde\(old: Gilde, g: Gilde\): boolean \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const LG = "if (!old.mitglieder.every((m) => g.mitglieder.some((n) => n.id === m.id))) return true;"
       + " for (const r of old.reihen) { const n = g.reihen.find((q) => q.id === r.id);"
-      + " if (!n || !Object.keys(r.ausnahmen).every((d) => Object.hasOwn(n.ausnahmen, d))) return null; }"
+      + " if (!n || !Object.keys(r.ausnahmen).every((d) => Object.hasOwn(n.ausnahmen, d))) return true; }"
       + " for (const [k, v] of Object.entries(old.anwesend)) { const n = g.anwesend[k];"
-      + " if (!n || !Object.keys(v).every((mid) => Object.hasOwn(n, mid))) return null; } }"
-      + " return { v: 1, gilde: g };";
-    check(chk === CHK && [...gdBare.matchAll(/\bcheckGilde\b/g)].length === 3,
-      "checkGilde refuses a state that leaves out the stored guild, a member, a series, an exception or a mark, and keeps detached ones",
+      + " if (!n || !Object.keys(v).every((mid) => Object.hasOwn(n, mid))) return true; }"
+      + " return lostPunkte(old, g);";
+    const gl = ((gd.match(/\nfunction geloesteOf\(x: unknown\): Geloeste\[] \| null \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const GL = "if (!Array.isArray(x) || x.length > MAX_GELOESTE) return null; const out: Geloeste[] = [];"
+      + " for (const e of x) { if (!isRec(e) || !only(e, GELOEST_KEYS) || !datumOk(e.am)) return null; const g = gildeOf(e.gilde); if (!g) return null; out.push({ am: e.am, gilde: g }); } return out;";
+    check(lg === LG && gl === GL && [...gdBare.matchAll(/\blostGilde\b/g)].length === 2 && [...gdBare.matchAll(/\bgeloesteOf\b/g)].length === 2,
+      "lostGilde refuses a guild that leaves out a member, a series, an exception or a mark (and, through lostPunkte, points), and geloesteOf takes at most 20 detached guilds, each a real day and a whole guild",
+      `found: ${lg} | ${gl}`);
+    const lost = ((gd.match(/\nfunction lostPunkte\(old: Gilde, g: Gilde\): boolean \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const LOST = "if (!(old.punkte?.arten ?? []).every((a) => g.punkte?.arten.some((b) => b.id === a.id))) return true;"
+      + " for (const m of old.mitglieder) { if (!m.punkte) continue; const n = g.mitglieder.find((q) => q.id === m.id)?.punkte; if (!n) return true;"
+      + " const op = m.punkte.pausen, oe = m.punkte.ansehen.eintraege, oz = m.punkte.zusatz;"
+      + " if (n.pausen.length < op.length || !op.every((p, i) => n.pausen[i]?.von === p.von)) return true;"
+      + " if (n.ansehen.eintraege.length < oe.length || !oe.every((e, i) => n.ansehen.eintraege[i]?.datum === e.datum && n.ansehen.eintraege[i]?.betrag === e.betrag)) return true;"
+      + " if (n.zusatz.length < oz.length || !oz.every((z, i) => n.zusatz[i]?.punkte === z.punkte && n.zusatz[i]?.notiz === z.notiz)) return true; }"
+      + " for (const [k, v] of Object.entries(old.zaehler ?? {})) { const n = g.zaehler?.[k]; if (!n || !Object.keys(v).every((mid) => Object.hasOwn(n, mid))) return true; }"
+      + " return false;";
+    check(lost === LOST && [...gdBare.matchAll(/\blostPunkte\b/g)].length === 2,
+      "lostPunkte refuses a state that leaves out a kind, a member's points, a pause, an entry, an extra or a counter (a pause may get an end, entries and extras keep their date and amount or points and note)", `found: ${lost}`);
+    check(chk === CHK && [...gdBare.matchAll(/\bcheckGilde\b/g)].length === 4,
+      "checkGilde refuses a state that leaves out a stored guild (the open one or a detached one), keeps each guild whole (through lostGilde), keeps the day a guild was detached, and takes no guild twice or over its size",
       `found: ${chk}`);
     // putGilde as written: size first, then the stored state, then checkGilde
     // against it, and only its result is saved
@@ -2448,23 +3081,55 @@ function auditMain() {
       + ' const read = readGildeFile(); if ("corrupt" in read) return "unavailable";'
       + ' const clean = checkGilde(data, read.data); if (!clean) return "refused";'
       + ' return saveGilde(clean) ? "saved" : "unavailable";';
-    check(put === PUT && [...gdBare.matchAll(/\bsaveGilde\b/g)].length === 2,
+    check(put === PUT && [...gdBare.matchAll(/\bsaveGilde\b/g)].length === 3,
       "putGilde checks size and schema before it writes, and writes only what checkGilde returned", `found: ${put}`);
     // 13b.9: the bounds, each defined once and used where it bounds
-    const BOUNDS = { MAX_TEXT: ["2097152", 2], MAX_MITGLIEDER: ["100", 3], MAX_REIHEN: ["20", 2], MAX_TERMINE: ["4000", 2] };
+    const BOUNDS = { MAX_TEXT: ["6291456", 2], MAX_GILDE_TEXT: ["2097152", 2], MAX_GELOESTE: ["20", 2], MAX_MITGLIEDER: ["100", 4], MAX_REIHEN: ["20", 2], MAX_TERMINE: ["4000", 3],
+      MAX_ARTEN: ["12", 2], MAX_PAUSEN: ["50", 2], MAX_EINTRAEGE: ["600", 2], MAX_ZUSAETZE: ["50", 2] };
     check(Object.entries(BOUNDS).every(([n, [v, k]]) => gd.split("\n").filter((l) => l === `const ${n} = ${v};`).length === 1
           && [...gdBare.matchAll(new RegExp(`\\b${n}\\s*=(?!=)`, "g"))].length === 1
           && [...gdBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === k)
         && gd.includes("x.mitglieder.length > MAX_MITGLIEDER || !Array.isArray(x.reihen) || x.reihen.length > MAX_REIHEN) return null;")
         && gd.includes("if (!isRec(x.anwesend) || Object.keys(x.anwesend).length > MAX_TERMINE) return null;")
-        && gd.includes("Object.keys(v).length > MAX_MITGLIEDER) return null;"),
-      "the guild is capped (MAX_TEXT 2097152 characters, MAX_MITGLIEDER 100, MAX_REIHEN 20, MAX_TERMINE 4000), each bound once");
+        && gd.includes("Object.keys(v).length > MAX_MITGLIEDER) return null;")
+        && gd.includes("if (!isRec(x) || Object.keys(x).length > MAX_TERMINE) return null;")
+        && gd.includes("x.arten.length > MAX_ARTEN) return null;") && gd.includes("x.pausen.length > MAX_PAUSEN) return null;")
+        && gd.includes("an.eintraege.length > MAX_EINTRAEGE) return null;") && gd.includes("x.zusatz.length > MAX_ZUSAETZE) return null;"),
+      "the guild is capped (MAX_TEXT 6291456 characters for the file, MAX_GILDE_TEXT 2097152 per guild, MAX_GELOESTE 20 detached guilds, MAX_MITGLIEDER 100, MAX_REIHEN 20, MAX_TERMINE 4000, and per member MAX_ARTEN 12, MAX_PAUSEN 50, MAX_EINTRAEGE 600, MAX_ZUSAETZE 50), each bound once");
+    // 13b.17 (#240, owner 14.10.2026): the one narrow way to remove what the person detached themselves. Only loescheGeloest
+    // removes anything, it asks first (a real request, the thing is detached, the name is right) and lays the backup of the whole
+    // file in "sicherungen" before it saves; the backup is written "wx" and nothing ever removes it; the page's putGilde stays as strict as before.
+    const LOE = ((gd.match(/\nexport function loescheGeloest\(req: unknown\): LoeschenErgebnis \{([\s\S]*?)\n\}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const LOE_WANT = "if (!isRec(req) || !only(req, LOESCHEN_KEYS) || typeof req.was !== \"string\" || !LOESCHEN_WAS.includes(req.was) || typeof req.id !== \"string\" || typeof req.name !== \"string\") { return { ok: false, grund: \"abgelehnt\" }; }"
+      + " const read = readGildeFile(); if (\"corrupt\" in read) return { ok: false, grund: \"unavailable\" };"
+      + " const neu = ohne(read.data, req.was, req.id, req.name); if (typeof neu === \"string\") return { ok: false, grund: neu };"
+      + " const clean = checkGilde(neu, empty()); if (!clean) return { ok: false, grund: \"abgelehnt\" };"
+      + " const sicherung = sichere(JSON.stringify(read.data)); if (!sicherung) return { ok: false, grund: \"sicherung\" };"
+      + " return saveGilde(clean) ? { ok: true, sicherung } : { ok: false, grund: \"unavailable\" };";
+    const SIC = ((gd.match(/\nfunction sichere\(text: string\): string \| null \{([\s\S]*?)\n\}\n/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const SIC_WANT = "const dir = settingsPath(\"sicherungen\"); try { fs.mkdirSync(dir, { recursive: true }); } catch { return null; }"
+      + " const tag = new Date().toISOString().slice(0, 10);"
+      + " for (const i of Array.from({ length: 99 }, (_, k) => k + 1)) { const name = \"gilde-vor-loeschen-\" + tag + (i === 1 ? \"\" : \"-\" + i) + \".json\";"
+      + " try { fs.writeFileSync(dir + \"/\" + name, text, { encoding: \"utf8\", flag: \"wx\" }); return name; } catch (err) { if ((err as NodeJS.ErrnoException)?.code !== \"EEXIST\") return null; } } return null;";
+    const OHNE = (gd.match(/\nfunction ohne\(alt: GildeFile, was: string, id: string, name: string\): GildeFile \| LoeschenGrund \{([\s\S]*?)\n\}\n/) || [null, ""])[1].replace(/\s+/g, " ");
+    check(LOE === LOE_WANT && SIC === SIC_WANT
+        && OHNE.includes("const e = (alt.geloeste ?? []).find((x) => x.gilde.id === id); if (!e) return \"nicht-geloest\"; if (!nameGleich(name, e.gilde.name)) return \"name\";")
+        && OHNE.includes("if (!m || !m.geloest) return \"nicht-geloest\"; if (!nameGleich(name, m.name)) return \"name\";")
+        && OHNE.includes("if (!p || !a || !a.geloest) return \"nicht-geloest\"; if (!nameGleich(name, a.name)) return \"name\";")
+        && OHNE.includes("if (g.reihen.some((r) => r.art === id)) return \"in-benutzung\";")
+        && [...gdBare.matchAll(/\bloescheGeloest\b/g)].length === 1 && [...gdBare.matchAll(/\bsichere\b/g)].length === 2 && [...gdBare.matchAll(/\bohne\b/g)].length === 2,
+      "gilde.ts removes for good only through loescheGeloest: a real request, a thing the person detached, the right name, and the backup in sicherungen (written wx, never removed) before it saves",
+      "found: " + LOE + " | " + SIC);
     // 13b.10
     const GILDE_STRINGS = new Set(["node:fs", "./paths", "boro-gilde.json", ".tmp", "utf8", "ENOENT", "wx",
       "tank", "heal", "dps", "", "da", "fehlt", "entschuldigt", "offen", "einmal", "woche", "tage",
-      "v", "gilde", "id", "name", "geloest", "mitglieder", "reihen", "anwesend", "rolle", "waffen", "notiz",
+      "was", "mitglied", "abgelehnt", "nicht-geloest", "sicherung", "in-benutzung", "sicherungen", "gilde-vor-loeschen-", "-", ".json", "/", "EEXIST",
+      "v", "gilde", "geloeste", "am", "id", "name", "geloest", "mitglieder", "reihen", "anwesend", "rolle", "waffen", "notiz",
       "Greatsword", "Sword and Shield", "Dagger", "Crossbow", "Longbow", "Staff", "Wand and Tome", "Spear", "Gauntlet", "Orb",
       "titel", "start", "zone", "wdh", "dauerMin", "erinnerungMin", "ausnahmen", "art", "bis", "aus", "zeit",
+      // points, counters, leaving and the second pair of weapons (11.10.2026)
+      "punkte", "zaehler", "ausgetreten", "alsDps", "offspec", "an", "rang", "gruppen", "schwellen", "monat", "teiler", "stichtag", "arten",
+      "proPunkt", "seit", "abzugMonate", "pausen", "ansehen", "zusatz", "von", "eintraege", "datum", "betrag", "number",
       "m", "r", "g", "object", "string", "boolean", "data", "corrupt", "saved", "refused", "unavailable"]);
     const tg = toks["gilde.ts"];
     const gOdd = tg.error ? ["(not tokenised)"] : tg.strings.filter((x) => !GILDE_STRINGS.has(x)).map((x) => JSON.stringify(x));
@@ -2483,7 +3148,7 @@ function auditMain() {
   const reminder = code["gilde-erinnerung.ts"];
   const reminderBare = bare["gilde-erinnerung.ts"] ?? "";
   check(Object.entries(gdNames).every(([f, k]) => f === "server.ts" || f === "gilde-erinnerung.ts" || k === 0)
-      && (gd === undefined || (/^import \{ createGilde, loadGilde, putGilde \} from "\.\/gilde";$/m.test(serverCode)
+      && (gd === undefined || (/^import \{ createGilde, loadGilde, loescheGeloest, putGilde \} from "\.\/gilde";$/m.test(serverCode)
         && ["putGilde", "loadGilde", "createGilde"]
           .every((n) => [...gdServerBare.matchAll(new RegExp(`\\b${n}\\b`, "g"))].length === 2)
         && [...gdServerBare.matchAll(/\bcreateGilde\(\);/g)].length === 1
@@ -2503,10 +3168,13 @@ function auditMain() {
   // BOOLEAN_KEYS), and no other string of the server names the guild
   if (gd !== undefined) {
     const ts = toks["server.ts"];
-    const gdStrings = ts.error ? ["(not tokenised)"] : ts.strings.filter((x) => /gilde/i.test(x));
+    // the strings of guild online (13c.9) are counted there; gildeOnline and gildeServer are its two settings keys, each twice
+    const ONLINE_KEYS = new Set(["./gilde-online", "gildeOnline", "gildeServer"]);
+    const gdStrings = ts.error ? ["(not tokenised)"] : ts.strings.filter((x) => /gilde/i.test(x) && !ONLINE_KEYS.has(x) && !x.startsWith("/api/gilde-online/"));
     const many = (x) => gdStrings.filter((y) => y === x).length;
-    check(many("/api/gilde") === 2 && many("./gilde") === 1 && many("gildeErinnerung") === 2 && gdStrings.length === 5
-        && (getBody ?? "").split('case "/api/gilde":').length === 2 && (postBody ?? "").split('case "/api/gilde":').length === 2,
+    check(many("/api/gilde") === 2 && many("/api/gilde-loeschen") === 1 && many("./gilde") === 1 && many("gildeErinnerung") === 2 && gdStrings.length === 6
+        && (getBody ?? "").split('case "/api/gilde":').length === 2 && (postBody ?? "").split('case "/api/gilde":').length === 2
+        && (postBody ?? "").split('case "/api/gilde-loeschen":').length === 2,
       "the guild route is /api/gilde, one GET and one POST case, and no other string of the server names the guild",
       `found: ${gdStrings.join(" | ")}`);
     const gGet = (((getBody ?? "").match(/case "\/api\/gilde": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
@@ -2515,12 +3183,20 @@ function auditMain() {
     const gPost = (((postBody ?? "").match(/case "\/api\/gilde": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
     check(gPost === 'const put = putGilde(sent.data); return reply(res, { ok: put === "saved" }, put === "saved" ? 200 : put === "refused" ? 400 : 503);',
       "/api/gilde's POST case calls putGilde(sent.data) once and nothing else", `found: ${gPost}`);
+    const gLoe = (((postBody ?? "").match(/case "\/api\/gilde-loeschen": \{\n([\s\S]*?)\n    \}/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    check(gLoe === 'const gone = loescheGeloest(sent); return reply(res, gone, gone.ok ? 200 : gone.grund === "unavailable" ? 503 : 400);'
+        && [...gdServerBare.matchAll(/\bloescheGeloest\b/g)].length === 2,
+      "/api/gilde-loeschen's POST case calls loescheGeloest(sent) once and nothing else (#240)", `found: ${gLoe}`);
     const gStart = (serverCode.match(/export async function startServer\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, ""])[1];
     check([...gdServerBare.matchAll(/\bcreateGilde\(/g)].length === 1
-        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createGilde\(\);\n  return port;$/.test(gStart),
+        && /\n  STATE\.port = port;\n\s*createWeeklies\(\);\n\s*createArchiv\(\);\n\s*createGilde\(\);\n  return port;$/.test(gStart),
       "createGilde is called once, from startServer, once the server listens", `found in startServer: ${/createGilde/.test(gStart)}`);
   }
-  // 13b.14: nothing leaves this computer. No file but gilde.ts, the reminder
+  // 13b.14: nothing leaves this computer - but for the one narrow exception of 13c
+  // (guild online, decided on 12.10.2026): there the guild goes only
+  // through gilde-online.ts, only when a leader turned it on, only over https and
+  // only to the address he set himself. Everything below holds for all other ways out.
+  // 13b.14 (as before): nothing leaves this computer. No file but gilde.ts, the reminder
   // and the server names loadGilde or GILDE_PATH, and the ways out - the
   // update notice, the party and its HTTP helper - never name the guild, in
   // any case, not even in a string. The fourth way out, questlog.ts, left
@@ -2528,6 +3204,11 @@ function auditMain() {
   // held to this rule too (decision of 07.10.2026).
   const gdReaders = files.filter((f) => !["gilde.ts", "gilde-erinnerung.ts", "server.ts"].includes(f)
     && /\b(?:loadGilde|GILDE_PATH)\b/.test(code[f]));
+  // 13b.18: the fields only the points of the guild use (alsDps, offspec, ausgetreten, abzugMonate, proPunkt) are named in gilde.ts alone,
+  // never in another module of main (the page side is checked with the guild's part, below)
+  const PUNKTE_FELDER = /\b(?:alsDps|offspec|ausgetreten|abzugMonate|proPunkt)\b/;
+  const punkteNamer = files.filter((f) => f !== "gilde.ts" && PUNKTE_FELDER.test(bare[f] ?? code[f]));
+  check(!punkteNamer.length, "only gilde.ts names the fields of the guild's points (alsDps, offspec, ausgetreten, abzugMonate, proPunkt)", `found in: ${punkteNamer}`);
   const OUTWARD = ["update.ts", "party.ts", "http.ts"];
   const gdOutward = [...OUTWARD, "questlog.ts"].filter((f) => /gilde/i.test(code[f] ?? ""));
   check(!gdReaders.length && !gdOutward.length && OUTWARD.every((f) => code[f] !== undefined),
@@ -2548,6 +3229,162 @@ function auditMain() {
       "the guild reminder uses electron's Notification and nothing that reaches the network (no fetch, http, https, net, dns, child_process or shell)",
       `electron: ${eNames.join(", ")}`);
   }
+
+  // --- 13c. guild online (#229, spec 2026-10-12-gilde-online-design.md, 1.4;
+  //          the rule change was approved on 12.10.2026): the one
+  //          narrow exception to 13b.14. With "guild online" turned on by a
+  //          leader (off from the factory) and an address of his own that
+  //          starts with https://, the guild goes to that one address -
+  //          through src/main/gilde-online.ts and nowhere else. The page
+  //          stays without a network (it speaks /api/ only); the update
+  //          notice, the party and the export still never name the guild.
+  //          Checks on calls and names read `bare`, on fixed text `code`.
+  const go = code["gilde-online.ts"];
+  const goBare = bare["gilde-online.ts"] ?? "";
+  check(go !== undefined, "gilde-online.ts is there to audit (13c)");
+  if (go !== undefined) {
+    // 13c.1: one module. No other file of main names it, except the local
+    // server in one import, and nothing else of main speaks to a /gilde/ path
+    const goNamers = files.filter((f) => f !== "gilde-online.ts" && f !== "server.ts" && /gilde-online|\/gilde\//i.test(code[f]));
+    const serverImports = (code["server.ts"].match(/^[^\n]*\bfrom\s*["'`][^"'`\n]*gilde-online["'`][^\n]*$/gm) || []);
+    const ghostPaths = files.filter((f) => f !== "gilde-online.ts" && /\/gilde\//.test(code[f]));
+    check(!goNamers.length && !ghostPaths.length && serverImports.length === 1 && serverImports[0] === 'import * as gilden from "./gilde-online";',
+      "only the local server imports gilde-online.ts (one line), and no other file of main names it or a /gilde/ path",
+      `found in: ${[...goNamers, ...ghostPaths].join(", ")} ${serverImports.join(" | ")}`);
+    // 13c.2: one request leaves, from one call, to serverBase of the address
+    const goImports = [...go.matchAll(/^import [^\n]*$/gm)].map((m) => m[0]);
+    const GO_IMPORTS = ['import * as fs from "node:fs";', 'import * as path from "node:path";', 'import { loadConfig } from "./config";',
+      'import { fetchJson, HttpError, serverBase, type Json } from "./http";', 'import { settingsPath } from "./paths";'];
+    check([...goBare.matchAll(/\bdeps\.net\(/g)].length === 1
+        && go.includes("await deps.net(`${serverBase(adresse)}/gilde/${pfad}`, TIMEOUT_MS, methode === \"POST\" ? (body ?? {}) : undefined, headers);")
+        && [...goBare.matchAll(/\bfetchJson\b/g)].length === 3
+        && !/\bfetch\s*\(|\bhttps?\b|\bXMLHttpRequest\b|\bWebSocket\b|\brequire\s*\(|\bimport\s*\(|child_process|\bdns\b/.test(goBare)
+        && JSON.stringify(goImports) === JSON.stringify(GO_IMPORTS),
+      "gilde-online.ts makes one request, to serverBase of the address with /gilde/ behind it, and imports only fs, path, config, http and paths",
+      `imports: ${goImports.join(" | ")}`);
+    // 13c.3: switched on, and the check comes first: every call site of the one
+    // way out sits in a function that asked bereit() or vorbereiten() before
+    const GO_PARTS = go.split(/^export (?:async )?function /m).slice(1);
+    const unasked = GO_PARTS.filter((part) => /\bruf\(deps\b/.test(part) && !/\b(?:vorbereiten|bereit)\(deps\b/.test(part)).map((part) => part.slice(0, 24));
+    check(!unasked.length && /^function bereit\(deps: Deps\)/m.test(go) && go.includes('if (!c.an) return { grund: "aus" };')
+        && [...goBare.matchAll(/\bgildeOnline\b/g)].length === 1 && go.includes("an: c.gildeOnline === true,") && !/\bgildeOnline\s*[:=]/.test(goBare.replace("an: c.gildeOnline === true", ""))
+        && !files.some((f) => f !== "gilde-online.ts" && /\bgildeOnline\b/.test(bare[f] ?? "")),
+      "every call of the one way out asks first whether guild online is on (off from the factory, never set by code, only read as === true)",
+      `unasked: ${unasked.join(" | ")}`);
+    // 13c.4: https only, to the address the person set, and a key to its own server only
+    check(go.includes('if (!basis.startsWith("https://")) return { grund: "kein-https" };')
+        && go.includes('if (!serverBase(adresse).startsWith("https://")) return { status: 0, json: {} };')
+        && /function amRechtenServer\(e: Eintrag, basis: string\): boolean \{\n  return serverBase\(e\.server\) === basis;\n\}/.test(go)
+        && go.includes('if (!amRechtenServer(e, b.basis)) return { grund: "adresse" };')
+        && go.includes('if (!amRechtenServer(e, b.basis)) return { ok: false, grund: "adresse" };') && [...goBare.matchAll(/\bamRechtenServer\(/g)].length === 4
+        && !/\bserverBase\(\s*["'`]/.test(code["gilde-online.ts"]),
+      "gilde-online.ts goes only over https, to the address from the settings, and a key only to the server it came from");
+    // 13c.4b (#240): deleting a guild for good: only the lead's ended guild, the backup of its last state before the one call to the
+    // server, the right server, and only after the server said yes (or that the guild is gone) does the entry forget its state and key
+    const goLoe = ((go.match(/\nexport async function loeschen\(code: string, deps: Deps = realDeps\): Promise<Ergebnis<\{ pfad: string \}>> \{\n([\s\S]*?)\n\}\n/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    check(goLoe.includes('if (e.rolle !== "lead" || !e.beendetAm || !e.verlassenAm) return { ok: false, grund: "rolle" };')
+        && goLoe.includes('if (!amRechtenServer(e, b.basis)) return { ok: false, grund: "adresse" };')
+        && goLoe.indexOf("schreibeSicherung(") > 0 && goLoe.indexOf("schreibeSicherung(") < goLoe.indexOf('await ruf(deps, deps.config().server, "POST", "loeschen", {}, e);')
+        && goLoe.indexOf('await ruf(deps, deps.config().server, "POST", "loeschen", {}, e);') < goLoe.indexOf("e.stand = null;")
+        && goLoe.includes('if (a.status !== 200 && !(a.status === 404 && a.json.error === "unknown code")) return { ok: false, grund: fehlerGrund(a) };')
+        && [...goBare.matchAll(/\bschreibeSicherung\(/g)].length === 3 && [...go.matchAll(/"loeschen"/g)].length === 1,
+      "gilde-online.ts deletes a guild for good only for the lead's ended guild, after the backup, at the entry's own server, and forgets the state only after the server agreed",
+      "found: " + goLoe);
+    // 13c.5: time and size
+    check(/^const TIMEOUT_MS = 8000;$/m.test(go) && /^const MIN_ABRUF_MS = 30000;$/m.test(go) && /^const MAX_ANTWORT = 2621440;/m.test(go)
+        && go.includes("if (JSON.stringify(json).length > MAX_ANTWORT) return { status: 502, json: {} };")
+        && go.includes("if (!erzwingen && jetzt - letzterAbruf < MIN_ABRUF_MS) return { ok: true, zwischenspeicher: true };"),
+      "gilde-online.ts asks for 8 s at most, pulls at most every 30 s and takes no answer over 2.5 MiB");
+    // 13c.6: the code and the keys stay out of every URL and every log, and the page-safe status holds none
+    const goTemplates = [...go.matchAll(/`[^`]*`/g)].map((m) => m[0]).filter((t) => /\$\{[^}]*(?:code|key|schluessel)[^}]*\}/i.test(t));
+    const statusBody = (go.match(/export function status\([\s\S]*?\n\}\n/) || [""])[0];
+    check(!goTemplates.length && !/\bconsole\b|\blog\w*\s*\(/.test(goBare) && statusBody.length > 0 && !/\bkey\b|\.key\b/.test(statusBody),
+      "gilde-online.ts puts no code or key in a URL, logs nothing, and its status holds no key",
+      `found: ${goTemplates.join(" | ")}`);
+    // 13c.7: it never reads the local guild
+    check(!/\b(?:loadGilde|putGilde|GILDE_PATH|readGildeFile)\b/.test(goBare) && !/from\s*["'`]\.\/gilde["'`]/.test(go) && !/boro-gilde\.json/i.test(go),
+      "gilde-online.ts does not import gilde.ts and does not read the local guild file");
+    // 13c.8: the file stays in main; export, bug report and the page never name it
+    const aussen = [join(scriptsDir, "export-public.mjs"), join(scriptsDir, "export-assets.mjs"), join(pageDir, "44-bug-report.ts")]
+      .filter((r) => existsSync(r) && /gilde-online|boro-gilde-online|X-Gilde-Code/i.test(readFileSync(r, "utf8")));
+    check(!aussen.length, "the export and the bug report never name guild online, its file or its header", `found in: ${aussen.join(", ")}`);
+    // 13c.9: the local server - one GET (status, the file only), the rest POSTs through onlineAntwort, no key forwarded
+    const gsrv = code["server.ts"];
+    const ONLINE_POSTS = ["gruenden", "beitreten", "abrufen", "schreiben", "link", "link-widerruf", "links", "staende", "stand-nr", "zurueck", "marke", "schliessen", "oeffnen", "loeschen", "sicherung", "verlassen"];
+    const gsTokens = toks["server.ts"].error ? [] : toks["server.ts"].strings.filter((x) => /gilde-online/.test(x));
+    const wantStrings = ["./gilde-online", "/api/gilde-online/status", ...ONLINE_POSTS.map((x) => "/api/gilde-online/" + x)];
+    check(JSON.stringify([...gsTokens].sort()) === JSON.stringify([...wantStrings].sort())
+        && (getBody ?? "").split("gilden.").length === 2 && (getBody ?? "").includes("return reply(res, { ok: true, status: gilden.status() });")
+        && ONLINE_POSTS.every((x) => (postBody ?? "").split(`case "/api/gilde-online/${x}":`).length === 2)
+        && [...(postBody ?? "").matchAll(/return onlineAntwort\(res, gilden\./g)].length === ONLINE_POSTS.length
+        && gsrv.includes("reply(res, { ...result, status: gilden.status() });"),
+      "the server answers guild online with one GET (the stored status) and sixteen POSTs, each through onlineAntwort",
+      `strings: ${gsTokens.join(" | ")}`);
+    // 13c.10: the settings keys are written as a true/false and a short text
+    check(go.includes('c.gildeServer === "string" ? c.gildeServer : ""') || go.includes('typeof c.gildeServer === "string"'),
+      "gildeServer is read as text only");
+  }
+  // 13c.11: the Python side (BoroPartyServer/boro_gilde.py): nothing runs, nothing is sent out, nothing is deleted,
+  // and the files it opens are its own two helpers
+  if (existsSync(gildePyPath)) {
+    const py = readFileSync(gildePyPath, "utf8");
+    const pyCode = py.replace(/"""[\s\S]*?"""/g, "").replace(/#[^\n]*/g, "");
+    const PY_BAD = ["subprocess", "os.system", "ctypes", "eval(", "exec(", "pickle", "marshal", "socket", "urllib", "http.client", "requests", "ftplib", "smtplib", "__import__", "importlib"];
+    const pyHits = PY_BAD.filter((x) => pyCode.includes(x));
+    const pyDelete = pyCode.match(/\bos\.(?:remove|unlink|rmdir|removedirs|truncate)\b|\bshutil\b|\bpathlib\b|\.unlink\(|\.rmdir\(|\.rmtree\(/g) || [];
+    const pyOpens = [...pyCode.matchAll(/\bopen\(([^)]*)\)/g)].map((m) => m[1].replace(/\s+/g, " ").trim());
+    // the one exception (#240): _entfernen deletes the folder of one closed guild, and loeschen is the only way to it
+    const pyEnt = ((pyCode.match(/\ndef _entfernen\(ordner\):\n([\s\S]*?)\n\n\n/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const PY_ENT = "for wurzel, unterordner, dateien in os.walk(ordner, topdown=False): for d in dateien: os.remove(os.path.join(wurzel, d)) for o in unterordner: os.rmdir(os.path.join(wurzel, o)) os.rmdir(ordner)";
+    const pyLoe = ((pyCode.match(/\n    def loeschen\(self, code, key, ip\):\n([\s\S]*?)\n    def oeffnen/) || [null, ""])[1]).replace(/\s+/g, " ").trim();
+    const PY_LOE = "with self.lock: code, ordner, meta = self._gilde(code, ip, geschlossen_ok=True) self._nur(self._rolle(meta, key, ip)[0], \"lead\") if not meta.get(\"geschlossen\"): raise GildeFehler(409, \"not closed\")"
+      + " if os.path.dirname(os.path.abspath(ordner)) != os.path.abspath(self.dir): raise GildeFehler(500, \"bad folder\") _entfernen(ordner)";
+    check(!pyHits.length && pyDelete.join(" ") === "os.remove os.rmdir os.rmdir" && pyEnt === PY_ENT && pyLoe === PY_LOE
+        && [...pyCode.matchAll(/\b_entfernen\(/g)].length === 2 && [...pyCode.matchAll(/\.loeschen\(/g)].length === 1,
+      "boro_gilde.py deletes only in _entfernen (one closed guild's folder, only after its lead asked and only if the guild is closed)",
+      "found: " + pyDelete.join(" | ") + " | " + pyEnt + " | " + pyLoe);
+    check(!pyHits.length
+        && JSON.stringify(pyOpens) === JSON.stringify(['tmp, "w", encoding="utf-8"', 'pfad, "r", encoding="utf-8"'])
+        && [...pyCode.matchAll(/\bos\.replace\(/g)].length === 2,
+      "boro_gilde.py runs nothing, opens no connection, and opens only its two helpers (os.replace moves, never removes)",
+      `found: ${[...pyHits, ...pyDelete, ...pyOpens].join(" | ")}`);
+  } else notes.push({ status: "SKIP", label: "boro_gilde.py not in this folder, not audited", detail: "" });
+
+  // --- 15. the party server over https (#231). The party server may now be
+  //         reached as https://, and the certificate is checked by Node's own
+  //         defaults. So: nothing in main loosens that check, no redirect is
+  //         followed, and every request to a party server goes to the address
+  //         the person set (serverBase of it) and to no fixed one.
+  const TLS_LOOSE = /rejectUnauthorized|NODE_TLS_REJECT_UNAUTHORIZED|checkServerIdentity|setGlobalDispatcher|\bdispatcher\b|\bAgent\b|secureContext|secureOptions|certificate-error|ignore-certificate|allow-insecure|setCertificateVerifyProc|NODE_EXTRA_CA_CERTS|\bca\s*:/;
+  const tlsLoose = files.filter((f) => TLS_LOOSE.test(code[f]));
+  check(!tlsLoose.length,
+    "main never loosens the certificate check (no rejectUnauthorized, NODE_TLS_REJECT_UNAUTHORIZED, checkServerIdentity, agent, dispatcher or extra CA)",
+    `found in: ${tlsLoose}`);
+  const httpTs = code["http.ts"] ?? "";
+  check([...httpTs.matchAll(/\bredirect:\s*"error"/g)].length === 2 && [...httpTs.matchAll(/\bredirect\b/g)].length === 2
+      && [...(bare["http.ts"] ?? "").matchAll(/\bfetch\(/g)].length === 1,
+    "fetchJson follows no redirect: its one fetch sets redirect: \"error\" in both the GET and the POST");
+  // every fetchJson call outside its own file starts with a template literal that
+  // names the base as serverBase(...) of the setting or the party's host - never
+  // a fixed address; a call with anything else as its first argument is listed
+  const badAddr = [];
+  for (const f of files) {
+    if (f === "http.ts") continue;
+    const calls = [...code[f].matchAll(/\bfetchJson\(\s*(`[^`]*`|[^,)]*)/g)].map((m) => m[1].trim());
+    for (const arg of calls) {
+      if (!/^`\$\{serverBase\((?:server|host|PARTY\.host)\)\}\/(?:party|health)[^`]*`$/.test(arg)) badAddr.push(`${f}: ${arg.slice(0, 60)}`);
+    }
+  }
+  check(!badAddr.length, "every fetchJson in main goes to serverBase(server | host | PARTY.host), the address the person set", `found: ${badAddr.join(" | ")}`);
+  const domainNamers = files.filter((f) => /borometer\.de/i.test(code[f]));
+  check(!domainNamers.length, "no main file names a party server address: the person sets it", `found in: ${domainNamers}`);
+  // #321: the party server address is only ever changed by an act of the person: the route
+  // looks at `bestaetigt === true` before anything is written, and writes in one place only
+  const srvRoute = /case "\/api\/party\/server": \{([\s\S]*?)\n    \}/.exec(code["server.ts"] ?? "")?.[1] ?? "";
+  const srvFirst = srvRoute.search(/\bupdateConfig\(/);
+  const srvGate = srvRoute.search(/\bsent\.bestaetigt\s*!==\s*true\b/);
+  check(srvFirst > 0 && srvGate >= 0 && srvGate < srvFirst && [...srvRoute.matchAll(/\bupdateConfig\(/g)].length === 1,
+    "the party server route writes the address only for a request that says bestaetigt === true");
 
   // --- 14. the update notice (spec Update-Hinweis, decided on
   //         02.10.2026): the third way out of this computer, beside the
@@ -2836,6 +3673,11 @@ async function auditPage() {
   check(!notApi.length && JSON.stringify(partyStart) === JSON.stringify(["/api/party/create", "/api/party/host"]),
     "every page fetch starts at /api/ as a literal (the party starts through /api/party/create or /api/party/host)",
     `found: ${[...notApi, ...partyStart].join(" | ")}`);
+  // #321: every post of the page to the party server route carries the person's
+  // confirmation (the request of a click handler); a post without it is listed
+  const srvPosts = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/\bfetch\s*\(\s*["'`]\/api\/party\/server["'`]\s*,([^;]*?)\)\s*[;.]/g)]
+    .filter((m) => /method\s*:\s*["']POST["']/.test(m[1]) && !/bestaetigt\s*:\s*true/.test(m[1])).map((m) => f + ": " + m[1].slice(0, 60)));
+  check(!srvPosts.length, "every page post to /api/party/server says bestaetigt: true (the person's click)", `found: ${srvPosts.join(" | ")}`);
   // Gruppenkurven (Spezifikation 2026-10-04, 6): die Kurve eines Mitglieds holt
   // nur kurveHolen in 42-party.ts - eine Stelle, die die Zahl der Abrufe je
   // Klick in der Hand hat. Ring und Rennen (64/65) rufen sie dort auf.
@@ -2871,16 +3713,42 @@ async function auditPage() {
     'import { switchTab } from "./34-menus-drop-and-tabs";',
     'import { kuerzelText, uiZoomFactor } from "./37-window-size-and-overlay";',
     'import { chooseServerDir, KOMPAKT_FENSTER, OWN_WINDOW, SERVED, serverDir } from "./41-server-mode";',
+    'import { frageNoetig, naechstesSpaeter } from "../rundgang-core";',
   ];
   const tourImports = [...tour.matchAll(/^\s*import\b[^\n]*$/gm)].map((m) => m[0].trim());
   check(JSON.stringify(tourImports) === JSON.stringify(TOUR_IMPORTS) && !/\bimport\s*\(|\brequire\s*\(/.test(tour),
     "the tour part imports only its listed parts", `found: ${tourImports.join(" | ")}`);
   const tourWrites = [...tour.matchAll(/\bpersistPref\b\s*\(([^)]*)\)/g)].map((m) => m[1].replace(/\s+/g, " ").trim());
   check(tourPart.length === 1 && tour.length > 0 && !tourAsks.length
-      && tourWrites.length === 1 && tourWrites[0] === '"rundgangGesehen", true'
-      && [...tour.matchAll(/\bpersistPref\b/g)].length === 2,
-    "the tour part asks nothing and writes only rundgangGesehen: true through persistPref",
+      && JSON.stringify(tourWrites) === JSON.stringify(['"rundgangGesehen", true', '"rundgangSpaeter", state.rundgangSpaeter', '"rundgangGesehen", true'])
+      && [...tour.matchAll(/\bpersistPref\b/g)].length === 4,
+    "the tour part asks nothing and writes only rundgangGesehen: true and rundgangSpaeter: state.rundgangSpaeter through persistPref",
     `part: ${tourPart}; asks: ${tourAsks.join(" ")}; writes: ${tourWrites.join(" | ")}`);
+  // Der Hinweis je Bereich (Spezifikation Rundgang erweitert 16.10.2026, 6; #265): auch dieser Teil
+  // fragt nichts (kein fetch, kein Beacon, kein /api/, kein Speicher im Browser) und schreibt nur
+  // bereicheGezeigt, nur durch persistPref, mit genau diesen Importen.
+  const hinwPart = readdirSync(pageDir).filter((f) => /^\d\d-bereichs-hinweise\.ts$/.test(f));
+  const hinw = hinwPart.length === 1 ? part(hinwPart[0]) : "";
+  const hinwAsks = [...hinw.matchAll(/\bfetch\b|sendBeacon|XMLHttpRequest|EventSource|WebSocket|\/api\/|localStorage|sessionStorage|indexedDB|\.cookie\b|caches\b/g)].map((m) => m[0]);
+  const HINW_IMPORTS = [
+    'import { state } from "./01-state";',
+    'import { t } from "./08-translation";',
+    'import { $ } from "./18-interface-basics";',
+    'import { persistPref } from "./27-weapons-tab";',
+    'import { bereichGewechselt } from "./34-menus-drop-and-tabs";',
+    'import { KOMPAKT_FENSTER, OWN_WINDOW } from "./41-server-mode";',
+    'import { frageOffen, rundgangOffen } from "./63-rundgang";',
+    'import { gezeigtMit, hinweisNoetig } from "../rundgang-core";',
+  ];
+  const hinwImports = [...hinw.matchAll(/^\s*import\b[^\n]*$/gm)].map((m) => m[0].trim());
+  check(JSON.stringify(hinwImports) === JSON.stringify(HINW_IMPORTS) && !/\bimport\s*\(|\brequire\s*\(/.test(hinw),
+    "the note part imports only its listed parts", `found: ${hinwImports.join(" | ")}`);
+  const hinwWrites = [...hinw.matchAll(/\bpersistPref\b\s*\(([^)]*)\)/g)].map((m) => m[1].replace(/\s+/g, " ").trim());
+  check(hinwPart.length === 1 && hinw.length > 0 && !hinwAsks.length
+      && JSON.stringify(hinwWrites) === JSON.stringify(['"bereicheGezeigt", state.bereicheGezeigt'])
+      && [...hinw.matchAll(/\bpersistPref\b/g)].length === 2,
+    "the note part asks nothing and writes only bereicheGezeigt through persistPref",
+    `part: ${hinwPart}; asks: ${hinwAsks.join(" ")}; writes: ${hinwWrites.join(" | ")}`);
   // Glutring (Spezifikation 02.10.2026, 8: keine neuen Daten, kein Netz): der Ring (64) und das
   // Rennen (65) fragen nichts und merken sich nichts - kein fetch, kein /api/, kein Speicher im
   // Browser, kein persistPref, kein neues Fenster. Beide Teile muessen da sein: ein fehlender
@@ -2920,6 +3788,110 @@ async function auditPage() {
   check(shown.length > 0 && !fetched.length && !reach.length,
     "the weapon-pair part asks nothing and loads nothing: no fetch, no /api/, no beacon, no link",
     `fetch: ${fetched.join(" | ")}; also: ${reach.join(" | ")}`);
+  // the strip's bar (72-kompakt-leiste.ts, Kompakt neu #241): the tabs, the weeklies view and the names on hover read and
+  // write the weeklies only through 59-weeklies.ts (/api/weeklies, the same way as the full view): this part asks nothing itself
+  const leiste = part("72-kompakt-leiste.ts");
+  const leisteFetch = [...leiste.matchAll(/\bfetch\b/g)].map((x) => x[0]);
+  const leisteReach = leiste.match(/XMLHttpRequest|sendBeacon|new Image\b|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|\/api\//g) || [];
+  check(leiste.length > 0 && !leisteFetch.length && !leisteReach.length,
+    "the strip's bar asks nothing itself: no fetch, no /api/, no beacon, no socket, no link (the weeklies come through 59)",
+    `fetch: ${leisteFetch.join(" | ")}; also: ${leisteReach.join(" | ")}`);
+  // Twinks (#251, spec Twinks 2, 3 and 8): the characters' log names (state.charaktere: ids and log names) stay on
+  // this page. They are named only in the lines listed here - kept by 59-weeklies.ts from the weeklies it read, read
+  // by the history (32) only through charakterFuer and zuordnungsStand (which give back ids), by the records (62)
+  // only through zuordnungsStand - so they never reach a fetch, persistPref, the export, the bug report, the party
+  // or the guild. Only these parts import the core or the settings' characters part (73), and that part asks
+  // nothing itself: it saves only through 59 (/api/weeklies, the same way as the weeklies). The core is pure, and
+  // its two functions that feed the history give back ids alone.
+  const chOhneSchluessel = (s) => s.replace(/(["'`])[\w.-]*[.-]charaktere(?:[.-][\w.-]*)?\1/g, '""');
+  const CH_NAME = /(?<![\w$-])charaktere(?![\w$-])/;
+  const chNennt = Object.keys(page).sort().flatMap((f) => chOhneSchluessel(page[f]).split("\n")
+    .filter((l) => CH_NAME.test(l)).map((l) => `${f}: ${l.trim()}`));
+  // the history's two lines for ch and zv (pinned again below in the history checks); while the weeklies are not read
+  // (charaktereBekannt) they keep what the index already holds, never a log name
+  const CH_VON_LINE = "const chVon = (at: number, g: unknown) => g ? undefined : !state.charaktereBekannt ? altCh.get(at) : state.charaktere.length ? charakterFuer(angreifer(), state.charaktere) : undefined;";
+  const CH_VON = "32-history.ts: " + CH_VON_LINE;
+  const ZV_TEIL = "const zvTeil = (alt: IndexEintrag): {zv?: string} => { if(!state.charaktereBekannt) return altZv(alt); const s = zuordnungsStand(state.charaktere); return s ? {zv: s} : {}; };";
+  // charaktereBekannt is a plain flag: false at the start, set to true only by 59-weeklies.ts after it read the weeklies
+  const chBekannt = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/^[^\n]*\bcharaktereBekannt\b\s*(?::|(?:\?\?|\|\||&&)?=(?!=))[^\n]*/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const CH_BEKANNT = ["../types.ts: charaktereBekannt: boolean;",
+    "01-state.ts: charaktereBekannt:false,   // erst nach dem Lesen der Weeklies gilt die Liste darueber (32-history.ts)",
+    "59-weeklies.ts: state.charaktereBekannt = true;"];
+  const CH_NENNT = [
+    "../types.ts: charaktere: CharEintrag[];",
+    "01-state.ts: charaktere:[],             // aktive Charaktere mit Logname (59-weeklies.ts)",
+    CH_VON,
+    "32-history.ts: ? !alt || !!alt.nach || JSON.stringify(alt.fights) !== JSON.stringify(fights) || (state.charaktereBekannt && (alt.zv ?? \"\") !== zuordnungsStand(state.charaktere))",
+    "32-history.ts: " + ZV_TEIL,
+    "32-history.ts: const meine = leute.filter(l => charakterFuer(l, state.charaktere));",
+    "59-weeklies.ts: /* Alle Charaktere mit Logname, so wie die Seite sie fuer den Verlauf braucht (state.charaktere, 32-history.ts):",
+    "59-weeklies.ts: state.charaktere = [...mitLog(daten.profile.filter(p => !p.geloest)), ...mitLog(daten.profile.filter(p => p.geloest))];",
+    "62-rekorde.ts: const todo = lesebedarf(liste, state.hist.files, alle, state.charaktereBekannt ? zuordnungsStand(state.charaktere) : \"\");",
+    // Twinks Schritt 2: the records' hint "New character?" asks only whether the log's one attacker is a character
+    "62-rekorde.ts: if(!n || n === \"__all\" || n !== n.trim() || [...n].length > 24 || charakterFuer(n, state.charaktere)) return null;"];
+  const chImport = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/^[^\n]*["'`][^"'`\n]*(?:charaktere-core|73-charaktere)(?:\.ts|\.js)?["'`][^\n]*/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const CH_IMPORT = [
+    "../main.ts: import { setup as setup73 } from \"./app/73-charaktere\";",
+    "../rekorde-core.ts: import { halterVon, kaempfeVon, UNBEKANNT } from \"./charaktere-core\";",
+    "../types.ts: import type { CharEintrag } from \"./charaktere-core\";",
+    "32-history.ts: import { charakterFuer, zuordnungsStand } from \"../charaktere-core\";",
+    "57-einstellungen.ts: import { renderCharaktere } from \"./73-charaktere\";",
+    "59-weeklies.ts: import { logPruefen, mainSetzen, mainZuerst } from \"../charaktere-core\";",
+    "62-rekorde.ts: import { charakterFuer, UNBEKANNT, zuordnungsStand } from \"../charaktere-core\";"];
+  const chTeil = part("73-charaktere.ts");
+  const chTeilReach = chTeil.match(/\bfetch\b|XMLHttpRequest|sendBeacon|new Image\b|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|\/api\/|\bpersistPref\b|localStorage|sessionStorage|indexedDB|\bstate\b/g) || [];
+  const CH_TEIL_IMPORTS = [
+    'import { t } from "./08-translation";',
+    'import { esc } from "./18-interface-basics";',
+    'import { switchTab } from "./34-menus-drop-and-tabs";',
+    'import { SERVED } from "./41-server-mode";',
+    'import { charakterAnlegen, charakterHaken, charakterLogSetzen, charakterMainSetzen, charakterNichtIgnorieren, weekliesCharakterListe, weekliesIgnoriert, weekliesLage, type CharaktereZeile } from "./59-weeklies";'];
+  const chTeilImports = [...chTeil.matchAll(/^\s*import\b[^\n]*$|\bfrom\s*["'`][^\n]*/gm)].map((m) => m[0].trim());
+  const chKern = (outer["../charaktere-core.ts"] ?? "").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/[^\n]*/gm, "");
+  const chKernGriffe = [...chKern.matchAll(/\bimport\b|\bfrom\s*["'`]|\brequire\s*\(|\bfetch\b|\bdocument\b|\bwindow\b|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bglobalThis\b|\bnavigator\b|\bXMLHttpRequest\b|\bsendBeacon\b|\bEventSource\b|\bWebSocket\b|\bImage\b|\blocation\b|\bself\b|\beval\b|\bFunction\b|\bstate\b/g)]
+    .map((m) => m[0].trim());
+  const chFuer = ((chKern.match(/\nexport function charakterFuer\(angreifer: string, liste: readonly CharEintrag\[\]\): string \{([\s\S]*?)\n\}/) || [null, null])[1] ?? "").replace(/\s+/g, " ").trim();
+  const chStand = ((chKern.match(/\nexport function zuordnungsStand\(liste: readonly CharEintrag\[\]\): string \{([\s\S]*?)\n\}/) || [null, null])[1] ?? "").replace(/\s+/g, " ").trim();
+  const chHalter = ((chKern.match(/\nexport function halterVon\(ch: unknown, aktiv: ReadonlySet<string>, geloest: ReadonlySet<string>\): string \| null \{([\s\S]*?)\n\}/) || [null, null])[1] ?? "").replace(/\s+/g, " ").trim();
+  // Twinks Schritt 3: mainZuerst only moves the main to the front; it reads no log name and adds or drops nobody
+  const chZuerst = ((chKern.match(/\nexport function mainZuerst<P extends \{ geloest\?: boolean; main\?: boolean \}>\(liste: readonly P\[\]\): P\[\] \{([\s\S]*?)\n\}/) || [null, null])[1] ?? "").replace(/\s+/g, " ").trim();
+  check(chTeil.length > 0 && chKern.length > 0
+      && JSON.stringify(chNennt) === JSON.stringify(CH_NENNT) && JSON.stringify(chImport) === JSON.stringify(CH_IMPORT)
+      && JSON.stringify(chBekannt) === JSON.stringify(CH_BEKANNT)
+      && !chTeilReach.length && JSON.stringify(chTeilImports) === JSON.stringify(CH_TEIL_IMPORTS)
+      && !chKernGriffe.length
+      && chFuer === 'if(!angreifer || angreifer === "__all") return ""; for(const c of liste) if(c.log === angreifer) return c.id; return "";'
+      && chStand === 'return liste.map(c => c.id).sort().join(",");'
+      && chHalter === 'if(typeof ch !== "string" || !ch || ch === UNBEKANNT) return UNBEKANNT; if(aktiv.has(ch)) return ch; return geloest.has(ch) ? null : UNBEKANNT;'
+      && chZuerst === 'const i = liste.findIndex(p => p.main && !p.geloest); return i <= 0 ? [...liste] : [liste[i]!, ...liste.slice(0, i), ...liste.slice(i + 1)];',
+    "the characters stay on this page: their log names are named only in the listed lines, the core is pure and gives the history ids alone, and the settings' characters part asks nothing itself; only 59 marks them as read (charaktereBekannt)",
+    `named: ${chNennt.filter((l) => !CH_NENNT.includes(l)).join(" | ")}; known: ${chBekannt.filter((l) => !CH_BEKANNT.includes(l)).join(" | ")}; imports: ${chImport.filter((l) => !CH_IMPORT.includes(l)).join(" | ")}`
+      + `; part: ${[...chTeilReach, ...chTeilImports.filter((l) => !CH_TEIL_IMPORTS.includes(l))].join(" | ")}; core: ${chKernGriffe.join(" | ")}; charakterFuer: ${chFuer}; zuordnungsStand: ${chStand}; halterVon: ${chHalter}; mainZuerst: ${chZuerst}`);
+  // Twinks Schritt 2 (#251, spec Twinks 6 and 7): the ignored attacker names live in the weeklies file alone. On this
+  // page the field is named only in 59-weeklies.ts (read with the state, set by charakterIgnorieren and
+  // charakterNichtIgnorieren, saved through /api/weeklies like every weekly); the records (62) and the settings'
+  // characters part (73) reach it only through 59's functions, imported in the listed lines - so the names never
+  // reach a fetch of their own, persistPref, the export, the bug report, the party or the guild.
+  const ignFeld = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/^[^\n]*(?:\.\s*ignoriert\b|\bignoriert\s*\??\s*:|\[\s*["'`]ignoriert["'`]\s*\]|["'`]ignoriert["'`])[^\n]*/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const IGN_FELD = [
+    "59-weeklies.ts: export interface Stand { v: 1; profile: WeeklyProfil[]; erinnerungen?: Erinnerung[]; ignoriert?: Ignoriert[] }",
+    "59-weeklies.ts: ...(Array.isArray(x.ignoriert) ? {ignoriert: x.ignoriert as Ignoriert[]} : {})};",
+    "59-weeklies.ts: return (daten.ignoriert ?? []).filter(e => !e.geloest).map(e => e.name);",
+    "59-weeklies.ts: const liste = daten.ignoriert ?? [];",
+    "59-weeklies.ts: daten.ignoriert = da ? liste.map(e => e === da ? {name} : e) : [...liste, {name}];",
+    "59-weeklies.ts: const liste = daten.ignoriert ?? [];",
+    "59-weeklies.ts: daten.ignoriert = liste.map(e => e.name === name ? {name, geloest: true} : e);"];
+  const ignImport = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/^[^\n]*\b(?:rekordCharaktere|weekliesIgnoriert|charakterIgnorieren|charakterNichtIgnorieren)\b[^\n]*\bfrom\b[^\n]*/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const IGN_IMPORT = [
+    "62-rekorde.ts: import { charakterAnlegen, charakterIgnorieren, rekordCharaktere, rekordHaken, weekliesIgnoriert, type CharaktereZeile } from \"./59-weeklies\";",
+    "73-charaktere.ts: " + CH_TEIL_IMPORTS[4]];
+  check(JSON.stringify(ignFeld) === JSON.stringify(IGN_FELD) && JSON.stringify(ignImport) === JSON.stringify(IGN_IMPORT),
+    "the ignored names stay in the weeklies: only 59 names the field, the records and the settings reach it through 59's functions alone",
+    `field: ${ignFeld.filter((l) => !IGN_FELD.includes(l)).join(" | ")}; imports: ${ignImport.filter((l) => !IGN_IMPORT.includes(l)).join(" | ")}`);
   // the shared image (spec Fortschritt, feature 4). The evening, which read
   // the saved party logs by GET, went with the redesign of 28.09., and with
   // it the permission for those two fetches: the image part fetches nothing
@@ -2968,43 +3940,318 @@ async function auditPage() {
   const klassenCore = outer["../klassen-core.ts"] ?? "";
   check(existsSync(join(rendererDir, "klassen-core.ts")), "the class table's core is there under its name");
   const gildeCore = (outer["../gilde-core.ts"] ?? "").replace(/^import \{[^}]*\} from "\.\/klassen-core";$/m, "") + "\n" + klassenCore;
-  // The one thing the guild's part takes from the party's part: the names
-  // this session already knows, for "Aus der Gruppe uebernehmen" (spec Gilde
-  // 4, on a click, each name ticked by hand). Exactly this import line is
-  // read past here - any other line naming the party still trips - and the
-  // function it imports is pinned as written: the session's colour names and
-  // the board standing now, without the sample party; nothing goes the other
-  // way (the party report, logs and bug report never name the guild, below).
-  const GRUPPEN_IMPORT = 'import { gruppenNamen } from "./19-grouping-and-party-fights";';
+  // The guild's part takes nothing from the party's part (the take-over from the party went on 11.10.2026): any import of it,
+  // and any line naming the party, trips below.
   const gildeRoh = part("68-gilde.ts");
-  const gildePart = gildeRoh.split("\n").filter((l) => l !== GRUPPEN_IMPORT).join("\n");
+  const gildePart = gildeRoh;
   // What the guild's part may import: exactly the modules it uses (plan task 5) - state, words, weapon
-  // marks, esc, the names line above, SERVED, its core and the class table. Anything else trips.
-  const GILDE_IMPORTE = ["./01-state", "./08-translation", "./09-weapon-icons", "./18-interface-basics", "./19-grouping-and-party-fights",
-    "./41-server-mode", "../gilde-core", "../klassen-core"];
+  // marks, esc, SERVED, its core and the class table. Anything else trips (no import from the party's part).
+  const GILDE_IMPORTE = ["./01-state", "./08-translation", "./09-weapon-icons", "./18-interface-basics",
+    "./41-server-mode", "../gilde-core", "../gilde-punkte-core", "../klassen-core"];
   const gildeImporte = [...gildeRoh.matchAll(/\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\brequire\s*\(/gm)]
     .map((m) => m[1] ?? m[2] ?? "require(");
   check(gildeImporte.length > 0 && gildeImporte.every((x) => GILDE_IMPORTE.includes(x)),
-    "the guild's part imports only its listed modules (state, words, weapon marks, esc, the session's names, SERVED, its core, the class table)",
+    "the guild's part imports only its listed modules (state, words, weapon marks, esc, SERVED, its cores, the class table; nothing from the party's part)",
     `imports: ${gildeImporte.join(" | ")}`);
   // the protected space and the middle dot stand as escapes in code (CLAUDE.md), never as raw characters
   const rohZeichen = [["68-gilde.ts", gildeRoh], ["gilde-core.ts", outer["../gilde-core.ts"] ?? ""], ["klassen-core.ts", outer["../klassen-core.ts"] ?? ""]]
     .filter(([, text]) => /[\u00a0\u00b7]/.test(text)).map(([n]) => n);
   check(!rohZeichen.length, "the guild's part, its core and the class table write the protected space and the middle dot as escapes, never raw",
     `raw in: ${rohZeichen.join(" | ")}`);
-  const namenFn = /\nexport function gruppenNamen\(\): string\[\] \{\n([\s\S]*?)\n\}\n/.exec(part("19-grouping-and-party-fights.ts"));
-  check(!!namenFn && namenFn[1] === "  mitgliederMerken(((state.party && state.party.board) || []).map(r => r.name));\n" +
-      "  return [...mitgliedNr.keys()].filter(n => !/^Beispiel [A-C]$/.test(n));",
-    "the guild takes from the party's part only the names this session knows (gruppenNamen as written)",
-    `body: ${namenFn ? namenFn[1] : "(missing)"}`);
   const REACH = /XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|navigator\.share\b/g;
   const gildeFetch = [...gildePart.matchAll(/\bfetch\b\s*(?:\(\s*([^,)]*))?/g)].map((m) => (m[1] ?? "").trim());
   const gildeReach = [...(gildePart.match(REACH) || []), ...(gildeCore.match(REACH) || []),
     ...[...gildeCore.matchAll(/\bfetch\b|\bimport\b|\brequire\b/g)].map((m) => "gilde-core.ts: " + m[0]),
     ...[gildePart, gildeCore].flatMap((s) => s.match(/party|questlog/gi) || [])];
-  check(gildeFetch.length > 0 && gildeFetch.every((a) => a === '"/api/gilde"') && !gildeReach.length,
-    "the guild's part fetches nothing but /api/gilde, its core nothing at all, and neither names the party or Questlog",
+  check(gildeFetch.length > 0 && gildeFetch.every((a) => a === '"/api/gilde"' || a === '"/api/gilde-loeschen"') && gildeFetch.filter((a) => a === '"/api/gilde-loeschen"').length === 1 && !gildeReach.length,
+    "the guild's part fetches nothing but /api/gilde, its core nothing at all, and neither names the party or Questlog (plus, exactly once, /api/gilde-loeschen for what the person detached, #240)",
     `fetch: ${gildeFetch.join(" | ")}; also: ${gildeReach.join(" | ")}`);
+  // The weeklies' part asks only for /api/weeklies (read, save, read again after a refusal) and, exactly once, for
+  // /api/weeklies-loeschen (what the person detached, #240); nothing else leaves it.
+  const wochenFetch = [...part("59-weeklies.ts").matchAll(/\bfetch\b\s*(?:\(\s*([^,)]*))?/g)].map((m) => (m[1] ?? "").trim());
+  check(wochenFetch.length === 4 && wochenFetch.filter((a) => a === '"/api/weeklies"').length === 3 && wochenFetch.filter((a) => a === '"/api/weeklies-loeschen"').length === 1,
+    "the weeklies' part fetches /api/weeklies (three calls) and, exactly once, /api/weeklies-loeschen, and nothing else",
+    "fetch: " + wochenFetch.join(" | "));
+  // 13b.17: the points' core (gilde-punkte-core.ts, spec Gilde-Punkte 2 and 6) is as pure as the guild's: it asks no clock
+  // ("heute" and "jetzt" are parameters), no random number, no network, no page, no storage, and imports only the guild's core.
+  check(existsSync(join(rendererDir, "gilde-punkte-core.ts")), "the points' core is there under its name");
+  const punkteKern = (outer["../gilde-punkte-core.ts"] ?? "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+  const kernImporte = [...punkteKern.matchAll(/\bfrom\s*["']([^"']+)["']|\brequire\s*\(|\bimport\s*\(/g)].map((m) => m[1] ?? m[0]);
+  const kernKlar = punkteKern.match(/Date\.now|new\s+Date\s*\(\s*\)|Math\.random|\bfetch\b|XMLHttpRequest|WebSocket|EventSource|sendBeacon|\blocalStorage\b|\bsessionStorage\b|\bdocument\b|\bwindow\b|\bnavigator\b|\bperformance\b/g) || [];
+  check(punkteKern.length > 0 && kernImporte.length > 0 && kernImporte.every((x) => x === "./gilde-core") && !kernKlar.length,
+    "the points' core reads no clock, asks no random number, no network, no page and no storage, and imports only the guild's core",
+    `imports: ${kernImporte.join(" | ")}; also: ${kernKlar.join(" | ")}`);
+  // 13b.18 (page side): the fields of the points stand only in the guild's part and the two cores, nowhere else on the page (the dictionary carries words and keys only, no data)
+  const punkteSeite = Object.keys(page).filter((f) => !/(?:^|\/)(?:68-gilde|gilde-core|gilde-punkte-core|07-dictionary)\.ts$/.test(f) && /\b(?:alsDps|offspec|ausgetreten|abzugMonate|proPunkt)\b/.test(page[f]));
+  check(!punkteSeite.length, "only the guild's part and its cores name the fields of the guild's points (alsDps, offspec, ausgetreten, abzugMonate, proPunkt)", `found in: ${punkteSeite.join(", ")}`);
+  // 13c (page side): guild online (#229, spec 2026-10-12-gilde-online-design.md; rule change approved on 12.10.2026).
+  // The page keeps its rule: it speaks to 127.0.0.1 and /api/ only. Its part (71-gilde-online.ts) is the one that names the routes of
+  // guild online (/api/gilde-online/), through one function; the way out of this computer stays in src/main/gilde-online.ts (13c.1 to 13c.9
+  // in auditMain). The core (gilde-online-core.ts) is as pure as the guild's. Neither the party's parts, the bug report nor the image
+  // ever name guild online.
+  {
+    const gop = part("71-gilde-online.ts");
+    const gopCode = gop.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    check(existsSync(join(pageDir, "71-gilde-online.ts")) && existsSync(join(rendererDir, "gilde-online-core.ts")), "guild online's part and its core are there under their names");
+    // 13c.P1: only that part names the routes; no other part of the page
+    const routeNamers = Object.keys(page).filter((f) => f !== "71-gilde-online.ts" && /\/api\/gilde-online/.test(page[f]));
+    check(!routeNamers.length, "only 71-gilde-online.ts names the /api/gilde-online/ routes", `found in: ${routeNamers.join(", ")}`);
+    // 13c.P2: two fetches, the one function (a route of guild online) and the setting; nothing else leaves
+    const gopFetch = [...gopCode.matchAll(/\bfetch\b\s*(?:\(\s*([^,)]*))?/g)].map((m) => (m[1] ?? "").trim());
+    const gopReach = gopCode.match(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|navigator\.share\b|\bnew\s+Image\b|\.\s*src\s*=(?!=)|\.\s*href\s*=(?!=)|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bconsole\b/g) || [];
+    check(JSON.stringify(gopFetch) === JSON.stringify(['"/api/gilde-online/" + pfad', '"/api/config"']) && !gopReach.length,
+      "71-gilde-online.ts fetches only /api/gilde-online/<route> (one function) and /api/config, and reaches nothing else: no storage, no link, no log",
+      `fetch: ${gopFetch.join(" | ")}; also: ${gopReach.join(" | ")}`);
+    // 13c.P3: the part imports only its listed modules (no party part), and holds no raw protected space or middle dot
+    const GOP_IMPORTE = ["./01-state", "./08-translation", "./18-interface-basics", "./41-server-mode", "./68-gilde", "../gilde-online-core", "../gilde-core"];
+    const gopImporte = [...gop.matchAll(/\bfrom\s*["']([^"']+)["']|^\s*import\s*["']([^"']+)["']|\brequire\s*\(/gm)].map((m) => m[1] ?? m[2] ?? "require(");
+    check(gopImporte.length > 0 && gopImporte.every((x) => GOP_IMPORTE.includes(x)) && !/[ ·]/.test(gop) && !/party|questlog/i.test(gopCode),
+      "71-gilde-online.ts imports only its listed modules, writes the protected space and the middle dot as escapes, and names neither the party nor Questlog",
+      `imports: ${gopImporte.join(" | ")}`);
+    // 13c.P4: the setting it writes is the switch and the address, and nothing else
+    check(gop.includes('body: JSON.stringify({gildeOnline: an, gildeServer: adresse})') && [...gopCode.matchAll(/\/api\/config/g)].length === 1,
+      "71-gilde-online.ts writes only gildeOnline and gildeServer into the settings, in one place");
+    // 13c.P5: the core reads no clock, asks no random number, no network, no page, no storage
+    const onKern = (outer["../gilde-online-core.ts"] ?? "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const onImporte = [...onKern.matchAll(/\bfrom\s*["']([^"']+)["']|\brequire\s*\(|\bimport\s*\(/g)].map((m) => m[1] ?? m[0]);
+    const onKlar = onKern.match(/Date\.now|new\s+Date\s*\(\s*\)|Math\.random|\bfetch\b|XMLHttpRequest|WebSocket|EventSource|sendBeacon|\blocalStorage\b|\bsessionStorage\b|\bdocument\b|\bwindow\b|\bnavigator\b|\bperformance\b/g) || [];
+    check(onKern.length > 0 && onImporte.every((x) => x === "./gilde-core") && !onKlar.length,
+      "the guild-online core reads no clock, asks no random number, no network, no page and no storage, and imports only the guild's core",
+      `imports: ${onImporte.join(" | ")}; also: ${onKlar.join(" | ")}`);
+    // the other parts never name it
+    const onlineOut = ["35-party-log-files.ts", "42-party.ts", "44-bug-report.ts", "50-bild.ts"].filter((f) => /gilde-online|gildeOnline|gildeServer/i.test(part(f)));
+    check(!onlineOut.length, "the party report, the party logs, the bug report and the image never name guild online", `found in: ${onlineOut}`);
+  }
+  // 13d (page side): the log archive (#264, spec 2026-10-16-log-archiv-design.md, 10, rules 3 and 4). The
+  // archive's part (76-archiv.ts) comes with a later task; until it is there these rules hold vacuously,
+  // and from then on they read it. Its core (archiv-core.ts) is there and pure.
+  {
+    const ARCHIV_PART = "76-archiv.ts";
+    const arp = part(ARCHIV_PART);
+    const arpCode = arp.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    // 13d.P1 (rule 3): the archive's part speaks to the archive only through /api/archiv/, each fetch with a
+    // literal address, and reaches nothing else. The address of each fetch is its whole first argument, read up to
+    // the comma or bracket that closes it. Strings are skipped together with their backslash escapes (\" does not
+    // end one), so a bracket, comma or quote inside a string cannot end the argument early. A template's ${ } is
+    // not parsed: the rule refuses any ${ and any backslash in the address, whatever the reader made of them.
+    const arpErstes = (code, auf) => {
+      let tiefe = 0;
+      for (let i = auf; i < code.length; i++) {
+        const c = code[i];
+        if (c === '"' || c === "'" || c === "`") {
+          let z = i + 1;
+          while (z < code.length && code[z] !== c) z += code[z] === "\\" ? 2 : 1;
+          if (z >= code.length) return code.slice(auf);
+          i = z;
+        } else if (c === "(" || c === "[" || c === "{") tiefe++;
+        else if (c === ")" || c === "]" || c === "}") { if (tiefe-- === 0) return code.slice(auf, i); }
+        else if (c === "," && tiefe === 0) return code.slice(auf, i);
+      }
+      return code.slice(auf);
+    };
+    const arpFetch = [...arpCode.matchAll(/\bfetch\b\s*(\()?/g)].map((m) => (m[1] ? arpErstes(arpCode, m.index + m[0].length) : "").trim());
+    const arpReach = arpCode.match(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\s*\(|\brequire\s*\(|<img\b|<iframe\b|navigator\.share\b|\bnew\s+Image\b/g) || [];
+    // each address one whole literal: no "..", no joining with +, no ${ ... } in a template, no backslash (an escape
+    // could spell ".." or a quote)
+    const arpFetchOk = (a) => /^(["'`])\/api\/archiv\/[^"'`\\]*\1$/.test(a) && !a.includes("..") && !a.includes("+") && !a.includes("${");
+    // #264 Teil 4: the literal addresses are exactly the archive's own routes, double-quoted, each fetched once in the
+    // part - the directory, taking a fight, detaching, removing for good and the backups' folder. Any other address
+    // under /api/archiv/ (the settings' /ordner, a route that is not there) or another quote trips.
+    const AR_ADRESSEN = ['"/api/archiv/liste"', '"/api/archiv/aufnehmen"', '"/api/archiv/loesen"', '"/api/archiv/loeschen"', '"/api/archiv/sicherungen"'];
+    const arpEinmal = AR_ADRESSEN.every((x) => arpFetch.filter((a) => a === x).length <= 1);
+    // one fetch alone may join (the search, Task 8, #264): one fight's lines by its key, exactly
+    // "/api/archiv/kampf?k=" + encodeURIComponent(<one name>) - the key encoded whole, nothing after it, once in the part
+    const AR_KAMPF = /^"\/api\/archiv\/kampf\?k=" \+ encodeURIComponent\([A-Za-z_$][\w$]*\)$/;
+    const arpKampf = arpFetch.filter((a) => AR_KAMPF.test(a));
+    check(arpFetch.every((a) => (arpFetchOk(a) && AR_ADRESSEN.includes(a)) || AR_KAMPF.test(a)) && arpEinmal && arpKampf.length <= 1 && !arpReach.length,
+      "the archive's part (76-archiv.ts) fetches only /api/archiv/ routes, each as a literal, and reaches nothing else",
+      `fetch: ${arpFetch.join(" | ")}; also: ${arpReach.join(" | ")}`);
+    // 13d.P0: the rules here never run empty - the archive's part is there under its name (since Task 6a,
+    // fd7cbec), and it alone names the archive's routes; the settings' part may name /api/archiv/ordner
+    // (the button "Archivordner oeffnen"), and no other part or file beside app/ names any of them
+    check(existsSync(join(pageDir, ARCHIV_PART)) && arp.length > 0, "the archive's part is there under its name (76-archiv.ts)");
+    const arRouteNamers = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/\/api\/archiv\b[^"'`\s)]*/g)]
+      .filter((m) => !(f === ARCHIV_PART || (f === "57-einstellungen.ts" && m[0] === "/api/archiv/ordner")))
+      .map((m) => `${f}: ${m[0]}`));
+    check(!arRouteNamers.length,
+      "only 76-archiv.ts names the archive's routes (/api/archiv/liste, /kampf, /aufnehmen); 57-einstellungen.ts may name /api/archiv/ordner",
+      `found: ${arRouteNamers.join(" | ")}`);
+    // 13d.P2 (rule 4): the archive's part hangs on nothing that leaves: no import of the party, the guild,
+    // guild online, the bug report, the party's log files, the image or the status bar with the update notice
+    // read by the file a specifier ends in, however the path is spelled ("./42-party", "../app/42-party.js")
+    const AR_FERN = /^(?:42-party|68-gilde|71-gilde-online|44-bug-report|35-party-log-files|50-bild|55-statusleiste)$/;
+    const arpImporte = [...arp.matchAll(/\bfrom\s*["'`]([^"'`]+)["'`]|^\s*import\s*["'`]([^"'`]+)["'`]/gm)].map((m) => m[1] ?? m[2]);
+    const arpFern = arpImporte.filter((x) => AR_FERN.test(posix.basename(posix.normalize(x.replace(/\\/g, "/"))).replace(/\.(?:ts|js|mjs|cjs)$/, "")));
+    check(!arpFern.length,
+      "the archive's part imports nothing from the party, the guild, guild online, the bug report, the party's log files, the image or the update notice",
+      `imports: ${arpFern.join(" | ")}`);
+    // ... and those parts never name the archive, its routes, its part or its core
+    const arFern = ["35-party-log-files.ts", "42-party.ts", "44-bug-report.ts", "50-bild.ts", "55-statusleiste.ts", "68-gilde.ts", "71-gilde-online.ts"]
+      .filter((f) => /\/api\/archiv|76-archiv|archiv-core|\barchiv(?:Aufnehmen|Stand|Kampf)\b|\bArchivKampf\b/i.test(part(f)));
+    check(!arFern.length, "the party, the bug report, the image, the update notice and the guild never name the archive",
+      `found in: ${arFern.join(", ")}`);
+    // 13d.P3: the archive's core is pure - no network, no page, no storage - and imports only other cores
+    check(existsSync(join(rendererDir, "archiv-core.ts")), "the archive's core is there under its name");
+    const arKern = (outer["../archiv-core.ts"] ?? "").replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const arKernImporte = [...arKern.matchAll(/\bfrom\s*["'`]([^"'`]+)["'`]|^\s*import\s*["'`]([^"'`]+)["'`]|\brequire\s*\(|\bimport\s*\(/gm)].map((m) => m[1] ?? m[2] ?? m[0]);
+    const arKernGriffe = arKern.match(/\bfetch\b|XMLHttpRequest|WebSocket|EventSource|sendBeacon|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bdocument\b|\bwindow\b|\bnavigator\b|\bglobalThis\b|\/api\//g) || [];
+    check(arKern.length > 0 && arKernImporte.every((x) => /^\.\/[\w-]+-core$/.test(x)) && !arKernGriffe.length,
+      "archiv-core.ts is a pure core: it imports only other cores and touches no network, page or storage",
+      `imports: ${arKernImporte.join(" | ")}; also: ${arKernGriffe.join(" | ")}`);
+    // 13d.P4 ("Alte Logs einlesen", spec 8): the log folder is read for the archive by its own part, 75-alte-logs.ts,
+    // which names no route of the archive (13d.P0) and hands each file to 76 by a call. It fetches exactly the long
+    // listing and the pieces of one log, each as written, GET only, and reaches nothing else; it imports only the
+    // server mode and the archive's part. Only it asks for the long listing (alle=1), and it runs only on the click:
+    // alteLogsEinlesen is called once, in 57's alteLogsStarten, which only the button #eAlteLogs calls; the
+    // archive takes a whole log (archivAusLog) only from 75.
+    const ALTE_PART = "75-alte-logs.ts";
+    const alt = part(ALTE_PART);
+    const altCode = alt.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const altFetches = [...altCode.matchAll(/\bfetch\b[^\n]*/g)].map((m) => m[0].trim());
+    const altReach = altCode.match(/XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\s*\(|\brequire\s*\(|<img\b|<iframe\b|\bnew\s+Image\b|\bpersistPref\b|\bmethod\s*:|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bbody\s*:/g) || [];
+    const altImporte = [...alt.matchAll(/\bfrom\s*["'`]([^"'`]+)["'`]|^\s*import\s*["'`]([^"'`]+)["'`]/gm)].map((m) => m[1] ?? m[2]);
+    check(existsSync(join(pageDir, ALTE_PART)) && alt.length > 0
+        && JSON.stringify(altFetches) === JSON.stringify(['fetch("/api/log?name=" + encodeURIComponent(name) + "&from=" + from, {signal: signal(abbruch)});',
+          'fetch("/api/logs?alle=1", {signal: signal(abbruch)});'])
+        && !altReach.length && JSON.stringify(altImporte) === JSON.stringify(["./41-server-mode", "./76-archiv"]),
+      "the old logs' part (75-alte-logs.ts) fetches only GET /api/logs?alle=1 and GET /api/log, sends nothing and imports only 41 and 76",
+      `fetch: ${altFetches.join(" | ")}; also: ${altReach.join(" | ")}; imports: ${altImporte.join(" | ")}`);
+    const alleFrager = Object.keys(page).sort().flatMap((f) => [...page[f].matchAll(/[?&]alle\s*=/g)].map((m) => `${f}: ${m[0]}`))
+      .filter((x) => x !== `${ALTE_PART}: ?alle=`);
+    const einst57 = part("57-einstellungen.ts");
+    const starten = [...einst57.matchAll(/^[^\n]*\balteLogsStarten\b[^\n]*$/gm)].map((m) => m[0].trim());
+    const einlesenRufer = Object.keys(parts).sort().flatMap((f) => [...parts[f].replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+      .matchAll(/\balteLogsEinlesen\s*\(/g)].map(() => f));
+    const ausLogRufer = Object.keys(parts).sort().flatMap((f) => [...parts[f].replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "")
+      .matchAll(/\barchivAusLog\s*\(/g)].map(() => f));
+    check(!alleFrager.length
+        && JSON.stringify(starten) === JSON.stringify(["async function alteLogsStarten(){", '$("#eAlteLogs").onclick = () => void alteLogsStarten();'])
+        && JSON.stringify(einlesenRufer) === JSON.stringify(["57-einstellungen.ts", "75-alte-logs.ts"])
+        && JSON.stringify(ausLogRufer) === JSON.stringify(["75-alte-logs.ts", "76-archiv.ts"]),
+      "only 75-alte-logs.ts asks for the long listing, and only the click on #eAlteLogs starts reading old logs",
+      `alle: ${alleFrager.join(" | ")}; alteLogsStarten: ${starten.join(" | ")}; alteLogsEinlesen( in: ${einlesenRufer.join(", ")}; archivAusLog( in: ${ausLogRufer.join(", ")}`);
+    // 13d.P4, Fix-Runde 1: the long listing cannot be asked for by a joined address either. Outside 75 a fetch that
+    // names /api/logs names exactly "/api/logs" (no query of any kind), and no fetch address is joined from a piece
+    // that could still become /api/logs ("/api/" + x, "/api/lo" + x, `/api/${x}`); no URLSearchParams carries alle.
+    // And the button: only 57 names #eAlteLogs - in alteNachfuehren and in its onclick, the two lines as written -,
+    // and nothing in alteNachfuehren clicks it.
+    const ohneKommentar = (src) => src.replace(/\/\*[\s\S]*?\*\//g, "").replace(/^\s*\/\/.*$/gm, "");
+    const logsWege = Object.keys(page).sort().filter((f) => f !== ALTE_PART).flatMap((f) => {
+      const c = ohneKommentar(page[f]);
+      return [...c.matchAll(/\bfetch\b\s*\(/g)].map((m) => arpErstes(c, m.index + m[0].length).trim()).filter((a) => {
+        const lit = ((a.match(/^(["'`])([^"'`]*)/) || [null, null, ""])[2]).split("${")[0];
+        const ganz = /^(["'`])[^"'`\\]*\1$/.test(a) && !a.includes("${");
+        return (lit.startsWith("/api/logs") && a !== '"/api/logs"') || (!ganz && lit.length < "/api/logs".length && "/api/logs".startsWith(lit) && lit.startsWith("/api/"));
+      }).map((a) => `${f}: ${a}`);
+    });
+    const alleParams = Object.keys(page).sort().filter((f) => f !== ALTE_PART && /URLSearchParams\s*\([^)]*\balle\b/.test(ohneKommentar(page[f])));
+    const knopfNenner = Object.keys(page).sort().filter((f) => f !== "57-einstellungen.ts" && /\beAlteLogs\b/.test(page[f]));
+    const knopfZeilen = [...einst57.matchAll(/^[^\n]*["'`]#?eAlteLogs["'`][^\n]*$/gm)].map((m) => m[0].trim());
+    const nachfuehren = (einst57.match(/\nfunction alteNachfuehren\(\)\{([\s\S]*?)\n\}/) || [null, null])[1];
+    check(!logsWege.length && !alleParams.length && !knopfNenner.length
+        && JSON.stringify(knopfZeilen) === JSON.stringify(['const b = $("#eAlteLogs") as HTMLButtonElement, ab = $("#eAlteLogsAb") as HTMLButtonElement;',
+          '$("#eAlteLogs").onclick = () => void alteLogsStarten();'])
+        && nachfuehren !== null && !/\.click\s*\(|dispatchEvent|alteLogsStarten/.test(nachfuehren),
+      "no other part reaches the long listing by a joined address, and only 57 names the button #eAlteLogs, without clicking it",
+      `/api/logs: ${logsWege.join(" | ")}; URLSearchParams: ${alleParams.join(", ")}; #eAlteLogs named in: ${knopfNenner.join(", ")}; 57: ${knopfZeilen.join(" | ")}; alteNachfuehren found: ${nachfuehren !== null}`);
+    // 13d.P6 (#264): no page file fetches an address with "..", and outside the archive's part (whose fetches
+    // 13d.P1 holds) every fetch whose address is not one whole literal is one of the joined forms that are there
+    // today, each in its file, as written and as often as written. So no part can build an address of the archive
+    // (or any other) out of pieces - "/api/weeklies/../archiv/erg" + "aenzen", "/api/x".slice(0, 5) + ... - and a
+    // new joined form has to be added here by name.
+    const FETCH_GEFUEGT = [
+      '23-kampfwahl.ts: "/api/log?name=" + encodeURIComponent(name) + "&from=" + from',
+      '34-menus-drop-and-tabs.ts: "/api/runs/load?name="+encodeURIComponent(pick)',
+      '35-party-log-files.ts: "/api/party-log/load?name="+encodeURIComponent(pick)',
+      '37-window-size-and-overlay.ts: "/api/events?seen=" + encodeURIComponent(JSON.stringify(gesehen))',
+      '41-server-mode.ts: "/api/latest?file=" + encodeURIComponent(file) + "&from=" + from',
+      '62-rekorde.ts: "/api/log?name=" + encodeURIComponent(name) + "&from=" + from',
+      '71-gilde-online.ts: "/api/gilde-online/" + pfad',
+      '75-alte-logs.ts: "/api/log?name=" + encodeURIComponent(name) + "&from=" + from'];
+    const fetchAdressen = Object.keys(page).sort().flatMap((f) => {
+      const c = ohneKommentar(page[f]);
+      return [...c.matchAll(/\bfetch\b\s*\(/g)].map((m) => ({ f, a: arpErstes(c, m.index + m[0].length).trim() }));
+    });
+    const fetchPunkte = fetchAdressen.filter((x) => x.a.includes("..")).map((x) => `${x.f}: ${x.a}`);
+    const fetchGefuegt = fetchAdressen.filter((x) => x.f !== ARCHIV_PART && !(/^(["'`])[^"'`\\]*\1$/.test(x.a) && !x.a.includes("${")))
+      .map((x) => `${x.f}: ${x.a}`);
+    check(!fetchPunkte.length && JSON.stringify(fetchGefuegt) === JSON.stringify(FETCH_GEFUEGT),
+      "no page fetch has .. in its address, and outside 76-archiv.ts every joined fetch address is one of the listed forms, in its file",
+      `..: ${fetchPunkte.join(" | ")}; joined: ${fetchGefuegt.filter((x) => !FETCH_GEFUEGT.includes(x)).join(" | ")}; listed but gone: ${FETCH_GEFUEGT.filter((x) => !fetchGefuegt.includes(x)).join(" | ")}`);
+    // 13d.P7 (#264 Teil 4, spec 2026-10-26-archiv-loeschen-design.md, 7.4): the routes that detach (loesen), remove
+    // (loeschen) and open the backups' folder (sicherungen) stand in the page's code only as the address of a fetch,
+    // one double-quoted literal, its options starting with method: "POST" - never in a variable, never joined, never
+    // a GET. Only 76-archiv.ts may name them at all (13d.P0: no other part, 57 included, and no file beside app/).
+    const ohneK = (f) => ohneKommentar(page[f]);
+    const AR_NEU = /\/api\/archiv\/(?:loesen|loeschen|sicherungen)\b/g;
+    const AR_NEU_FORM = /^fetch\("\/api\/archiv\/(?:loesen|loeschen|sicherungen)",\s*\{\s*method\s*:\s*"POST"\s*[,}]/;
+    const arNeuStray = Object.keys(page).sort().flatMap((f) => [...ohneK(f).matchAll(AR_NEU)]
+      .filter((m) => !AR_NEU_FORM.test(ohneK(f).slice(m.index - 7)))
+      .map((m) => `${f}: ${ohneK(f).slice(Math.max(0, m.index - 16), m.index + m[0].length + 24).replace(/\s+/g, " ")}`));
+    check(!arNeuStray.length,
+      "the archive's routes /api/archiv/loesen, /loeschen and /sicherungen are fetched only as one literal with method: \"POST\" first",
+      `found: ${arNeuStray.join(" | ")}`);
+    // 13d.P8 (spec 7.6): the page asks to remove for good from one place only. /api/archiv/loeschen is fetched at most
+    // once in the whole page, in 76-archiv.ts, inside the function archivLoeschenSenden; that function is called from
+    // 76 alone, once. Until the dialog is there (plan Task 5) there is no fetch and the rule holds vacuously - a second
+    // fetch, one in another function or a call from another part trips it already. Task 5 pins the calling line
+    // (the dialog's confirm button) here.
+    const AR_LOESCH_RUFER = "archivLoeschenSenden";
+    const arpC = ohneKommentar(arp);
+    const umgebendeFunktion = (src, i) => {
+      const kopf = [...src.slice(0, i).matchAll(/(?:^|\n)(?:export )?(?:async )?function ([\w$]+)\s*\(/g)].pop();
+      if (!kopf) return null;
+      const ende = src.indexOf("\n}\n", kopf.index + 1);
+      return ende > i ? kopf[1] : null;
+    };
+    const loeschFetches = Object.keys(page).sort().flatMap((f) => [...ohneK(f).matchAll(/\/api\/archiv\/loeschen\b/g)].map((m) => ({ f, i: m.index })));
+    const senderNenner = Object.keys(page).sort().flatMap((f) => [...ohneK(f).matchAll(new RegExp(`\\b${AR_LOESCH_RUFER}\\b`, "g"))].map(() => f));
+    check(loeschFetches.length <= 1 && loeschFetches.every((x) => x.f === ARCHIV_PART && umgebendeFunktion(arpC, x.i) === AR_LOESCH_RUFER)
+        && senderNenner.every((f) => f === ARCHIV_PART) && senderNenner.length <= 2,
+      "the page fetches /api/archiv/loeschen at most once, only in 76-archiv.ts's archivLoeschenSenden, which only 76 names, called once",
+      `fetches: ${loeschFetches.map((x) => `${x.f} in ${x.f === ARCHIV_PART ? umgebendeFunktion(arpC, x.i) : "?"}`).join(" | ")}; archivLoeschenSenden named in: ${senderNenner.join(", ")}`);
+    // 13d.P8, Task 5: the calling place is pinned. archivLoeschenSenden is declared once (a top-level async function) and
+    // called once, on this line, inside loeschenBestaetigt - after that function checked the typed text against what the
+    // dialog shows. loeschenBestaetigt is named twice in the whole page: its declaration and the dialog form's submit
+    // handler, as written. Nothing in 76 clicks, submits or dispatches programmatically, and no other part names the
+    // dialog's form, its button or its field - so only a person confirming in the dialog sends the request.
+    const AR_LOESCH_KNOPF = "loeschenBestaetigt";
+    const AR_LOESCH_AUFRUF = "const antwort = await archivLoeschenSenden(offen.ks, feld.value);";
+    const AR_LOESCH_PRUEFUNG = "if(!offen || offen.laeuft || offen.fertig || !bestaetigungOk(feld.value, offen.soll)) return;";
+    const AR_LOESCH_BINDUNG = '$("#arDlgForm").addEventListener("submit", e => { e.preventDefault(); void loeschenBestaetigt(); });';
+    const senderDeklRx = new RegExp(`^async function ${AR_LOESCH_RUFER}\\(`);
+    const senderAufrufe = [...arpC.matchAll(new RegExp(`\\b${AR_LOESCH_RUFER}\\s*\\(`, "g"))]
+      .map((m) => ({ zeile: arpC.slice(arpC.lastIndexOf("\n", m.index) + 1, arpC.indexOf("\n", m.index)), in: umgebendeFunktion(arpC, m.index) }))
+      .filter((x) => !senderDeklRx.test(x.zeile)).map((x) => ({ zeile: x.zeile.trim(), in: x.in }));
+    const senderDekl = [...arpC.matchAll(new RegExp(`(?:^|\\n)async function ${AR_LOESCH_RUFER}\\(`, "g"))].length;
+    const knopfNennt = Object.keys(page).sort().flatMap((f) => [...ohneK(f).matchAll(new RegExp(`\\b${AR_LOESCH_KNOPF}\\b`, "g"))]
+      .map((m) => ({ f, zeile: ohneK(f).slice(ohneK(f).lastIndexOf("\n", m.index) + 1, ohneK(f).indexOf("\n", m.index)).trim() })));
+    const knopfKopf = arpC.search(new RegExp(`\\nasync function ${AR_LOESCH_KNOPF}\\(\\)\\{\\n`));
+    const knopfKoerper = knopfKopf < 0 ? "" : arpC.slice(knopfKopf, arpC.indexOf("\n}\n", knopfKopf + 1));
+    const pruefungVor = knopfKoerper.indexOf(AR_LOESCH_PRUEFUNG), aufrufBei = knopfKoerper.indexOf(AR_LOESCH_AUFRUF);
+    const ausloeserCode = arpC.match(/\.click\s*\(|requestSubmit|dispatchEvent|\.submit\s*\(|new\s+(?:Keyboard|Mouse|Pointer|Submit)?Event\b/g) || [];
+    const dialogNenner = Object.keys(page).sort().filter((f) => f !== ARCHIV_PART && /\barDlg(?:Form|Ja|Feld)\b/.test(page[f]));
+    check(senderDekl === 1 && JSON.stringify(senderAufrufe) === JSON.stringify([{ zeile: AR_LOESCH_AUFRUF, in: AR_LOESCH_KNOPF }])
+        && JSON.stringify(knopfNennt) === JSON.stringify([{ f: ARCHIV_PART, zeile: `async function ${AR_LOESCH_KNOPF}(){` }, { f: ARCHIV_PART, zeile: AR_LOESCH_BINDUNG }])
+        && pruefungVor >= 0 && aufrufBei > pruefungVor && knopfKoerper.split(AR_LOESCH_AUFRUF).length === 2
+        && !ausloeserCode.length && !dialogNenner.length,
+      "the dialog's confirm (loeschenBestaetigt, bound only to the form's submit) is the one caller of archivLoeschenSenden, after checking the typed text, and nothing triggers it by code",
+      `calls: ${senderAufrufe.map((x) => `${x.in}: ${x.zeile}`).join(" | ")}; declared: ${senderDekl}; ${AR_LOESCH_KNOPF} named: ${knopfNennt.map((x) => `${x.f}: ${x.zeile}`).join(" | ")}; check before call: ${pruefungVor >= 0 && aufrufBei > pruefungVor}; by code: ${ausloeserCode.join(" | ")}; dialog named in: ${dialogNenner.join(", ")}`);
+    // 13d.P9 (spec 7.5, rule 4 of the first spec): what detaches or removes fights touches nothing but the archive -
+    // no function that fetches one of these routes names the history, a best pull, the weeklies, the guild or any
+    // other route
+    const AR_FREMD = /verlauf|\bhist\w*|bester?Pull|best-pull|weekl|gilde|\/api\/(?!archiv\/)/i;
+    const arNeuFremd = [...arpC.matchAll(AR_NEU)].map((m) => {
+      const name = umgebendeFunktion(arpC, m.index);
+      const kopf = name === null ? -1 : arpC.search(new RegExp(`(?:^|\\n)(?:export )?(?:async )?function ${name}\\s*\\(`));
+      const koerper = kopf < 0 ? arpC : arpC.slice(kopf, arpC.indexOf("\n}\n", kopf + 1));
+      const fremd = koerper.match(AR_FREMD);
+      return fremd ? `${name ?? "(top level)"}: ${fremd[0]}` : null;
+    }).filter(Boolean);
+    check(!arNeuFremd.length,
+      "the archive's functions that detach, remove or open the backups name no history, best pull, weeklies, guild or other route",
+      `found: ${arNeuFremd.join(" | ")}`);
+  }
   // The files the guild hands out (the image, the calendar file, plan task 7) leave only as a Blob of its
   // own: every link the part sets is exactly URL.createObjectURL(...), in one place, and nothing in it loads
   // a picture or a page by address (no new Image, no src, no href or src by setAttribute).
@@ -3032,6 +4279,7 @@ async function auditPage() {
   // more - hits, crit, heavy, miss - and never a text. histRecord builds a
   // fight in one literal and a few assignments; nothing else joins them
   check(existsSync(join(pageDir, "32-history.ts")), "the history part is there under its name");
+  const h32Early = part("32-history.ts");
   const histBody = (part("32-history.ts").match(/export function histRecord\(\)\{([\s\S]*?)\n\}/) || [null, ""])[1];
   const histLit = (histBody.match(/const f: HistFight = \{([\s\S]*?)\};/) || [null, ""])[1];
   const histKeys = [...histLit.matchAll(/\b(\w+)\s*:/g)].map((m) => m[1]).sort().join();
@@ -3039,16 +4287,35 @@ async function auditPage() {
   // the group mark g (06.10.2026): the sum of a group, opened with
   // "everyone", is set in exactly one line and only to the number 1 - never
   // a name, never the chosen attacker
-  check(histKeys === "at,dmg,dps,dur,name" && histSets === "b,c,crit,g,heavy,hits,miss,w"
+  // the character ch (Twinks #251, spec Twinks 3): set in exactly one line, only to what chVon returns - what
+  // charakterFuer returns (an id of the list or ""), or while the weeklies are not read the index's own ch of the
+  // fight with the same start -, never for the sum of a group; the re-read carries it over only as ch: n.ch. No
+  // other part sets a ch.
+  // A shorthand property ({...f, ch} or {a, ch}) counts as a set too: any of them outside the listed lines fails.
+  const chSets = Object.keys(parts).sort().flatMap((f) => [...parts[f].matchAll(/^[^\n]*(?:\.ch|\[\s*["'`]ch["'`]\s*\])\s*(?:\?\?|\|\||&&)?=(?!=)[^\n]*|^[^\n]*(?:[{,]\s*|["'`])ch["'`]?\s*:[^\n]*|^[^\n]*[{,]\s*ch\s*[,}][^\n]*|^[ \t]*ch[ \t]*,?[ \t]*(?:\/\/[^\n]*)?$/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const CH_SETS = ["32-history.ts: if(ch !== undefined) f.ch = ch;",
+    "32-history.ts: : alt && !alt.nach ? altFights.map(f => { const n = neu.find(x => x.at === f.at); return n && n.top != null ? {...f, top: n.top, topSid: n.topSid ?? \"\", ...(n.ch === undefined ? {} : {ch: n.ch})} : f; })"];
+  // ch comes only from chVon: the id charakterFuer gives back, or - while the weeklies are not read - the ch the
+  // index already holds for the fight with the same start (altCh, strings of the index itself)
+  const ALT_CH = "\n  const altCh = new Map((state.hist.files[key]?.fights ?? []).filter(x => typeof x.ch === \"string\").map(x => [x.at, x.ch!]));\n";
+  check(histKeys === "at,dmg,dps,dur,name" && histSets === "b,c,ch,crit,g,heavy,hits,miss,w"
+      && histBody.includes(ALT_CH + "  " + CH_VON_LINE + "\n")
+      && [...histBody.matchAll(/\baltCh\b/g)].length === 2 && [...histBody.matchAll(/\bchVon\b/g)].length === 3
+      && histBody.includes("\n    const ch = chVon(seg.start, f.g);\n    if(ch !== undefined) f.ch = ch;\n")
+      && histBody.includes("\n      const ch = chVon(alt.at, alt.g);\n")
+      && [...histBody.matchAll(/\bf\.ch\b/g)].length === 1 && JSON.stringify(chSets) === JSON.stringify(CH_SETS)
+      && h32Early.includes("\nconst angreifer = () => state.player !== \"__all\" ? state.player : state.players.length === 1 ? state.players[0]! : \"\";\n")
       && !/Object\.assign\(\s*f\b|\bf\s*\[|\(f as\b|\.\.\.f\b/.test(histBody)
       && histBody.includes("\n    const miss = seg.missed || 0;\n")
       && histBody.includes("\n    f.hits = st.hits + miss; f.crit = st.crit; f.heavy = st.heavy; f.miss = miss;\n")
       && histBody.includes("\n    const b = altB.get(seg.start);\n    if(b) f.b = b;\n")
       && histBody.includes("\n    const w = paarCode(paarVon(seg, histStill) ?? []);\n    if(w) f.w = w;\n")
       && histBody.includes("\n    if(state.players.length > 1 && state.player === \"__all\") f.g = 1;\n")
-      && [...histBody.matchAll(/\bf\.g\b/g)].length === 1,
-    "the history index takes per fight only its known fields, hits, crit, heavy and miss as whole numbers, the pair w as two numbers, b carried over and the group mark g as 1",
-    `literal: ${histKeys}; assigned: ${histSets}`);
+      // f.g: set in its one line, read once more only in the ch line (a group's sum gets no character)
+      && [...histBody.matchAll(/\bf\.g\b/g)].length === 2,
+    "the history index takes per fight only its known fields, hits, crit, heavy and miss as whole numbers, the pair w as two numbers, b carried over, the group mark g as 1 and the character ch only as an id (from charakterFuer, or carried over while the weeklies are not read)",
+    `literal: ${histKeys}; assigned: ${histSets}; ch: ${chSets.filter((l) => !CH_SETS.includes(l)).join(" | ")}`);
   // Records (spec Rekorde 3, Fixrunde 1, 02.10.2026): the fight's top hit
   // joins the index only through topDazu - called once in histRecord, after
   // the four numbers - as a whole number and a skill id of a fixed pattern
@@ -3077,8 +4344,27 @@ async function auditPage() {
   // re-read never removes an entry, histRecord hands it the fights). Nothing
   // else writes into it.
   const IDX_WRITES = [
-    "32-history.ts: else state.hist.files[key] = {size: state.text.length, fights};",
-    "32-history.ts: state.hist.files[name] = !alt || alt.nach ? {size, bytes, nach: true, fights} : {...alt, size, bytes, fights};"];
+    "32-history.ts: else state.hist.files[key] = {size: state.text.length, fights, ...zvTeil(alt)};",
+    "32-history.ts: state.hist.files[name] = !alt || alt.nach ? {size, bytes, nach: true, fights, ...zv} : {...alt, size, bytes, fights, ...zv};"];
+  // ... and zv (Twinks #251, spec Twinks 3): the state of the assignment, only the ids of the characters sorted
+  // and joined (zuordnungsStand), from zvTeil or carried over from the old entry as text (altZv, also while the
+  // weeklies are not read) - never a log name
+  const ZV_LINES = ["const altZv = (alt: IndexEintrag): {zv?: string} => typeof alt?.zv === \"string\" ? {zv: alt.zv} : {};",
+    ZV_TEIL,
+    "const zv = ab > 0 || ergebnis !== \"ok\" ? altZv(alt) : zvTeil(alt);"];
+  const h32Lines = part("32-history.ts").split("\n").map((l) => l.trim());
+  // in 32-history.ts every line naming zv; in the other parts (54 has a scroll box of that name) any zv as a field
+  const zvUse = Object.keys(parts).sort().flatMap((f) => [...parts[f].matchAll(f === "32-history.ts" ? /^[^\n]*\bzv\b[^\n]*/gm
+    : /^[^\n]*(?:\.\s*zv\b|\[\s*["'`]zv["'`]\s*\]|(?:[{,]\s*|["'`])zv["'`]?\s*:|\{[^{}\n]*(?<![\w$.])zv(?![\w$])[^{}\n]*\}\s*=(?!=))[^\n]*/gm)]
+    .map((m) => `${f}: ${m[0].trim()}`));
+  const ZV_USE = ["32-history.ts: ? !alt || !!alt.nach || JSON.stringify(alt.fights) !== JSON.stringify(fights) || (state.charaktereBekannt && (alt.zv ?? \"\") !== zuordnungsStand(state.charaktere))",
+    ...ZV_LINES.slice(0, 2).map((l) => "32-history.ts: " + l),
+    "32-history.ts: /* beim Anhaengen (ab > 0) bleibt der alte Stand zv: nur ganz gelesen ist die Datei neu zugeordnet;",
+    "32-history.ts: " + ZV_LINES[2],
+    "32-history.ts: state.hist.files[name] = !alt || alt.nach ? {size, bytes, nach: true, fights, ...zv} : {...alt, size, bytes, fights, ...zv};"];
+  check(ZV_LINES.every((l) => h32Lines.filter((x) => x === l).length === 1) && JSON.stringify(zvUse) === JSON.stringify(ZV_USE),
+    "the history index takes zv only as the ids of the characters (zuordnungsStand) or the old entry's text, in 32-history.ts alone",
+    `zv: ${zvUse.filter((l) => !ZV_USE.includes(l)).join(" | ")}`);
   const IDX_DELETES = ["32-history.ts: if(!fights.length) delete state.hist.files[key];"];
   const idxWrites = Object.keys(parts).sort().flatMap((f) => [...parts[f].matchAll(/^[^\n]*\bhist\.files\s*\[[^\]]*\]\s*=(?!=)[^\n]*/gm)]
     .map((m) => `${f}: ${m[0].trim()}`));
@@ -3087,7 +4373,7 @@ async function auditPage() {
   const idxOther = Object.keys(parts).flatMap((f) => [...parts[f].matchAll(/Object\.assign\(\s*state\.hist\.files\b|=\s*state\.hist\.files\s*;|Reflect\.\w+\(\s*state\.hist\.files\b/g)]
     .map((m) => `${f}: ${m[0]}`));
   check(JSON.stringify(idxWrites) === JSON.stringify(IDX_WRITES) && JSON.stringify(idxDeletes) === JSON.stringify(IDX_DELETES) && !idxOther.length,
-    "the history index per file is written only by histRecord and the records' re-read, with size, bytes, nach and fights",
+    "the history index per file is written only by histRecord and the records' re-read, with size, bytes, nach, fights and zv",
     `writes: ${idxWrites.filter((l) => !IDX_WRITES.includes(l)).join(" | ")}; deletes: ${idxDeletes.filter((l) => !IDX_DELETES.includes(l)).join(" | ")}; other: ${idxOther.join(" | ")}`);
   // Records (Fixrunde 1, Gutachten H2): the re-read stores nothing but the
   // index entry - histRecord under histStill makes no build (bauFuer would
@@ -3318,6 +4604,22 @@ if (missing15.length) failures.push({ status: "FAIL", label: "could not find the
 else auditSpielbilder();
 if (existsSync(serverPath)) auditServer();
 else notes.push({ status: "SKIP", label: "party server not in this folder, not audited", detail: "" });
+
+// The two embedded typefaces (Anton, Source Sans 3; #342) are under the SIL Open
+// Font License 1.1, which lets them travel only with their licence text. Both
+// texts must be in licenses/, must be that licence, and electron-builder.yml
+// must pack the folder into the installer (the export copies licenses/ whole).
+const lizenzenDir = process.env.AUDIT_LIZENZEN_DIR || root;
+const FONT_LICENSES = ["LICENSE-Anton-OFL.txt", "LICENSE-SourceSans3-OFL.txt"];
+for (const f of FONT_LICENSES) {
+  const p = join(lizenzenDir, "licenses", f);
+  const text = existsSync(p) ? readFileSync(p, "utf8") : "";
+  check(/SIL OPEN FONT LICENSE Version 1\.1/.test(text), `font licence ${f} is in licenses/ and is the SIL OFL 1.1`, existsSync(p) ? "text is not the OFL" : "file missing");
+}
+const builderPath = join(lizenzenDir, "electron-builder.yml");
+const builderYml = existsSync(builderPath) ? readFileSync(builderPath, "utf8") : "";
+check(/^ {2}- from: licenses\n {4}to: licenses$/m.test(builderYml), "electron-builder.yml packs licenses/ into the installer (the font licences go with it)",
+  existsSync(builderPath) ? "no 'from: licenses / to: licenses' entry" : "electron-builder.yml missing");
 
 for (const n of notes) console.log(`  ${n.status}  ${n.label}`);
 for (const f of failures) {

@@ -1,8 +1,10 @@
+import { state } from "./01-state";
 import { t } from "./08-translation";
 import { full } from "./03-helpers";
 import { esc } from "./18-interface-basics";
-import { SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, SERVED } from "./41-server-mode";
 import { WK_MARKE, wkAnfang, wkBilderCss, wkHatBild } from "./60-weeklies-bilder";
+import { logPruefen, mainSetzen, mainZuerst } from "../charaktere-core";
 import { anzeigeStand, bereichZu, fortschrittVon, GRUNDLISTE, letzteWoche, letzterReset, naechsterReset, vorwocheSichern, type Erinnerung, type Takt, type WeeklyProfil } from "../weeklies-core";
 
 /* ---------- Weeklies (Spezifikation 2026-09-29-weeklies-design.md, Plan Aufgabe W3) ----------
@@ -46,15 +48,20 @@ import { anzeigeStand, bereichZu, fortschrittVon, GRUNDLISTE, letzteWoche, letzt
    renderAll, 32). Nichts hiervon geht ins Netz, in ein Gruppen-Log oder in
    den Fehlerbericht. */
 
-export interface Stand { v: 1; profile: WeeklyProfil[]; erinnerungen?: Erinnerung[] }
+/** Ein Angreifername, den der Spieler ignoriert (Spezifikation Twinks 6): geloest statt geloescht, wie in der Datei (weeklies.ts). */
+export interface Ignoriert { name: string; geloest?: boolean }
+export interface Stand { v: 1; profile: WeeklyProfil[]; erinnerungen?: Erinnerung[]; ignoriert?: Ignoriert[] }
 interface Punkt { schluessel: string; gruppe: string; menge: number; takt: Takt; name: string; grund: string; eigen: boolean; aus: boolean; geloest: boolean }
 type Lage = "laden" | "da" | "nurApp" | "gesperrt";
 type Speicher = "" | "nie" | "spaeter" | "anderswo";
-type Undo = { art: "profil"; id: string } | { art: "eigen"; id: string; k: string };
+/* main: der geloeste Charakter war Main; Rueckgaengig macht ihn wieder dazu (Twinks Schritt 1, offener Punkt) */
+type Undo = { art: "profil"; id: string; main?: true } | { art: "eigen"; id: string; k: string };
 
 /** Hoechstens sechs nicht geloeste Charaktere (Spezifikation 2), 60 insgesamt mit den geloesten und eigene Punkte
     je Charakter wie die Datei (weeklies.ts: MAX_ACTIVE, MAX_PROFILES, MAX_OWN). */
 const MAX_AKTIV = 6, MAX_PROFILE = 60, MAX_EIGENE = 100;
+/** hoechstens 60 ignorierte Namen, wie die Datei (weeklies.ts: MAX_IGNORED) */
+const MAX_IGNORIERT = 60;
 const GRUPPEN = [...new Set(GRUNDLISTE.map(g => g.gruppe)), "eigene"];
 /* Die Haendler in ihrer Folge (Spezifikation 10): ein Feld, je Haendler ein Block. */
 const HAENDLER = ["gemischtwaren", "gildenhaendler", "vertragsmuenzen", "widerstandswaren", "ehrenmuenzen", "raidwaren"];
@@ -67,6 +74,7 @@ const FLUEGEL = ["zitadelle", "korridor", "altar"], STUFEN = ["Normal", "Schwer"
 
 let daten: Stand | null = null;
 let lage: Lage = "laden";
+/** Der Charakter, den der Nutzer in dieser Sitzung gewaehlt hat; null heisst keine Wahl: dann der erste der Reihe, also der Main (Twinks Schritt 3). */
 let gewaehlt: string | null = null;
 let neuOffen = false, nameOffen = false, anpassen = false, geloesteAuf = false;
 /** "Nur Offenes zeigen" und der Satz bei sechs Charakteren; beides nur in der Sitzung. */
@@ -79,6 +87,9 @@ let undo: Undo | null = null;
 let speicher: Speicher = "";
 /** Ein Satz zur Eingabe (Name zu lang, Menge falsch); weg mit der naechsten Handlung. */
 let meldung = "";
+/* Endgueltig loeschen (Spezifikation Weeklies loeschen, #240): nur, was in einer Liste der Gelösten steht, nur mit dem Namen, die Sicherung legt der
+   Hauptprozess an. loeschFrage: der Charakter oder der eigene Punkt, dessen Frage offen ist; loeschName: was im Feld steht; loeschSatz: der Satz danach. */
+let loeschFrage: {was: "charakter" | "eigen"; id: string} | null = null, loeschName = "", loeschSatz = "";
 /** Das Element (data-f), das nach dem naechsten Zeichnen den Fokus bekommt. */
 let fokus: string | null = null;
 /** Die Truhe (1 bis Menge), die den einen Tabstopp der Truhen traegt; null heisst die naechste zu fuellende. */
@@ -88,6 +99,27 @@ let rasterPos: string | null = null;
 
 /** Haken fuer den Dialog der Erinnerungen (67): nach dem Zeichnen und nach dem Speichern. */
 export const haken: {gezeichnet: (() => void) | null; gespeichert: (() => void) | null} = {gezeichnet: null, gespeichert: null};
+/** Haken fuer den Streifen (72): der Stand wurde gelesen, nachgelesen oder von der Vollansicht geaendert. */
+export const streifenHaken: {geaendert: (() => void) | null} = {geaendert: null};
+/** Haken fuer den Abschnitt "Charaktere" der Einstellungen (73): der Stand wurde gelesen oder geaendert. */
+export const charakterHaken: {geaendert: (() => void) | null} = {geaendert: null};
+/** Haken fuer die Rekorde (62): die Charaktere oder die ignorierten Namen wurden gelesen oder geaendert. */
+export const rekordHaken: {geaendert: (() => void) | null} = {geaendert: null};
+/** Haken fuer das Archiv (76): die Charaktere wurden gelesen oder geaendert (ihre Namen stehen in den Kaempfen). */
+export const archivNamenHaken: {geaendert: (() => void) | null} = {geaendert: null};
+/* Alle Charaktere mit Logname, so wie die Seite sie fuer den Verlauf braucht (state.charaktere, 32-history.ts):
+   die aktiven zuerst, dann die geloesten. Ein geloester behaelt so seine Kaempfe (Spezifikation Twinks 3), Loesen
+   und Zurueckholen aendern den Zuordnungsstand nicht, und teilt ein geloester den Lognamen mit einem aktiven,
+   gewinnt der aktive (charakterFuer nimmt den ersten).
+   Erst ein gelesener Stand sagt, welche Charaktere es gibt (charaktereBekannt). Ist er noch nicht da oder
+   unlesbar, bleibt die zuletzt gelesene Liste stehen: sonst saehe der Verlauf "keine Charaktere" und nahme
+   gespeicherten Kaempfen ihren Charakter. */
+function charaktereMelden(){
+  if(!daten || lage !== "da") return;
+  const mitLog = (ps: readonly WeeklyProfil[]) => ps.flatMap(p => p.log ? [{id: p.id, log: p.log}] : []);
+  state.charaktere = [...mitLog(daten.profile.filter(p => !p.geloest)), ...mitLog(daten.profile.filter(p => p.geloest))];
+  state.charaktereBekannt = true;
+}
 
 /* ---------- Lesen: erst lesen, dann schreiben ---------- */
 let ladeTimer: ReturnType<typeof setTimeout> | null = null, ladeVersuch = 0;
@@ -104,7 +136,9 @@ function standVon(x: unknown): Stand | null {
       namen: isRec(p.namen) ? p.namen : {}, eigene: Array.isArray(p.eigene) ? p.eigene : []} as WeeklyProfil);
   }
   // die Erinnerungen bleiben im Stand: die Datei lehnt einen Stand ab, der gespeicherte wegliesse (weeklies.ts)
-  return {v: 1, profile, ...(Array.isArray(x.erinnerungen) ? {erinnerungen: x.erinnerungen as Erinnerung[]} : {})};
+  return {v: 1, profile, ...(Array.isArray(x.erinnerungen) ? {erinnerungen: x.erinnerungen as Erinnerung[]} : {}),
+    // ebenso die ignorierten Namen (Spezifikation Twinks 6)
+    ...(Array.isArray(x.ignoriert) ? {ignoriert: x.ignoriert as Ignoriert[]} : {})};
 }
 function laden(){
   if(!SERVED || ladeTimer) return;
@@ -144,7 +178,8 @@ function merken(){
 }
 function senden(keepalive = false){
   sendeTimer = null;
-  if(!daten || lage !== "da") return;
+  // das abgerissene Fenster (Windows Teil 2) schreibt nichts
+  if(!daten || lage !== "da" || ABRISS_FENSTER) return;
   if((unterwegs || pruefend) && !keepalive){ nochmal = true; return; }
   if(wiederTimer){ clearTimeout(wiederTimer); wiederTimer = null; }
   unterwegs = true;
@@ -163,19 +198,29 @@ function senden(keepalive = false){
 }
 /* Nach 400: die Datei einmal lesen. Traegt sie etwas anderes als zuletzt
    gelesen oder gespeichert, gilt ihr Stand, und ein Satz sagt es. */
-function nachLesen(){
+function nachLesen(leise = false){
   pruefend = true;
   fetch("/api/weeklies").then(r => r.ok ? r.json() : null).then((d: unknown) => {
     const s = isRec(d) && d.ok === true ? standVon(d.data) : null;
-    if(s && kanon(s) !== gespeichert){
-      daten = s; gespeichert = kanon(s); speicher = "anderswo";
-      nochmal = false; undo = null; neuOffen = false; nameOffen = false; punktEdit = null;
+    if(s && kanon(s) !== gespeichert && !(leise && (sendeTimer || unterwegs))){
+      daten = s; gespeichert = kanon(s);
+      // leise (Fokus zurueck, nachfrischen): nichts ging verloren, also kein Satz "anderswo geaendert" und kein Zustand weg
+      if(!leise){
+        speicher = "anderswo";
+        nochmal = false; undo = null; neuOffen = false; nameOffen = false; punktEdit = null;
+      }
       renderWeeklies();
     }
   }, () => {}).then(() => {
     pruefend = false;
     if(nochmal){ nochmal = false; senden(); }
   });
+}
+/* Zwei Fenster, ein Speicher (Kompakt neu, 5): kommt ein Fenster in den Vordergrund, liest es den Stand neu, wenn es nichts
+   Ungesendetes haelt und die Datei etwas anderes traegt - ein Haken im Streifen soll in der Vollansicht stehen und umgekehrt. */
+function nachfrischen(){
+  if(!SERVED || lage !== "da" || sendeTimer || unterwegs || pruefend) return;
+  nachLesen(true);   // dieselbe Leseroute wie nach einem 400, nur leise
 }
 /** Beim Schliessen oder Neuladen: eine entprellte Aenderung sofort senden (K5). */
 function beimVerlassen(){
@@ -186,8 +231,10 @@ function beimVerlassen(){
 
 /* ---------- Charaktere und Punkte ---------- */
 const aktive = () => daten ? daten.profile.filter(p => !p.geloest) : [];
+/** Die aktiven in der Folge der Reiter: der Main zuerst (Twinks Schritt 3). */
+const reihe = () => mainZuerst(aktive());
 function profilJetzt(): WeeklyProfil | null {
-  const a = aktive();
+  const a = reihe();
   return a.find(p => p.id === gewaehlt) || a[0] || null;
 }
 function ersetze(neu: WeeklyProfil){
@@ -273,9 +320,10 @@ function umbenennen(roh: string){
 function profilLoesen(){
   const p = profilJetzt();
   if(!p) return;
-  ersetze({...p, geloest: true});
-  undo = {art: "profil", id: p.id};
-  gewaehlt = aktive()[0]?.id ?? null;
+  const {main: _main, ...ohneMain} = p;   // ein geloester Charakter ist nie Main (weeklies.ts)
+  ersetze({...ohneMain, geloest: true});
+  undo = {art: "profil", id: p.id, ...(p.main ? {main: true as const} : {})};
+  gewaehlt = null;
   anpassen = false; nameOffen = false; punktEdit = null;
   fokus = "undo";
   ansagen(t("weeklies.geloestAngesagt", {name: p.name}));
@@ -359,7 +407,11 @@ function undoAusfuehren(){
   const u = undo;
   undo = null;
   if(!u) return;
-  if(u.art === "profil") profilZurueck(u.id);
+  if(u.art === "profil"){
+    profilZurueck(u.id);
+    // war er Main und ist es seitdem keiner geworden, ist er es wieder
+    if(u.main && daten && !daten.profile.some(x => x.main) && aktive().some(x => x.id === u.id)){ daten.profile = mainSetzen(daten.profile, u.id) as WeeklyProfil[]; merken(); }
+  }
   else if(u.id === profilJetzt()?.id) eigenLoesen(u.k, false);
 }
 /** Die Kachel eines Punkts: eigene in "Eigene", die der Haendler in "Haendler", sonst seine Gruppe. */
@@ -393,7 +445,7 @@ function kopfSetzen(jetzt: number){
   setzen(document.querySelector("#wkTag"), t("weeklies.resetTagKopf", {zeit: bd.zeit, in: dauer(d - jetzt)}));
 }
 function statusSetzen(){
-  setzen(document.querySelector("#wkStatus"), meldung ? t(meldung) : speicher ? t("weeklies.sp." + speicher) : "");
+  setzen(document.querySelector("#wkStatus"), meldung ? t(meldung) : loeschSatz ? loeschSatz : speicher ? t("weeklies.sp." + speicher) : "");
 }
 
 /* ---------- Das Wochenband ----------
@@ -487,14 +539,70 @@ function undoHtml(): string {
   }
   return '<p class="wkgeloest"><span id="wkUndoSatz">' + esc(satz) + "</span> " + knopf("btn sm", 'data-wk-undo data-f="undo" aria-describedby="wkUndoSatz"', t("weeklies.undo")) + "</p>";
 }
+const namenGleich = (a: string, b: string) => a.trim().toLowerCase() === b.trim().toLowerCase();
+/** Was die Frage zum endgueltigen Loeschen als Namen verlangt: der Name des Charakters oder des eigenen Punktes (nur gelöste). */
+function loeschZiel(): string {
+  const q = loeschFrage, p = profilJetzt();
+  if(!q || !daten) return "";
+  if(q.was === "charakter") return daten.profile.find(x => x.id === q.id && x.geloest)?.name ?? "";
+  return p?.eigene.find(e => e.schluessel === q.id && e.geloest)?.name ?? "";
+}
+/** Der Knopf neben "Zurueck": oeffnet die Frage. */
+const loeschKnopf = (was: "charakter" | "eigen", id: string, name: string, cls = "btn sm") =>
+  knopf(cls, 'data-wk-loesch-frage="' + was + '" data-id="' + id + '" data-f="lq:' + id + '" aria-label="' + esc(t("weeklies.loeschen.aria", {name})) + '"', t("weeklies.loeschen.knopf"));
+/** Die Frage zum endgueltigen Loeschen: Name eintippen, dann ist der Knopf frei. */
+function loeschFrageHtml(was: "charakter" | "eigen", id: string): string {
+  if(!loeschFrage || loeschFrage.was !== was || loeschFrage.id !== id) return "";
+  const name = loeschZiel();
+  return '<div class="wkloeschfrage" role="group" aria-labelledby="wkLQ"><p id="wkLQ">' + esc(t("weeklies.loeschen.frage", {name})) + "</p>" +
+    '<span class="field"><label for="wkLoeschName">' + esc(t("weeklies.loeschen.feld")) + '</label><input id="wkLoeschName" data-f="loeschName" maxlength="60" autocomplete="off" spellcheck="false" value="' + esc(loeschName) + '"></span>' +
+    '<span class="wkloeschknoepfe">' + knopf("btn sm hot", 'data-wk-loesch-ja data-f="loeschJa"' + (namenGleich(loeschName, name) ? "" : " disabled"), t("weeklies.loeschen.ja")) +
+    knopf("btn sm", "data-wk-loesch-nein data-f=\"loeschNein\"", t("weeklies.loeschen.nein")) + "</span></div>";
+}
+/** Der Eintrag eines gelösten Charakters in beiden Listen: Name, Zurueck, Endgueltig loeschen, die Frage. */
+function geloesterCharakterHtml(p: WeeklyProfil, voll: boolean): string {
+  return '<li><span class="wkausname">' + esc(p.name) + "</span>" +
+    knopf("btn sm", 'data-wk-zurueck="' + p.id + '" data-f="zu:' + p.id + '" aria-label="' + esc(t("weeklies.zurueckName", {name: p.name})) + '"' +
+      (voll ? ' disabled aria-describedby="wkZurueckVoll"' : ""), t("weeklies.zurueck")) + loeschKnopf("charakter", p.id, p.name) + loeschFrageHtml("charakter", p.id) + "</li>";
+}
+/** Ein gelöschter Punkt, der Eintrag eines gelösten eigenen Punktes in Anpassen. */
+async function abwarten(){
+  if(sendeTimer){ clearTimeout(sendeTimer); sendeTimer = null; senden(); }
+  for(let n = 0; n < 100 && (unterwegs || pruefend || nochmal); n++) await new Promise(r => setTimeout(r, 50));
+}
+async function loeschenAusfuehren(){
+  const q = loeschFrage, p = profilJetzt();
+  if(!q || !daten || lage !== "da") return;
+  const name = loeschZiel();
+  if(!name || !namenGleich(loeschName, name)) return;
+  await abwarten();
+  const body = q.was === "eigen" ? {was: q.was, profil: p?.id ?? "", id: q.id, name: loeschName} : {was: q.was, id: q.id, name: loeschName};
+  let antwort: unknown = null, status = 0;
+  try {
+    const r = await fetch("/api/weeklies-loeschen", {method: "POST", headers: {"Content-Type": "application/json"}, body: JSON.stringify(body)});
+    status = r.status; antwort = await r.json();
+  } catch { /* der Satz sagt, dass es nicht ging */ }
+  loeschFrage = null; loeschName = "";
+  if(isRec(antwort) && antwort.ok === true && typeof antwort.sicherung === "string"){
+    loeschSatz = t("weeklies.loeschen.fertig", {name, datei: antwort.sicherung});
+    ansagen(loeschSatz);
+    // die Datei hat sich geaendert: die Seite liest sie neu, bevor sie wieder schreibt
+    lage = "laden"; ladeVersuch = 0;
+    renderWeeklies();
+    laden();
+    return;
+  }
+  const grund = isRec(antwort) && typeof antwort.grund === "string" ? antwort.grund : status === 503 ? "unavailable" : "abgelehnt";
+  loeschSatz = t("weeklies.loeschen.fehler." + (["name", "sicherung", "nicht-geloest", "unavailable"].includes(grund) ? grund : "abgelehnt"));
+  ansagen(loeschSatz);
+  renderWeeklies();
+}
 /* Die Liste der geloesten Charaktere unter der Leiste (Knopf "Geloeste (n)" in der Leiste, 125.2). */
 function geloesteListeHtml(): string {
   const weg = daten!.profile.filter(p => p.geloest);
   if(!weg.length || !geloesteAuf) return "";
   const voll = aktive().length >= MAX_AKTIV;
-  let h = '<ul class="wkausliste" id="wkGeloeste">' + weg.map(p => '<li><span class="wkausname">' + esc(p.name) + "</span>" +
-    knopf("btn sm", 'data-wk-zurueck="' + p.id + '" data-f="zu:' + p.id + '" aria-label="' + esc(t("weeklies.zurueckName", {name: p.name})) + '"' +
-      (voll ? ' disabled aria-describedby="wkZurueckVoll"' : ""), t("weeklies.zurueck")) + "</li>").join("") + "</ul>";
+  let h = '<ul class="wkausliste" id="wkGeloeste">' + weg.map(p => geloesterCharakterHtml(p, voll)).join("") + "</ul>";
   if(voll) h += '<p class="wkhinweis" id="wkZurueckVoll">' + esc(t("weeklies.zurueckVoll")) + "</p>";
   return '<div class="wkausw">' + h + "</div>";
 }
@@ -505,9 +613,7 @@ function geloesteHtml(): string {
   let h = '<div class="wkausw"><p class="wkauswk">' + knopf("leise", 'data-wk-geloeste data-f="gz" aria-expanded="' + geloesteAuf + '"' +
     (geloesteAuf ? ' aria-controls="wkGeloeste"' : ""), geloesteAuf ? t("weeklies.geloesteVerbergen") : t("weeklies.geloesteZeigen", {n: weg.length})) + "</p>";
   if(geloesteAuf){
-    h += '<ul class="wkausliste" id="wkGeloeste">' + weg.map(p => '<li><span class="wkausname">' + esc(p.name) + "</span>" +
-      knopf("btn sm", 'data-wk-zurueck="' + p.id + '" data-f="zu:' + p.id + '" aria-label="' + esc(t("weeklies.zurueckName", {name: p.name})) + '"' +
-        (voll ? ' disabled aria-describedby="wkZurueckVoll"' : ""), t("weeklies.zurueck")) + "</li>").join("") + "</ul>";
+    h += '<ul class="wkausliste" id="wkGeloeste">' + weg.map(p => geloesterCharakterHtml(p, voll)).join("") + "</ul>";
     if(voll) h += '<p class="wkhinweis" id="wkZurueckVoll">' + esc(t("weeklies.zurueckVoll")) + "</p>";
   }
   return h + "</div>";
@@ -518,12 +624,16 @@ const KHAKEN = '<svg class="wkhk" viewBox="0 0 24 24" aria-hidden="true"><path d
 function karteHtml(x: WeeklyProfil, an: boolean, jetzt: number): string {
   const f = fortschrittVon(x, jetzt), offen = f.woche.g - f.woche.n;
   const satz = f.fertig ? t("weeklies.karteFertig", {t: f.tag.n, tg: f.tag.g}) : t("weeklies.karteOffen", {n: offen, t: f.tag.n, tg: f.tag.g});
-  const vh = f.fertig ? t("weeklies.karteVhFertig", {name: x.name, t: f.tag.n, tg: f.tag.g}) : t("weeklies.karteVhOffen", {name: x.name, n: offen, t: f.tag.n, tg: f.tag.g});
+  // der Main hoert sein Wort im Satz, die Marke selbst ist fuer den Vorleser still
+  const vh = f.fertig ? t(x.main ? "weeklies.karteVhMainFertig" : "weeklies.karteVhFertig", {name: x.name, t: f.tag.n, tg: f.tag.g})
+    : t(x.main ? "weeklies.karteVhMainOffen" : "weeklies.karteVhOffen", {name: x.name, n: offen, t: f.tag.n, tg: f.tag.g});
   const ini = [...x.name][0]?.toUpperCase() ?? "?";
-  return '<button type="button" role="tab" class="wkkarte' + (f.fertig ? " fertig" : "") + '" id="wkTab-' + x.id + '" data-wk-reiter="' + x.id + '" data-f="r:' + x.id +
+  return '<button type="button" role="tab" class="wkkarte' + (f.fertig ? " fertig" : "") + (x.main ? " main" : "") + '" id="wkTab-' + x.id + '" data-wk-reiter="' + x.id + '" data-f="r:' + x.id +
     '" aria-selected="' + an + '" aria-controls="wkPanel" tabindex="' + (an ? 0 : -1) + '" aria-label="' + esc(vh) + '" data-wk-woche="' + f.woche.n + "/" + f.woche.g + '" data-wk-heute="' + f.tag.n + "/" + f.tag.g + '"><span class="wkscheibe" aria-hidden="true">' +
-    ring(44, 3.5, f.woche.anteil) + (f.fertig ? KHAKEN : "<b>" + esc(ini) + "</b>") + '</span><span class="wkkname">' + esc(x.name) +
-    '</span><span class="wkkstand2" aria-hidden="true">' + esc(satz) + "</span></button>";
+    ring(44, 3.5, f.woche.anteil) + (f.fertig ? KHAKEN : "<b>" + esc(ini) + "</b>") + '</span>' + (x.main
+      ? '<span class="wkkname wkmit"><span class="wkkn">' + esc(x.name) + '</span><span class="wkmain" aria-hidden="true">' + esc(t("ch.main")) + "</span></span>"
+      : '<span class="wkkname">' + esc(x.name) + "</span>") +
+    '<span class="wkkstand2" aria-hidden="true">' + esc(satz) + "</span></button>";
 }
 /* Sind alle Bereiche des Charakters zu? Dann bietet der Knopf "Alle aufklappen" an. */
 function alleSindZu(p: WeeklyProfil, jetzt: number): boolean {
@@ -673,13 +783,13 @@ function anpZeileHtml(x: Punkt): string {
       '<button type="submit" class="btn sm">' + esc(t("weeklies.speichern")) + "</button>" + knopf("btn sm", 'data-wk-abbrechen="punkt"', t("weeklies.abbrechen")) + "</form></li>";
   const umb = knopf("leise", 'data-wk-umben="' + k + '" data-f="u:' + k + '" aria-label="' + esc(t("weeklies.umbenennenName", {name: x.name})) + '"', t("weeklies.umbenennen"));
   const zweit = x.eigen
-    ? x.geloest ? knopf("leise", 'data-wk-eigen-zurueck="' + k + '" data-f="ez:' + k + '" aria-label="' + esc(t("weeklies.zurueckName", {name: x.name})) + '"', t("weeklies.zurueck"))
+    ? x.geloest ? knopf("leise", 'data-wk-eigen-zurueck="' + k + '" data-f="ez:' + k + '" aria-label="' + esc(t("weeklies.zurueckName", {name: x.name})) + '"', t("weeklies.zurueck")) + loeschKnopf("eigen", k, x.name, "leise")
       : knopf("leise", 'data-wk-eigen-los="' + k + '" data-f="el:' + k + '" aria-label="' + esc(t("weeklies.loesenName", {name: x.name})) + '"', t("weeklies.loesen"))
     : knopf("leise", 'data-wk-aus="' + k + '" data-f="a:' + k + '" aria-label="' + esc(t(x.aus ? "weeklies.einName" : "weeklies.ausName", {name: x.name})) + '"',
         t(x.aus ? "weeklies.einblenden" : "weeklies.ausblenden"));
   const leise = x.aus ? t("weeklies.ausgeblendet") : x.geloest ? t("weeklies.geloestKurz") : x.name !== x.grund ? x.grund : "";
   return '<li class="wkanp' + (x.aus || x.geloest ? " aus" : "") + '" data-wk-anp="' + k + '"><span class="wkanpname"><span class="wkname" title="' + esc(x.name) + '">' + esc(x.name) + "</span>" +
-    (leise ? '<span class="wkorig" title="' + esc(leise) + '">' + esc(leise) + "</span>" : "") + '</span><span class="wkakt">' + umb + zweit + "</span></li>";
+    (leise ? '<span class="wkorig" title="' + esc(leise) + '">' + esc(leise) + "</span>" : "") + '</span><span class="wkakt">' + umb + zweit + "</span>" + (x.eigen && x.geloest ? loeschFrageHtml("eigen", k) : "") + "</li>";
 }
 function anpassenHtml(p: WeeklyProfil): string {
   const alle = punkteVon(p);
@@ -702,10 +812,9 @@ function bodyHtml(jetzt: number): string {
   if(lage === "nurApp") return '<div class="wbox wkleer">' + SYMBOL + '<p class="wksatz">' + esc(t("weeklies.nurApp")) + "</p></div>";
   if(lage === "laden") return '<p class="wksatz wkladen">' + esc(t("weeklies.laden")) + "</p>";
   if(lage === "gesperrt") return '<p class="wksatz wkgesperrt">' + esc(t("weeklies.gesperrt")) + "</p>";
-  const akt = aktive(), p = profilJetzt();
+  const akt = reihe(), p = profilJetzt();
   if(!p) return '<div class="wbox wkleer">' + SYMBOL + '<p class="wksatz">' + esc(t("weeklies.leer")) + "</p>" +
     (neuOffen ? neuFormHtml() : knopf("btn wkneu", 'id="wkNeu" data-f="neu"', t("weeklies.neu"))) + undoHtml() + "</div>" + geloesteHtml();
-  gewaehlt = p.id;
   const nameForm = !nameOffen ? "" : '<form class="wkform" id="wkNameForm" novalidate><span class="field"><label for="wkNameNeu">' + esc(t("weeklies.nameNeu")) + "</label>" +
     '<input id="wkNameNeu" data-f="nu" maxlength="24" autocomplete="off" spellcheck="false" value="' + esc(p.name) + '"></span>' +
     '<button type="submit" class="btn sm">' + esc(t("weeklies.speichern")) + "</button>" + knopf("btn sm", 'data-wk-abbrechen="name"', t("weeklies.abbrechen")) + "</form>";
@@ -752,7 +861,12 @@ export function renderWeeklies(){
   }
   bandSetzen(jetzt);
   if(fokus){ const f = fokus; fokus = null; fokusSetzen(box, f); }
+  charaktereMelden();
+  charakterHaken.geaendert?.();
+  rekordHaken.geaendert?.();
+  archivNamenHaken.geaendert?.();
   haken.gezeichnet?.();
+  streifenHaken.geaendert?.();
 }
 function nachHandlung(){
   // ein Bereich, der mit dieser Handlung fertig wurde, klappt zu: der Fokus geht auf seinen Kopf
@@ -794,6 +908,118 @@ export function weekliesAnsage(text: string){ ansagen(text); }
 export function weekliesDauer(ms: number): string { return dauer(ms); }
 export function weekliesOffen(): number { const jetzt = Date.now(); return aktive().filter(p => !fortschrittVon(p, jetzt).fertig).length; }
 
+/* Fuer den Streifen (72-kompakt-leiste.ts): die Charaktere, ihre sichtbaren Punkte mit Stand und das Zaehlen. Der Streifen
+   waehlt seinen Charakter selbst (gewaehlt gehoert der Vollansicht) und schreibt ueber denselben Weg: erst die Vorwoche
+   sichern, dann den Zaehler setzen, entprellt senden. */
+export interface StreifenPunkt { schluessel: string; name: string; menge: number; takt: Takt; stand: number; eigen: boolean }
+export function weekliesCharaktere(): {id: string; name: string; n: number; g: number}[] {
+  const jetzt = Date.now();
+  return reihe().map(p => { const f = fortschrittVon(p, jetzt).woche; return {id: p.id, name: p.name, n: f.n, g: f.g}; });
+}
+export function weekliesPunkteFuer(id: string): StreifenPunkt[] {
+  const p = aktive().find(x => x.id === id);
+  if(!p) return [];
+  const jetzt = Date.now();
+  return punkteVon(p).filter(sichtbar).map(x => ({schluessel: x.schluessel, name: x.name, menge: x.menge, takt: x.takt, stand: standVonPunkt(p, x, jetzt), eigen: x.eigen}));
+}
+/** Einen Punkt um delta weiterzaehlen (0 bis Menge); der neue Stand, oder null, wenn nichts zu zaehlen war. */
+export function weekliesZaehlen(id: string, k: string, delta: number): number | null {
+  const p = aktive().find(x => x.id === id);
+  const x = p && punkteVon(p).filter(sichtbar).find(y => y.schluessel === k);
+  if(!p || !x || lage !== "da") return null;
+  const jetzt = Date.now(), alt = standVonPunkt(p, x, jetzt), neu = Math.max(0, Math.min(x.menge, alt + delta));
+  if(neu === alt) return null;
+  const q = vorwocheSichern(p, jetzt);
+  ersetze({...q, zaehler: {...q.zaehler, [k]: {stand: neu, seit: jetzt}}});
+  merken();
+  return neu;
+}
+/** Sind die Weeklies lesbar (da), oder gibt es nur den Satz "nur in der App"? Der Streifen zeigt dann einen Satz statt der Platten. */
+export function weekliesLage(): Lage { return lage; }
+
+/* Fuer den Abschnitt "Charaktere" der Einstellungen (73-charaktere.ts): die aktiven Charaktere, das Aendern ueber denselben Weg
+   (Speichern entprellt), Anlegen wie in den Weeklies. Loesen und Zurueckholen bleiben dort (dort liegt das Rueckgaengig). */
+export interface CharaktereZeile { id: string; name: string; log: string; main: boolean }
+export function weekliesCharakterListe(): CharaktereZeile[] | null {
+  if(!daten || lage !== "da") return null;
+  return aktive().map(p => ({id: p.id, name: p.name, log: p.log ?? "", main: !!p.main}));
+}
+/** Fuer das Archiv (76, Spezifikation Log-Archiv 4): der Anzeigename je Kennung der aktiven Charaktere - nie ein Logname. */
+export function charakterNamen(): Map<string, string> {
+  return new Map((weekliesCharakterListe() ?? []).map(c => [c.id, c.name]));
+}
+export const weekliesGeloesteZahl = () => daten ? daten.profile.filter(p => p.geloest).length : 0;
+export function charakterLogSetzen(id: string, roh: string): "ok" | "leer" | "doppelt" | "nichts" {
+  if(!daten || lage !== "da") return "nichts";
+  const p = aktive().find(x => x.id === id);
+  if(!p) return "nichts";
+  if(!roh.replace(STEUER, "").trim()){
+    // leer nimmt den Lognamen weg: der Charakter bekommt keine Kaempfe mehr zugeordnet
+    if(p.log === undefined) return "ok";
+    const {log: _l, ...rest} = p;
+    ersetze(rest as WeeklyProfil); merken(); renderWeeklies();
+    return "ok";
+  }
+  const r = logPruefen(roh, daten.profile, id);
+  if(!r.ok) return r.grund;
+  if(r.log !== p.log){ ersetze({...p, log: r.log}); merken(); renderWeeklies(); }
+  return "ok";
+}
+export function charakterMainSetzen(id: string | null): void {
+  if(!daten || lage !== "da") return;
+  daten.profile = mainSetzen(daten.profile, id) as WeeklyProfil[];
+  merken(); renderWeeklies();
+}
+export function charakterAnlegen(nameRoh: string, logRoh: string): "ok" | "name" | "log" | "doppelt" | "sechs" | "alleVoll" | "nichts" {
+  if(!daten || lage !== "da") return "nichts";
+  const name = sauber(nameRoh, 24);
+  if(name == null) return "name";
+  if(aktive().length >= MAX_AKTIV) return "sechs";
+  if(daten.profile.length >= MAX_PROFILE) return "alleVoll";
+  let log: string | undefined;
+  if(logRoh.replace(STEUER, "").trim()){
+    const r = logPruefen(logRoh, daten.profile);
+    if(!r.ok) return r.grund === "doppelt" ? "doppelt" : "log";
+    log = r.log;
+  }
+  daten.profile.push({id: neueId(), name, ...(log ? {log} : {}), zaehler: {}, aus: [], namen: {}, eigene: []});
+  merken(); renderWeeklies();
+  return "ok";
+}
+
+/* Fuer die Rekorde (62-rekorde.ts, Spezifikation Twinks 4 und 8): die aktiven Charaktere mit Name, Logname und Main
+   (in der Reihenfolge der Weeklies) und die Kennungen der geloesten - deren Kaempfe zaehlen nicht, solange sie geloest sind. */
+export function rekordCharaktere(): {aktiv: CharaktereZeile[]; geloest: string[]} | null {
+  const aktiv = weekliesCharakterListe();
+  if(!aktiv || !daten) return null;
+  return {aktiv, geloest: daten.profile.filter(p => p.geloest).map(p => p.id)};
+}
+/* Die ignorierten Namen (Spezifikation Twinks 6): "Ignorieren" merkt einen Namen, "Nicht mehr ignorieren" loest ihn
+   (er bleibt in der Datei), ein neues Ignorieren holt ihn zurueck. Gespeichert wird wie alles hier (/api/weeklies). */
+export function weekliesIgnoriert(): string[] | null {
+  if(!daten || lage !== "da") return null;
+  return (daten.ignoriert ?? []).filter(e => !e.geloest).map(e => e.name);
+}
+export function charakterIgnorieren(roh: string): "ok" | "voll" | "nichts" {
+  if(!daten || lage !== "da") return "nichts";
+  const name = sauber(roh, 24);
+  if(name == null) return "nichts";
+  const liste = daten.ignoriert ?? [];
+  const da = liste.find(e => e.name === name);
+  if(da && !da.geloest) return "ok";
+  if(!da && liste.length >= MAX_IGNORIERT) return "voll";
+  daten.ignoriert = da ? liste.map(e => e === da ? {name} : e) : [...liste, {name}];
+  merken(); renderWeeklies();
+  return "ok";
+}
+export function charakterNichtIgnorieren(name: string): void {
+  if(!daten || lage !== "da") return;
+  const liste = daten.ignoriert ?? [];
+  if(!liste.some(e => e.name === name && !e.geloest)) return;
+  daten.ignoriert = liste.map(e => e.name === name ? {name, geloest: true} : e);
+  merken(); renderWeeklies();
+}
+
 /* ---------- Minutentakt, nur solange der Bereich offen ist ---------- */
 let takt: ReturnType<typeof setTimeout> | null = null;
 function planen(){
@@ -816,7 +1042,10 @@ function klick(e: MouseEvent){
   const z = (e.target as HTMLElement).closest<HTMLButtonElement>("button");
   if(!z || z.disabled || lage !== "da" && !z.matches("[data-wk-abbrechen]")) return;
   const d = z.dataset;
-  meldung = ""; sechsHinweis = false;
+  if(d.wkLoeschFrage !== undefined){ loeschFrage = {was: d.wkLoeschFrage === "eigen" ? "eigen" : "charakter", id: d.id || ""}; loeschName = ""; loeschSatz = ""; fokus = "loeschName"; if(loeschFrage.was === "charakter") geloesteAuf = true; renderWeeklies(); return; }
+  if(d.wkLoeschNein !== undefined){ const q = loeschFrage; loeschFrage = null; loeschName = ""; fokus = q ? "lq:" + q.id : null; renderWeeklies(); return; }
+  if(d.wkLoeschJa !== undefined){ void loeschenAusfuehren(); return; }
+  meldung = ""; sechsHinweis = false; loeschSatz = "";
   if(z.id === "wkNeu"){ if(aktive().length >= MAX_AKTIV){ sechsHinweis = true; fokus = "neu"; } else { neuOffen = true; fokus = "nn"; } }
   else if(d.wkAbbrechen !== undefined){
     if(d.wkAbbrechen === "neu"){ neuOffen = false; fokus = "neu"; }
@@ -981,6 +1210,19 @@ export function setup(): void {
     box.addEventListener("change", aendern);
     box.addEventListener("submit", absenden);
     box.addEventListener("keydown", taste);
+    box.addEventListener("input", e => {
+      const x = e.target as HTMLInputElement;
+      if(x.id !== "wkLoeschName") return;
+      loeschName = x.value;
+      const ja = box.querySelector<HTMLButtonElement>("[data-wk-loesch-ja]");
+      if(ja) ja.disabled = !namenGleich(loeschName, loeschZiel());
+    });
+    box.addEventListener("keydown", e => {
+      if(e.key !== "Enter" || (e.target as HTMLElement).id !== "wkLoeschName") return;
+      e.preventDefault();
+      const ja = box.querySelector<HTMLButtonElement>("[data-wk-loesch-ja]");
+      if(ja && !ja.disabled) ja.click();
+    });
   }
   // die eingebetteten Bilder einmal als Stilblatt (60-weeklies-bilder.ts), nichts wird geladen
   if(!document.querySelector("#wkBilder")){
@@ -995,6 +1237,7 @@ export function setup(): void {
     box.parentElement?.before(a);
   }
   addEventListener("pagehide", beimVerlassen);
+  addEventListener("focus", nachfrischen);
   if(!SERVED) lage = "nurApp";
   else laden();
   renderWeeklies();

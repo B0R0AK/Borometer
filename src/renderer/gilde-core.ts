@@ -11,25 +11,50 @@ import { klasseVon } from "./klassen-core";
 
 export type Rolle = "tank" | "heal" | "dps" | "";
 export type Marke = "da" | "fehlt" | "entschuldigt" | "offen";
-export interface Mitglied { id: string; name: string; rolle: Rolle; waffen: string[]; notiz: string; geloest?: boolean }
+/* Punkte (Spezifikation 2026-10-11-gilde-punkte-design.md, 3): alles optional und additiv, die Rechnung steht in gilde-punkte-core.ts.
+   Die Typen leben hier, damit dieser Kern keinen zweiten Import braucht. */
+/** Eine Art, die Punkte bringt: proPunkt Teilnahmen sind einmal "punkte" (Gildenboss: 7 je Punkt). */
+export interface Art { id: string; name: string; punkte: number; proPunkt: number; geloest?: boolean }
+/** Ein inaktiver Zeitraum [von, bis) in Tagen; ohne bis gilt er, bis der Lead ihn beendet. */
+export interface Pause { von: string; bis?: string }
+export interface Eintrag { datum: string; betrag: number; geloest?: boolean }
+export interface Zusatz { punkte: number; notiz: string; geloest?: boolean }
+export interface MitgliedPunkte {
+  seit: string; abzugMonate?: number; pausen: Pause[]; start: Record<string, number>;
+  ansehen: { start: number; eintraege: Eintrag[] }; zusatz: Zusatz[];
+}
+export interface PunkteRegeln {
+  an: boolean; rang: boolean; gruppen: boolean; schwellen: [number, number]; monat: number; teiler: number; stichtag: string; arten: Art[];
+}
+export interface Mitglied {
+  id: string; name: string; rolle: Rolle; waffen: string[]; notiz: string; geloest?: boolean;
+  ausgetreten?: string; alsDps?: boolean; offspec?: string[]; punkte?: MitgliedPunkte;
+}
 export interface Ausnahme { aus?: boolean; zeit?: string }
 export interface Wdh { art: "einmal" | "woche" | "tage"; tage: number[]; bis?: string }
 export interface Reihe {
   id: string; titel: string; start: string; zone: string; wdh: Wdh; dauerMin: number; erinnerungMin: number;
   ausnahmen: Record<string, Ausnahme>; geloest?: boolean;
+  /** die Art, fuer die dieses Event Punkte bringt (hoechstens eine) */
+  art?: string;
 }
 export interface Gilde {
   id: string; name: string; geloest?: boolean; mitglieder: Mitglied[]; reihen: Reihe[];
   anwesend: Record<string, Record<string, Marke>>;
+  punkte?: PunkteRegeln;
+  /** Zaehler je Termin und Mitglied (0 bis proPunkt) fuer Arten mit mehreren Teilnahmen je Punkt: "<reiheId>|YYYY-MM-DD" */
+  zaehler?: Record<string, Record<string, number>>;
 }
+/** Eine gelöste Gilde (Datei boro-gilde.json, Schluessel geloeste): der Tag, an dem sie geloest wurde, und die ganze Gilde. */
+export interface Geloeste { am: string; gilde: Gilde }
 export interface Termin { reiheId: string; datum: string; start: string; aus: boolean }
 export interface Zeile {
-  mitgliedId: string; da: number; fehlt: number; entschuldigt: number; quote: number | null; straehne: number; letzte: string | null;
+  mitgliedId: string; da: number; fehlt: number; quote: number | null; letzte: string | null;
 }
 /** Die Worte der Textausgabe in der Seitensprache. reihe: die gewaehlte Reihe oder "Alle Reihen"; treffer: bei aktivem
     Filter "N von M Mitgliedern", sonst leer; datum: das kurze Datum wie auf den Karten (25.10. oder 10/25). */
 export interface TextWorte {
-  kopf: string; reihe: string; treffer: string; straehne: string; zuletzt: string; entschuldigt: string; offen: string; datum: (tag: string) => string;
+  kopf: string; reihe: string; treffer: string; zuletzt: string; offen: string; datum: (tag: string) => string;
 }
 
 /** Die deutschen Waffennamen (wie WEAPON_LABEL_DE der Seite), fuer die Suche. */
@@ -40,20 +65,22 @@ export const WAFFEN_DE: Record<string, string> = {
   "Gauntlet": "Panzerhandschuhe", "Orb": "Kugel",
 };
 
-/** Die Rolle eines Mitglieds: aus dem Waffenpaar, sonst die gesetzte. */
+/** Die Rolle eines Mitglieds: aus dem Waffenpaar, sonst die gesetzte. Ein Heiler mit Haekchen (alsDps) zaehlt als Schaden. */
 export function rolleVon(m: Mitglied): Rolle {
-  return klasseVon(m.waffen)?.role ?? m.rolle;
+  const k = klasseVon(m.waffen);
+  if (!k) return m.rolle;
+  return k.role === "heal" && m.alsDps ? "dps" : k.role;
 }
 
-/** Rolle ("" = alle) und Suche (Name, Klasse, Waffen, Notiz; ohne Gross-/Kleinschreibung); geloeste nie. */
+/** Rolle ("" = alle) und Suche (Name, Klasse, Waffen, Notiz, dazu Klasse und Waffen des Offspecs; ohne Gross-/Kleinschreibung); geloeste nie. */
 export function filtern(ms: Mitglied[], f: { rolle: Rolle; suche: string }): Mitglied[] {
   const q = f.suche.trim().toLowerCase();
   return ms.filter((m) => {
     if (m.geloest) return false;
     if (f.rolle && rolleVon(m) !== f.rolle) return false;
     if (!q) return true;
-    const k = klasseVon(m.waffen);
-    const heu = [m.name, m.notiz, k?.en, k?.de, ...m.waffen, ...m.waffen.map((w) => WAFFEN_DE[w])];
+    const k = klasseVon(m.waffen), o = m.offspec ?? [], ok = klasseVon(o);
+    const heu = [m.name, m.notiz, k?.en, k?.de, ...m.waffen, ...m.waffen.map((w) => WAFFEN_DE[w]), ok?.en, ok?.de, ...o, ...o.map((w) => WAFFEN_DE[w])];
     return heu.some((x) => !!x && x.toLowerCase().includes(q));
   });
 }
@@ -87,8 +114,31 @@ export function termine(r: Reihe, von: string, bis: string): Termin[] {
 
 /** Hat der Leader zu diesem Termin mindestens ein Haekchen gesetzt (nicht "offen")? */
 export function abgehakt(g: Gilde, t: Termin): boolean {
-  const m = g.anwesend[terminSchluessel(t)];
-  return !!m && Object.values(m).some((x) => x !== "offen");
+  const key = terminSchluessel(t), m = g.anwesend[key], z = g.zaehler?.[key];
+  return (!!m && Object.values(m).some((x) => x !== "offen")) || (!!z && Object.keys(z).length > 0);
+}
+
+/** Ein Tag, den es gibt ("YYYY-MM-DD"; der 30. Februar nicht). */
+const tagOk = (s: string) => /^\d{4}-\d{2}-\d{2}$/.test(s) && tagStr(tagMs(s)) === s;
+
+/** Ein getipptes Datum als "YYYY-MM-DD": 10.09.2026, 10.9.2026, 10.09. (mit dem uebergebenen Jahr) oder 2026-09-10; sonst null. */
+export function datumParse(s: string, jahr: number): string | null {
+  const t = s.trim();
+  const d = /^(\d{1,2})\.(\d{1,2})\.?(?:(\d{4}))?$/.exec(t), i = /^(\d{4})-(\d{2})-(\d{2})$/.exec(t);
+  const roh = d ? `${d[3] ?? String(jahr).padStart(4, "0")}-${zwei(+d[2]!)}-${zwei(+d[1]!)}` : i ? t : "";
+  return roh && tagOk(roh) ? roh : null;
+}
+
+/** Die Events (nicht geloest), die an diesem Tag stattfinden oder stattfanden: mit der Uhrzeit (verschoben: der neuen) und ob der Termin ausfaellt. */
+export function eventsAm(g: Gilde, tag: string): { reihe: Reihe; zeit: string; aus: boolean }[] {
+  if (!tagOk(tag)) return [];
+  const out: { reihe: Reihe; zeit: string; aus: boolean }[] = [];
+  for (const r of g.reihen) {
+    if (r.geloest) continue;
+    const t = termine(r, tag, tag)[0];
+    if (t) out.push({ reihe: r, zeit: t.start.slice(11, 16), aus: t.aus });
+  }
+  return out;
 }
 
 /** Die lokale Uhr des PCs als Wanduhr-Zeichenkette. */
@@ -97,26 +147,20 @@ export function wandUhr(ms: number): string {
   return `${d.getFullYear()}-${zwei(d.getMonth() + 1)}-${zwei(d.getDate())}T${zwei(d.getHours())}:${zwei(d.getMinutes())}`;
 }
 
-/** Quote, Straehne, letzte Teilnahme je Mitglied; nur vergangene, nicht ausgefallene, abgehakte Termine zaehlen. */
+/** Quote und letzte Teilnahme je Mitglied; nur vergangene, nicht ausgefallene, abgehakte Termine zaehlen. Man ist da oder nicht
+    da: eine alte Marke "entschuldigt" aus der Datei (die Seite setzt sie nicht mehr) zaehlt als nicht da. */
 export function auswerten(g: Gilde, reiheIds: string[] | null, jetzt: string): Zeile[] {
   const reihen = g.reihen.filter((r) => !r.geloest && (!reiheIds || reiheIds.includes(r.id)));
   const alle = reihen.flatMap((r) => termine(r, r.start.slice(0, 10), jetzt.slice(0, 10)))
     .filter((t) => !t.aus && t.start <= jetzt && abgehakt(g, t))
     .sort((a, b) => (a.start < b.start ? -1 : a.start > b.start ? 1 : 0));
   return g.mitglieder.filter((m) => !m.geloest).map((m) => {
-    let da = 0, fehlt = 0, entschuldigt = 0, letzte: string | null = null;
-    const marken: Marke[] = [];
+    let da = 0, fehlt = 0, letzte: string | null = null;
     for (const t of alle) {
       const x = g.anwesend[terminSchluessel(t)]?.[m.id] ?? "offen";
-      marken.push(x);
-      if (x === "da") { da++; letzte = t.datum; } else if (x === "fehlt") fehlt++; else if (x === "entschuldigt") entschuldigt++;
+      if (x === "da") { da++; letzte = t.datum; } else if (x === "fehlt" || x === "entschuldigt") fehlt++;
     }
-    let straehne = 0;
-    for (let i = marken.length - 1; i >= 0; i--) {
-      if (marken[i] === "da") straehne++;
-      else if (marken[i] === "fehlt") break;
-    }
-    return { mitgliedId: m.id, da, fehlt, entschuldigt, quote: da + fehlt ? da / (da + fehlt) : null, straehne, letzte };
+    return { mitgliedId: m.id, da, fehlt, quote: da + fehlt ? da / (da + fehlt) : null, letzte };
   });
 }
 
@@ -128,8 +172,7 @@ export function textAusgabe(zeilen: Zeile[], g: Gilde, w: TextWorte): string {
     if (!m) continue;
     const teile = [m.name,
       z.quote === null ? w.offen : `${Math.round(z.quote * 100)}\u00a0% (${z.da}/${z.da + z.fehlt})`,
-      `${w.straehne} ${z.straehne}`, `${w.zuletzt} ${z.letzte ? w.datum(z.letzte) : w.offen}`];
-    if (z.entschuldigt) teile.push(`${z.entschuldigt} ${w.entschuldigt}`);
+      `${w.zuletzt} ${z.letzte ? w.datum(z.letzte) : w.offen}`];
     out.push(teile.join(" \u00b7 "));
   }
   return out.join("\n");

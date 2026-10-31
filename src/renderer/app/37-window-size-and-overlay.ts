@@ -1,7 +1,7 @@
 import { state } from "./01-state";
 import { toast, toastFail, toastNachfuehren } from "./03-helpers";
 import { t, tt } from "./08-translation";
-import { markiereRest } from "./16-fight-analysis";
+import { markiereRest, rasteListe } from "./16-fight-analysis";
 import { $, esc } from "./18-interface-basics";
 import { catOf, HIT_CATS } from "./19-grouping-and-party-fights";
 import { CAT_SWATCH } from "./21-damage-table";
@@ -12,25 +12,30 @@ import { persistPref } from "./27-weapons-tab";
 import { renderAll } from "./32-history";
 import { switchTab } from "./34-menus-drop-and-tabs";
 import { applyWindowSize } from "./36-dialog";
-import { FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, abrissThemaHolen, FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
 import { isWatching } from "./45-startup";
 import { syncPartySwitch } from "./42-party";
 import { einstNachfuehren } from "./57-einstellungen";
 import { startAuftragHolen } from "./66-windows";
+import { abrissTitel, aufMenueWahl } from "./77-abreissen";
 import { erinnerungAnfragenPruefen } from "./67-weeklies-erinnerung";
 import type { Fight, ViewOptions } from "../types";
-import { durchsichtWirksam } from "../kompakt-core";
+import { durchsichtWirksam, fensterDeckung, toenung } from "../kompakt-core";
 
 /* Was das Kompaktfenster (Nachtraege N4) den Hauptprozess fragen darf -
    dieselbe Liste wie KOMPAKT_AKTIONEN in window.ts. Rahmenknoepfe, Material,
    Groesseneinstellung und der Punkt in der Taskleiste gehoeren dem grossen
    Fenster. */
 const KOMPAKT_DARF = ["kompakt", "close", "resize", "pin", "seethrough", "clickthrough"];
+/* Was das abgerissene Fenster (Windows Teil 2) fragen darf - dieselbe Liste
+   wie ABRISS_AKTIONEN in window.ts: sich schliessen und die Knoepfe im Thema. */
+const ABRISS_DARF = ["close", "chrome"];
 
 /** Eine Fensteraktion an den Hauptprozess. Nur im eigenen Fenster; sie nennt das Fenster (FENSTER). */
 export function winPost(body: {do: string; [k: string]: unknown}): Promise<any> {
   if(!SERVED || !OWN_WINDOW) return Promise.resolve(null);
   if(KOMPAKT_FENSTER && !KOMPAKT_DARF.includes(body.do)) return Promise.resolve(null);
+  if(ABRISS_FENSTER && !ABRISS_DARF.includes(body.do)) return Promise.resolve(null);
   return fetch("/api/win", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({...body, win: FENSTER})}).then(r => r.json()).catch(() => null);
 }
@@ -193,11 +198,20 @@ export function syncRahmenKnoepfe(){
      || document.body.classList.contains("compact")) return;
   winPost({do:"chrome", theme: document.documentElement.dataset.theme, height: kopfHoehe()});
 }
+/* Ein Geraete-Pixel in Layoutpunkten (--geraete-px): Kanten wie die Kontur der
+   Heldenzahl rechnen in Vielfachen davon und landen so auf ganzen Pixeln.
+   Der Zoom steht als CSS-zoom auf <html>, ein Layoutpunkt ist also
+   zoom x devicePixelRatio Geraete-Pixel breit. */
+export function syncGeraetePixel(){
+  const z = clampUiZoom(state.zoom) / 100, q = window.devicePixelRatio || 1;
+  document.documentElement.style.setProperty("--geraete-px", (1 / (z * q)).toFixed(5) + "px");
+}
 function applyUiZoom(){
   const z = clampUiZoom(state.zoom);
   // 100% clears the property instead of setting 1: an app nobody has touched
   // should carry no zoom at all
   document.documentElement.style.zoom = z === 100 ? "" : String(z / 100);
+  syncGeraetePixel();
   syncWidthStops();   // the layout just got a different amount of room
   // die Kopfleiste ist mitgewachsen, die Systemknoepfe darueber muessen folgen
   syncRahmenKnoepfe();
@@ -240,45 +254,12 @@ export function setUiZoom(pct: number, opts?: ViewOptions){
      Zaehlung im Kopf ("9 von 12") gehoerte zu einem Kasten, den es nicht
      mehr gab. */
   markiereRest();
+  /* Die Vollansicht hat eine feste Groesse (#364, Entscheidung 31.10.2026): die
+     Groessen-Einstellung skaliert die Seite im Fenster, nie das Fenster.
+     Frueher wuchs es mit (Aktion "size"); bei 200 % hat die Seite nun nur
+     noch die halbe Flaeche, und die Stufen fuer kleine Fenster (syncWidthStops)
+     bauen Ring und Tafeln um. Der Kompaktstreifen misst sich weiter selbst. */
   if(document.body.classList.contains("compact")) applyWindowSize();
-  // At startup the saved size is applied to a window that was just created at
-  // its fixed default, so it is sized from that default rather than scaled
-  // from wherever it is. Scaling on every launch would multiply: 150% saved
-  // would mean 1.5x bigger than last time, every time.
-  else if(opts && opts.fromStart){
-    /* Steht das Fenster schon an seiner gemerkten Lage (Fenster-Extras 3.4),
-       hat es die Groesse, die es mit dieser Einstellung zuletzt hatte - vom
-       Standard aus gerechnet waere sie wieder weg. */
-    if(!opts.keepWindow) sizeWindowFor(z);
-  }
-  else scaleWindowBy(z / was);
-}
-/* Setting the size bigger should make the window bigger, not fit less of the
-   app into the same frame. Compact works that out from the rows it has to
-   show; full view has no such measurement, so it scales by the same factor
-   the content just did.
-   Die Aktion heisst "size", nicht "resize": resize merkt sich eine "Groesse
-   vor Kompakt", die die Vollansicht spaeter wiederherstellt, und das hier ist
-   keine - es ist die eigene Groesse des Fensters, die sich aendert. Frueher
-   ging das ueber "edge" (die Randgriffe); die gibt es mit dem nativen Rahmen
-   nicht mehr, und der Hauptprozess kennt "edge" nicht mehr. Nur im eigenen
-   Fenster (winPost): ein Browser-Tab auf 127.0.0.1 soll das Fenster der App
-   nicht von der Seite her umstellen. */
-const WINDOW_BASE_W = 1280, WINDOW_BASE_H = 860;   // what src/main/window.ts creates
-function setWindowSize(w: number, h: number){
-  const maxW = (typeof screen !== "undefined" && screen.availWidth) || 4096;
-  const maxH = (typeof screen !== "undefined" && screen.availHeight) || 2160;
-  void winPost({do:"size",
-    w: Math.min(maxW, Math.max(SIZE_MIN_W, Math.round(w))),
-    h: Math.min(maxH, Math.max(SIZE_MIN_H, Math.round(h)))});
-}
-function scaleWindowBy(ratio: number){
-  if(!isFinite(ratio) || ratio === 1) return;
-  setWindowSize(innerWidth * ratio, innerHeight * ratio);
-}
-function sizeWindowFor(z: number){
-  if(z === 100) return;   // the window is already the size it was created at
-  setWindowSize(WINDOW_BASE_W * z / 100, WINDOW_BASE_H * z / 100);
 }
 function stepUiZoom(dir: number){
   const z = clampUiZoom(state.zoom);
@@ -351,14 +332,16 @@ export function applySeeThrough(opts?: ViewOptions){
   /* Am Anschlag .65 statt .5 (Entscheidung vom 29.09. (an Claude
      uebertragen), Pruefung Aufgabe 9): ueber einer hellen Szene blieb die
      Schrift bei .5 unter AA, im TnL-Thema auch bei .6. */
-  document.documentElement.style.setProperty("--glass-a", (0.92 - (see/55) * 0.27).toFixed(3));
+  /* Kompakt neu (14.10.2026): die Toenung ist .50 bis .10 (toenung, kompakt-core.ts); die Inseln tragen die Schrift. Seit #348 blendet
+     das Fenster auf Acrylic zusaetzlich bis .70 ab (fensterDeckung): erst das macht den Hintergrund erkennbar. */
+  document.documentElement.style.setProperty("--glass-a", toenung(see).toFixed(3));
   const geistAlpha = Math.max(1 - see/100, GEIST_BODEN);
   /* Im Kompaktfenster erst, wenn /api/state gesagt hat, ob Acrylic da ist
      (Kompakt-Fix 4, materialGemeldet). */
   if(KOMPAKT_FENSTER && !materialBekannt) return;
   winPost({do:"seethrough",
     alpha: !on ? 1
-         : acrylic ? (geist ? geistAlpha : 1)
+         : acrylic ? (geist ? geistAlpha : fensterDeckung(see))
          : (geist ? geistAlpha : 1 - see/100)});
   if(!(opts && opts.quiet)) persistPref("compactAlpha", 1 - regler/100);
 }
@@ -384,10 +367,6 @@ export function setSee(v: number | string, opts?: ViewOptions){
   state.seeThrough = clampSee(v);
   applySeeThrough(opts);
 }
-
-/* Die Untergrenze, die setWindowSize() einhaelt: dieselbe, die das Fenster
-   selbst hat (MIN_ACTION_W/H in window.ts). */
-const SIZE_MIN_W = 180, SIZE_MIN_H = 100;
 
 /* ---------- stay on top ----------
    Only offered alongside compact: a small window sitting over the game is
@@ -492,6 +471,9 @@ export function setKompaktOffen(offen: boolean){
 type VollStand = {grund: string; datei: string; kampf: number | null};
 function vollStand(): VollStand {
   const nur = (grund: string): VollStand => ({grund, datei: "", kampf: null});
+  /* ein Kampf aus dem Archiv (76): nur hier; der Streifen holt keine Datei (Log-Archiv 7, #264). Vor Live,
+     denn das Oeffnen pausiert es - der Streifen zeigte sonst still den Live-Stand statt des Satzes. */
+  if(state.origin === "archiv") return nur("archiv");
   if(isWatching() || istLivePausiert()) return nur("live");
   if(state.origin === "sample") return nur("beispiel");
   const namen = state.fileNames || [];
@@ -515,9 +497,32 @@ function standSenden(){
 }
 /** Nach jedem Zeichnen (renderAll): hat sich der Stand geaendert, waehrend der Streifen offen ist, erfaehrt er es. */
 export function standFolgen(){
-  if(KOMPAKT_FENSTER || !state.zweiFenster || !state.kompaktOffen) return;
+  if(KOMPAKT_FENSTER || ABRISS_FENSTER) return;
+  if(!(state.zweiFenster && state.kompaktOffen) && !abrissGeoeffnet) return;
   if(JSON.stringify(vollStand()) === standZuletzt) return;
   void standSenden();
+}
+/* Ein Bereich in ein eigenes Fenster (Windows Teil 2): vor dem Oeffnen der
+   Stand wie beim Streifen, das Fenster fragt ihn beim Laden ab. Danach folgt
+   er jedem Wechsel; ob das Fenster inzwischen zu ist, weiss die Seite nicht,
+   ein Stand zu viel kostet nur eine Anfrage, und nur bei einer Aenderung. */
+let abrissGeoeffnet = false;
+/** Live ging an oder aus (45): das zeichnet nicht neu, aendert aber den Stand - das abgerissene Fenster erfaehrt es. */
+export function standNachLive(){
+  if(abrissGeoeffnet) standFolgen();
+}
+/** Etwas ausser dem Kampf hat sich geaendert, das ein offenes abgerissenes Fenster mitnehmen soll (das Thema, 39): der Stand geht noch einmal hinaus und weckt es (Ereignis kompaktstand). Der Kompaktstreifen braucht das nicht, er liest sein Thema selbst. */
+export function standErneut(){
+  if(KOMPAKT_FENSTER || ABRISS_FENSTER) return;
+  if(abrissGeoeffnet) void standSenden();
+}
+export function abreissen(teil: string){
+  /* Gleich, nicht erst mit der Antwort: Live kann enden, bevor sie da ist, und das Fenster muss es erfahren. */
+  abrissGeoeffnet = true;
+  void standSenden().then(() => winPost({do:"abreissen", teil})).then(d => {
+    if(!d){ toastFail(tt("party.helperNoAnswer")); return; }
+    if(!d.ok){ toastFail(tt("abriss.fehler", {why: d.error || "?"}), 6000); return; }
+  });
 }
 function kompaktFensterSchalten(on: boolean, durch = false){
   /* Vor dem Oeffnen der Stand: der Streifen fragt ihn beim Laden ab. */
@@ -538,9 +543,10 @@ async function kompaktStandHolen(){
     // der Helfer ist gerade weg: beim naechsten Ereignis wieder
   }
 }
-async function vollStandHolen(){
+export async function vollStandHolen(){
   try {
     const s = await (await fetch("/api/state")).json();
+    // auch fuer das abgerissene Fenster (Windows Teil 2): beim Laden (41) und bei jedem Ereignis kompaktstand
     void streifenFolgt(s.kompakt);
   } catch(err) {
     // der Helfer ist gerade weg: beim naechsten Ereignis wieder
@@ -640,7 +646,7 @@ function aufKuerzel(){
    an, weil die erste Frage scheiterte, hielt sie jeden alten Tastendruck
    und Knopfklick fuer neu und spielte sie alle noch einmal ab. */
 async function horcheAufEreignisse(){
-  let gesehen: Record<string, number> = {hotkey:0, compact:0, live:0, handsize:0, material:0, kompakt:0, kompakthand:0, kompaktstand:0, pin:0, start:0, erinnerung:0, weeklies:0};
+  let gesehen: Record<string, number> = {hotkey:0, compact:0, live:0, handsize:0, material:0, kompakt:0, kompakthand:0, kompaktstand:0, pin:0, start:0, erinnerung:0, weeklies:0, menuekopieren:0, menuerotation:0};
   for(;;){
     try {
       const d = await (await fetch("/api/events?now=1")).json();
@@ -658,12 +664,14 @@ async function horcheAufEreignisse(){
       hotkeyFrei = d.registered !== false;
       const c = d.counts || {};
       const neu = (k: string) => (c[k] || 0) - (gesehen[k] || 0);
-      // zwei schnelle Druecke heben sich auf, wie bei einem Lichtschalter
-      if(neu("hotkey") > 0 && neu("hotkey") % 2 === 1) aufKuerzel();
+      /* zwei schnelle Druecke heben sich auf, wie bei einem Lichtschalter.
+         Das abgerissene Fenster (Windows Teil 2) hoert dieselben Zaehler; das
+         Kuerzel und alles, was "nur im grossen Fenster" heisst, gilt dort nicht. */
+      if(!ABRISS_FENSTER && neu("hotkey") > 0 && neu("hotkey") % 2 === 1) aufKuerzel();
       /* Eine Erinnerung der Weeklies ist faellig: die Seite sagt dem Hauptprozess, wie viele Charaktere noch offen haben (67).
          Und ihre Meldung will die Weeklies sehen (Klick auf "Ansehen"). Beides nur im grossen Fenster. */
-      if(!KOMPAKT_FENSTER && neu("erinnerung") > 0) erinnerungAnfragenPruefen();
-      if(!KOMPAKT_FENSTER && neu("weeklies") > 0) switchTab("weeklies");
+      if(FENSTER === "main" && neu("erinnerung") > 0) erinnerungAnfragenPruefen();
+      if(FENSTER === "main" && neu("weeklies") > 0) switchTab("weeklies");
       /* Die beiden Knoepfe der Taskleisten-Vorschau sind Umschalter wie die
          eigenen Knoepfe, fuer die sie stehen: jeder Klick dort ist ein Klick
          hier. Zwischen zwei Abfragen koennen mehrere zusammenkommen; eine
@@ -672,15 +680,15 @@ async function horcheAufEreignisse(){
       /* Die Knoepfe der Vorschau sitzen am grossen Fenster; das
          Kompaktfenster hat keinen Platz in der Taskleiste und schaltet mit
          ihnen nichts (N4). */
-      if(!KOMPAKT_FENSTER && neu("compact") > 0 && neu("compact") % 2 === 1) $("#btnCompact").click();
+      if(FENSTER === "main" && neu("compact") > 0 && neu("compact") % 2 === 1) $("#btnCompact").click();
       /* #btnWatch steht an jedem Ort in der Titelleiste (seit 28.09. auch
          auf der Startseite); #btnWatch2 dort traegt denselben Handler. */
-      if(!KOMPAKT_FENSTER && neu("live") > 0 && neu("live") % 2 === 1) $("#btnWatch").click();
+      if(FENSTER === "main" && neu("live") > 0 && neu("live") % 2 === 1) $("#btnWatch").click();
       /* Das Fenster wurde am Rand von Hand gezogen (will-resize in window.ts).
          Im Kompaktmodus gilt die Groesse von da an, sonst schriebe
          applyWindowSize() beim naechsten Zeichnen die gerechnete darueber.
          Die eigenen Aufrufe von setContentSize melden sich dort nicht. */
-      if(!KOMPAKT_FENSTER && neu("handsize") > 0 && document.body.classList.contains("compact"))
+      if(FENSTER === "main" && neu("handsize") > 0 && document.body.classList.contains("compact"))
         state.compactHandSized = true;
       /* Dasselbe fuer das Kompaktfenster, das seinen eigenen Rand hat (N4). */
       if(KOMPAKT_FENSTER && neu("kompakthand") > 0) state.compactHandSized = true;
@@ -689,15 +697,19 @@ async function horcheAufEreignisse(){
       if(state.zweiFenster && neu("kompakt") > 0) await kompaktStandHolen();
       /* Die Vollansicht zeigt jetzt etwas anderes (Kompakt-Fix 01.10.): der
          Streifen holt ihren Stand und folgt (23, streifenFolgt). */
-      if(KOMPAKT_FENSTER && neu("kompaktstand") > 0) await vollStandHolen();
+      if((KOMPAKT_FENSTER || ABRISS_FENSTER) && neu("kompaktstand") > 0) await vollStandHolen();
+      // ... und das abgerissene Fenster auch das Thema der Vollansicht (#350)
+      if(ABRISS_FENSTER && neu("kompaktstand") > 0) await abrissThemaHolen();
       /* Windows hat "Transparenzeffekte" umgeschaltet (transparencyChanged in
          window.ts): ob Kompakt jetzt auf Acrylic liegt, sagt /api/state. */
       if(neu("material") > 0) await materialNachfragen();
       /* Das Infobereich-Menue (tray.ts): "Ueber dem Spiel anheften" ist ein
          Klick auf den eigenen Knopf; ein Auftrag aus der Sprungliste wird
          geholt, getan und quittiert (66) - ohne die Schleife aufzuhalten. */
-      if(!KOMPAKT_FENSTER && neu("pin") > 0 && neu("pin") % 2 === 1) $("#btnPin").click();
-      if(!KOMPAKT_FENSTER && neu("start") > 0) void startAuftragHolen();
+      if(FENSTER === "main" && neu("pin") > 0 && neu("pin") % 2 === 1) $("#btnPin").click();
+      if(FENSTER === "main" && neu("start") > 0) void startAuftragHolen();
+      if(FENSTER === "main" && neu("menuekopieren") > 0) aufMenueWahl("kopieren");
+      if(FENSTER === "main" && neu("menuerotation") > 0) aufMenueWahl("rotation");
       gesehen = {...gesehen, ...c};
     } catch(err) {
       await new Promise(r => setTimeout(r, 3000));
@@ -820,6 +832,8 @@ export function setup(): void {
      box instead of the event, so it also catches maximise, restore, and compact
      resizing its own window. Both call the same idempotent function. */
   addEventListener("resize", syncWidthStops);
+  addEventListener("resize", syncGeraetePixel);   // das Fenster wechselt den Bildschirm: andere Dichte
+  syncGeraetePixel();
   if(typeof ResizeObserver !== "undefined"){
     new ResizeObserver(syncWidthStops).observe(document.documentElement);
   }
@@ -906,11 +920,12 @@ export function setup(): void {
      Behaelter, weil die Zeilen bei jedem Zeichnen neu gebaut werden. */
   (function(){
     const box = $("#bars");
-    if(box) box.addEventListener("scroll", markiereRest, {passive:true});
+    if(box){ box.addEventListener("scroll", markiereRest, {passive:true}); box.addEventListener("scrollend", rasteListe, {passive:true}); }
     addEventListener("resize", markiereRest);
   })();
-  /* Die Restzeile fuehrt zur Vollansicht, wie der Knopf im Streifen (#160). */
-  $("#kRest").addEventListener("click", () => $("#btnCompact").click());
+  /* "+N weitere" klappt die Liste an Ort und Stelle auf und wieder zu (Kompakt neu, Panel, 3). Vorher fuehrte der Knopf zur
+     Vollansicht und tat es im Streifen nicht (#287). Der Zustand steht am body und gilt fuer Kampf und Weeklies. */
+  // (der Klick sitzt in 72-kompakt-leiste.ts, setup)
   $("#btnDurch").onclick = aufDurchKnopf;
   /* Der Knopf (Nachtraege N4): im Kompaktfenster heisst er "Vollansicht"
      und bittet den Hauptprozess, den Streifen zu schliessen und das grosse
@@ -1032,6 +1047,8 @@ export function syncThroughTexts(){
   /* Vorleser und Alt+Tab unterscheiden die zwei Fenster am Titel (N4,
      Pruefung K6); das grosse bleibt "Borometer". */
   if(KOMPAKT_FENSTER) document.title = t("compact.fensterTitel");
+  // das abgerissene Fenster heisst nach seinem Bereich (77)
+  abrissTitel();
   syncHotkeyNote();
   if(durchklick) syncThroughHint();
   syncSeePille(seePilleWert);

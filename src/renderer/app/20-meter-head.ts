@@ -185,22 +185,28 @@ function setHeadName(name: string){
    environment where requestAnimationFrame fires synchronously. */
 function setHeroDps(value: number | null){
   const el = $("#hDps");
-  if(value == null){ el.textContent = "—"; state._heroDps = null; return; }
+  if(value == null){ state._heroToken = (state._heroToken || 0) + 1; state._heroLaeuft = false; el.dataset.zaehlt = "0"; el.textContent = "—"; state._heroDps = null; return; }
   const from = state._heroDps;
   const reduce = typeof matchMedia === "function" && matchMedia("(prefers-reduced-motion: reduce)").matches;
+  /* Zaehlt die Zahl schon zu genau diesem Wert hoch, bleibt sie dabei: ein zweites renderHead mit gleichem Wert (jeder Takt, jede
+     Umschaltung) setzte sonst den Endwert und liess die Zaehlung von vorn weiterlaufen - die Zahl sprang zurueck (#224). */
+  if(from === value && !reduce && state._heroLaeuft) return;
   if(from == null || reduce || from === value){
+    // auch das Springen beendet eine laufende Zaehlung
+    state._heroToken = (state._heroToken || 0) + 1; state._heroLaeuft = false; el.dataset.zaehlt = "0";
     el.textContent = fmt(value); state._heroDps = value; return;
   }
   state._heroDps = value;
   const frames = 16; let i = 0;
   const token = (state._heroToken = (state._heroToken || 0) + 1);
+  state._heroLaeuft = true; el.dataset.zaehlt = "1";   // fuer die Probe: sie wartet auf das Ende der Zaehlung, nicht auf eine Frist
   el.classList.remove("tick"); void el.offsetWidth; el.classList.add("tick");
   const step = () => {
     if(token !== state._heroToken) return;   // a newer value took over
     i++;
     const t = i / frames, ease = 1 - Math.pow(1 - t, 3);
     el.textContent = fmt(from + (value - from) * ease);
-    if(i < frames) requestAnimationFrame(step); else el.textContent = fmt(value);
+    if(i < frames) requestAnimationFrame(step); else { el.textContent = fmt(value); state._heroLaeuft = false; el.dataset.zaehlt = "0"; }
   };
   requestAnimationFrame(step);
 }
@@ -355,6 +361,8 @@ export function renderHead(){
     t("chip.shieldTitle", {hits: s.shieldHits, dmg: full(s.shieldDmg!), share: pct(s.shieldDmg!/(s.total||1), 1)})) : "";
   $("#hMeta").innerHTML =
     '<span class="scope" title="'+esc(wer || "")+'">'+esc(wer || "")+"</span>"+
+    /* Ein Kampf aus dem Archiv (76-archiv.ts) sagt, woher er kommt (Spezifikation Log-Archiv 7) */
+    (state.origin === "archiv" ? fakt("archiv", esc(t("ar.ausArchiv"))) : "")+
     (ort ? fakt("ort", esc(ort)) : "")+
     (state.wall ? fakt("zeit", '<i class="wt">'+esc(wallTime(seg.start).slice(0, 5))+"</i>", wallTime(seg.start)) : "")+
     (state.noTime ? "" : fakt("dauer", esc(dur(s.seconds))))+

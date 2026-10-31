@@ -579,7 +579,7 @@ try {
   };
   const klick = (pg, k, v) => pg.evaluate(([k, v]) => [...document.querySelectorAll("#deineRot [data-wahl]")]
     .find((x) => x.dataset.k === k && x.dataset.wahl === v)?.click(), [k, v]);
-  const warte = async (pg, bis) => { for (const end = Date.now() + 15000; Date.now() < end && !bis(); ) await pg.waitForTimeout(100); };
+  const warte = async (pg, bis) => { for (const end = performance.now() + 15000; performance.now() < end && !bis(); ) await pg.waitForTimeout(100); };
 
   // eine Wahl bleibt in der Sitzung: Stimmt, ein Kampf mit demselben Paar, Zuruecknehmen, Rueckgaengig; nichts wird geschrieben
   const A = await helfer();
@@ -985,7 +985,7 @@ try {
   await lp.evaluate(() => document.querySelector("#btnWatch").click());
   const takt = async () => {
     const ziel = LV.anfragen + 1;
-    for (const end = Date.now() + 15000; Date.now() < end && LV.anfragen < ziel; ) await lp.waitForTimeout(100);
+    for (const end = performance.now() + 15000; performance.now() < end && LV.anfragen < ziel; ) await lp.waitForTimeout(100);
     await lp.waitForTimeout(500);
   };
   await takt();

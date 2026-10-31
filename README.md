@@ -1,11 +1,16 @@
-Hey,this app is completely AI generated. The only thing what i did was telling him what to create and to fix because AI is dumb as me. It works fine. I did tell him exactly what it should do, like your mum telling you to clean finally your room. Have fun! :-)
-
 # Borometer
 
-A DPS meter for **Throne and Liberty**. It reads the combat log file that the
-game itself writes to disk, and nothing else. It has no access to the game
-process, needs no account, sends no telemetry and makes no outbound network
-call of its own.
+**I wanted to know what to change after a pull without hooking anything into
+the game.** So Borometer reads only the combat log that **Throne and Liberty**
+writes itself and tells you in plain sentences what carried your damage and
+where seconds went missing. It also shows how you compare to your best pull
+over time. No access to the game, no account, no ads, no money. It works
+without internet, and the source code is open.
+
+It sends no telemetry and makes no outbound network call of its own. Group,
+online guild and the update notice only run when you switch them on.
+
+Hey,this app is completely AI generated. The only thing what i did was telling him what to create and to fix because AI is dumb as me. It works fine. I did tell him exactly what it should do, like your mum telling you to clean finally your room. Have fun! :-)
 
 > **Fan project.** Not affiliated with NCSOFT or Amazon Games, and not endorsed or
 > reviewed by them. Throne and Liberty is a trademark of NCSOFT. Borometer is free,
@@ -63,6 +68,17 @@ volleys reached as many aftershocks as your best one. How many aftershocks a
 target gives at all depends on its size, so the ceiling is set per boss in a
 table instead of being fixed.
 
+Below the sentences the fight runs as one strip across the window, with a bay
+for every skill, as large as its weight. The findings hang above the strip as
+flags: each gap, the weakest stretch, the start, the strongest five seconds.
+Press a flag and its sentence appears, and the bays that added nothing there
+fade out. Every cast is a tick in one of four heat steps (normal, heavy,
+critical, critical heavy), your best pull runs along as a dashed curve, and each
+row says in one line what stands out about its skill: a pause in its own
+rhythm, fewer casts than in your best pull, or just the count and the beat.
+The rate for critical and heavy counts direct hits only, without duration and
+passive skills, and the page says how many hits that was.
+
 [![The analysis and its findings](docs/bilder/analyse.png)](docs/bilder/analyse.png)
 
 ## When you used what
@@ -87,7 +103,9 @@ are only bigger because the fight ran longer.
 Dark, light, a third in the game's own colours, and smoked glass, which on
 Windows 11 lets what is behind the window show through, blurred. Contrast is
 measured in all four. Borometer takes the setting from Windows, or you pick
-one.
+one. All windows use the same two typefaces, Anton for titles and numbers and
+Source Sans 3 for text, names, paths and times. Both are free (SIL Open Font
+License) and built in, so nothing is fetched from the internet.
 
 [![Borometer, light theme](docs/bilder/meter-hell.png)](docs/bilder/meter-hell.png)
 
@@ -99,7 +117,7 @@ One tab per character: the raid as a grid of wings and difficulties, the
 secret dungeon, events, the dimensional trial and the merchants, each with
 its counter. A band shows where the week stands and when the next weekly and
 daily reset comes. Nothing here is read from the game; you tick it off
-yourself.
+yourself. A character marked as main comes first and opens first.
 
 [![Weekly tasks of one character](docs/bilder/weeklies.png)](docs/bilder/weeklies.png)
 
@@ -111,11 +129,86 @@ first fight. Bosses you have not fought yet stand as empty outlines.
 
 [![The records album](docs/bilder/rekorde.png)](docs/bilder/rekorde.png)
 
+## Several characters
+
+Under Settings › Characters you list the characters from your weeklies and
+give each one its log name, the attacker name exactly as the log writes it.
+One of them can be marked as main. Borometer then knows which character fought
+which fight, and the records say who holds which one: a bar above the album
+counts them as Total, Main, Twinks and, where fights have no known character,
+Unknown. The history keeps only an ID for the character, never the name.
+Without a log name, the records stay as they were.
+
+## Archive of boss fights
+
+Borometer keeps a copy of every boss fight it reads, in the folder `archiv`
+next to its settings, only on your PC. That covers field bosses, raid bosses,
+dungeons, the Hall of Illusions and the training dummy; trash and group sums do
+not. If the game later deletes its logs, the copies stay. The first time, a
+notice on the start page says what the archive does, and nothing is recorded
+before you confirm it. Settings › Archive switches it off, opens the folder, and
+**Read old logs** takes the fights from the logs still sitting in the game's
+folder into the archive.
+
+The *Archive* area in the left rail lists every known boss as a card with its
+best DPS and the number of fights, grouped like the records and searchable by
+German and English name. A click opens the boss: the dots of all its fights over
+time, the median, the best one marked, and the fights themselves, newest first.
+A fight opens from the archive even when its log is gone, and *Open log* in the
+records does the same.
+
+Fights you no longer want can be set aside, one or several, with *Undo*. Only
+from the list of set-aside fights can you delete them for good: you type the
+boss and the date (for several, their number), and Borometer first copies the
+fight files and the index into the folder `sicherungen` and checks the copy. If
+the copy is incomplete, nothing is deleted. Borometer never deletes the copy,
+and never deletes anything by itself.
+
+## Guild
+
+For guild leaders: a member list with weapons and role, events that repeat,
+attendance per event (there, not there, excused) and an overview with rate and
+streak, without colours or ranks. A points tab, off by default, keeps an account
+per member from active months, bosses and raids, standing in the guild and
+extra points set by hand; the rules can be changed. As long as you do nothing
+else, the guild lies in `boro-gilde.json` on your PC and nothing is sent.
+
+A leader can switch on **Guild online**. The list then lies on a server at an
+`https://` address the leader types in, and members join with a code or link
+and see the list without being able to change it. The operator of that server
+can read everything on it, which the setup says before the guild is created.
+A guild nobody needs is set aside, not deleted. From the list of set-aside
+guilds, members and kinds you can delete them for good, after typing the name
+and after Borometer has put a backup file into `sicherungen`.
+
 ## Compact
 
-For a second monitor, or laid over the game: the readout and the bars, nothing
-else. The window can be made see-through, in whole steps from 0 to 55 %, and
-kept on top of everything. **Esc** takes you back.
+For a second monitor, or laid over the game: a flat panel with the readout and
+the bars, nothing else. The big DPS number sits on the left with the comparison
+to your last pull below it, boss, time and length on the right. An edge on the
+left stands full while Live runs. Two tabs, *Fight* and *Weeklies*, switch the
+view (Ctrl+Shift+W does too). The skills show five rows and scroll with the
+mouse wheel; the button below them opens the whole list, and the window grows
+with it. Grab the window anywhere on the top bar to move it. It cannot be
+dragged smaller than the bar and the first row. The window can be made
+see-through, in whole steps from 0 to 55 %, and kept on top of everything.
+**Esc** takes you back.
+
+## Windows
+
+Right-click, Shift+F10 or the menu key on a row of the damage table opens the
+Windows menu at the pointer, in German or English as set. *Copy* puts the skill
+and its value on the clipboard (Ctrl+C on a focused row does the same), *Show
+in rotation* jumps to the rotation with that skill highlighted. In the head of
+Fight, Rotation, Analysis and Compare a button opens that area in a window of
+its own, for a second monitor. There is at most one such window; it follows the
+fight of the main view, writes nothing and closes with it. Neither the menu nor
+the button exists in the compact window or in the browser.
+
+More of Windows is in Settings › Windows, all off by default except the tray
+icon: a notification after each fight (also only for a new best), a jump list
+on the taskbar icon with the last logs, a progress bar while a big log loads,
+and start with Windows.
 
 ---
 
@@ -204,7 +297,8 @@ Crusader · Tank. Rows open up. Everything for it lives on the *Party* tab.
 its address once: under *Party server*, into the **Server address** field,
 then **Save**. After that the four-character code somebody passes around is
 all you need. Leave the field empty and Borometer hosts from your own PC
-instead.
+instead. If your clan has no server, the [guest server](#guest-server) below is
+open to everyone.
 
 **Hosted from your own PC.** Type your character name and press **Host a
 party**. You get a four-character code plus an address, like
@@ -231,6 +325,47 @@ for up to twelve skills their names with the same figures, split by hit type,
 a damage curve per second and the times of their casts. It never
 reads a combat log and talks to nothing except the Borometers that choose to
 push to it.
+
+The party itself writes nothing to disk and keeps nothing: a room is dropped 30
+minutes after its last member has gone, and a server set up for everyone (with
+`BORO_ROOM_MAX_AGE`) drops every room after 12 hours at the latest. (The guild
+store, a separate part of the same server, does keep its files on disk.) There are no accounts and no telemetry. A server
+run for strangers sets limits on rooms, names and request rates; they are
+described in [`SELF-HOSTING.md`](BoroPartyServer/SELF-HOSTING.md).
+
+---
+
+## Guest server
+
+If your clan has no server, you can use the one the project runs:
+`https://guest.borometer.de`. It is open to everyone, for trying the party
+board and for using it. If too much is going on, it can be switched off. The
+address then answers with a short notice, and Borometer shows that nothing is
+answering. There is no promise that it is always up, so a party that matters
+belongs on your own server or on the host's PC.
+
+**Using it.** In the *Party* tab, under *Where the party runs*, choose *Public
+server*. The address and a note appear, and **Use this server** saves it. Only
+that click saves it; before it, Borometer asks nothing. You can also type
+`https://guest.borometer.de` yourself under *Party server*, into the **Server
+address** field, and press **Save**. After that the four-character code works as
+with any party server. If you never enter the address, nothing goes there.
+
+**What it is.** The same file as the party server in
+[`BoroPartyServer/`](BoroPartyServer/), started with the limits for strangers
+and without the guild store. It writes nothing to disk. A room is gone 30
+minutes after its last member has left, after 12 hours at the latest, or when
+the server restarts. There are no accounts and no telemetry. It knows what
+every party server knows (described under *Party board*), and no more.
+
+**Limits.** At most 500 rooms at the same time, 3000 names in all rooms
+together and 40 names in one room. One sender may make 180 requests a minute and
+open 10 new rooms an hour. Twenty different wrong codes within a minute bring a
+pause of five minutes, so guessing codes gets nowhere. When the server is full,
+a new room is refused with a short notice. The counters live in memory and are
+dropped after their window. The values are in the service file
+[`boro-party-public.service`](BoroPartyServer/boro-party-public.service) and
+explained in [`SELF-HOSTING.md`](BoroPartyServer/SELF-HOSTING.md).
 
 ---
 
@@ -260,7 +395,9 @@ carried over once on first run, so updating is just starting the new version.
 
 What Borometer writes itself (`Logs`, `Party-Logs` and `Bug-Reports`) appears
 only the first time you save that kind of file: under `Documents\Borometer`
-for the installed version, next to the exe for the portable ones.
+for the installed version, next to the exe for the portable ones. The archive of
+boss fights (`archiv`) and the backup copies made before anything is deleted for
+good (`sicherungen`) sit beside the settings file.
 
 ---
 
@@ -305,20 +442,24 @@ prefixes. Compact's see-through does not exist on Linux.
 Borometer reads the detailed combat log that Throne and Liberty writes when
 you switch on the game's own combat logging. It does not inject code, read
 game memory, hook the renderer, or send any input to the game. Nothing is
-uploaded, and there is no account and no telemetry.
+uploaded unless you switch on a party or Guild online, and there is no account
+and no telemetry.
 
 Borometer registers exactly one shortcut with Windows: **Ctrl+Shift+D** for
 click-through. Windows tells Borometer when that combination is pressed and
 about no other key. Borometer does not read the keyboard.
 
 Network only happens when you switch it on. In normal use the local helper
-binds to 127.0.0.1 and calls nothing. Two things change that, each only on
+binds to 127.0.0.1 and calls nothing. Three things change that, each only on
 your word. A party: hosting opens a second port to the outside, and joining
 sends your figures to the host or to your party server. What travels is your
 character name with weapons, role and game language, and your newest fight:
 its figures per skill, the damage per second and when you used what. Never a
-log file. And the update notice, off by default: switched on, it asks this
-repository once per start for its latest release.
+log file. Guild online, off by default: once a guild leader has switched it on
+and typed in a server address, the member list, points and attendance go to
+that one `https://` address and to no other. And the update notice, off by
+default: switched on, it asks this repository once per start for its latest
+release.
 
 `npm run audit:safety` checks these rules mechanically, against the source, on
 every change. [What the audit checks](#what-the-audit-checks) lists them.
@@ -340,13 +481,18 @@ more than read the combat log. Among its rules:
   no overlay; the game's folder is only ever read;
 - the page has no network: it speaks HTTP to `127.0.0.1` only, and every request
   starts at `/api/`;
-- the main process goes outside in two places only, and only when you ask for it:
+- the main process goes outside in three places only, and only when you ask for it:
   the update notice (off by default, one request to this repository's latest
-  release), fixed to one address; and the party server,
+  release), fixed to one address; the party server,
   at the address you enter yourself (for it, the audit checks that no file content
-  goes out and that only POST routes reach it);
-- the main process never deletes a file, and best pulls and weeklies
-  are only ever detached, never removed; files are only
+  goes out and that only POST routes reach it); and Guild online, only after a
+  leader has switched it on, only to the `https://` address the leader typed in;
+- the main process deletes nothing by itself. You can delete for good only what
+  you set aside first, only from the list of set-aside items, only after typing
+  a name (for a fight, boss and date) and only after Borometer has put a backup
+  into `sicherungen`: set-aside boss fights in the archive, and set-aside entries
+  in the weeklies and the guild. Borometer never deletes the backup. Active
+  entries, best pulls, history and logs are never removed; files are only
   written where Borometer keeps its own;
 - the source carries no game images (they come into the release build from a private
   repository, see "Building from source").

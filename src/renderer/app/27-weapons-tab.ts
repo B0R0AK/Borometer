@@ -10,7 +10,7 @@ import { className, classNameFor, iPlayVentius, roleWithVentius } from "./17-cla
 import { $, esc } from "./18-interface-basics";
 import { renderBars } from "./21-damage-table";
 import { askConfirm } from "./36-dialog";
-import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
 import { AUTO_OFF_MIN, clearWeaponByHand, fightKey, setWeaponByHand } from "./42-party";
 import type { Fight, SkillStats } from "../types";
 
@@ -39,10 +39,11 @@ function normWeapon(s: unknown){
    eigenem Stand: schriebe es ganze Karten zurueck (runs, logIndex,
    ventiusTop, skillNames, Thema), gewaenne der letzte Schreiber, und was die
    Vollansicht inzwischen gemerkt hat, waere weg. Es schreibt darum nichts
-   Gespeichertes - ausser randlosGesehen, damit "Verstanden" haelt. */
+   Gespeichertes - ausser randlosGesehen, damit "Verstanden" haelt. Das
+   abgerissene Fenster (Windows Teil 2) schreibt gar nichts. */
 const KOMPAKT_DARF_MERKEN = ["randlosGesehen"];
 export function persistConfig(){
-  if(!SERVED || KOMPAKT_FENSTER) return;
+  if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER) return;
   fetch("/api/config", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({weaponOf:state.weaponOf, weaponById:state.weaponById,
                           mainWeapon:state.mainWeapon||"", offWeapon:state.offWeapon||"",
@@ -51,11 +52,11 @@ export function persistConfig(){
 }
 /* A preference on its own, kept apart from the weapon and run payload above so
    that saving where your fights get cut never rewrites your saved runs. */
-export function persistPref(key: string, value: unknown){
-  if(!SERVED || (KOMPAKT_FENSTER && !KOMPAKT_DARF_MERKEN.includes(key))) return;
+export function persistPref(key: string, value: unknown): Promise<void> {
+  if(!SERVED || ABRISS_FENSTER || (KOMPAKT_FENSTER && !KOMPAKT_DARF_MERKEN.includes(key))) return Promise.resolve();
   const body: Record<string, unknown> = {}; body[key] = value;
-  fetch("/api/config", {method:"POST", headers:{"Content-Type":"application/json"},
-    body: JSON.stringify(body)}).catch(() => {});
+  return fetch("/api/config", {method:"POST", headers:{"Content-Type":"application/json"},
+    body: JSON.stringify(body)}).then(() => {}, () => {});
 }
 function afterAssign(){
   persistConfig();

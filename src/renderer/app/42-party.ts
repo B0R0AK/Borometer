@@ -22,7 +22,7 @@ import { persistConfig, renderWeapons } from "./27-weapons-tab";
 import { renderAll } from "./32-history";
 import { setGroup, switchTab } from "./34-menus-drop-and-tabs";
 import { askConfirm } from "./36-dialog";
-import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
 import { einstSpringen } from "./57-einstellungen";
 import { syncFelder } from "./58-felder";
 import type {
@@ -178,7 +178,7 @@ export function artenJe(seg: Fight): (name: string) => {k: string; h: number; d:
 export function sendReport(force: boolean){
   /* Der Gruppe meldet nur die Vollansicht (N4, Pruefung W4): der Streifen hat
      einen eigenen Stand, oft ohne Kampf, und die Tafel spraenge hin und her. */
-  if(!SERVED || KOMPAKT_FENSTER || !state.party.role) return;
+  if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER || !state.party.role) return;
   const p = partyPayload();
   /* Having nothing to report is itself a report. Falling silent left the host
      holding the last fight until it timed out, so a cleared list still read
@@ -774,8 +774,12 @@ var partyFehlerGesagt: string | undefined, partyZaehlungGesagt: unknown;
    Reihe der Serien, bunt nach #34. */
 
 /** Wo eine neue Gruppe laufen soll; null folgt dem eingetragenen Gruppen-Server. */
-let wo: "pc" | "server" | null = null;
-const woJetzt = () => wo ?? (state.partyServer ? "server" : "pc");
+type Wo = "pc" | "oeffentlich" | "server";
+let wo: Wo | null = null;
+/* Die oeffentliche Adresse steht nur hier in der Seite, als Text, den der Nutzer sieht; der Hauptprozess nennt sie nie.
+   Gespeichert wird sie erst auf den Klick (#pOeffNimm), mit bestaetigt:true. */
+const OEFF_ADR = "https://guest.borometer.de";
+const woJetzt = (): Wo => wo ?? (state.partyServer === OEFF_ADR ? "oeffentlich" : state.partyServer ? "server" : "pc");
 /* Wer aufgeklappt ist ("Name") und welche Faehigkeit ("Name|Faehigkeit");
    gilt in der Sitzung. Das eigene Mitglied steht beim ersten Blick offen. */
 const aufMitglied = new Set<string>(), aufArt = new Set<string>();
@@ -854,25 +858,60 @@ function wegePlatz(unten: boolean){
   else if(!unten && wege.parentElement === auf){ auf.open = false; $("#pOhne").before(wege); }
 }
 
+/* ---------- Adresse ohne Verschluesselung ----------
+   Eine Server-Adresse, die nicht mit https:// beginnt, geht im Klartext ueber
+   das Netz (der Hauptprozess nimmt ohne Schema http, src/main/http.ts
+   isPlain). Die Warnung steht am Feld und wird als Satz angesagt (role=status):
+   der Text wird erst gesetzt, wenn er gebraucht wird, nicht nur eingeblendet. */
+function klarAdresse(a: string){
+  const s = a.trim();
+  return s !== "" && !/^https:\/\//i.test(s);
+}
+function klarSetzen(id: string, klar: boolean){
+  const el = $(id);
+  const satz = klar ? t("party.klar") : "";
+  if(el.textContent !== satz) el.textContent = satz;
+  el.hidden = !klar;
+}
+function klarNachfuehren(){
+  const start = document.getElementById("pServer") as HTMLInputElement | null;
+  if(start) klarSetzen("#pServerKlar", woJetzt() === "server" && klarAdresse(start.value));
+  const beitritt = document.getElementById("pJoinSrv") as HTMLInputElement | null;
+  /* Leer gilt der eingetragene Gruppen-Server */
+  if(beitritt) klarSetzen("#pJoinKlar", klarAdresse(beitritt.value.trim() || state.partyServer || ""));
+  const einst = document.getElementById("eServer") as HTMLInputElement | null;
+  if(einst) klarSetzen("#eServerKlar", klarAdresse(einst.value));
+}
+
 /* ---------- die zwei Wege ---------- */
 function renderWege(){
-  const server = woJetzt() === "server";
+  const jetzt = woJetzt();
+  const server = jetzt === "server";
   document.querySelectorAll<HTMLElement>("#pWo [role=radio]").forEach(b => {
-    const an = b.dataset.wo === (server ? "server" : "pc");
+    const an = b.dataset.wo === jetzt;
     b.setAttribute("aria-checked", String(an));
     b.tabIndex = an ? 0 : -1;
   });
   $("#pServerZeile").hidden = !server;
   $("#pServerSatz").hidden = !server;
+  /* Die Karte des oeffentlichen Servers: Adresse und Hinweis immer, der Knopf nur solange die Adresse
+     nicht gespeichert ist, danach der Satz "eingestellt". Beides ist Text, nichts ruft etwas ab. */
+  const oeff = jetzt === "oeffentlich", gesetzt = state.partyServer === OEFF_ADR;
+  $("#pOeff").hidden = !oeff;
+  $("#pOeffNimm").hidden = gesetzt;
+  $("#pOeffDa").hidden = !gesetzt;
   const feld = $<HTMLInputElement>("#pServer");
-  if(document.activeElement !== feld && !feld.dataset.getippt) feld.value = state.partyServer || "";
+  /* Die oeffentliche Adresse ist keine eigene: im Feld "Eigener Server" bleibt sie leer */
+  const eigene = state.partyServer === OEFF_ADR ? "" : state.partyServer || "";
+  if(document.activeElement !== feld && !feld.dataset.getippt) feld.value = eigene;
   /* Der Host lauscht auf allen Netzen (party.ts, startPublic: listenFrom
      "0.0.0.0"); beim ersten Mal fragt Windows dafuer nach der Firewall. Ueber
      den eigenen Server oeffnet dieser PC nichts - dann steht der Satz dazu da. */
   const note = $("#pHostNote");
-  note.textContent = server ? "" : t("party.hostOpensPort");
-  note.hidden = server;
+  note.textContent = jetzt === "pc" ? t("party.hostOpensPort") : "";
+  note.hidden = jetzt !== "pc";
   $("#pJoinSrvSatz").textContent = state.partyServer ? t("party.joinSrvMit", {addr: state.partyServer}) : t("party.joinSrvOhne");
+  klarNachfuehren();
   if(!SERVED){
     /* Im Browser gibt es keine Gruppe: ein Grund fuer beide Wege, einmal
        unter ihnen (#pHint, an beiden Knoepfen per aria-describedby). */
@@ -896,7 +935,7 @@ function joinHinweis(){
 }
 
 /* Radiogruppe "Wo die Gruppe laeuft": Klick oder Pfeiltaste waehlt, ein Tabstopp. */
-function woSetzen(neu: "pc" | "server", fokus: boolean){
+function woSetzen(neu: Wo, fokus: boolean){
   wo = neu;
   renderWege();
   if(fokus) document.querySelector<HTMLElement>('#pWo [data-wo="' + neu + '"]')?.focus();
@@ -1177,6 +1216,7 @@ export function serverEinstNachfuehren(){
   const satz = offen ? t("party.serverOffen") : "";
   if($("#eServerOffen").textContent !== satz) $("#eServerOffen").textContent = satz;
   $("#eServerOffen").hidden = !offen;
+  klarNachfuehren();
 }
 function setSrvStatus(cls: string, text: string | string[]){
   const el = $("#eServerStatus");
@@ -1198,6 +1238,10 @@ function zeigeStatus(cls: string, text: () => string | string[]){
   letzterStatus = () => setSrvStatus(cls, text());
   letzterStatus();
 }
+/* Bei einer https-Adresse hilft der Hinweis auf Port 8732 nicht (Caddy davor) */
+function srvDownSatz(addr: string){
+  return t(klarAdresse(addr) ? "party.srvDown" : "party.srvDownS", {addr});
+}
 function checkPartyServer(){
   if(!SERVED) return;
   if(!state.partyServer){ zeigeStatus("", () => t("party.srvUnset")); return; }
@@ -1209,8 +1253,8 @@ function checkPartyServer(){
                                       t("party.srvPing",{ms:d.ms}),
                                       t("party.srvRooms",{rooms:d.rooms})]);
     else if(d.reason === "unset") zeigeStatus("", () => t("party.srvUnset"));
-    else zeigeStatus("down", () => t("party.srvDown",{addr:d.server||state.partyServer}));
-  }).catch(() => zeigeStatus("down", () => t("party.srvDown",{addr:state.partyServer})));
+    else zeigeStatus("down", () => srvDownSatz(d.server||state.partyServer));
+  }).catch(() => zeigeStatus("down", () => srvDownSatz(state.partyServer)));
 }
 /* Nichts laedt von allein: der Gruppen-Server wird nur auf "Jetzt pruefen"
    und nach "Speichern" gefragt (Entscheidung Pruefung Aufgabe 8, Befund 3).
@@ -1383,16 +1427,29 @@ export function setup(): void {
   $("#eServerCheck").onclick = checkPartyServer;
   // was getippt ist, ueberschreibt der naechste Abruf nicht mit dem gespeicherten Server
   $("#pServer").oninput = () => { $("#pServer").dataset.getippt = "1"; renderWege(); };
+  $("#pJoinSrv").oninput = klarNachfuehren;
   $("#eServer").oninput = () => { $("#eServer").dataset.getippt = "1"; serverEinstNachfuehren(); };
   // aus dem Bereich Gruppe zum Abschnitt Gruppe und Server der Einstellungen
   $("#pZuEinst").onclick = () => einstSpringen("gruppe");
+  /* "Diesen Server verwenden": die eine Handlung, die den oeffentlichen Server einstellt (bestaetigt:true) */
+  $("#pOeffNimm").onclick = () => {
+    fetch("/api/party/server", {method:"POST", headers:{"Content-Type":"application/json"},
+      body: JSON.stringify({server:OEFF_ADR, bestaetigt:true})}).then(r => r.json()).then(d => {
+        if(!d.ok){ $("#pHint").textContent = t("party.helperNoAnswer"); return; }
+        state.partyServer = d.server || "";
+        renderParty();
+        serverStatusNachfuehren();
+        toast(tt("party.serverSaved",{addr:state.partyServer}));
+        $("#pHost").focus();
+      }).catch(() => { $("#pHint").textContent = t("party.helperNoAnswer"); });
+  };
   /* Speichern (Einstellungen, Gruppe und Server): dieselbe Route wie die
      fruehere Karte Gruppen-Server; leer loescht den Eintrag (Pruefung
      Aufgabe 7, Befund 2). Das Feld zum Starten im Bereich Gruppe folgt. */
   $("#eServerSave").onclick = () => {
     const addr = $<HTMLInputElement>("#eServer").value.trim();
     fetch("/api/party/server", {method:"POST", headers:{"Content-Type":"application/json"},
-      body: JSON.stringify({server:addr})}).then(r => r.json()).then(d => {
+      body: JSON.stringify({server:addr, bestaetigt:true})}).then(r => r.json()).then(d => {
         state.partyServer = d.server || "";
         $<HTMLInputElement>("#eServer").value = state.partyServer;
         delete $("#eServer").dataset.getippt;
@@ -1405,11 +1462,14 @@ export function setup(): void {
   /* Wo die Gruppe laeuft: eine Radiogruppe - Klick waehlt, Pfeiltasten
      wechseln und nehmen den Fokus mit, ein Tabstopp (woSetzen). */
   document.querySelectorAll<HTMLElement>("#pWo [role=radio]").forEach(b => {
-    b.onclick = () => woSetzen(b.dataset.wo === "server" ? "server" : "pc", true);
+    b.onclick = () => woSetzen(b.dataset.wo === "server" ? "server" : b.dataset.wo === "oeffentlich" ? "oeffentlich" : "pc", true);
     b.onkeydown = e => {
       if(!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown"].includes(e.key)) return;
       e.preventDefault();
-      woSetzen(woJetzt() === "server" ? "pc" : "server", true);
+      // Links/Oben zur vorigen, Rechts/Unten zur naechsten Wahl, am Ende herum
+      const reihe: Wo[] = ["pc", "oeffentlich", "server"];
+      const schritt = e.key === "ArrowLeft" || e.key === "ArrowUp" ? -1 : 1;
+      woSetzen(reihe[(reihe.indexOf(woJetzt()) + schritt + reihe.length) % reihe.length]!, true);
     };
   });
   // eine neue Eingabe loest die alte Antwort des Helfers ab
@@ -1431,8 +1491,11 @@ export function setup(): void {
   $("#pHost").onclick = () => {
     const name = $<HTMLInputElement>("#pName").value.trim();
     if(!name){ toastFail(tt("party.putNameFirst")); return; }
-    const server = woJetzt() === "server";
-    const addr = $<HTMLInputElement>("#pServer").value.trim();
+    const oeff = woJetzt() === "oeffentlich";
+    /* Der oeffentliche Server zaehlt erst, wenn der Nutzer ihn bestaetigt hat (Knopf in der Karte) */
+    if(oeff && state.partyServer !== OEFF_ADR){ $("#pHint").textContent = t("party.oeffErst"); $("#pOeffNimm").focus(); return; }
+    const server = oeff || woJetzt() === "server";
+    const addr = oeff ? OEFF_ADR : $<HTMLInputElement>("#pServer").value.trim();
     if(server && !addr){ $("#pHint").textContent = t("party.serverFehlt"); $("#pServer").focus(); return; }
     /* Eigener Server: der Raum entsteht dort, der Helfer merkt sich die
        Adresse (server.ts, /api/party/create). Auf diesem PC: /api/party/host.

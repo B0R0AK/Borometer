@@ -252,6 +252,8 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
     eq(orte(t[0]).map((x) => x.de), ["Dragaryle", "Zairos \u00b7 Vulkan", "Radeth", "Calanthia"], "echte Tabelle: der Raid wie im Entwurf");
     eq(t[2].gruppen.map((g) => g.key), [null, "erz", "koloss"], "echte Tabelle: Feldbosse, Erzbosse, Kolosse");
     eq(t[3].gruppen.map((g) => g.key), ["s4", "s3", "s2", "s1", "solo", "separat"], "echte Tabelle: Dungeons nach Sternen, dann Halle der Illusionen");
+    eq(t[3].gruppen.find((g) => g.key === "separat").orte.map((x) => x.de), ["Verence", "Marta", "Haylock", "Gaudian", "Molgras", "Murdock"],
+      "echte Tabelle: die Halle der Illusionen hat sechs Plaetze (#252)");
     ok(o.length === new Set(o.map((x) => x.id)).size && o.length > 60, "echte Tabelle: jeder Boss einmal", o.length);
     const a = core.rekorde([k("Deluzhnoa", 1, 0), k("Ascended Aridus [Undead]", 1, 0), k("King Khanzaizin", 1, 0), k("Vegamor's Claw", 1, 0)], t, false);
     eq(a.ohneOrt, 0, "echte Tabelle: Erzboss, Feldboss mit Zustand, Dungeonboss und Kolossteil finden ihren Platz");
@@ -264,6 +266,84 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
       .filter(([id, , key]) => platz(key) !== id);
     eq(falsch, [], "echte Tabelle: der histKey jeder Schreibweise findet ihren Platz (Schluessel aus boro-best.json)");
   }
+}
+
+// --- Zuordnung (Spezifikation Twinks 3): eine Datei mit anderem Zuordnungsstand wird noch einmal gelesen
+{
+  const liste = [{ name: "TLCombatLog-a.txt", size: 500 }, { name: "TLCombatLog-b.txt", size: 700 }];
+  const fight = { at: 1, top: 10, topSid: "1" };
+  const index = {
+    "TLCombatLog-a.txt": { bytes: 500, fights: [{ ...fight, ch: "wtest00001" }], zv: "wtest00001" },
+    "TLCombatLog-b.txt": { bytes: 700, fights: [{ ...fight }] },
+  };
+  eq(core.lesebedarf(liste, index, false, "").map((x) => x.name), [], "ohne Charaktere liest nichts nach");
+  eq(core.lesebedarf(liste, index, false, "wtest00001").map((x) => x.name), ["TLCombatLog-b.txt"], "eine Datei ohne Zuordnungsstand wird gelesen, die mit gleichem nicht");
+  eq(core.lesebedarf(liste, index, false, "wtest00001,wtest00002").map((x) => x.name), ["TLCombatLog-a.txt", "TLCombatLog-b.txt"], "ein neuer Stand liest beide noch einmal");
+  eq(core.lesebedarf(liste, index, false, "wtest00001")[0]?.ab, 0, "ganz gelesen, ab 0");
+  const nurGruppe = { "TLCombatLog-a.txt": { bytes: 500, fights: [{ ...fight, g: 1 }] } };
+  eq(core.lesebedarf([liste[0]], nurGruppe, false, "wtest00001").length, 0, "eine Datei nur mit Gruppensummen hat nichts zuzuordnen");
+}
+
+// ---------------------------------------------------------------- Twinks (#251, Spezifikation Twinks 4)
+{
+  const A = "wtest00001", B = "wtest00002", L = "wtest00003";
+  const aktiv = [A, B], geloest = [L];
+  const mit = (ch, ...r) => ({ ...k(...r), ...(ch === undefined ? {} : { ch }) });
+  const kaempfe = [
+    mit(A, "Morokai", 100000, 0, { top: 300000 }), mit(B, "Morokai", 180000, 2, { top: 250000 }), mit(A, "Morokai", 150000, 4, { top: 410000 }),
+    mit(L, "Morokai", 999999, 5, { top: 999999 }),            // geloest: zaehlt nicht
+    mit(undefined, "Aridus", 90000, 1), mit("", "Aridus", 120000, 3),   // unbekannt
+    mit(A, "Vulcanus", 50000, 1), mit(A, "Vulcanus", 70000, 6),
+    mit(B, "Vegamor", 60000, 2), mit(B, "Vegamor", 66000, 3), mit("wtest00099", "Vegamor", 80000, 4),   // nicht mehr in der Liste: unbekannt
+    mit(B, "Verence", 40000, 1), mit(B, "Verence", 44000, 2),
+    mit(A, "Dragaryle", 30000, 1), mit(A, "Dragaryle", 31000, 2), mit(B, "Calanthia", 20000, 1), mit(B, "Calanthia", 25000, 3),
+  ];
+  const tw = core.twinkRekorde(kaempfe, T, false, aktiv, geloest);
+  eq(tw.halter, [A, B, "?"], "Halter: die aktiven in ihrer Reihenfolge, dann unbekannt, weil es solche Kaempfe gibt");
+  const g = platz(tw.gesamt, "Morokai").wert;
+  eq([g.n, g.dps, g.dpsCh, g.ersterDps, g.ersterCh, g.erster], [3, 180000, B, 100000, A, T0],
+    "Gesamt Morokai: bester Kampf von B, erster Kampf von A; der geloeste Charakter zaehlt nicht");
+  eq([tw.gesamt.held.top, tw.gesamt.held.ch, tw.je[B].held.top, tw.je[B].held.ch], [410000, A, 250000, B], "der Held: in Gesamt mit seinem Halter, je Charakter der eigene");
+  eq(core.zuwachs(g), 80, "Zuwachs vom ersten zum besten Kampf: +80 %");
+  const a = platz(tw.je[A], "Morokai").wert;
+  eq([a.n, a.dps, a.dpsCh, a.top], [2, 150000, A, 410000], "je Charakter: nur seine Kaempfe (bester 150k, staerkster Treffer 410k)");
+  eq(platz(tw.je[B], "Morokai").wert.bester, false, "B hat an Morokai einen Kampf: kein bester Pull");
+  const ar = platz(tw.gesamt, "Aridus").wert;
+  eq([ar.dps, ar.dpsCh, ar.ersterCh], [120000, "?", "?"], "Kaempfe ohne ch oder mit \"\" zaehlen in Gesamt, Halter unbekannt");
+  eq(platz(tw.gesamt, "Vegamor").wert.dpsCh, "?", "eine Kennung, die nicht mehr in der Liste steht, haelt als unbekannt");
+  eq(tw.zaehler, { [A]: 2, [B]: 3, "?": 2 }, "Zaehler: wie viele Rekorde (mit bestem Pull) jeder Halter in Gesamt haelt");
+  eq(core.zuwachs({ bester: false, dps: 0, dpsAt: 0, ersterDps: 1, erster: 1 }), null, "ohne besten Pull kein Zuwachs");
+  eq(core.zuwachs({ bester: true, dps: 5, dpsAt: 7, ersterDps: 5, erster: 7 }), null, "ist der erste der beste, kein Zuwachs");
+
+  // gleicher Wert: der aeltere Kampf haelt
+  const gleich = core.twinkRekorde([mit(B, "Morokai", 100000, 1), mit(A, "Morokai", 100000, 0), mit(A, "Morokai", 50000, 2)], T, false, aktiv, []);
+  eq(platz(gleich.gesamt, "Morokai").wert.dpsCh, A, "zwei gleiche Werte: der aeltere Kampf haelt");
+  eq(core.twinkRekorde(kaempfe.filter((x) => x.ch !== undefined && x.ch !== "" && x.ch !== "wtest00099"), T, false, aktiv, geloest).halter, [A, B],
+    "ohne Kaempfe unbekannter Halter kein Ring \"unbekannt\"");
+
+  // die fuenf Teile
+  const teile = core.twinkTeile(tw.gesamt.seiten, T);
+  eq(teile.map((x) => x.id), ["raid", "feld", "erz", "dungeon", "halle"], "fuenf Teile: Raids, Feldbosse, Erzbosse, Dungeons, Halle der Illusionen");
+  eq(teile[0].gruppen.flatMap((x) => x.plaetze.map((p) => p.ort.de)), ["Dragaryle", "Zairos · Vulkan", "Radeth", "Calanthia"],
+    "Raids: immer in der Reihenfolge des Spiels (Zitadelle, Korridor, Altar), auch die leeren");
+  eq(teile[1].gruppen.map((x) => [x.key, x.plaetze.map((p) => p.ort.de)]), [[null, ["Morokai", "Aridus", "Talus", "Minezerok", "Manticus"]]],
+    "Feldbosse: nur die offene Welt");
+  eq(teile[2].gruppen.map((x) => [x.key, x.plaetze.map((p) => p.ort.de)]), [[null, ["Vegamor", "Sintflutbringerin"]]],
+    "Erzbosse: die Erzbosse und Vegamor in einer Gruppe, die bekaempften zuerst");
+  eq(teile[3].gruppen.map((x) => x.key), ["s4", "s3", "s2", "s1", "solo"], "Dungeons nach Sternen, ohne die Halle der Illusionen");
+  eq(teile[4].gruppen.map((x) => [x.key, x.plaetze.map((p) => p.ort.en)]), [[null, ["Verence", "Marta"]]], "Halle der Illusionen eigens");
+  eq(teile.map((x) => [x.besiegt, x.gesamt]), [[2, 4], [2, 5], [1, 2], [1, 8], [1, 2]], "je Teil: n von m bekaempft");
+
+  // Sortierung je Gruppe; unbekaempfte bleiben hinten in der Reihenfolge der Tafel
+  const feld = teile[1].gruppen[0].plaetze;
+  eq(core.twinkSortiert(feld, "best").map((p) => p.ort.de), ["Morokai", "Aridus", "Talus", "Minezerok", "Manticus"], "Bester DPS: hoechster zuerst");
+  eq(core.twinkSortiert(feld, "neu").map((p) => p.ort.de), ["Morokai", "Aridus", "Talus", "Minezerok", "Manticus"], "Zuletzt: der juengste Kampf zuerst");
+  eq(core.twinkSortiert(feld, "plus").map((p) => p.ort.de), ["Morokai", "Aridus", "Talus", "Minezerok", "Manticus"], "Groesster Zuwachs: +80 % vor +33 %");
+  const zwei = [{ ort: { de: "x" }, wert: { bester: true, dps: 1, dpsAt: 9, zuletzt: 2, ersterDps: 1, erster: 1 } },
+    { ort: { de: "y" }, wert: { bester: true, dps: 2, dpsAt: 5, zuletzt: 1, ersterDps: 1, erster: 1 } }, { ort: { de: "z" }, wert: null }];
+  eq([core.twinkSortiert(zwei, "best"), core.twinkSortiert(zwei, "neu"), core.twinkSortiert(zwei, "plus")].map((l) => l.map((p) => p.ort.de).join("")),
+    ["yxz", "xyz", "yxz"], "Sortierung nach DPS, nach dem letzten Kampf und nach dem Zuwachs; ohne Kampf zuletzt");
+  eq(zwei.map((p) => p.ort.de).join(""), "xyz", "die Eingabe bleibt unberuehrt");
 }
 
 console.log(failed ? `\n${failed} FAILED` : "\nall passed");

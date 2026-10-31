@@ -1,6 +1,45 @@
 BOROMETER — CHANGELOG
 =====================
 
+v2.0
+----
+Added
+  - Archive of boss fights with search, boss cards and history per boss (#264, #288, #292)
+  - Read old logs into the archive; Open log falls back to the archive (#264)
+  - Set fights aside in the archive, delete them for good with backup (#264)
+  - Characters with log name and main; records per character (#251)
+  - Main comes first in the Weeklies and the compact strip (#251)
+  - Analysis workbench: a bay per skill, flags on the strip, best-pull curve (#218)
+  - Each skill row says what stands out; legend and axis above (#270)
+  - Crit and heavy rate of direct hits; gap marks with duration (#269)
+  - Eye of Ventius best per boss now in Records (#218)
+  - Guild points: accounts, rules, inactive members, kinds of your own (#228)
+  - Guild online: the list on a server of your own, https only (#229)
+  - Set guilds and Weeklies entries aside; delete them for good with backup (#237, #240)
+  - Party server over https; warning for unencrypted addresses (#231)
+  - Party tab: choice “Public server” for guest.borometer.de (#310, #321)
+  - Windows menu on table rows (Copy, Show in rotation) (#168)
+  - Open Fight, Rotation, Analysis or Compare in a window of its own (#168)
+  - Tour asks first; one hint per area on the first visit (#265)
+  - Hall of Illusions: Molgras and Murdock (#252)
+
+Changed
+  - Compact window redesigned: panel, big number, tabs Fight and Weeklies (#241, #287)
+  - Compact: grab the whole head, mouse wheel, minimum size, clearer glass (#328, #348)
+  - Two typefaces everywhere: Anton and Source Sans 3 (#342)
+  - Big DPS number with outline, sharp at any zoom; bars with metal sheen (#284, #332)
+  - Start page fits without scrolling (#285)
+  - Nothing in the interface can be selected with the mouse, except inputs (#286)
+  - Glow ring: centre text stays inside the hole (#335)
+  - Sharper boss and skill images (#258)
+  - Server address example is an https name (#249)
+  - Guide brought up to date for 2.0 (#355)
+  - Full view has a fixed size (default 1280 x 860): no dragging, no maximising, no fullscreen; bigger or smaller only through the scale in Settings; torn-off windows stay resizable (#364)
+
+Fixed
+  - Analysis: pressing a flag no longer collapses the bays (#236)
+  - Compact window no longer grows off the bottom of the screen (#298)
+
 v1.10
 -----
   - A fourth theme, Smoked glass. On Windows 11 the big window lies on Acrylic:

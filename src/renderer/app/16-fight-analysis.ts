@@ -11,8 +11,8 @@ import { mitte } from "../build-core";
 import { mechanikSekunden, mechanikStempel, mechanikStrecken } from "./61-mechanik";
 import { luecken } from "../analyse-core";
 import { uiZoomFactor } from "./37-window-size-and-overlay";
-import { COMPACT_ROWS } from "./36-dialog";
-import { restZeile } from "../kompakt-core";
+import { KN_ALLE_BIS, KN_SICHT, restUnten } from "../kompakt-core";
+import { plattenBeschriften } from "./72-kompakt-leiste";
 import type { Fight, Insight, SavedRun, StackSeries } from "../types";
 
 /* One encoding for one fact. A --pitch band was the first idea for the gaps
@@ -53,7 +53,10 @@ function schneideAufZeilen(box: HTMLElement, kompakt: boolean){
      Flaeche (Feinschliff 7, Belegprobe in test-tafel-page): der Deckel der
      alten Vollansicht entfiel, es gibt nichts zu schneiden. */
   if(!kompakt){ box.style.maxHeight = ""; return; }
-  /* Hier kommt nur noch Kompakt an. Gerollt wird nicht neu geschnitten -
+  /* Kompakt neu, Panel (21.10.2026): die Zeilen stehen im Fluss, fuenf und der Knopf "+N weitere", der aufklappt (restZeileSetzen).
+     Ein Schnitt auf ganze Zeilen gibt es nicht mehr; ab zwoelf Zeilen deckelt styles.css die Liste. */
+  if(kompakt){ box.style.maxHeight = ""; return; }
+  /* Hier kam frueher Kompakt an. Gerollt wird nicht neu geschnitten -
      aber ein "none" aus dem Raster darf nicht stehen bleiben, sonst haette
      die Liste im Kompakt gar keinen Deckel. Dann gilt wenigstens der aus
      styles.css. */
@@ -159,36 +162,73 @@ function kopfBeschneiden(){
   if(bereich && beschnitten() && bereich.getBoundingClientRect().width < 30)
     bereich.classList.add("zuEng");
 }
-/* Die Restzeile (#160, Spezifikation Kompakt-Fenster 8a): was unter der
-   letzten ganzen Zeile liegt, als eigene Zeile darunter - "+9 weitere, 12 %". Gemessen an den Kaesten wie die Zaehlung im Spaltenkopf; ein
-   Klick fuehrt zur Vollansicht (37). Nur im Kompakt. */
+/* Die Liste im Kampf (#160; Kompakt neu, Panel, 21.10.2026; Mausrad statt Knopf seit #328, 27.10.2026): bis KN_ALLE_BIS Zeilen stehen alle
+   da, darueber zeigt sie KN_SICHT Zeilen und rollt mit dem Mausrad, Zeile fuer Zeile (styles.css, scroll-snap, --kn-zeilen). Unter der Liste
+   steht ein stiller Hinweis (#kRest, kein Knopf): "\u2193 n weitere \u00b7 p %" mit dem Rest unter der letzten ganzen Zeile, am Ende
+   "\u2191 Ende". Fuer den Vorleser traegt die Liste einen Namen mit ihrem Ausschnitt statt des Hinweises. Zeilen tragen kein kn-weg mehr;
+   die Pfeiltasten der Zeilen (24) rollen den Fokus ins Bild. Ausserhalb des Kompakts gibt es weder Hinweis noch Rollen. */
 function restZeileSetzen(box: HTMLElement, kompakt: boolean){
-  const knopf = document.querySelector<HTMLButtonElement>("#kRest");
+  const knopf = document.querySelector<HTMLElement>("#kRest");
   if(!knopf) return;
   const haupt = [...box.querySelectorAll<HTMLElement>(".row:not(.sub)")];
-  const bk = box.getBoundingClientRect();
-  const unten = kompakt ? haupt.filter(z => z.getBoundingClientRect().bottom > bk.bottom + 0.5) : [];
+  box.querySelectorAll<HTMLElement>(".row.kn-weg").forEach(z => z.classList.remove("kn-weg"));
+  const mehr = kompakt && haupt.length > KN_ALLE_BIS;
+  /* Aufgeklappt (#348, Entscheidung B): der Hinweis ist der Knopf; ein Klick zeigt alle Zeilen (kn-offen), das Fenster waechst mit
+     (compactWindowSize), "weniger" bringt die fuenf zurueck. Die Weeklies haben ihr eigenes kn-alle-Gegenstueck und lassen es hier ruhen. */
+  const offen = mehr && document.body.classList.contains("kn-alle") && !document.body.classList.contains("kn-wk");
+  const rollt = mehr && !offen;
+  if(kompakt && haupt.length) box.style.setProperty("--kn-zeilen", String(rollt ? KN_SICHT : haupt.length));
+  else box.style.removeProperty("--kn-zeilen");
+  box.classList.toggle("kn-rollt", rollt);
+  box.classList.toggle("kn-offen", offen);
+  /* Schrumpft die Liste auf sechs Zeilen oder weniger, ist nichts mehr aufzuklappen: der Wunsch ist erledigt */
+  if(!mehr && !document.body.classList.contains("kn-wk")) document.body.classList.remove("kn-alle");
+  knopf.setAttribute("aria-expanded", String(offen));
+  if(offen){
+    knopf.hidden = false;
+    knopf.querySelector(".krestn")!.textContent = "−";
+    knopf.querySelector(".krestw")!.textContent = t("compact.weniger");
+    knopf.querySelector(".krestp")!.textContent = "";
+    knopf.setAttribute("aria-label", t("compact.wenigerName"));
+    box.setAttribute("aria-label", t(state.group === "party" ? "compact.listeNameGruppe" : "compact.listeName", {a: 1, b: haupt.length, n: haupt.length}));
+    return;
+  }
+  if(!rollt){
+    knopf.hidden = true;
+    knopf.removeAttribute("aria-label");
+    if(box.getAttribute("aria-label") !== t("bars.tableLabel")) box.setAttribute("aria-label", t("bars.tableLabel"));
+    return;
+  }
+  // Zeilenhoehe aus den Massen der Liste selbst: scrollTop, scrollHeight und clientHeight tragen dieselbe Einheit (auch bei Zoom)
+  const zeile = box.scrollHeight / haupt.length;
+  const erste = Math.round(box.scrollTop / zeile), sicht = Math.min(haupt.length, Math.round(box.clientHeight / zeile));
   const wert = (z: HTMLElement) => Number(z.dataset.dmg) || 0;
-  const r = restZeile(haupt.map(wert), unten.map(wert));
-  knopf.hidden = !r;
-  if(!r) return;
-  knopf.querySelector(".kresttext")!.textContent = t("compact.rest", {n: r.n, p: pctMin(r.anteil, 0)});
-  knopf.querySelector(".krestwert")!.textContent = fmt(r.schaden);
-  knopf.querySelector<HTMLElement>(".krestspur")!.style.width = (100 * r.anteil).toFixed(1) + "%";
-  // der Name sagt, was ein Klick tut; Anteil und Schaden stehen im sichtbaren Text, darauf zeigt die Beschreibung
-  knopf.setAttribute("aria-describedby", "kRestText");
-  knopf.setAttribute("aria-label", t(state.group === "party" ? "compact.restNameGruppe" : "compact.restName", {n: r.n}));
+  const r = restUnten(haupt.map(wert), erste, sicht);
+  knopf.hidden = false;
+  knopf.querySelector(".krestn")!.textContent = r ? "\u2193" + r.n : "\u2191";
+  knopf.querySelector(".krestw")!.textContent = r ? t("compact.restKurz") : t("compact.restEnde");
+  knopf.querySelector(".krestp")!.textContent = r ? pctMin(r.anteil, 0) : "";
+  knopf.setAttribute("aria-label", t("compact.alleName", {n: haupt.length}));
+  box.setAttribute("aria-label", t(state.group === "party" ? "compact.listeNameGruppe" : "compact.listeName", {a: erste + 1, b: erste + sicht, n: haupt.length}));
+}
+/* Nach dem Rollen auf eine ganze Zeile rasten (#328): das Mausrad rastet per CSS (scroll-snap), der Fokus einer Zeile (Pfeiltasten)
+   scrollt nur "ins Bild" und liess die Liste zwischen zwei Zeilen stehen. Die Liste endet immer an einer ganzen Zeile. */
+export function rasteListe(){
+  const box = $("#bars");
+  if(!box || !box.classList.contains("kn-rollt")) return;
+  const n = box.querySelectorAll(".row:not(.sub)").length;
+  if(!n) return;
+  const zeile = box.scrollHeight / n, ziel = Math.round(box.scrollTop / zeile) * zeile;
+  if(Math.abs(ziel - box.scrollTop) > 0.5) box.scrollTo({top: ziel});
 }
 export function markiereRest(){
   const box = $("#bars");
   if(!box) return;
   const kompakt = document.body.classList.contains("compact");
   kopfBeschneiden();
-  /* Der Platz der Restzeile steht fest, sobald es mehr als fuenf Hauptzeilen
-     gibt - vor dem Schneiden, sonst kuerzt ihr Erscheinen die Liste erneut. */
-  document.body.classList.toggle("mitrest", kompakt && box.querySelectorAll(".row:not(.sub)").length > COMPACT_ROWS);
   schneideAufZeilen(box, kompakt);
   restZeileSetzen(box, kompakt);
+  plattenBeschriften(box, kompakt);
   const folgt = box.scrollHeight - box.clientHeight - box.scrollTop > 2;
   /* Die Blende am unteren Rand des Kompakts (.mehr) entfiel mit der
      Neugestaltung: die Liste endet dort an der letzten ganzen Zeile.
@@ -751,7 +791,9 @@ export function insights(seg: Fight){
       teile.sort((a, b) => b.n - a.n);
       out.push({key:"invulnCasts", vars:{
         teile, n: teile.reduce((x, p) => x + p.n, 0),
-        from: clock(von / 1000), to: clock(bis / 1000)
+        from: clock(von / 1000), to: clock(bis / 1000),
+        // the same stretch in seconds, for the flag in the fight strip (70)
+        vonS: von / 1000, bisS: bis / 1000
       }});
     }
   }

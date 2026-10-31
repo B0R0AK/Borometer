@@ -12,7 +12,7 @@
 import * as dgram from "node:dgram";
 import * as http from "node:http";
 import * as os from "node:os";
-import { errorName, fetchJson, HttpError, listenFrom, readJson, send, type Json } from "./http";
+import { errorName, fetchJson, HttpError, listenFrom, readJson, send, serverBase, type Json } from "./http";
 
 const CODE_ALPHABET = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789"; // no 0/O, no 1/I
 const STALE_AFTER = 300; // seconds: a report older than this drops off the board
@@ -229,7 +229,7 @@ export function resetParty(extra: Partial<typeof PARTY> = {}): void {
 export async function pushOnce(name: string, payload: Payload | null): Promise<boolean> {
   if (!PARTY.host) return false;
   try {
-    await fetchJson(`http://${PARTY.host}/party/push`, 6000, {
+    await fetchJson(`${serverBase(PARTY.host)}/party/push`, 6000, {
       code: PARTY.code, name, payload, weapons: null, ventius: false,
     });
     return true;
@@ -246,7 +246,7 @@ export async function pushOnce(name: string, payload: Payload | null): Promise<b
 export async function askRename(old: string, to: string): Promise<boolean> {
   if (!PARTY.host) return false;
   try {
-    const answer = await fetchJson(`http://${PARTY.host}/party/rename`, 6000, { code: PARTY.code, name: old, to });
+    const answer = await fetchJson(`${serverBase(PARTY.host)}/party/rename`, 6000, { code: PARTY.code, name: old, to });
     return !!answer.ok;
   } catch {
     return false;
@@ -266,7 +266,7 @@ export async function pushToHost(): Promise<void> {
   if (!pushes() || !PARTY.host) return;
   const host = PARTY.host;
   try {
-    const answer = await fetchJson(`http://${host}/party/push`, 6000, {
+    const answer = await fetchJson(`${serverBase(host)}/party/push`, 6000, {
       code: PARTY.code,
       name: PARTY.name,
       payload: PARTY.mine, // null before the first fight

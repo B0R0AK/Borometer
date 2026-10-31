@@ -125,10 +125,12 @@ export function ventiusMix(seg: Fight){
   const per = new Map();
   for(const c of ventiusCasts(seg)){
     let t = per.get(c.target);
-    if(!t){ t = {target: c.target, casts: 0, hits: 0, by: new Map(), top: 0, folge: []}; per.set(c.target, t); }
+    if(!t){ t = {target: c.target, casts: 0, hits: 0, by: new Map(), top: 0, folge: [], zeiten: []}; per.set(c.target, t); }
     t.casts++;
     t.hits += c.hits || 0;
     const w = ventiusWaves(c);
+    // der Beginn jeder Salve zur Folge: die Werkbank (69) setzt ihre Saeulen an diese Zeit
+    t.zeiten.push(c.t);
     /* Auch eine unlesbare Salve steht in der Folge, mit 0: der Kasten der
        Analyse zeichnet sie als leere Saeule an ihrer Stelle (Entwurf). */
     if(!w){ t.folge.push(0); continue; }
@@ -147,7 +149,7 @@ export function ventiusMix(seg: Fight){
   const best = [...per.values()].filter(t => t.top)
     .sort((a,b) => b.casts - a.casts)[0];
   if(!best) return {casts: 0, shaped: 0, off: 0, top: 0, atTop: 0, rows: [],
-                    folge: [], hits: 0, target: "", cap: 0, capAt: 0};
+                    folge: [], zeiten: [], hits: 0, target: "", cap: 0, capAt: 0};
   const shaped = [...best.by.values()].reduce((n,x) => n + x.n, 0);
   /* What this target has given anyone, ever - the fight's own best says
      nothing about what was possible.
@@ -164,7 +166,7 @@ export function ventiusMix(seg: Fight){
   return {casts: best.casts, shaped, off: best.casts - shaped, top: best.top,
           cap: (sure && sure.waves) || 0, capAt: (sure && sure.atTop) || 0,
           atTop: (best.by.get(best.top) || {n:0}).n, target: best.target,
-          folge: best.folge, hits: best.hits,
+          folge: best.folge, zeiten: best.zeiten as number[], hits: best.hits,
           rows: [...best.by.entries()].sort((a,b) => a[0] - b[0])
                   .map(([waves, g]) => ({waves, hits: waves*3+1, n: g.n,
                                          dmg: g.dmg, trefferIst: g.hits}))};
@@ -259,9 +261,9 @@ function ventiusPresses(ev: CombatEvent[]){
     // the first wave of the fight opens a press whatever it looks like:
     // the fight can start in the middle of a volley
     if(!out.length || (w.length === 1 && before > VENTIUS_GUARD && after > VENTIUS_GUARD))
-      out.push({t:w[0]!.t, last:w[0]!.t, dmg:0, hits:0, crit:0});
+      out.push({t:w[0]!.t, last:w[0]!.t, dmg:0, hits:0, crit:0, heavy:0});
     const c = out[out.length-1]!;
-    for(const e of w){ c.dmg += e.dmg; c.hits++; if(e.crit) c.crit++; c.last = e.t; }
+    for(const e of w){ c.dmg += e.dmg; c.hits++; if(e.crit) c.crit++; if(e.heavy) c.heavy = (c.heavy || 0) + 1; c.last = e.t; }
   }
   return out;
 }
@@ -348,8 +350,9 @@ export function casts(seg: Encounter){
     if(last && e.t - last.last <= win){
       last.dmg += e.dmg; last.hits++; last.last = e.t;
       if(e.crit) last.crit++;
+      if(e.heavy) last.heavy = (last.heavy || 0) + 1;
     } else {
-      list.push({t:e.t, last:e.t, dmg:e.dmg, hits:1, crit:e.crit?1:0});
+      list.push({t:e.t, last:e.t, dmg:e.dmg, hits:1, crit:e.crit?1:0, heavy:e.heavy?1:0});
     }
   }
   if(volley.length) by.set(VENTIUS_NAME, ventiusPresses(volley));

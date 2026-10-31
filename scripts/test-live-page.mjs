@@ -30,7 +30,7 @@ function assert(cond, name, detail) {
    Pruefungen danach sagen dann, was fehlt. */
 const schlaf = (ms) => new Promise((r) => setTimeout(r, ms));
 async function bisZu(bedingung, worauf, ms = 15000) {
-  for (const ende = Date.now() + ms; Date.now() < ende; await schlaf(50)) if (bedingung()) return true;
+  for (const ende = performance.now() + ms; performance.now() < ende; await schlaf(50)) if (bedingung()) return true;
   if (bedingung()) return true;
   assert(false, "Zeitablauf (" + ms + " ms) beim Warten auf: " + (typeof worauf === "function" ? worauf() : worauf));
   return false;

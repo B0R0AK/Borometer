@@ -1,3 +1,4 @@
+import { KN_SICHT } from "../kompakt-core";
 import { state } from "./01-state";
 import { toastFail } from "./03-helpers";
 import { t, tt } from "./08-translation";
@@ -120,11 +121,9 @@ export const COMPACT_ROWS = 5;      // rows visible before the list scrolls
    auf der letzten Zeile zu liegen - sonst zaehlt die Ueberschrift sieben
    Zeilen und die siebte ist halb ausradiert. */
 export const COMPACT_FADE = 14;
-/* Die Luft zwischen zwei Zeilen. Sie steht im Stylesheet als margin-bottom,
-   und margin steckt nicht in getBoundingClientRect - wer sie hier vergisst,
-   baut das Fenster um sechs mal zwei Punkte zu kurz und schneidet die
-   letzte Zeile ab. */
-const COMPACT_GAP = 2;
+/* Kompakt neu, Panel (Spezifikation 21.10.2026, 6): die Hoehe folgt dem Inhalt. KN_MAX_ZEILEN Zeilen hoechstens (darueber rollt die
+   Liste in sich, styles.css --kn-max), KN_LUFT_K unter der Liste (Kampf, ohne den Hinweis), KN_LUFT_W in den Weeklies, in Layoutpunkten. */
+export const KN_MAX_ZEILEN = 12, KN_LUFT_K = 8, KN_LUFT_W = 8;
 let lastCompactH = 0, lastCompactW = 0, compactSettle: ReturnType<typeof setTimeout> | null = null;
 /* A visible element's box, or null. Hidden ones answer with a zero box at
    0,0, which any sum over children would otherwise take at face value. */
@@ -144,37 +143,35 @@ function compactWindowSize(){
     if(!el || el.hidden || !el.getBoundingClientRect) return 0;
     return el.getBoundingClientRect().height || 0;
   };
-  const chrome = hOf("#titlebar") + hOf(".top") + hOf(".headwrap") + hOf(".bhead");
-  const rowEl = document.querySelector("#bars .row");
-  // clamp: a measured row should be ~20px in compact. If anything odd comes
-  // back, do not let it multiply into an absurd window height.
-  const rawRow = (rowEl && rowEl.getBoundingClientRect().height) || 20;
-  // the clamp is in device pixels but the measurement is not, so at any size
-  // under 70% the floor of 14 was above the real row and every window came
-  // back too tall. Scale the guard into the units it is guarding.
-  const zRow = uiZoomFactor();
-  const rowH = Math.min(40 * zRow, Math.max(14 * zRow, rawRow));
-  const rows = document.querySelectorAll("#bars .row").length ||
-               (state.encounters[state.sel] ? state.encounters[state.sel]!.stats.skills.length : COMPACT_ROWS);
-  const shown = Math.min(rows, COMPACT_ROWS);
-  /* Die Restzeile (#160) zaehlt als eine Zeile mehr, wenn es mehr gibt als
-     gezeigt wird - sonst schnitte sie die fuenfte ab. */
-  const haupt = document.querySelectorAll("#bars .row:not(.sub)").length;
-  const restZeilen = haupt > COMPACT_ROWS ? 1 : 0;
-  /* Ohne Kampf ist nur das Chrom da - der Streifen. Ohne diesen Fall rechnet
-     die Formel mit sieben erfundenen Zeilen (ohne Zeilen faellt die Zahl auf
-     COMPACT_ROWS zurueck) und baut ein leeres Fenster in voller Hoehe.
-     Die Luft zwischen den Zeilen geht hier ein, weil margin nicht in
-     getBoundingClientRect steckt. */
-  const ruht = document.body.classList.contains("noFight");
-  /* Ohne Kampf steht eine Meldung (der Randlos-Hinweis beim ersten Mal)
-     unter dem Streifen im Fluss: das Fenster nimmt sie mit, sonst lag sie
-     ausserhalb des 28-Punkte-Fensters (Gutachten H1). Mit Kampf schneidet
-     die Tafel stattdessen eine Zeile ab (markiereRest). */
+  /* Kompakt neu, Panel (Spezifikation 21.10.2026, 6): der Streifen ist ein Panel aus Kopf, Lesezeile und Zeilen. Gemessen werden die
+     Zeilen selbst (die sichtbaren, hoechstens KN_MAX_ZEILEN) und der Knopf "+N weitere", dazu die feste Luft unten. Die Hoehe folgt
+     dem Inhalt, solange keine Hand sie zog. */
+  const wkAn = document.body.classList.contains("kn-wk"), zRow = uiZoomFactor();
+  const sichtbar = (e: HTMLElement) => e.getClientRects().length > 0 && getComputedStyle(e).display !== "none";
+  const chrome = hOf("#titlebar") + hOf(".top") + (wkAn ? hOf("#kwk .kn-insel") : hOf(".headwrap") + hOf(".bhead"));
+  /* Gemessen wird die Unterkante der letzten Zeile und des Knopfes, nicht ein Container: .stage und #kwkPlatten fuellen das Fenster
+     und meldeten nur die Groesse, die schon da ist. Zeilen und Knopf haben feste Hoehen und wandern nicht. Rollt die Liste (mehr als
+     KN_MAX_ZEILEN Zeilen), endet sie am Kasten. */
+  const unten = (sel: string) => Math.max(0, ...[...document.querySelectorAll<HTMLElement>(sel)].filter(sichtbar).map(e => e.getBoundingClientRect().bottom));
+  const kasten = document.querySelector<HTMLElement>(wkAn ? "#kwkPlatten" : "#bars");
+  /* Kampf (#328): die Liste zeigt hoechstens KN_SICHT Zeilen und rollt darueber (kn-rollt), Weeklies bis KN_MAX_ZEILEN */
+  const zeilenMax = !wkAn && kasten?.classList.contains("kn-rollt") ? KN_SICHT : KN_MAX_ZEILEN;
+  /* Weeklies ganz (#348): aufgeklappt hat die Liste keinen Deckel von zwoelf Zeilen, das Fenster waechst mit ihr, bis der Bildschirm endet */
+  const wkGanz = wkAn ? document.body.classList.contains("kn-alle") : !!kasten?.classList.contains("kn-offen");
+  const deckel = !wkGanz && kasten && sichtbar(kasten) ? kasten.getBoundingClientRect().top + zeilenMax * (wkAn ? 32 : 26) * zRow + (wkAn ? 40 * zRow : 0) : Infinity;
+  const zeilenEnde = Math.min(unten(wkAn ? "#kwkPlatten .kn-wplatte, #kwkPlatten .kn-alles" : "#bars .row"), deckel);
+  /* Der Knopf steht unter der Liste, so hoch wie er ist; seine Unterkante allein reicht nicht: gibt die Liste nach (Fenster niedriger als
+     sie), rueckt er hoch, und die Zeilen reichen dann unter ihn. Darum Unterkante der Zeilen plus seine Hoehe und sein Abstand. */
+  const knopf = document.querySelector<HTMLElement>(wkAn ? "#kwkRest" : "#kRest");
+  const knopfH = knopf && !knopf.hidden && sichtbar(knopf) ? knopf.getBoundingClientRect().height + 6 * zRow : 0;
+  const ende = zeilenEnde + knopfH;
+  const block = ende > 0 ? Math.max(0, ende - chrome) : 0;
+  /* Ohne Kampf ist nur das Chrom da - der Streifen. Mit Meldung (der Randlos-Hinweis beim ersten Mal) nimmt das Fenster
+     sie mit, sonst lag sie ausserhalb (Gutachten H1). */
+  const ruht = document.body.classList.contains("noFight") && !wkAn;
+  const hGanz = (chrome || 60) + block + (wkAn ? KN_LUFT_W : KN_LUFT_K) * zRow;
   const h = ruht ? (chrome || 26 * zRow) + hOf("#toast.on")
-                 : (chrome || 60) + (shown + restZeilen) * rowH +
-                   Math.max(0, shown + restZeilen - 1) * COMPACT_GAP * zRow +
-                   COMPACT_FADE * zRow;
+                 : wkGanz && typeof screen !== "undefined" && screen.availHeight > 0 ? Math.min(hGanz, screen.availHeight - 2) : hGanz;
   // Width is set by the longest name the list can print, not by a round
   // number. The name column takes whatever is left after 13 + 55 + 44 for
   // rank and the two figures, and at 364 that leaves 222px for a name —
@@ -277,8 +274,13 @@ function compactWindowSize(){
   /* 300 wie der Streifen im Entwurf (E:796); die Bedienleiste kann mehr
      verlangen, dann gilt ihre Summe. Vorher 364 fuer die Spalten der Tafel,
      die der Streifen nicht mehr zeigt. */
-  return {w: Math.round(Math.max(300 * z, needed)),
-          h: Math.max(Math.round((ruht ? 26 : 170) * z), Math.round(h) + 2)};
+  const wFenster = Math.round(Math.max(300 * z, needed)), hFenster = Math.max(Math.round((ruht ? 26 : 120) * z), Math.round(h) + 2);
+  /* Der Boden (#348): so klein, dass der Streifen lesbar bleibt - in der Breite die Leiste mit allen Knoepfen, in der Hoehe Kopf, eine
+     Zeile und der Knopf. Ohne Kampf ist der Streifen selbst der Boden. Der Hauptprozess setzt ihn als Mindestgroesse des Fensters. */
+  const ersteZeile = (wkAn ? document.querySelector<HTMLElement>("#kwkPlatten .kn-wplatte, #kwkPlatten .kn-alles") : document.querySelector<HTMLElement>("#bars .row:not(.sub):not(.kn-weg)"));
+  const ersteH = ersteZeile && sichtbar(ersteZeile) ? ersteZeile.getBoundingClientRect().height : (wkAn ? 32 : 26) * zRow;
+  const hBoden = ruht || !kasten || !sichtbar(kasten) ? hFenster : Math.min(hFenster, Math.round(kasten.getBoundingClientRect().top + ersteH + knopfH + (wkAn ? KN_LUFT_W : KN_LUFT_K) * zRow) + 2);
+  return {w: wFenster, h: hFenster, min: {w: wFenster, h: hBoden}};
 }
 /* ---------- Das Menue im Kompaktfenster (Kompakt-Fix 01.10.) ----------
    Befund: das Menue hinter den drei Punkten war im Streifen
@@ -397,7 +399,7 @@ export function applyWindowSize(){
       if(menueGross) return;
       const hand = state.compactHandSized;
       if(hand && !KOMPAKT_FENSTER) return;
-      const {w, h} = compactWindowSize();
+      const {w, h, min} = compactWindowSize();
       /* Both, not just the height. The first pass runs two frames after the
          class goes on and can still measure the full-view header; the second
          pass, 260 ms later, has the compact layout and the right width - and
@@ -406,7 +408,7 @@ export function applyWindowSize(){
       if(h === lastCompactH && w === lastCompactW) return;
       lastCompactH = h; lastCompactW = w;
       fetch("/api/win", {method:"POST", headers:{"Content-Type":"application/json"},
-        body: JSON.stringify({do:"resize", w, h, win: FENSTER, ...(hand ? {art: "hand"} : {})})})
+        body: JSON.stringify({do:"resize", w, h, min, win: FENSTER, ...(hand ? {art: "hand"} : {})})})
         .then(r => r.json())
         .then(d => {
           // if the platform ignored the resize, say so once instead of leaving

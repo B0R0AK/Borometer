@@ -99,15 +99,22 @@ try {
     assert(logs.logAnswer(ordner, "alt.txt", String(10 ** 9)).status === 409, "logAnswer: hinter dem Ende 409");
     assert(logs.logAnswer(join(work, "gibtsnicht"), "alt.txt", "0").status === 404 && logs.logAnswer("", "alt.txt", "0").status === 404
       && logs.listLogs("").length === 0, "ohne Ordner: keine Auflistung, nichts zu lesen");
-    // hoechstens 60: die aeltesten fallen weg und sind auch nicht zu lesen
+    // die Auflistung nennt hoechstens 60 (die neuesten); lesen laesst sich seit "Alte Logs einlesen" (#264) bis LIST_ALLE_MAX
     const viele = join(work, "viele");
     mkdirSync(viele);
     for (let i = 0; i < 63; i++) datei(viele, `log${String(i).padStart(2, "0")}.txt`, "x\n", new Date(Date.UTC(2026, 8, 1) + i * 60000));
     const V = logs.listLogs(viele);
     assert(V.length === 60 && V[0].name === "log62.txt" && V[59].name === "log03.txt", "listLogs: hoechstens 60, die neuesten",
       { n: V.length, erst: V[0]?.name, letzt: V[59]?.name });
-    assert(logs.logAnswer(viele, "log02.txt", "0").status === 404 && logs.logAnswer(viele, "log03.txt", "0").status === 200,
-      "logAnswer: eine Datei jenseits der 60 ist nicht zu lesen");
+    assert(logs.logAnswer(viele, "log02.txt", "0").status === 200 && logs.logAnswer(viele, "log03.txt", "0").status === 200,
+      "logAnswer: auch eine Datei jenseits der 60 ist zu lesen (bis LIST_ALLE_MAX)");
+    // jenseits von LIST_ALLE_MAX: die aeltesten fallen weg und sind nicht zu lesen
+    const sehrViele = join(work, "sehrviele");
+    mkdirSync(sehrViele);
+    const N = logs.LIST_ALLE_MAX + 3;
+    for (let i = 0; i < N; i++) datei(sehrViele, `l${String(i).padStart(4, "0")}.txt`, "x\n", new Date(Date.UTC(2026, 8, 1) + i * 60000));
+    assert(logs.logAnswer(sehrViele, "l0002.txt", "0").status === 404 && logs.logAnswer(sehrViele, "l0003.txt", "0").status === 200,
+      "logAnswer: jenseits von LIST_ALLE_MAX ist eine Datei nicht zu lesen");
   }
 
   // ------------------------------------------------------------ Teil 2: die Seite
@@ -443,7 +450,7 @@ try {
     await p.evaluate(() => document.querySelector("#btnWatch").click());
     assert(await warte(p, () => document.querySelectorAll("#fightList .fight").length > 0 && document.body.classList.contains("watching")), "6: Live liest");
     // der laufende (neueste) Kampf, wie Live ihn ins Verzeichnis schrieb
-    for (const ende = Date.now() + 8000; Date.now() < ende && !s.logIndex?.["TLCombatLog-260926.txt"]; ) await p.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
+    for (const ende = performance.now() + 8000; performance.now() < ende && !s.logIndex?.["TLCombatLog-260926.txt"]; ) await p.evaluate(() => new Promise((r) => requestAnimationFrame(r)));
     const neuester = Math.max(...(s.logIndex?.["TLCombatLog-260926.txt"]?.fights || []).map((f) => f.at));
     await p.clock.fastForward(10000);
     await p.evaluate(() => fetch("/api/ping"));

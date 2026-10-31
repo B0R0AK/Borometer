@@ -18,6 +18,7 @@ import { KOMPAKT_FENSTER, SERVED } from "./41-server-mode";
 import { bestInfo, mitLauf, type BestInfo } from "./46-best-pull";
 import { mechanikStempel, mechanikStrecken } from "./61-mechanik";
 import { syncGlutring } from "./64-glutring";
+import { archivKennt, archivRueckfall } from "./76-archiv";
 
 /* ---------- Kampf-Tafel (Instrumententafel 4, Neugestaltung 28.09.) ----------
    Der Bereich "Kampf" zeigt in der vollen Ansicht alles gleichzeitig:
@@ -314,7 +315,8 @@ function ohneLaufHtml(info: BestInfo): string {
   const tag = info.refAt != null ? pullWhen(info.refAt, state.lang) : "";
   const bezug = '<p class="ubezug">' + esc(t(info.isBest ? "tafel.gegenZweit" : "tafel.gegen",
     {boss: info.label, when: tag, dps: fmt(info.refDps)})) + "</p>";
-  const knopf = SERVED && !KOMPAKT_FENSTER && !!tag && logOrdnerKennt(info.ohneLauf.split(" + ")) !== false;
+  // die Datei fehlt im Ordner, der Kampf liegt aber im Archiv: der Knopf oeffnet ihn von dort (Log-Archiv 8, 76)
+  const knopf = SERVED && !KOMPAKT_FENSTER && !!tag && (logOrdnerKennt(info.ohneLauf.split(" + ")) !== false || archivKennt(info.ohneLauf, info.refAt));
   const satz = knopf
     ? "<span>" + esc(t("best.ohneLauf", {when: tag})) + '</span><button type="button" class="leise" id="btnOhneLauf">' +
       esc(t("best.ohneLaufKnopf")) + "</button>"
@@ -325,13 +327,14 @@ function ohneLaufHtml(info: BestInfo): string {
    geoeffnet" (oeffneDateien, 23), dann der Kampf des Bezugs. bestRecord
    haelt dabei seinen Lauf fest - aus dem Bezug wird ein gewoehnlicher. Der
    Fokus geht danach auf die Kampfwahl, wie nach jedem Wechsel des Kampfes;
-   der Knopf selbst ist dann weg. Kommt die Datei nicht (Toast "Datei
-   fehlt"), bleibt alles, wie es war. */
+   der Knopf selbst ist dann weg. Fehlt die Datei im Ordner, kommt der
+   Kampf aus dem Archiv, wenn er dort liegt (archivRueckfall, 76). Kommt
+   er auch dort nicht (Toast "Datei fehlt"), bleibt alles, wie es war. */
 async function ohneLaufOeffnen(){
   const info = bestInfo();
   if(!info.ohneLauf) return;
-  const namen = info.ohneLauf.split(" + "), at = info.refAt;
-  await oeffneDateien(namen);
+  const datei = info.ohneLauf, namen = datei.split(" + "), at = info.refAt;
+  await oeffneDateien(namen, aktuell => archivRueckfall(datei, at, aktuell));
   const da = (state.fileNames || []).join(" + ") === namen.join(" + ");
   if(!da) return;
   const i = at != null ? state.encounters.findIndex(e => e.start === at) : -1;

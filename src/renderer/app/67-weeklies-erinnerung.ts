@@ -1,6 +1,6 @@
 import { t } from "./08-translation";
 import { esc } from "./18-interface-basics";
-import { KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
+import { ABRISS_FENSTER, KOMPAKT_FENSTER, OWN_WINDOW, SERVED } from "./41-server-mode";
 import { haken, weekliesAendern, weekliesAnsage, weekliesDauer, weekliesDaten, weekliesOffen } from "./59-weeklies";
 import type { Erinnerung } from "../weeklies-core";
 
@@ -207,7 +207,7 @@ function fokusHalten(e: FocusEvent){
 let fragt = false;
 /** Fragt den Hauptprozess nach offenen Erinnerungen und den naechsten Zeiten; beantwortet jede offene mit {id, n}. */
 export function erinnerungAnfragenPruefen(){
-  if(!SERVED || KOMPAKT_FENSTER || fragt) return;
+  if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER || fragt) return;
   fragt = true;
   fetch("/api/erinnerung").then(r => r.ok ? r.json() : null).then((d: unknown) => {
     fragt = false;

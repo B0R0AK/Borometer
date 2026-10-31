@@ -123,6 +123,9 @@ export function setup(): void {
   state.randlosGesehen = null;      // Randlos-Hinweis: unbekannt, bis /api/config antwortet
   state.rundgangGesehen = null;     // Rundgang (63): unbekannt, bis /api/config antwortet
   state.ersterStart = null;         // ebenso: ob dies eine neue Installation ist
+  state.rundgangSpaeter = null;     // Frage zum Rundgang (63): wie oft "Spaeter", unbekannt bis /api/config
+  state.bereichHinweise = null;     // Hinweise zu den Bereichen (74): der Schalter, unbekannt bis /api/config
+  state.bereicheGezeigt = null;     // ebenso: welche Bereiche ihren Hinweis schon hatten
   state.wasKicked = false;          // so being removed is said once, not every poll
   state.fromSample = false;   // the sample's character must never be offered as yours
   state.origin = "";          // "watch" | "file" | "sample" - see loadOrigin
@@ -167,4 +170,5 @@ export function setup(): void {
   state.weeklies = false;
   state.rekorde = false;
   state.gilde = false;
+  state.archiv = false;
 }

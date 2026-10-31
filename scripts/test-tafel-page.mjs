@@ -98,7 +98,7 @@ async function oeffne({ app = false, lang = "en", config = {}, breite = 1280, ho
       return json(k ? { ok: true, name, curve: k } : { ok: false, error: "no curve" });
     }
     if (path === "/api/party/state" && gruppe) return json(gruppe);
-    if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, ...config });
+    if (path === "/api/config" && req.method() === "GET") return json({ rundgangGesehen: true, bereichHinweise: false, ...config });
     if (path === "/api/config") { s.posts.push(JSON.parse(req.postData() || "{}")); return json({ ok: true }); }
     if (path === "/api/win") return json({ ok: true, max: false, w: 400, h: 28, on_top: true });
     if (path === "/api/events") { await new Promise((r) => setTimeout(r, 1000)); return json({ ok: true, registered: true, counts: {} }); }
@@ -224,6 +224,39 @@ function fensterPull(start, ziel, setz) {
 }
 
 try {
+  // --- 0. Schrift (#284): die Heldenzahl in Anton, mit dunkler Kontur und schmalem, hartem Schatten
+  // (keine Weichzeichnung), in allen vier Themen der Vollansicht (der Kompaktstreifen gehoert dem Kompaktfenster); Ziffern bleiben gleich breit
+  {
+    const s = await oeffne({ app: true, breite: 1280, hoehe: 860 });
+    await beispiel(s.page);
+    const lies = () => s.page.evaluate(() => {
+      const v = document.querySelector(".big .v"), c = getComputedStyle(v);
+      const rgb = (f) => { const x = document.createElement("canvas").getContext("2d"); x.fillStyle = f; x.fillRect(0, 0, 1, 1); return [...x.getImageData(0, 0, 1, 1).data].slice(0, 3); };
+      const lum = ([r, g, b]) => [r, g, b].map((k) => { k /= 255; return k <= .04045 ? k / 12.92 : ((k + .055) / 1.055) ** 2.4; }).reduce((a, k, i) => a + k * [.2126, .7152, .0722][i], 0);
+      const f = lum(rgb(c.color)), k = lum(rgb(c.webkitTextStrokeColor));
+      return { familie: c.fontFamily.split(",")[0], breite: c.webkitTextStrokeWidth, ordnung: c.paintOrder, schatten: c.textShadow,
+        kontrast: (Math.max(f, k) + .05) / (Math.min(f, k) + .05), kleiner: k < f };
+    });
+    for (const thema of ["dark", "light", "tnl", "glas"]) {
+      await s.page.evaluate((t) => document.querySelector(`#themeRow [data-theme="${t}"]`).click(), thema);
+      await s.page.waitForFunction((n) => document.documentElement.dataset.theme === n, thema);
+      const k = await lies();
+      assert(/Anton/.test(k.familie), `Schrift ${thema}: die Heldenzahl bleibt Anton`, k);
+      assert(k.breite === "2px" && /^stroke/.test(k.ordnung), `Schrift ${thema}: 2 px Kontur, aussen gemalt (paint-order stroke fill)`, k);
+      assert(/ 0px 2px 0px/.test(k.schatten) && !/\d+px \d+px [1-9]\d*px/.test(k.schatten.replace(/rgba?\([^)]*\)|color\([^)]*\)/g, "")), `Schrift ${thema}: ein harter 2-px-Schatten ohne Weichzeichner`, k);
+      assert(k.kleiner && k.kontrast >= 1.5, `Schrift ${thema}: die Kontur ist dunkler als die Zahl (Kontrast ${k.kontrast.toFixed(2)})`, k);
+    }
+    const breiten = await s.page.evaluate(async () => {
+      const v = document.querySelector(".big .v"); await document.fonts.ready; const w = [];
+      /* Anton hat keine tabellarischen Ziffern: alle Ziffern sind gleich breit ausser der 1 (677 statt 1012 Einheiten).
+         Die 1 gehoert bewusst nicht in diese Probe; offen, siehe PR #342. */
+      for (const t of ["999.9k", "000.0k", "466.8k", "823.5k"]) { v.textContent = t; w.push(v.getBoundingClientRect().width); }
+      return w;
+    });
+    assert(Math.max(...breiten) - Math.min(...breiten) < 0.01, "Schrift: die Heldenzahl ist bei jeder Ziffer ausser der 1 gleich breit (Anton)", breiten);
+    assert(!s.fehler.length, "Schrift: keine Fehler", s.fehler);
+    await s.page.close();
+  }
   // --- 1. Raster des Glutrings (folgt Spezifikation Glutring 2 und 7; E 8, E 9): ab 900 x 700 nebeneinander -
   // Ringfeld links oben, Band darunter, Liste rechts mit dem Urteil darunter -, sonst gestapelt Ringfeld, Liste, Band
   for (const [breite, hoehe, zoom, voll] of [[1280, 860, 100, true], [1100, 700, 100, true], [1650, 1050, 150, true],
