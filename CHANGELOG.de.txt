@@ -1,6 +1,11 @@
 BOROMETER — ÄNDERUNGSPROTOKOLL
 ==============================
 
+v2.0.1
+------
+Behoben
+  - Fenstergröße der Vollansicht folgt der Skalierung: Das Fenster wächst und schrumpft mit, bis zum Arbeitsbereich (#372)
+
 v2.0
 ----
 Hinzugefügt

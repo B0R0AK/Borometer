@@ -132,6 +132,61 @@ eq(k.platzVoll(G, [], null), null, "platzVoll: kein Monitor meldet sich: Standar
 eq(k.platzVoll(undefined, [HAUPT], HAUPT), null, "platzVoll: nichts gemerkt: Standard");
 eq(k.platzVoll({ ...G, w: 100 }, [HAUPT], HAUPT), null, "platzVoll: ungueltig: Standard");
 
+// --- 4c. Vollansicht folgt der Groessen-Einstellung (#372): Standardgroesse mal Prozent, hoechstens der Arbeitsbereich
+const GROSS = { x: 0, y: 0, width: 2560, height: 1400 };
+const NB = { x: 0, y: 0, width: 1366, height: 728 };
+for (const [z, w, h] of [[75, 960, 645], [100, 1280, 860], [150, 1920, 1290], [200, 2560, 1720]]) {
+  eq(k.vollGroesse(null, z), { w, h }, `vollGroesse ${z} %: ${w} x ${h}, ohne Monitor ungedeckelt`);
+}
+eq(k.vollGroesse(GROSS, 150), { w: 1920, h: 1290 }, "vollGroesse 150 % auf 2560 x 1400: passt");
+eq(k.vollGroesse(GROSS, 200), { w: 2560, h: 1400 }, "vollGroesse 200 % auf 2560 x 1400: nur die Hoehe gedeckelt");
+eq(k.vollGroesse(HAUPT, 150), { w: 1920, h: 1040 }, "vollGroesse 150 % auf 1920 x 1040: die Hoehe gedeckelt");
+eq(k.vollGroesse(NB, 75), { w: 960, h: 645 }, "vollGroesse 75 % auf 1366 x 728: passt");
+eq(k.vollGroesse(NB, 100), { w: 1280, h: 728 }, "vollGroesse 100 % auf 1366 x 728: Hoehe gedeckelt");
+eq(k.vollGroesse(NB, 200), { w: 1366, h: 728 }, "vollGroesse 200 % auf 1366 x 728: der ganze Arbeitsbereich");
+eq(k.vollGroesse(HAUPT), k.vollGroesse(HAUPT, 100), "vollGroesse ohne Einstellung: wie 100 %");
+eq(k.vollGroesse(null, 33), { w: 422, h: 284 }, "vollGroesse rundet: 1280 x 0,33 = 422,4 und 860 x 0,33 = 283,8");
+eq(k.vollGroesse(null, 10), { w: 180, h: 86 }, "vollGroesse 10 %: nicht unter dem Boden des Fensters (Breite 180)");
+eq(k.vollGroesse(null, 500), k.vollGroesse(null, 200), "vollGroesse: ueber dem Bereich gilt 200 %");
+eq(k.vollGroesse(null, 1), k.vollGroesse(null, 10), "vollGroesse: unter dem Bereich gilt 10 %");
+for (const schlecht of ["150", NaN, null, undefined, 0, Infinity, {}]) {
+  eq(k.vollGroesse(null, schlecht), { w: 1280, h: 860 }, `vollGroesse: ${JSON.stringify(schlecht) ?? "undefined"} ist keine Einstellung: 100 %`);
+}
+eq([k.ZOOM_MIN, k.ZOOM_MAX], [10, 200], "der Bereich der Einstellung: 10 bis 200 %");
+{
+  // derselbe Bereich auf der Seite (37-window-size-and-overlay.ts): ZOOM_STEPS von 10 bis 200
+  const seite = readFileSync(join(root, "src/renderer/app/37-window-size-and-overlay.ts"), "utf8");
+  const stufen = /const ZOOM_STEPS = \[([\d, ]+)\]/.exec(seite)?.[1].split(",").map(Number) ?? [];
+  eq([stufen[0], stufen.at(-1)], [k.ZOOM_MIN, k.ZOOM_MAX], "ZOOM_MIN/ZOOM_MAX des Hauptprozesses = die Stufen der Seite");
+}
+eq(k.platzVoll(G, [HAUPT], HAUPT, 75), { x: 120, y: 80, w: 960, h: 645, max: false }, "platzVoll 75 %: die gemerkte Position, die kleinere Groesse");
+eq(k.platzVoll(G, [HAUPT], HAUPT, 150), { x: 0, y: 0, w: 1920, h: 1040, max: false },
+  "platzVoll 150 %: breiter als der Arbeitsbereich erlaubt, in die Ecke gerueckt und gedeckelt");
+eq(k.platzVoll({ x: 1000, y: 400, w: 400, h: 300, max: false }, [HAUPT], HAUPT, 75), { x: 960, y: 395, w: 960, h: 645, max: false },
+  "platzVoll 75 %: ragt hinaus, rueckt hinein");
+eq(k.platzVoll({ x: 5000, y: 50, w: 1280, h: 860, max: false }, [NB], NB, 200), { x: 0, y: 0, w: 1366, h: 728, max: false },
+  "platzVoll 200 % auf kleinem Hauptmonitor, Platz verschwunden: Mitte, begrenzt");
+eq(k.platzVoll(maxRechts, [HAUPT, RECHTS], HAUPT, 150), { x: 2000, y: -90, w: 1920, h: 1290, max: false },
+  "platzVoll 150 %: auf dem hoeheren Monitor ohne Deckel, unten hineingerueckt");
+eq(k.platzVoll(G, [HAUPT], HAUPT, 999), k.platzVoll(G, [HAUPT], HAUPT, 200), "platzVoll: eine Einstellung ausser Bereich gilt als 200 %");
+eq(k.platzVoll(G, [HAUPT], HAUPT, "x"), k.platzVoll(G, [HAUPT], HAUPT, 100), "platzVoll: Muell als Einstellung gilt als 100 %");
+
+// vollAnpassen: die Einstellung aendert sich im offenen Fenster - Ecke oben links bleibt, dann in den Arbeitsbereich
+const jetzt = { x: 120, y: 80, w: 1280, h: 860 };
+eq(k.vollAnpassen(jetzt, 75, [HAUPT], HAUPT), { x: 120, y: 80, w: 960, h: 645, max: false }, "vollAnpassen 100 -> 75 %: Ecke bleibt");
+eq(k.vollAnpassen(jetzt, 150, [HAUPT], HAUPT), { x: 0, y: 0, w: 1920, h: 1040, max: false }, "vollAnpassen 100 -> 150 % auf 1920 x 1040: in die Ecke gerueckt, gedeckelt");
+eq(k.vollAnpassen({ x: 40, y: 30, w: 960, h: 645 }, 100, [HAUPT], HAUPT), { x: 40, y: 30, w: 1280, h: 860, max: false }, "vollAnpassen 75 -> 100 %: passt, Ecke bleibt");
+eq(k.vollAnpassen({ x: 800, y: 600, w: 960, h: 645 }, 100, [HAUPT], HAUPT), { x: 640, y: 180, w: 1280, h: 860, max: false },
+  "vollAnpassen: ragt unten und rechts hinaus, rueckt hinein");
+eq(k.vollAnpassen({ x: 2100, y: 0, w: 1280, h: 860 }, 150, [HAUPT, RECHTS], HAUPT), { x: 2100, y: -90, w: 1920, h: 1290, max: false },
+  "vollAnpassen auf dem zweiten Monitor: bleibt dort");
+eq(k.vollAnpassen({ x: 1900, y: 0, w: 1280, h: 860 }, 75, [HAUPT, RECHTS], HAUPT), { x: 1920, y: 0, w: 960, h: 645, max: false },
+  "vollAnpassen: ueber zwei Monitore, der mit mehr Flaeche (rechts) haelt es: hineingerueckt");
+eq(k.vollAnpassen({ x: 9000, y: 0, w: 1280, h: 860 }, 75, [HAUPT], HAUPT), { x: 480, y: 198, w: 960, h: 645, max: false },
+  "vollAnpassen: Monitor verschwunden: Mitte des Hauptmonitors");
+eq(k.vollAnpassen({ x: 9000, y: 0, w: 1280, h: 860 }, 75, [], null), null, "vollAnpassen: kein Monitor bekannt: nichts tun");
+eq(k.vollAnpassen(jetzt, 200, [NB], NB), { x: 0, y: 0, w: 1366, h: 728, max: false }, "vollAnpassen 200 % auf 1366 x 728: der ganze Arbeitsbereich");
+
 // --- 5. fensterNeu: was geschrieben wird
 eq(k.fensterNeu(undefined, "gross", G), { gross: G }, "erste Lage");
 eq(k.fensterNeu({ kompakt: { x: 1, y: 2 } }, "gross", G), { kompakt: { x: 1, y: 2 }, gross: G }, "der andere Teil bleibt");

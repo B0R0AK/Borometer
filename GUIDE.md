@@ -589,9 +589,10 @@ Einstellungen wirken sofort. Links stehen die Abschnitte:
   durchgemessen.
 - **Sprache**: Deutsch oder Englisch. Jede Beschriftung gibt es in beiden.
 - **Größe**: die Oberfläche von 10 bis 200 %. Strg + Plus, Strg + Minus und
-  Strg+0 tun dasselbe. Das Fenster der Vollansicht hat eine feste Größe: Es
-  lässt sich weder ziehen noch maximieren, und die Größe der Oberfläche ändert
-  es nicht. Wer mehr oder weniger auf dem Bildschirm sehen will, stellt sie
+  Strg+0 tun dasselbe. Das Fenster der Vollansicht lässt sich weder ziehen
+  noch maximieren. Seine Größe richtet sich allein nach dieser Einstellung: Es
+  wächst und schrumpft mit, höchstens so groß wie der Bildschirm (ohne
+  Taskleiste). Wer mehr oder weniger auf dem Bildschirm sehen will, stellt sie
   hier. Fenster, die du aus einem Bereich abreißt, lassen sich ziehen und
   maximieren.
 - **Overlay**: Durchsicht, das Kürzel für den Durchklick, *Über dem Spiel halten* und

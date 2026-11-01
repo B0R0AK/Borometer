@@ -190,12 +190,13 @@ eq(/function backToFull[\s\S]*?\n\}\n/.exec(win)?.[0].includes('ansichtSetzen(wi
 eq(/ansichtSetzen\(win, "kompakt"\)/.test(win), true, "window.ts: in Kompakt wird das Fenster wieder ziehbar");
 eq(/max: win\.isMaximized\(\)/.test(win), false, "window.ts: gemerkt wird nie ein maximierter Zustand der Vollansicht");
 {
-  // die Seite: kein eigener Maximieren-Knopf, und die Einstellung der Groesse bewegt das Fenster nicht mehr
+  // die Seite: kein eigener Maximieren-Knopf, und die Einstellung der Groesse schickt nur die Prozentzahl (size, #372)
   const html = readFileSync(join(root, "src/renderer/index.html"), "utf8");
   const start = readFileSync(join(root, "src/renderer/app/45-startup.ts"), "utf8");
   const groesse = readFileSync(join(root, "src/renderer/app/37-window-size-and-overlay.ts"), "utf8");
   eq(/winMax/.test(html) || /winMax|"maximize"/.test(start), false, "Seite: kein Maximieren-Knopf, keine Aktion maximize");
-  eq(/do:\s*"size"/.test(groesse), false, "Seite: die Groessen-Einstellung schickt keine Fenstergroesse mehr");
+  const sizes = [...groesse.matchAll(/do:\s*"size"[^}]*\}/g)].map((m) => m[0]);
+  eq(sizes, ['do:"size", zoom: z}'], "Seite: die Groessen-Einstellung schickt an size nur die Prozentzahl, nie eine Groesse (#372)");
   for (const l of ["de", "en"]) eq(Object.hasOwn(I18N[l], "win.max"), false, l + ": kein Wort win.max mehr");
 }
 

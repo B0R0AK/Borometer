@@ -1,6 +1,11 @@
 BOROMETER — CHANGELOG
 =====================
 
+v2.0.1
+------
+Fixed
+  - Window size of the full view follows the zoom: the window grows and shrinks with it, up to the work area (#372)
+
 v2.0
 ----
 Added

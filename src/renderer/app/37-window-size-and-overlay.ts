@@ -254,12 +254,15 @@ export function setUiZoom(pct: number, opts?: ViewOptions){
      Zaehlung im Kopf ("9 von 12") gehoerte zu einem Kasten, den es nicht
      mehr gab. */
   markiereRest();
-  /* Die Vollansicht hat eine feste Groesse (#364, Entscheidung 31.10.2026): die
-     Groessen-Einstellung skaliert die Seite im Fenster, nie das Fenster.
-     Frueher wuchs es mit (Aktion "size"); bei 200 % hat die Seite nun nur
-     noch die halbe Flaeche, und die Stufen fuer kleine Fenster (syncWidthStops)
-     bauen Ring und Tafeln um. Der Kompaktstreifen misst sich weiter selbst. */
+  /* Die Vollansicht laesst sich nicht ziehen (#364), folgt aber der Einstellung
+     (#372): der Hauptprozess macht das Fenster 1280 x 860 mal die Prozent,
+     hoechstens so gross wie der Arbeitsbereich des Monitors (Aktion "size"
+     mit der Zahl, nie mit einer Groesse). Wo der Monitor es deckelt, greifen
+     die Stufen fuer kleine Fenster (syncWidthStops) und bauen Ring und Tafeln
+     um. Beim Start nicht: das Fenster oeffnet schon in der Groesse der
+     gemerkten Einstellung (quiet). Der Kompaktstreifen misst sich selbst. */
   if(document.body.classList.contains("compact")) applyWindowSize();
+  else if(!(opts && opts.quiet)) void winPost({do:"size", zoom: z});
 }
 function stepUiZoom(dir: number){
   const z = clampUiZoom(state.zoom);

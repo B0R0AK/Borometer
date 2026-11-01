@@ -556,9 +556,10 @@ Settings take effect at once. The sections are on the left:
   Contrast is measured for all four.
 - **Language**: German or English. Every label exists in both.
 - **Size**: the interface from 10 to 200 %. Ctrl + plus, Ctrl + minus and
-  Ctrl+0 do the same. The window of the full view has a fixed size: it can be
-  neither dragged nor maximised, and the interface size does not change it.
-  If you want to see more or less on the screen, set it here. Windows you tear
+  Ctrl+0 do the same. The window of the full view can be neither dragged nor
+  maximised. Its size follows this setting alone: it grows and shrinks with it,
+  at most as big as the screen (without the taskbar). If you want to see more
+  or less on the screen, set it here. Windows you tear
   off from an area can be dragged and maximised.
 - **Overlay**: see-through, the shortcut for click-through, *Keep above the
   game* and *View the overlay*. App only.

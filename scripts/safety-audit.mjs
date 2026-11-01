@@ -1369,28 +1369,40 @@ function auditMain() {
     check(!stray.length, "live reads only the on/off flag from the request", `found: ${stray}`);
   }
 
-  // Full view's size: the content size of our own window and nothing else.
-  // Two whole numbers from the request, each through int(); the size before
-  // compact (state.prev) is not this action's to touch.
+  // Full view's size follows the size setting (#372): the request carries the setting in percent and nothing
+  // else; the size is worked out in lage.ts (vollAnpassen -> vollGroesse: default size times the setting, capped
+  // at the work area) and set as bounds of our own full-view window. The size before compact (state.prev) is not
+  // this action's to touch, and neither is a maximised window.
   const size = block("size");
   check(size !== null, "a 'size' (full view follows the size setting) action exists");
   if (size !== null) {
     const calls = [...size.matchAll(/\b(\w+)\s*\(/g)].map((m) => m[1]).filter((c) => c !== "if");
-    check(calls.every((c) => ["int", "isMaximized", "sizeBySelf"].includes(c))
-        && calls.filter((c) => c === "sizeBySelf").length === 1,
-      "size only sets our own window's content size (sizeBySelf)", `calls: ${calls}`);
-    check(/if \(win\.isMaximized\(\)\) break;/.test(size),
+    check(calls.every((c) => ["isMaximized", "isMinimized", "getBounds", "vollAnpassen", "monitore", "hauptmonitor", "boundsBySelf"].includes(c))
+        && calls.filter((c) => c === "boundsBySelf").length === 1 && calls.filter((c) => c === "vollAnpassen").length === 1,
+      "size only sets our own window's bounds (boundsBySelf) to what vollAnpassen worked out", `calls: ${calls}`);
+    check(/win\.isMaximized\(\) \|\| win\.isMinimized\(\)\) break;/.test(size) && !/unmaximize|restore\(/.test(size),
       "size leaves a maximised window as it is");
-    const raw = [...size.matchAll(/\bsent\b[^;]*/g)].map((m) => m[0].trim())
-      .filter((u) => !/^sent\.(w|h)\)$/.test(u));
-    const viaInt = [...size.matchAll(/\bsent\b/g)].length
-      === [...size.matchAll(/\bint\(sent\.(w|h)\)/g)].length;
-    check(!raw.length && viaInt, "size reads only w and h from the request, as whole numbers through int()",
-      `found: ${raw.join(" | ") || "a use of sent outside int()"}`);
-    check(!/state\.prev/.test(size), "size leaves the size before compact alone");
+    const raw = [...size.matchAll(/\bsent\b[^;]*/g)].map((m) => m[0].trim());
+    const viaZoom = [...size.matchAll(/\bsent\b/g)].length === [...size.matchAll(/\bsent\.zoom\b/g)].length
+      && raw.length === 2 && raw[0].startsWith("sent.zoom !== \"number\" ||") && raw[1] === "sent.zoom, monitore(), hauptmonitor())";
+    check(viaZoom, "size reads only the setting (zoom) from the request, checks it is a number, and hands it on only to vollAnpassen",
+      `found: ${raw.join(" | ")}`);
+    check(/state\.prev \|\|/.test(size) && !/state\.prev\s*=[^=]/.test(size) && /win !== state\.win \|\|/.test(size),
+      "size leaves the size before compact alone, and only full view's own window is sized");
     const found = risky.filter((w) => size.toLowerCase().includes(w.toLowerCase()));
     check(!found.length, "size captures nothing and hooks nothing", `found: ${found}`);
   }
+  // The size comes only from vollGroesse (lage.ts): default times the setting, rounded, capped at the work area -
+  // and full view is built and brought back from compact at the size of the saved setting
+  const lageSrc = bare["lage.ts"] ?? "";
+  check(lageSrc.includes("const w = Math.max(KOMPAKT_W, Math.round((VOLL_W * z) / 100));")
+      && lageSrc.includes("const h = Math.max(KOMPAKT_H, Math.round((VOLL_H * z) / 100));")
+      && lageSrc.includes("return monitor ? { w: Math.min(w, monitor.width), h: Math.min(h, monitor.height) } : { w, h };")
+      && lageSrc.includes("return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, n));")
+      && /export const ZOOM_MIN = 10;\s+export const ZOOM_MAX = 200;/.test(lageSrc)
+      && win.split('platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor(), loadConfig().uiZoom)').length === 3
+      && win.split("vollGroesse(hauptmonitor(), loadConfig().uiZoom)").length === 2,
+    "full view's size is the default size times the size setting, rounded and capped at the work area, at the start and when leaving compact");
   // sizeBySelf: the flag that tells will-resize this is no hand, and one
   // setContentSize - nothing a caller could widen into something else
   const bySelf = (win.match(/function sizeBySelf\([^)]*\)[^{]*\{([\s\S]*?)\n\}/) || [null, null])[1];
@@ -1886,7 +1898,7 @@ function auditMain() {
   // "pfad" passed on beside the stand) is a change the audit sees
   const KOMPAKT_STAND = "\n  return { offen: kompaktWindow() !== null, live: kompakt.start.live, durch: kompakt.start.durch,\n"
     + "    grund: vollStand.grund, datei: vollStand.datei, kampf: vollStand.kampf };";
-  const SENT_FIELDS = ["alpha", "an", "art", "best", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "min", "nr", "on", "remember", "satz", "teil", "theme", "titel", "w", "win"];
+  const SENT_FIELDS = ["alpha", "an", "art", "best", "datei", "do", "durch", "grund", "h", "height", "kampf", "kind", "live", "min", "nr", "on", "remember", "satz", "teil", "theme", "titel", "w", "win", "zoom"];
   const sentFields = [...new Set([...winBare.matchAll(/\bsent\s*\.\s*(\w+)/g)].map((m) => m[1]))].sort();
   const standOk = fnBody(win, "export function kompaktStand\\(\\): \\{ offen: boolean; live: boolean; durch: boolean; grund: string; datei: string; kampf: number \\| null \\}") === KOMPAKT_STAND
     && JSON.stringify(sentFields) === JSON.stringify(SENT_FIELDS);
@@ -2150,7 +2162,7 @@ function auditMain() {
     "streifen.vorMenue.gehoben = true;", "const v = streifen.vorMenue;", "streifen.vorMenue = null;"];
   const vorMenueLines = [...win.matchAll(/[^\n]*\bstreifen\s*\.\s*vorMenue\b[^\n]*/g)].map((m) => m[0].trim());
   const POSITION_CALLS = ["kw, { x: b.x, y: lage.y }", "kw, { x: o.x, y: Math.max(a.y, o.y - ueber) }", "win, p"];
-  const BOUNDS_CALLS = ["kw, { x: b.x, y: v.gehoben ? v.y : b.y, w: v.w, h: v.h, max: false }", "win, g"];
+  const BOUNDS_CALLS = ["kw, { x: b.x, y: v.gehoben ? v.y : b.y, w: v.w, h: v.h, max: false }", "win, g", "win, g"];
   const boundsCalls = argsOf(win, "boundsBySelf").filter((a) => a !== "win: BrowserWindow, g: LageGross");
   const positionCalls = argsOf(win, "positionBySelf").filter((a) => a !== "win: BrowserWindow, p: LageKompakt");
   check(fnBody(win, "function menueAuf\\(kw: BrowserWindow, w: number, h: number\\): void") === MENUE_AUF

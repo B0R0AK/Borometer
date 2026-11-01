@@ -241,9 +241,9 @@ export function abrissTeil(v: unknown): AbrissTeil | null {
  * What a window may do by hand, per view (#364, decided 31.10.2026). One
  * BrowserWindow carries full view and the shrunk compact strip, so the same
  * window switches between the two sets and back:
- *  - voll: a fixed size (VOLL_W x VOLL_H in lage.ts). It cannot be dragged
+ *  - voll: a size from the size setting (VOLL_W x VOLL_H times it, lage.ts). It cannot be dragged
  *    bigger or smaller, nor maximised (title bar button, double click on the
- *    title bar, Win+arrow). Smaller or bigger is the app's size setting.
+ *    title bar, Win+arrow). Smaller or bigger is the size setting; the window follows it (#372).
  *  - kompakt: dragged by hand down to the strip's floor (180 x 24), never
  *    maximised.
  *  - abriss: the torn-off window is a window like any other, dragged and

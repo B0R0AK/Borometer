@@ -280,9 +280,19 @@ Chrome oder Edge voraussetzt.
 
 ### Beim ersten Start
 
-Windows zeigt einen SmartScreen-Hinweis, der Herausgeber sei unbekannt. Den
-bekommt jedes unsignierte Programm, egal was es tut: **Weitere Informationen →
-Trotzdem ausführen**.
+Seit 2.0.0 sind die Windows-Dateien mit einem Code-Signing-Zertifikat von
+Certum signiert und mit einem Zeitstempel versehen: der Installer, die portable
+Exe sowie die Exe und die Electron-eigenen DLLs in der Zip-Datei. Die Zip-Datei
+selbst ist nicht signiert, und zwei DLLs (`d3dcompiler_47.dll`, `dxil.dll`)
+tragen weiter die Signatur von Microsoft. Als Herausgeber steht im Zertifikat „Open Source Developer“, gefolgt
+vom Namen des Maintainers.
+
+SmartScreen kann trotzdem „Der Computer wurde durch Windows geschützt /
+Unbekannte App“ zeigen. SmartScreen urteilt nach Ruf, und eine Datei, die
+Microsoft noch nicht kennt, hat noch keinen. Er wächst mit der Zahl der
+Downloads und braucht Tage bis Wochen. Der Hinweis nennt den Herausgeber, und er
+heißt nicht, dass die Datei kaputt ist: Die Signatur zeigt, von wem sie kommt.
+Zum Fortfahren wähle **Weitere Informationen → Trotzdem ausführen**.
 
 Möglicherweise schlägt auch dein Virenscanner an, am ehesten bei der portablen
 Einzeldatei. Sie entpackt sich bei jedem Start in einen temporären Ordner, und
@@ -527,12 +537,31 @@ prüft, dass das Audit es merkt. Beides läuft bei jedem Push ([CI](.github/work
 
 ## Einen Download prüfen
 
-Jedes Release baut die CI dieses Repositorys aus dem getaggten Commit, mit einem
-Herkunftsnachweis (Provenance-Attestation):
+Ab 2.0.0 sind die Windows-Dateien (Installer, portable Exe, Exe und Electron-eigene DLLs
+in der Zip-Datei; zwei DLLs tragen die Signatur von Microsoft) von Hand mit einem Code-Signing-Zertifikat von Certum signiert. Zum
+Prüfen: Rechtsklick auf die Datei, Eigenschaften, Digitale Signaturen. In
+PowerShell:
+
+    Get-AuthenticodeSignature .\Borometer-Setup-2.0.0.exe | Format-List Status, SignerCertificate
+
+Der Status muss `Valid` sein, und der Fingerabdruck (SHA-1) muss
+`93FB8657D9284400CF9E9B06ECBCD18FDFB6E35E` lauten.
+
+Die CI baut weiterhin jedes Release aus dem getaggten Commit und beglaubigt die
+unsignierten Build-Dateien mit einem Herkunftsnachweis (Provenance-Attestation).
+Die signierten Windows-Dateien entstehen danach auf dem Rechner des
+Maintainers und tragen ihn darum nicht: `gh attestation verify` schlägt ab 2.0.0
+bei Installer, portabler Exe und Zip-Datei fehl. `boro-meter.html` ist weiter
+beglaubigt:
+
+    gh attestation verify boro-meter.html --repo B0R0AK/Borometer
+
+Releases bis 1.10.0 sind unsigniert und tragen den Nachweis:
 
     gh attestation verify Borometer-Setup-1.9.0.exe --repo B0R0AK/Borometer
 
-Windows SmartScreen kann beim ersten Start warnen: die Exe ist nicht signiert.
+Du kannst die App auch selbst aus dem Quelltext bauen (siehe „Aus dem Quelltext
+bauen“).
 
 ## Aus dem Quelltext bauen
 

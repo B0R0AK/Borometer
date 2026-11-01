@@ -353,20 +353,29 @@ try {
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await s.page.close();
   }
-  // --- 2. feste Groesse der Vollansicht (#364, ersetzt 3.4 "gemerkte Lage"): die Groessen-Einstellung
-  //        skaliert die Seite, nie das Fenster - weder beim Start (mit und ohne gemerkte Lage) noch beim Stellen
+  // --- 2. Groesse der Vollansicht (#364, #372): nicht ziehbar, aber das Fenster folgt der Groessen-Einstellung.
+  //        Die Seite schickt nur die Prozentzahl (Aktion "size"), nie eine Groesse; beim Start nichts: das Fenster
+  //        oeffnet schon in der Groesse der gemerkten Einstellung (Hauptprozess, vollGroesse)
   {
     for (const windowPlaced of [true, false]) {
       const s = await oeffne({ config: { uiZoom: 150, windowPlaced } });
       await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "150%", undefined, 5000, "150 % steht");
       await stille(s, "Start bei 150 %");
-      assert(!s.win.some((b) => b.do === "size"), "Start bei 150 % (gemerkte Lage " + windowPlaced + "): die Seite bittet nie um eine Fenstergroesse", s.win);
+      assert(!s.win.some((b) => b.do === "size"), "Start bei 150 % (gemerkte Lage " + windowPlaced + "): die Seite bittet nicht um eine Fenstergroesse", s.win);
       await s.page.evaluate(() => document.querySelector("#zoomIn").click());
       await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "175%", undefined, 5000, "175 % steht");
       await s.page.evaluate(() => document.querySelector("#zoomOut").click());
       await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "150%", undefined, 5000, "wieder 150 %");
       await stille(s, "Stufen der Groesse");
-      assert(!s.win.some((b) => ["size", "maximize"].includes(b.do)), "Groesse stellen: die Seite bewegt das Fenster nicht (kein size, kein maximize)", s.win.map((b) => b.do));
+      const sizes = s.win.filter((b) => b.do === "size");
+      assert(sizes.length === 2 && sizes[0].zoom === 175 && sizes[1].zoom === 150
+          && sizes.every((b) => Object.keys(b).sort().join() === "do,win,zoom"),
+        "Groesse stellen: je Stufe genau eine Aktion size mit nur der Prozentzahl (175, dann 150), keine Groesse", sizes);
+      await s.page.evaluate(() => document.querySelector("#zoomVal").click());
+      await warte(s.page, () => document.querySelector("#zoomVal")?.textContent === "100%", undefined, 5000, "100 % steht");
+      await stille(s, "Zurueck auf 100 %");
+      assert(s.win.filter((b) => b.do === "size").at(-1)?.zoom === 100, "Klick auf die Zahl: size mit 100", s.win.filter((b) => b.do === "size"));
+      assert(!s.win.some((b) => b.do === "maximize"), "Groesse stellen: kein maximize", s.win.map((b) => b.do));
       assert(!(await s.page.evaluate(() => !!document.querySelector("#winMax"))), "die Seite kennt keinen Maximieren-Knopf mehr");
       await s.page.close();
     }

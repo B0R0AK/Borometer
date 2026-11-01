@@ -269,8 +269,17 @@ log folder, which needs Chrome or Edge.
 
 ### On first launch
 
-Windows shows a SmartScreen notice saying the publisher is unknown. That
-appears for every unsigned program, whatever it does: **More info → Run
+Since 2.0.0 the Windows files are signed with a code-signing certificate from
+Certum and carry a timestamp: the installer, the portable exe, and the exe and
+Electron's own DLLs inside the zip. The zip itself is not signed, and two DLLs
+(`d3dcompiler_47.dll`, `dxil.dll`) keep Microsoft's signature. The publisher named in the
+certificate is "Open Source Developer", followed by the maintainer's name.
+
+SmartScreen can still show "Windows protected your PC / Unrecognized app".
+SmartScreen goes by reputation, and a file Microsoft has not seen before has
+none yet. It grows with the number of downloads and takes days to weeks. The
+notice names the publisher, and it does not mean the file is damaged: the
+signature shows who it comes from. To continue, choose **More info → Run
 anyway**.
 
 Your antivirus may also flag it, most likely the single portable file. That
@@ -502,12 +511,28 @@ that the audit notices. Both run on every push ([CI](.github/workflows/build.yml
 
 ## Verify a download
 
-Every release is built by this repository's CI from the tagged commit, with a
-provenance attestation:
+From 2.0.0 the Windows files (installer, portable exe, the exe and Electron's own
+DLLs in the zip; two DLLs keep Microsoft's signature) are signed by hand with a Certum code-signing certificate. To check one,
+right-click the file, open Properties, then Digital Signatures. In PowerShell:
+
+    Get-AuthenticodeSignature .\Borometer-Setup-2.0.0.exe | Format-List Status, SignerCertificate
+
+The status must be `Valid`, and the thumbprint (SHA-1) must be
+`93FB8657D9284400CF9E9B06ECBCD18FDFB6E35E`.
+
+The CI still builds every release from the tagged commit and attests the
+unsigned build files with a provenance attestation. The signed Windows files
+are made afterwards on the maintainer's computer, so they do not carry it, and
+`gh attestation verify` fails on the installer, the portable exe and the zip
+from 2.0.0. `boro-meter.html` is still attested:
+
+    gh attestation verify boro-meter.html --repo B0R0AK/Borometer
+
+Releases up to 1.10.0 are unsigned and carry the attestation:
 
     gh attestation verify Borometer-Setup-1.9.0.exe --repo B0R0AK/Borometer
 
-Windows SmartScreen may warn on first start: the exe is not code-signed.
+You can also build the app yourself from the source (see "Building from source").
 
 ## Building from source
 

@@ -19,7 +19,7 @@ import { autostartSetzen } from "./autostart";
 import { loadConfig, updateConfig } from "./config";
 import { bump } from "./events";
 import {
-  fensterNeu, neuerMerker, platzAbriss, platzKompakt, platzVoll, teilAus, VOLL_H, VOLL_W, vollGroesse,
+  fensterNeu, neuerMerker, platzAbriss, platzKompakt, platzVoll, teilAus, VOLL_H, VOLL_W, vollAnpassen, vollGroesse,
   type LageGross, type LageKompakt, type Monitor, type Teil,
 } from "./lage";
 import { meldeKampf } from "./notify";
@@ -29,7 +29,7 @@ import { abrissTeil, fensterOptionen, kompaktMinimum, menueArt, streifenLage, ty
 import { zeigeMenue } from "./menue";
 import type { Json } from "./http";
 
-/* Full view's fixed size (#364): lage.ts holds the numbers and the rules. */
+/* Full view's default size (#364): lage.ts holds the numbers and the rules; the size setting scales it (#372). */
 export const WINDOW_W = VOLL_W;
 export const WINDOW_H = VOLL_H;
 /* the floor of a requested resize: the same numbers as minWidth and
@@ -163,11 +163,12 @@ export function createWindow(url: string, iconPath: string, start: "normal" | "m
   /* Full view's place from last time (spec Fenster-Extras 3.4) while its
      title bar is still on a monitor, else the middle of the main monitor;
      nothing remembered: Electron's default, centred. */
-  /* Full view has a fixed size (#364): of the remembered place only the
-     position is used, never the size and never "maximised". On a screen too
-     small for it, the size is the work area. */
-  const platz = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
-  const fest = vollGroesse(hauptmonitor());
+  /* Full view cannot be dragged (#364) and its size follows the size setting
+     (#372): of the remembered place only the position is used, never the size
+     and never "maximised". The size is the default times the saved setting,
+     no bigger than the work area. */
+  const platz = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor(), loadConfig().uiZoom);
+  const fest = vollGroesse(hauptmonitor(), loadConfig().uiZoom);
   const win = new BrowserWindow({
     title: "Borometer",
     width: platz ? platz.w : fest.w,
@@ -812,7 +813,7 @@ function backToFull(win: BrowserWindow): void {
   const prev = state.prev;
   if (!prev) return;
   merker.jetzt();
-  const g = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor());
+  const g = platzVoll(teilAus(loadConfig().fenster, "gross"), monitore(), hauptmonitor(), loadConfig().uiZoom);
   if (g) boundsBySelf(win, g);
   else sizeBySelf(win, prev[0], prev[1]);
   state.prev = null;
@@ -964,25 +965,25 @@ export function winAction(sent: Json): Answer {
         break;
       case "size": {
         /*
-         * Not sent by the page since #364: full view has a fixed size and the
-         * size setting scales the page inside it, not the window. The action
-         * stays as the audit pins it. It was: full view follows the app's own
-         * size setting, at 150 % the page asks for a window half as big
-         * again. Unlike resize this is not a
-         * "size before compact" to come back to, so state.prev stays as it
-         * is. Content size through sizeBySelf, so will-resize does not count
-         * it as a hand on the border; the same floor as resize. Here a
-         * request under it is left out rather than raised: full view scales
-         * a window of hundreds of points, and one of 180 x 24 would be a
-         * bad measurement, not a size anyone asked for.
+         * The app's size setting changed (#372): full view follows it. The
+         * page sends the setting in percent (sent.zoom), never a size; the
+         * size is vollGroesse(monitor, zoom) - the default size times the
+         * setting, no bigger than the work area. The top-left corner stays
+         * where it is, and the window is moved back in if it now sticks out
+         * (vollAnpassen). Unlike resize this is no "size before compact" to
+         * come back to, so state.prev stays as it is. Set as bounds through
+         * boundsBySelf, so will-resize does not count it as a hand on the
+         * border. Full view only: while compact holds the window, and in
+         * the torn-off window, the request is left out - compact brings the
+         * setting back with it in backToFull.
          */
-        // A maximised window stays maximised: the size setting scales a
-        // window, it is no reason to drop out of a state someone chose.
-        // The answer still carries the current content size.
-        if (win.isMaximized()) break;
-        const w = int(sent.w);
-        const h = int(sent.h);
-        if (w >= MIN_ACTION_W && h >= MIN_ACTION_H) sizeBySelf(win, w, h);
+        // A maximised window stays maximised: the setting scales a window,
+        // it is no reason to drop out of a state someone chose. The answer
+        // still carries the current content size.
+        if (typeof sent.zoom !== "number" || win !== state.win || state.prev || win.isMaximized() || win.isMinimized()) break;
+        const b = win.getBounds();
+        const g = vollAnpassen({ x: b.x, y: b.y, w: b.width, h: b.height }, sent.zoom, monitore(), hauptmonitor());
+        if (g) boundsBySelf(win, g);
         break;
       }
       case "pin": {

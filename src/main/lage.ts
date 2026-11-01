@@ -89,53 +89,102 @@ export function platzGross(roh: unknown, monitore: readonly Monitor[], haupt: Mo
 }
 
 /*
- * Full view has a fixed size (#364): VOLL_W x VOLL_H, or the work area of its
- * monitor when that is smaller (a small screen). Of the remembered place only
- * the position is used - never the size, never "maximised": an old file with
- * another size, or a window that was maximised last time, does not tip the
- * fixed size. The file itself is left as it is.
+ * Full view cannot be dragged (#364), but its size follows the app's size
+ * setting (#372): VOLL_W x VOLL_H times the setting, or the work area of its
+ * monitor when that is smaller (a small screen, or 200 %). Of the remembered
+ * place only the position is used - never the size, never "maximised": an old
+ * file with another size, or a window that was maximised last time, does not
+ * tip the size. The file itself is left as it is.
  */
 export const VOLL_W = 1280;
 export const VOLL_H = 860;
+/** the size setting's range in percent - the same numbers as ZOOM_MIN and ZOOM_MAX of the page */
+export const ZOOM_MIN = 10;
+export const ZOOM_MAX = 200;
 
-/** The fixed size on a monitor's work area (null: none known, the default size). */
-export function vollGroesse(monitor: Monitor | null): { w: number; h: number } {
-  return monitor
-    ? { w: Math.min(VOLL_W, monitor.width), h: Math.min(VOLL_H, monitor.height) }
-    : { w: VOLL_W, h: VOLL_H };
+/** A size setting as the page keeps it (uiZoom): a whole percent in range, 100 for anything else. */
+export function zoomPruefen(v: unknown): number {
+  const n = typeof v === "number" ? Math.round(v) : NaN;
+  if (!Number.isFinite(n) || !n) return 100;
+  return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, n));
+}
+
+/**
+ * The window's size at a size setting on a monitor's work area: the default
+ * size times the setting, rounded, no smaller than the window's own floor and
+ * no bigger than the work area (null: none known, the size without the cap).
+ */
+export function vollGroesse(monitor: Monitor | null, zoom: unknown = 100): { w: number; h: number } {
+  const z = zoomPruefen(zoom);
+  const w = Math.max(KOMPAKT_W, Math.round((VOLL_W * z) / 100));
+  const h = Math.max(KOMPAKT_H, Math.round((VOLL_H * z) / 100));
+  return monitor ? { w: Math.min(w, monitor.width), h: Math.min(h, monitor.height) } : { w, h };
+}
+
+/* The monitor most of a rectangle lies on (null: none of them). */
+function meisterMonitor(r: { x: number; y: number; w: number; h: number }, monitore: readonly Monitor[]): Monitor | null {
+  let beste: Monitor | null = null;
+  let flaeche = 0;
+  for (const m of monitore) {
+    const sx = Math.min(r.x + r.w, m.x + m.width) - Math.max(r.x, m.x);
+    const sy = Math.min(r.y + r.h, m.y + m.height) - Math.max(r.y, m.y);
+    if (sx > 0 && sy > 0 && sx * sy > flaeche) {
+      flaeche = sx * sy;
+      beste = m;
+    }
+  }
+  return beste;
 }
 
 /*
- * Where full view opens: the remembered position at the fixed size, moved in
- * so that all of it lies on the monitor it is mostly on; or, when no monitor
- * holds the remembered title bar any more, the middle of the main monitor.
- * Null: nothing usable is remembered, the caller opens centred at the fixed
- * size. `max` is always false.
+ * Full view at a size setting with its top-left corner at (x, y): the size for
+ * the monitor most of the window lies on, moved in so that all of it lies on
+ * that monitor. Null when the window lies on no monitor.
  */
-export function platzVoll(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null): LageGross | null {
+function voll(x: number, y: number, zoom: unknown, monitore: readonly Monitor[]): LageGross | null {
+  const m = meisterMonitor({ x, y, ...vollGroesse(null, zoom) }, monitore);
+  if (!m) return null;
+  const { w, h } = vollGroesse(m, zoom);
+  return {
+    x: Math.max(m.x, Math.min(x, m.x + m.width - w)),
+    y: Math.max(m.y, Math.min(y, m.y + m.height - h)),
+    w, h, max: false,
+  };
+}
+
+/*
+ * Where full view opens: the remembered position at the size of the size
+ * setting, moved in so that all of it lies on the monitor it is mostly on; or,
+ * when no monitor holds the remembered title bar any more, the middle of the
+ * main monitor. Null: nothing usable is remembered, the caller opens centred
+ * at that size. `max` is always false.
+ */
+export function platzVoll(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null, zoom: unknown = 100): LageGross | null {
   const lage = pruefen(roh, "gross");
   if (!lage) return null;
-  const fest = { x: lage.x, y: lage.y, w: VOLL_W, h: VOLL_H };
+  const fest = { x: lage.x, y: lage.y, ...vollGroesse(null, zoom) };
   if (sichtbar(fest, monitore)) {
-    let beste: Monitor | null = null;
-    let flaeche = 0;
-    for (const m of monitore) {
-      const sx = Math.min(fest.x + fest.w, m.x + m.width) - Math.max(fest.x, m.x);
-      const sy = Math.min(fest.y + fest.h, m.y + m.height) - Math.max(fest.y, m.y);
-      if (sx > 0 && sy > 0 && sx * sy > flaeche) {
-        flaeche = sx * sy;
-        beste = m;
-      }
-    }
-    if (beste) {
-      const { w, h } = vollGroesse(beste);
-      const x = Math.max(beste.x, Math.min(lage.x, beste.x + beste.width - w));
-      const y = Math.max(beste.y, Math.min(lage.y, beste.y + beste.height - h));
-      return { x, y, w, h, max: false };
-    }
+    const p = voll(lage.x, lage.y, zoom, monitore);
+    if (p) return p;
   }
   if (!haupt) return null;
-  return { ...rueckfall(vollGroesse(haupt), haupt), max: false };
+  return { ...rueckfall(vollGroesse(haupt, zoom), haupt), max: false };
+}
+
+/*
+ * The size setting changed while the window is open (#372): the same top-left
+ * corner at the new size, then moved back into the work area if it sticks out.
+ * A window that lies on no monitor goes to the middle of the main one; null
+ * when there is none either (nothing to do).
+ */
+export function vollAnpassen(
+  jetzt: { x: number; y: number; w: number; h: number }, zoom: unknown, monitore: readonly Monitor[], haupt: Monitor | null,
+): LageGross | null {
+  const m = meisterMonitor(jetzt, monitore);
+  const p = m ? voll(jetzt.x, jetzt.y, zoom, [m]) : null;
+  if (p) return p;
+  if (!haupt) return null;
+  return { ...rueckfall(vollGroesse(haupt, zoom), haupt), max: false };
 }
 
 /** Where the torn-off window opens: a place like full view's, kept apart under "abriss". */

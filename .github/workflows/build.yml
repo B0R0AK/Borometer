@@ -29,6 +29,7 @@ permissions:
 
 jobs:
   check:
+    # pinned: Playwright 1.56 does not support the newest Ubuntu image (26.04); check again when Playwright is raised
     runs-on: ubuntu-24.04
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

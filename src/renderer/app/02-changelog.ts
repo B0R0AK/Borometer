@@ -3,6 +3,9 @@
 // short, skimmable bullets, newest first
 export const BORO_CHANGELOG = {
   en: [
+    {v:"2.0.1", notes:[
+      "Fixed: Window size of the full view follows the zoom: the window grows and shrinks with it, up to the work area (#372)",
+    ]},
     {v:"2.0", notes:[
       "Added: Archive of boss fights with search, boss cards and history per boss (#264, #288, #292)",
       "Added: Read old logs into the archive; Open log falls back to the archive (#264)",
@@ -672,6 +675,9 @@ export const BORO_CHANGELOG = {
     ]},
   ],
   de: [
+    {v:"2.0.1", notes:[
+      "Behoben: Fenstergröße der Vollansicht folgt der Skalierung: Das Fenster wächst und schrumpft mit, bis zum Arbeitsbereich (#372)",
+    ]},
     {v:"2.0", notes:[
       "Hinzugefügt: Archiv der Bosskämpfe mit Suche, Bosskarten und Verlauf je Boss (#264, #288, #292)",
       "Hinzugefügt: Alte Logs ins Archiv einlesen; Log öffnen fällt aufs Archiv zurück (#264)",
