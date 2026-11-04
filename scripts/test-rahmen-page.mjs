@@ -218,7 +218,7 @@ try {
     await s.page.evaluate(() => document.querySelector("#btnCompact").click());
     await s.page.waitForTimeout(400);
     const k = await kopf(s.page);
-    assert(Math.abs(k.h - 34) < 0.5 && k.ziehen !== "drag", "Kompakt: der Streifen ist 34 Punkt (#328), die Leiste selbst zieht nicht, nur ihre Fläche dahinter", k);
+    assert(Math.abs(k.h - 26) < 0.5 && k.ziehen !== "drag", "Kompakt: der Streifen ist 26 Punkt (Aufbau B; vorher 34, #328), die Leiste selbst zieht nicht, nur ihre Fläche dahinter", k);
     assert(!s.fehler.length, "App: keine Fehler auf der Seite", s.fehler);
     await s.page.close();
   }
@@ -1032,8 +1032,8 @@ try {
     const k = await p.evaluate(() => ({ weg: ["#kwKnopf", "#kampfwahl", "#bereiche", "#statusleiste"].map((q) => document.querySelector(q).getClientRects().length),
       top: document.querySelector(".top").getBoundingClientRect().height,
       kinder: [...document.querySelector(".top").children].filter((e) => e.getClientRects().length).map((e) => e.id || e.className) }));
-    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 34) < 0.5 && !k.kinder.includes("kwKnopf"),
-      "Kompakt: Knopf, Kampfwahl, Bereichs- und Statusleiste sind nicht da, der Streifen ist 34 Punkt (#328)", k);
+    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 26) < 0.5 && !k.kinder.includes("kwKnopf"),
+      "Kompakt: Knopf, Kampfwahl, Bereichs- und Statusleiste sind nicht da, der Streifen ist 26 Punkt (Aufbau B; vorher 34, #328)", k);
     assert(!s.fehler.length, "Kompakt: keine Fehler auf der Seite", s.fehler);
     await p.close();
   }

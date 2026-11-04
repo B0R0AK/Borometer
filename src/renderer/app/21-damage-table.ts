@@ -11,6 +11,7 @@ import { $, cssv, esc } from "./18-interface-basics";
 import { groupRows, partyGroupRows } from "./19-grouping-and-party-fights";
 import { barsRoving } from "./24-table-keyboard-and-timeline";
 import { focusKeeper } from "./30-fight-list";
+import { applyWindowSize } from "./36-dialog";
 import { tafelGilt } from "./56-tafel";
 import { renderGlutring } from "./64-glutring";
 import type { BarFigures, BarSubRow, SkillCoreInfo } from "../types";
@@ -454,13 +455,16 @@ export function renderBars(){
                 {dmg: full(r.shieldDmg ?? 0)}))+'">'+esc(t("hitcat.shield"))+"</i>" : "")+
           "</span>"+
       cell(r, "strong") + "</div>";
-    if(can && open) subSort(r.subs).forEach(s => {
+    /* Kompakt (Aufbau B, 02.11.2026): ein Mitglied klappt hoechstens seine vier staerksten Faehigkeiten auf, ohne dritte Ebene; die
+       Trefferarten einer eigenen Faehigkeit (catMode) bleiben vollstaendig. */
+    const kompaktGruppe = document.body.classList.contains("compact") && !catMode;
+    if(can && open) subSort(r.subs).slice(0, kompaktGruppe ? 4 : undefined).forEach(s => {
       const swatch = catMode ? CAT_SWATCH[s.key] : r.color;
       /* Eine dritte Ebene, und nur dort, wo sie etwas zu sagen hat: in der
          Gruppe traegt eine Faehigkeit ihre Trefferarten. Beim eigenen
          Schaden SIND die Unterzeilen schon die Trefferarten - da gibt es
          nichts mehr aufzuklappen. */
-      const tiefer = !catMode && s.subs && s.subs.length > 1;
+      const tiefer = !catMode && !kompaktGruppe && s.subs && s.subs.length > 1;
       const tk = r.name + "\u0000" + s.key;
       const tiefOffen = tiefer && state.expandedSub.has(tk);
       // Unterzeilen erben die Farbe der Zeile darueber, also auch das Muster -
@@ -520,6 +524,8 @@ export function renderBars(){
     aufSelbst = true;
     if(state.expanded.has(name)) state.expanded.delete(name); else state.expanded.add(name);
     renderBars();
+    /* Kompakt: die Hoehe folgt dem Inhalt, auch wenn eine Zeile aufgeklappt wird (Aufbau B) */
+    if(document.body.classList.contains("compact")) applyWindowSize();
   }));
   /* Eigener Binder, eigener Schluessel: eine Unterzeile traegt den Namen der
      Zeile darueber mit, sonst wuerde "Auge von Ventius" bei jedem Mitglied

@@ -37,6 +37,8 @@ export interface ArchivOrt {
   gruppe: string;
   /** Seite des Albums (raid, puppe, feld, dungeon); aelterer Aufbau ohne sie: aus der Gruppe */
   seite?: string;
+  /** Namen des Platzes, die nicht in seine Zahlen zaehlen, sondern einen eigenen Platz haben (Vegamor: die Teile, #395) */
+  ohne?: readonly string[];
 }
 export interface ArchivZeile { ort: ArchivOrt; n: number; bester: number | null }
 export interface ArchivGruppe { gruppe: string; zeilen: ArchivZeile[] }
@@ -69,9 +71,15 @@ export function archivEintrag(f: ArchivQuelle, ort: { platz: string; boss: strin
 /** Flach aus dem Album; die Gruppe ist der Schluessel der Gruppe, sonst die Seite. */
 export function archivOrte(seiten: readonly RkSeite[]): ArchivOrt[] {
   const aus: ArchivOrt[] = [];
-  for(const s of seiten) for(const g of s.gruppen) for(const o of g.orte)
-    aus.push({id: o.id, de: o.de, en: o.en, namen: o.klasse != null ? [...o.namen, ...PUPPE_NAMEN] : o.namen,
-      unter: o.unter, gruppe: g.key ?? s.id, seite: s.id});
+  for(const s of seiten) for(const g of s.gruppen) for(const o of g.orte){
+    const ohne = o.ohne ?? [];
+    const gruppe = g.key ?? s.id;
+    const namen = o.klasse != null ? [...o.namen, ...PUPPE_NAMEN] : o.namen;
+    aus.push({id: o.id, de: o.de, en: o.en, namen: ohne.length ? namen.filter(n => !ohne.some(x => nackt(x) === nackt(n))) : namen,
+      unter: o.unter, gruppe, seite: s.id, ...(ohne.length ? {ohne} : {})});
+    /* Ein Teil eines Kolosses (Vegarion von Vegamor) zaehlt nicht beim Boss, bleibt aber als eigener Platz auffindbar (#395) */
+    for(const n of ohne) aus.push({id: "feld:" + n.toLowerCase(), de: n, en: n, namen: [n], unter: {de: o.de, en: o.en}, gruppe, seite: s.id});
+  }
   return aus;
 }
 
@@ -141,6 +149,15 @@ export function archivPlatz(boss: string, orte: readonly ArchivOrt[], puppeKlass
   }
   for(const o of orte) if(o.namen.some(n => nackt(n) === name)) return o.id;
   return null;
+}
+
+/** Der Platz eines gespeicherten Kampfs in der heutigen Tabelle (Spezifikation 13): steht sein Platz nicht mehr in der
+    Tabelle, findet der Name im Log ihn neu; liegt ein Teil eines Kolosses noch auf dem Platz des Kolosses, wandert er auf
+    seinen eigenen (#395). Rechnet nur; der Eintrag im Verzeichnis bleibt, wie er ist. */
+export function archivPlatzJetzt(k: { platz: string; boss: string; c?: number }, orte: readonly ArchivOrt[]): string {
+  const hier = orte.find(o => o.id === k.platz);
+  if(hier && !hier.ohne?.some(x => nackt(x) === nackt(k.boss))) return k.platz;
+  return archivPlatz(k.boss, orte, k.c) ?? k.platz;
 }
 
 /** Die Bosse, gefiltert und nach Gruppe in der Reihenfolge des Albums gegliedert. */

@@ -174,5 +174,37 @@ eq(core.geloesteGruppen(gl).map((g) => [g.platz, g.kaempfe.map((x) => x.at)]), [
   "geloesteGruppen: nur geloeste, je Boss, die Bosse nach ihrem neuesten Kampf, darin neueste zuerst");
 eq(core.geloesteGruppen([ak(8, 50)]), [], "geloesteGruppen: ohne geloeste nichts");
 
+// Vegamor (#395): ein Koloss zaehlt nur Kaempfe gegen sich selbst, seine Teile bekommen einen eigenen Platz (Suche nach dem Teil findet ihn)
+{
+  const seiten = [{ id: "feld", gruppen: [{ key: "koloss", orte: [
+    { id: "feld:vegamor", de: "Vegamor", en: "Vegamor", namen: ["Vegamor", "Vegarion", "Vegamor's Claw", "Vagamont"], teile: ["Vegarion", "Vegamor's Claw"], ohne: ["Vegarion", "Vegamor's Claw"], unter: null, klasse: null },
+    { id: "feld:manticus", de: "Manticus", en: "Manticus", namen: ["Manticus", "Akman"], teile: ["Akman", "Deckman"], unter: null, klasse: null },
+  ] }] }];
+  const vo = core.archivOrte(seiten);
+  const vm = vo.find((o) => o.id === "feld:vegamor");
+  eq(vm.namen, ["Vegamor", "Vagamont"], "Vegamor: die Teile stehen nicht mehr in den Namen des Platzes");
+  const teil = vo.find((o) => o.id === "feld:vegarion");
+  ok(!!teil && teil.namen.length === 1 && teil.namen[0] === "Vegarion" && teil.gruppe === "koloss", "Vegarion hat einen eigenen Platz in derselben Gruppe", teil);
+  eq(vo.find((o) => o.id === "feld:manticus").namen, ["Manticus", "Akman"], "ein Platz ohne 'ohne' bleibt, wie er war");
+  eq(core.archivPlatz("Vegarion", vo), "feld:vegarion", "Platz: der Teil liegt auf seinem Platz");
+  eq(core.archivPlatz("Vegamor's Claw", vo), "feld:vegamor's claw", "Platz: die Klaue liegt auf ihrem Platz");
+  eq(core.archivPlatz("Vagamont", vo), "feld:vegamor", "Platz: Vagamont ist Vegamor");
+  eq(core.archivPlatz("Vegamor", vo), "feld:vegamor", "Platz: Vegamor selbst");
+  // schon gespeicherte Kaempfe liegen unter feld:vegamor (vor dem Fix): in der Auswertung wandern die Teile, die Datei bleibt
+  const alt = [
+    { k: "v|1", platz: "feld:vegamor", boss: "Vegarion", at: 1, dps: 100, dmg: 1, dur: 60, datei: "v", zeilen: 1 },
+    { k: "v|2", platz: "feld:vegamor", boss: "Vegamor", at: 2, dps: 200, dmg: 1, dur: 60, datei: "v", zeilen: 1 },
+    { k: "v|3", platz: "feld:vegamor", boss: "Vagamont", at: 3, dps: 300, dmg: 1, dur: 60, datei: "v", zeilen: 1 },
+    { k: "v|4", platz: "feld:vegamor", boss: "Vegarion", at: 4, dps: 50, dmg: 1, dur: 60, datei: "v", zeilen: 1, geloest: true },
+  ];
+  const jetzt = alt.map((x) => ({ ...x, platz: core.archivPlatzJetzt(x, vo) }));
+  eq(jetzt.map((x) => x.platz), ["feld:vegarion", "feld:vegamor", "feld:vegamor", "feld:vegarion"], "archivPlatzJetzt: nur der Teil wandert");
+  eq(alt[0].platz, "feld:vegamor", "archivPlatzJetzt: der Eintrag selbst bleibt unveraendert");
+  const z = core.archivZahlen(jetzt);
+  eq([z.get("feld:vegamor").n, z.get("feld:vegamor").bester, z.get("feld:vegarion").n], [2, 300, 1], "Karte Vegamor zaehlt nur Vegamor, der Teil seine eigenen");
+  eq(core.bossListeAus(vo, z, "vegarion", "de").flatMap((g) => g.zeilen.map((r) => r.ort.id)), ["feld:vegarion"], "Suche nach dem Teil findet den Teil");
+  eq(core.archivPlatzJetzt({ ...alt[0], boss: "Unbekannt", platz: "feld:weg" }, vo), "feld:weg", "unbekannter Platz ohne Treffer bleibt");
+}
+
 if (failed) { console.log("\n" + failed + " FAILED"); process.exit(1); }
 console.log("\nalle Proben ok");

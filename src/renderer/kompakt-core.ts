@@ -73,7 +73,7 @@ export function restZeile(alle: number[], unten: number[]): Rest | null {
 
 /* Die Zeilen (Spezifikation Kompakt neu, Panel, 2 und 3): zuerst grund Zeilen, dann der Knopf "+N weitere", der die Liste
    aufklappt. Bleibt dem Knopf nur eine Zeile, steht sie gleich da: ein Knopf fuer eine Zeile spart nichts. alle: aufgeklappt. */
-export const KN_GRUND = 5, KN_GRUND_WK = 4;
+export const KN_GRUND = 5, KN_GRUND_WK = 5;
 export type ZeilenSicht = { zeigen: number; rest: number };
 export function zeilenSicht(n: number, alle: boolean, grund = KN_GRUND): ZeilenSicht {
   const gesamt = Number.isFinite(n) && n > 0 ? Math.floor(n) : 0;

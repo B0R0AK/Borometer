@@ -79,6 +79,8 @@ export interface RkOrt {
   namen: string[];
   /** die Teile eines Kolosses (Manticus: Akman, Deckman) - der Treffer nennt sie */
   teile: string[];
+  /** Namen, die zum Platz gehoeren, aber nicht in seine Karte zaehlen (Vegamor: die Teile, Issue #393) */
+  ohne?: string[];
   /** der Fluegel oder Dungeon darunter */
   unter: RkName | null;
   /** Uebungspuppe: die Laengenklasse */
@@ -150,6 +152,8 @@ export function albumTafel(dungeons: readonly RkDungeon[], offene: readonly RkOf
     const teile = rest.length >= 2 ? rest : [];
     const ort: RkOrt = {id: id("feld", o.en), de: o.de, en: o.en, namen: [...new Set([...o.names, o.de, o.en])],
       teile, unter: null, klasse: null};
+    /* Ein Koloss (Vegamor) zaehlt nur Kaempfe gegen ihn selbst; seine Teile haben eine eigene Zeile im Verlauf (Entscheidung 03.11.2026, #393). */
+    if(o.kind === "koloss" && teile.length) ort.ohne = teile;
     (feld[o.kind] || feld.field!).push(ort);
   }
   return [
@@ -222,6 +226,7 @@ export function rekorde(kaempfe: readonly (RkKampf | null | undefined)[], seiten
     for(const teil of k.name.split("\u00b7")){
       const roh = teil.trim();
       const o = nachName.get(klein(roh)) || nachName.get(klein(nackt(roh)));
+      if(o && o.ohne && o.ohne.some(x => klein(x) === klein(nackt(roh)))) continue;
       if(o) return o;
     }
     return null;

@@ -610,6 +610,10 @@ export function setup(): void {
         if(auf === "true"){ e.preventDefault(); zeile.click(); return; }
         ziel = barsEltern(zeilen, i);
         break;
+      /* Kompakt (Aufbau B): Esc schliesst die offene Zeile; ausserhalb des Kompakts gehoert Esc anderen Teilen der Seite */
+      case "Escape":
+        if(auf === "true" && document.body.classList.contains("compact")){ e.preventDefault(); zeile.click(); }
+        return;
       default: return;
     }
     e.preventDefault();

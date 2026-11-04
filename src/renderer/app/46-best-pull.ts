@@ -136,7 +136,10 @@ function verzeichnisPulls(key: string): Map<number, BossPull> {
   }
   const e = state.best[key];
   const cls = key.startsWith("dummy:") ? +key.slice(6) : 0;
-  for(const p of [e?.best, e?.second]) if(p && !raus.has(p.at))
+  /* Ein gespeicherter Pull, dessen Kampf einem anderen Boss gehoert (ein Teil wie Vegarion, der unter
+     "boss:Vegamor" liegt, Issue #393), ist hier kein Bezug. Die Datei behaelt ihn; nur die Menge ueberspringt ihn. */
+  const fremd = (n: string | undefined) => !!n && knownBoss(n) && !key.startsWith("dummy:") && "boss:" + histKey(n) !== key;
+  for(const p of [e?.best, e?.second]) if(p && !raus.has(p.at) && !fremd(p.run.name))
     raus.set(p.at, {at: p.at, dps: p.run.dps, dur: p.run.seconds ?? 0, ...(cls ? {c: cls} : {}), file: p.file, seg: null});
   return raus;
 }

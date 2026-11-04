@@ -1512,7 +1512,7 @@ const cases = [
     /win\.webContents\.on\("did-finish-load", \(\) => \{/, "    win.setOpacity(0.05);",
     "the window's opacity is set only in see-through"],
   ["pin that sets nothing, and always-on-top elsewhere", "window.ts",
-    /        win\.setAlwaysOnTop\(want\);/, '        if (want !== want) win.setAlwaysOnTop(want);\n    win.setAlwaysOnTop(true, "screen-saver");',
+    / else win\.setAlwaysOnTop\(want\);/, ' else if (want !== want) win.setAlwaysOnTop(want);\n    win.setAlwaysOnTop(true, "screen-saver");',
     "the window's always-on-top is set only in pin", "replace"],
   ["always-on-top outside pin", "window.ts",
     /win\.webContents\.on\("did-finish-load", \(\) => \{/, '    win.setAlwaysOnTop(true, "screen-saver");',
@@ -1520,8 +1520,20 @@ const cases = [
   ["always-on-top as a window option", "window.ts",
     /    title: "Borometer",/, '    title: "Borometer",\n    alwaysOnTop: true,',
     "the window's always-on-top is set only in pin", "replace"],
-  ["pin at a level above full-screen games", "window.ts",
-    /        win\.setAlwaysOnTop\(want\);/, '        win.setAlwaysOnTop(want, "screen-saver");',
+  ["full view pinned at a level above full-screen games", "window.ts",
+    / else win\.setAlwaysOnTop\(want\);/, ' else win.setAlwaysOnTop(want, "screen-saver");',
+    "the window's always-on-top is set only in pin", "replace"],
+  ["the screen-saver level for every window, not only the compact one", "window.ts",
+    /if \(want && win === kompaktWindow\(\)\) \{/, "if (want) {",
+    "the window's always-on-top is set only in pin", "replace"],
+  ["a second call at the compact level in pin", "window.ts",
+    /kompaktPuffer\.merke\("ebene:screen-saver"\); \}/, 'kompaktPuffer.merke("ebene:screen-saver"); win.setAlwaysOnTop(true, "screen-saver"); }',
+    "the window's always-on-top is set only in pin", "replace"],
+  ["another level for the compact window", "window.ts",
+    /win\.setAlwaysOnTop\(true, "screen-saver"\);/, 'win.setAlwaysOnTop(true, "pop-up-menu");',
+    "the window's always-on-top is set only in pin", "replace"],
+  ["the screen-saver level named in another file", "tray.ts",
+    /holeFenster\(\)\?\.isAlwaysOnTop\(\)/, 'holeFenster()?.setAlwaysOnTop(true, "screen-saver")',
     "the window's always-on-top is set only in pin", "replace"],
   ["a second pin case ahead of the real one", "window.ts",
     /      case "restore_size":/,
@@ -2351,6 +2363,8 @@ const cases = [
   ["a tray outside tray.ts", "main.ts", /Menu\.setApplicationMenu\(null\);/, '  new Tray("x");', "Tray and its menu only in tray.ts"],
   ["a second tray", "tray.ts", /tray = new Tray\(icon\);/, "tray = new Tray(icon);\n  new Tray(icon);", "Tray and its menu only in tray.ts", "replace"],
   ["a tray item that runs something", "tray.ts", /\{ type: "separator" \},/, '{ label: "x", click: () => shell.openPath("C:\\\\") },\n      { type: "separator" },', "a tray item only raises an event, shows the window or quits", "replace"],
+  ["the compact report that sets always-on-top", "windows-core.ts", /return \{ offen: true, oben: w\.isAlwaysOnTop\(\),/, "w.setAlwaysOnTop(true); return { offen: true, oben: w.isAlwaysOnTop(),", "the window's always-on-top is set only in pin", "replace"],
+  ["the compact report with an always-on-top option", "windows-core.ts", /export function kompaktLage\(/, "export const alwaysOnTop = true;\nexport function kompaktLage(", "the window's always-on-top is set only in pin", "replace"],
   ["a tray that sets always-on-top", "tray.ts", /holeFenster\(\)\?\.isAlwaysOnTop\(\)/, "(holeFenster()?.setAlwaysOnTop(true), true)", "the window's always-on-top is set only in pin", "replace"],
   ["the start mode taken from something else", "main.ts", /ERSTER_START\.autostart \?/, 'loadConfig().lang === "de" ?', "all three windows load only the app's own page", "replace"],
   ["a tray event the app does not list", "main.ts", /app\.on\("before-quit", beendenErlauben\);/, 'app.on("before-quit", beendenErlauben);\n  app.on("browser-window-created", () => {});', "app listens only to its listed events"],
@@ -3163,6 +3177,39 @@ const cases = [
     /  const g = platzVoll\(teilAus\(loadConfig\(\)\.fenster, "gross"\), monitore\(\), hauptmonitor\(\), loadConfig\(\)\.uiZoom\);/,
     "  const g = platzVoll(teilAus(loadConfig().fenster, \"gross\"), monitore(), hauptmonitor());",
     "full view's size is the default size times the size setting", "replace"],
+  // Stufe A der schlanken CI: BILDER_PFADE im Workflow muss jeden Leser von BORO_BILDER nennen.
+  // Nur im Arbeits-Repo (oeffentlich/ da); der Export hat keinen solchen Workflow.
+  ...(existsSync(join(root, "oeffentlich")) ? [
+    ["CI image paths without the image switch script", "ci/build.yml",
+      /bilder-weiche\|/, "", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths without the build script", "ci/build.yml",
+      /\|build-renderer/, "", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths without a test that reads BORO_BILDER", "ci/build.yml",
+      /\|spielbilder\|verlauf/, "|verlauf", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths without the page's image tables", "ci/build.yml",
+      /\(11-skill-icons\|12-boss-images\|/, "(12-boss-images|", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths without the game image folder", "ci/build.yml",
+      /\^\(assets\/\.\*\|/, "^(", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths not anchored", "ci/build.yml",
+      /BILDER_PFADE='\^\(/, "BILDER_PFADE='(", "CI image paths: BILDER_PFADE", "replace"],
+    ["CI image paths line removed", "ci/build.yml",
+      /BILDER_PFADE='/, "BILDER_ALT='", "CI image paths: BILDER_PFADE", "replace"],
+    // Stufe C: BAUM_PFADE muss jede Datei nennen, die in den Exportbaum geht oder ihn prueft.
+    ["CI tree paths without the page and main process", "ci/build.yml",
+      /BAUM_PFADE='\^\(src\/\.\*\|/, "BAUM_PFADE='^(", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths without the scripts", "ci/build.yml",
+      /\|scripts\/\.\*\|/, "|", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths without the public-only folder", "ci/build.yml",
+      /\|oeffentlich\/\.\*\|/, "|", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths without the package files", "ci/build.yml",
+      /(?<=BAUM_PFADE='[^\n]*)\|package\(-lock\)\?\\\.json\|/, "|", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths without the public docs", "ci/build.yml",
+      /\|\(README\|GUIDE\|CHANGELOG\)\[\^\/\]\*\|/, "|", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths not anchored", "ci/build.yml",
+      /BAUM_PFADE='\^\(/, "BAUM_PFADE='(", "CI tree paths: BAUM_PFADE", "replace"],
+    ["CI tree paths line removed", "ci/build.yml",
+      /BAUM_PFADE='/, "BAUM_ALT='", "CI tree paths: BAUM_PFADE", "replace"],
+  ] : []),
 ];
 /* Nur lokal: AUDIT_NEGATIVE_NUR="text" fuehrt nur Faelle aus, deren Name "text" enthaelt
    (ein Gesamtlauf dauert Stunden). Die CI setzt es nie; ohne die Variable laeuft jeder Fall,
@@ -3199,6 +3246,7 @@ async function fall([name, file, at, insert, rule, how]) {
     const skript = file.startsWith("scripts/");
     const py = file.startsWith("py/");
     const lizenz = file.startsWith("lizenzen/");
+    const ci = file.startsWith("ci/");
     const seite = file.startsWith("app/") || file.startsWith("renderer/");
     if (asset) {
       const voll = join(root, "assets", "spielbilder.ts");
@@ -3209,6 +3257,9 @@ async function fall([name, file, at, insert, rule, how]) {
       // "lizenzen/..." sind die Lizenztexte der Schriften und electron-builder.yml (Pfad relativ zum Repo)
       cpSync(join(root, "licenses"), join(dir, "licenses"), { recursive: true });
       cpSync(join(root, "electron-builder.yml"), join(dir, "electron-builder.yml"));
+    } else if (ci) {
+      // "ci/build.yml" ist der Workflow (BILDER_PFADE), AUDIT_CI_DIR zeigt auf die Kopie
+      cpSync(join(root, ".github", "workflows", "build.yml"), join(dir, "build.yml"));
     } else if (py) {
       // "py/..." ist eine Python-Datei des Servers (BoroPartyServer)
       cpSync(join(root, "BoroPartyServer", file.slice(3)), join(dir, file.slice(3)));
@@ -3222,7 +3273,7 @@ async function fall([name, file, at, insert, rule, how]) {
         return [`  FAIL  ${name}: audit failed, but not on "${rule}"`, true];
       return [`  ok    ${name}`, false];
     }
-    const p = join(dir, lizenz ? file.slice(9) : asset ? file.slice(7) : skript ? file.slice(8) : py ? file.slice(3) : file.startsWith("renderer/") ? file.slice(9) : file);
+    const p = join(dir, ci ? file.slice(3) : lizenz ? file.slice(9) : asset ? file.slice(7) : skript ? file.slice(8) : py ? file.slice(3) : file.startsWith("renderer/") ? file.slice(9) : file);
     if (at === null) {
       // eine neue Datei: gibt es sie schon, prueft der Fall nicht, was er sagt
       if (existsSync(p)) return [`  SKIP  ${name} (file already there)`, true];
@@ -3239,7 +3290,7 @@ async function fall([name, file, at, insert, rule, how]) {
         renameSync(p, join(dirname(p), insert));
       } else writeFileSync(p, src.replace(at, (m) => (how === "replace" ? insert : m + "\n" + insert)));
     }
-    const r = await auditLauf({ ...process.env, [lizenz ? "AUDIT_LIZENZEN_DIR" : asset ? "AUDIT_ASSETS_DIR" : skript ? "AUDIT_SCRIPTS_DIR" : py ? "AUDIT_GILDE_PY" : seite ? "AUDIT_RENDERER_DIR" : "AUDIT_MAIN_DIR"]: py ? join(dir, file.slice(3)) : dir });
+    const r = await auditLauf({ ...process.env, [ci ? "AUDIT_CI_DIR" : lizenz ? "AUDIT_LIZENZEN_DIR" : asset ? "AUDIT_ASSETS_DIR" : skript ? "AUDIT_SCRIPTS_DIR" : py ? "AUDIT_GILDE_PY" : seite ? "AUDIT_RENDERER_DIR" : "AUDIT_MAIN_DIR"]: py ? join(dir, file.slice(3)) : dir });
     if (r.status === 0) return [`  FAIL  ${name}: audit passed a forbidden change`, true];
     if (rule && !r.stdout.split("\n").some((l) => l.startsWith("  FAIL  ") && l.includes(rule)))
       return [`  FAIL  ${name}: audit failed, but not on "${rule}"`, true];

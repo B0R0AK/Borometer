@@ -438,6 +438,16 @@ function ablauf(teile) {
     [true, "Calanthia", "Calanthia"], "Gegenprobe: Calanthias zweite Phase bleibt Calanthia");
 }
 
+// --- 5g2. Vegamor und seine Teile (Issue #393)
+{
+  const key = (n) => p.histKey(n);
+  eq([key("Vegamor"), key("Vagamont")], ["Vegamor", "Vegamor"], "Vegamor und Vagamont (innerer Name) sind ein Schluessel");
+  for(const teil of ["Vegarus", "Vegarion", "Vegaorb", "Vegamor's Claw", "Vegamors Klaue"])
+    eq([key(teil) !== "Vegamor", p.knownBoss(teil)], [true, true], teil + ": eigener Schluessel, nicht Vegamor, weiter ein bekannter Boss");
+  eq(key("Vegarion") !== key("Vegarus"), true, "zwei Teile sind zwei Schluessel");
+  eq(key("Morokai"), "Morokai", "Gegenprobe: ein anderer Boss behaelt seinen Schluessel");
+}
+
 // --- 5h. Altar von Calanthia: Korridor und Altar getrennt, auch wenn Phase 2 mehr Schaden hat (Issue #111)
 {
   frisch(8, true);

@@ -129,9 +129,10 @@ en: {
   /* Kompakt neu (14.10.2026): die Leiste, die Reiter und die Weeklies im Streifen */
   "compact.restKurz":"more", "compact.tabs":"View", "compact.tabK":"Fight", "compact.tabW":"Weeklies", "compact.tabWErinnerung":"Weeklies, reminder due",
   "compact.ansageK":"Fight", "compact.ansageW":"Weeklies",
-  "compact.platte":v=>v.name+", "+v.dps+" DPS, "+v.anteil,
+  "compact.zeileName":v=>v.name+", "+v.schaden+", "+v.dps+" DPS", "compact.gruppeAuf":v=>"Show skills of "+v.name, "compact.gruppeZu":v=>"Hide skills of "+v.name,
   "compact.wkOffen":"still open", "compact.wkErledigt":v=>v.n+" of "+v.g+" done",
   "compact.wkReset":v=>"Reset Thu\u00a010:00 · "+v.in,
+  "compact.wkListeName":v=>"Weeklies, rows "+v.a+" to "+v.b+" of "+v.n,
   "compact.wkAlles":"All done – until the next reset.",
   "compact.wkPunkt":v=>v.name+", "+v.n+" of "+v.m, "compact.wkErledigtAnsage":v=>v.name+", "+v.n+" of "+v.m+", done",
   "compact.wkWahl":"Switch character", "compact.wkOeffnen":"Open weeklies", "compact.wkDurchklick":"Read-only while click-through",
@@ -1793,9 +1794,10 @@ de: {
   /* Kompakt neu (14.10.2026): die Leiste, die Reiter und die Weeklies im Streifen */
   "compact.restKurz":"weitere", "compact.tabs":"Ansicht", "compact.tabK":"Kampf", "compact.tabW":"Weeklies", "compact.tabWErinnerung":"Weeklies, Erinnerung fällig",
   "compact.ansageK":"Kampf", "compact.ansageW":"Weeklies",
-  "compact.platte":v=>v.name+", "+v.dps+" DPS, "+v.anteil,
+  "compact.zeileName":v=>v.name+", "+v.schaden+", "+v.dps+" DPS", "compact.gruppeAuf":v=>"Fähigkeiten von "+v.name+" zeigen", "compact.gruppeZu":v=>"Fähigkeiten von "+v.name+" verbergen",
   "compact.wkOffen":"noch offen", "compact.wkErledigt":v=>v.n+" von "+v.g+" erledigt",
   "compact.wkReset":v=>"Reset Do\u00a010:00 · "+v.in,
+  "compact.wkListeName":v=>"Weeklies, Zeile "+v.a+" bis "+v.b+" von "+v.n,
   "compact.wkAlles":"Alles erledigt – bis zum nächsten Reset.",
   "compact.wkPunkt":v=>v.name+", "+v.n+" von "+v.m, "compact.wkErledigtAnsage":v=>v.name+", "+v.n+" von "+v.m+", erledigt",
   "compact.wkWahl":"Charakter wechseln", "compact.wkOeffnen":"Weeklies öffnen", "compact.wkDurchklick":"Im Durchklick nur lesen",

@@ -4504,8 +4504,8 @@ try {
       zeilen: ganz.slice(0, 5).map((z) => {
         const q = (s) => z.querySelector(s);
         return { h: z.getBoundingClientRect().height, b: z.getBoundingClientRect().toJSON(), rang: sicht(q(".rank")), pfeil: sicht(q(".twist")), bild: r(q(bilder ? "img.sic" : ".sic.leer")), name: r(q(".nmt")),
-          schaden: r(q('[data-k="damage"]')), anteil: r(q('[data-k="share"]')), fill: r(q(".fill")), aus: q(".fill")?.classList.contains("aus"),
-          andere: ["dps", "hits", "max", "critRate", "heavyRate"].filter((k) => sicht(q(`[data-k="${k}"]`))) };
+          schaden: r(q('[data-k="damage"]')), dps: r(q('[data-k="dps"]')), anteil: r(q('[data-k="share"]')), fill: r(q(".fill")), aus: q(".fill")?.classList.contains("aus"),
+          andere: ["hits", "max", "critRate", "heavyRate"].filter((k) => sicht(q(`[data-k="${k}"]`))) };
       }) };
   }, BILDER);
   const kopfMass = (p) => p.evaluate(() => {
@@ -4516,7 +4516,7 @@ try {
     const vor = (f) => { const c = getComputedStyle(f, "::before").content; return c && c !== "none" && c !== "normal" ? JSON.parse(c) : ""; };
     return { bild: r("#hName .hbild"), name: r("#hName .hnt"), meta: r("#hMeta"), dps: r("#hDps"), dpsFs: getComputedStyle(document.querySelector("#hDps")).fontSize,
       einheit: r("#hDpsKurz"), einheitText: document.querySelector("#hDpsKurz")?.textContent, fakten: sichtbar.map((f) => f.dataset.f),
-      metaText: sichtbar.map((f, i) => (i ? vor(f) : "") + f.textContent).join("").replace(/\s+/g, " ").trim(), lese: r("#hCompact") };
+      metaText: sichtbar.map((f, i) => (i ? vor(f) : "") + [...f.querySelectorAll("*")].reduce((t, e) => getComputedStyle(e).display === "none" ? t.replace(e.textContent, "") : t, f.textContent)).join("").replace(/\s+/g, " ").trim(), lese: r("#hCompact") };
   });
   const deckung = (p, q) => p.evaluate((q) => [...document.querySelectorAll(q)].map((e) => {
     let o = 1; for (let x = e; x; x = x.parentElement) o *= parseFloat(getComputedStyle(x).opacity); return Math.round(o * 100) / 100; }), q);
@@ -4533,7 +4533,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const z = await streifen(p);
     // folgt Entwurf E:1017ff. (300 Punkt breit); die Leiste liegt ueber der oberen Zeile und verlangt keine Breite (Pruefung W1)
     assert(w && w.w >= 300 && w.w <= 320, `11.2 ${lang}: das Fenster ist ein schmaler Streifen (300 bis 320 Punkt)`, w);
-    assert(w && w.h >= 250 && w.h <= 350, `11.2 ${lang}: Panel (Kompakt neu, #287): Leiste, Kopf, fuenf Zeilen und der Knopf, rund 300 Punkt hoch`, w);
+    assert(w && w.h >= 200 && w.h <= 350, `11.2 ${lang}: Panel (Kompakt neu, #287): Leiste, Kopf, fuenf Zeilen und der Knopf, rund 210 Punkt hoch`, w);
     assert(z.zahl >= 12 && z.ganz === 5 && z.halb === 0, `11.2 ${lang}: Top 5 - fuenf Zeilen, keine angeschnittene weitere (der Rest steht hinter dem Knopf)`, { zahl: z.zahl, ganz: z.ganz, halb: z.halb });
     // #328: der Hinweis unter der Liste ist seit B (#348) der Knopf zum Aufklappen (vorher ein stiller Text); die Liste nennt ihren Ausschnitt
     const rest = await p.evaluate(() => {
@@ -4549,23 +4549,23 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
     const anteilZahl = (f) => f > 0 && f < 0.01 ? "< 1" : f < 1 && f > 0.99 ? "> 99" : String(Math.round(f * 100));
     const n = rest.alle - 5;
     const wort = lang === "de" ? "weitere" : "more";
-    assert(rest.alle > 6 && rest.da && rest.chip === `\u2193${n}` && rest.wort === wort && rest.tag === "BUTTON" && rest.stumm === null && rest.auf === "false" && rest.knopfName === (lang === "de" ? `Alle ${rest.alle} Zeilen zeigen` : `Show all ${rest.alle} rows`) && rest.h >= 20 && rest.h <= 26 && rest.unten <= rest.fenster + 0.5,
-      `11.2 ${lang} (#328): der Hinweis "\u2193${n} ${wort} \u00b7 x %" steht im Fluss unter der Liste, 22 Punkt hoch, ganz im Fenster, seit B (#348) der Knopf zum Aufklappen`, rest);
-    assert(rest.p === anteilZahl(rest.rest) + "\u00a0%".slice(lang === "de" ? 0 : 1), `11.2 ${lang}: sein Anteil ist der Schaden der Zeilen darunter`, rest);
+    assert(rest.alle > 6 && rest.da && rest.chip === `\u2193${n}` && rest.wort === wort && rest.tag === "BUTTON" && rest.stumm === null && rest.auf === "false" && rest.knopfName === (lang === "de" ? `Alle ${rest.alle} Zeilen zeigen` : `Show all ${rest.alle} rows`) && rest.h >= 12 && rest.h <= 16 && rest.unten <= rest.fenster + 0.5,
+      `11.2 ${lang} (#328): der Hinweis "\u2193${n} ${wort}" (Knopf, 12 bis 16 Punkt hoch) liegt ganz im Fenster, ausserhalb des Flusses, nur bei Fokus sichtbar`, rest);
+    assert(rest.p === "", `11.2 ${lang}: der Hinweis traegt keine Prozentzahl (Aufbau B, 02.11.2026)`, rest);
     assert(rest.name === (lang === "de" ? `F\u00e4higkeiten, Zeile 1 bis 5 von ${rest.alle}` : `Skills, rows 1 to 5 of ${rest.alle}`), `11.2 ${lang}: die Liste nennt ihren Ausschnitt (der Knopf traegt seinen eigenen Namen)`, rest);
     assert(!z.kopfSicht && z.spaltenKoepfe >= 2, `11.2 ${lang}: kein sichtbarer Spaltenkopf, fuer den Vorleser bleiben die Spaltenkoepfe`, z);
-    const zeilenGut = z.zeilen.every((x) => !x.rang && !x.pfeil && !x.andere.length && x.bild && Math.abs(x.bild.width - 18) < 0.6 && x.name && x.name.width >= 30 && !x.schaden && x.anteil &&
-      x.h > 24 && x.h < 28 && x.fill && x.fill.left <= x.b.left + 0.5 && x.fill.height >= 18 && x.fill.right <= x.b.right + 0.5 &&
-      x.anteil.right <= x.b.right + 0.5 && x.bild.left >= x.b.left && x.name.left >= x.bild.right && x.anteil.left >= x.name.left);
+    const zeilenGut = z.zeilen.every((x) => !x.rang && !x.pfeil && !x.andere.length && x.bild && Math.abs(x.bild.width - 20) < 0.6 && x.name && x.name.width >= 30 && x.schaden && x.dps && !x.anteil &&
+      x.h > 23 && x.h < 25 && x.fill && x.fill.left <= x.b.left + 0.5 && x.fill.height >= 22 && x.fill.right <= x.b.right + 0.5 &&
+      x.dps.right <= x.b.right + 0.5 && x.bild.left >= x.b.left && x.name.left >= x.bild.right && x.schaden.left >= x.name.left && x.dps.left >= x.schaden.right - 0.5);
     assert(zeilenGut && z.zeilen[0].aus && Math.abs(z.zeilen[0].fill.right - z.zeilen[0].b.right) <= 1,
-      `11.2 ${lang}: je Zeile Symbol (18 Punkt), Name sichtbar, Anteil rechts, dahinter der Balken ab der Kante; kein Schaden in der Zeile; Rang 1 fuellt die Zeile` + (BILDER ? "" : " (ohne Spielbilder: Marke statt Bild)"), z.zeilen);
+      `11.2 ${lang}: je Zeile (24 Punkt) Symbol (20 Punkt), Name, Schaden und DPS, kein Anteil, dahinter die Fuellung ab der Kante; Rang 1 fuellt die Zeile` + (BILDER ? "" : " (ohne Spielbilder: Marke statt Bild)"), z.zeilen);
     const k = await kopfMass(p);
-    assert(!k.bild && k.name && k.meta && k.dps && k.einheit && Math.abs(parseFloat(k.dpsFs) - 42) < 0.6 && k.name.left >= k.dps.right - 1 && k.meta.top >= k.name.bottom - 1 &&
-      Math.abs(k.meta.right - k.name.right) <= 1 && k.einheitText === "DPS" && k.einheit.top >= k.dps.bottom - 2 && k.einheit.left <= k.dps.left + 2,
-      `11.2 ${lang}: Kopf ohne Bossbild: links DPS in 42 Punkt mit "DPS" darunter, rechts Boss und darunter Uhrzeit \u00b7 Dauer`, k);
-    // Uhrzeit vor der Dauer wie in der Faktenzeile (der Entwurf stellt die Dauer vorn, E:1024)
-    assert(JSON.stringify(k.fakten) === JSON.stringify(["zeit", "dauer"]) && /^\d{1,2}:\d{2} \u00b7 \S+/.test(k.metaText),
-      `11.2 ${lang}: unter dem Boss nur Uhrzeit \u00b7 Dauer`, { fakten: k.fakten, text: k.metaText });
+    assert(!k.bild && k.name && k.meta && k.dps && k.einheit && Math.abs(parseFloat(k.dpsFs) - 26) < 0.6 && k.dps.left >= k.name.right - 1 && k.meta.top >= k.name.bottom - 1 &&
+      Math.abs(k.meta.left - k.name.left) <= 1 && k.einheitText === "DPS" && k.einheit.left >= k.dps.right - 1 && k.meta.right <= k.dps.left + 1,
+      `11.2 ${lang} (Aufbau B): Kopf ohne Bossbild: links Boss und darunter die Faktenzeile, rechts die DPS in 26 Punkt mit "DPS" daneben`, k);
+    // Schaden, Uhrzeit, Dauer (Aufbau B: der Gesamtschaden steht vorn, kurz)
+    assert(JSON.stringify(k.fakten) === JSON.stringify(["schaden", "zeit", "dauer"]) && /^\S+ \S+ \u00b7 \d{1,2}:\d{2} \u00b7 \S+/.test(k.metaText),
+      `11.2 ${lang}: unter dem Boss Schaden \u00b7 Uhrzeit \u00b7 Dauer`, { fakten: k.fakten, text: k.metaText });
     if (lang === "de") {
       const l = await p.evaluate(() => {
         const s = document.querySelector("#hCompact > span"), pv = document.querySelector("#hPrev");
@@ -4603,11 +4603,11 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       const rechts = Math.max(r(zahl).right, zr && zr.getClientRects().length ? r(zr).right : 0);
       const pr = pv.getClientRects().length ? r(pv) : null;
       return { da: !!pr, nameGanz: k(nm), faktenGanz: fakten.every(k), dauer: fakten.some((f) => f.dataset.f === "dauer"), anzahl: fakten.length,
-        pr: pr && { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom }, zahlUnten: r(zahl).bottom, zahlRechts: rechts, kurzRechts: zr && zr.getClientRects().length ? r(zr).right : 0, nameLinks: r(nm).left, w: innerWidth, h: innerHeight };
+        pr: pr && { l: pr.left, r: pr.right, t: pr.top, b: pr.bottom }, metaUnten: r(document.querySelector("#hMeta")).bottom, zahlUnten: r(zahl).bottom, zahlRechts: rechts, kurzRechts: zr && zr.getClientRects().length ? r(zr).right : 0, nameLinks: r(nm).left, w: innerWidth, h: innerHeight };
     });
     assert(vg.da && vg.nameGanz && vg.faktenGanz && vg.dauer && vg.anzahl >= 2 && vg.pr.l >= 0 && vg.pr.r <= vg.w + 0.5 && vg.pr.b <= vg.h + 0.5 &&
-      vg.pr.t >= vg.zahlUnten - 1 && vg.pr.l >= vg.kurzRechts - 1 && vg.pr.r <= vg.nameLinks + 0.5,
-      `11.2 ${lang} (#157): der Vergleich steht unter der Zahl neben "DPS" und nimmt der rechten Spalte nichts - Boss, Uhrzeit und Dauer ungekuerzt`, vg);
+      vg.pr.t >= vg.metaUnten - 1 && vg.pr.l >= vg.nameLinks - 1 && vg.pr.r <= vg.zahlRechts + 0.5,
+      `11.2 ${lang} (#157, Aufbau B): der Vergleich steht in einer eigenen Zeile unter Boss und Faktenzeile, ganz im Kopf - Boss, Schaden, Uhrzeit und Dauer ungekuerzt`, vg);
     // Gruppenansicht ohne Lebende (body.partyEmpty): die Zahl und ihre Einheit bleiben aus, auch wenn .big sich im Streifen aufloest
     const zeigt = () => p.evaluate(() => ["#hDps", "#hDpsKurz"].map((q) => document.querySelector(q).getClientRects().length > 0));
     const ohneGruppe = await zeigt();
@@ -4638,9 +4638,9 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       return { skill: x.dataset.skill || x.querySelector(".nmt")?.textContent, leer: !!x.querySelector(".nm .sic.leer"), platte: r(".nm .sic"), name: r(".nmt"), fill: r(".fill") };
     }));
     const ohneSym = z.find((x) => /Testschlag/.test(x.skill || ""));
-    assert(!!ohneSym && ohneSym.leer && ohneSym.platte && Math.abs(ohneSym.platte.width - 18) < 0.6 && Math.abs(ohneSym.platte.height - 18) < 0.6 && ohneSym.fill
-      && z.every((x) => !x.platte || (Math.abs(x.platte.width - 18) < 0.6 && Math.abs(x.platte.height - 18) < 0.6)),
-      "11.2 ohne Symbol: die Platte eines Skills ohne Symbol ist so gross wie das Bild (18 Punkt), jede Zeile gleich", z);
+    assert(!!ohneSym && ohneSym.leer && ohneSym.platte && Math.abs(ohneSym.platte.width - 20) < 0.6 && Math.abs(ohneSym.platte.height - 20) < 0.6 && ohneSym.fill
+      && z.every((x) => !x.platte || (Math.abs(x.platte.width - 20) < 0.6 && Math.abs(x.platte.height - 20) < 0.6)),
+      "11.2 ohne Symbol: die Platte eines Skills ohne Symbol ist so gross wie das Bild (20 Punkt), jede Zeile gleich", z);
     assert(!s.fehler.length, "11.2 buendig ohne Symbol: keine Fehler", s.fehler);
     await p.close();
   }
@@ -4691,6 +4691,33 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       "11.3 mit Gruppe hoechstens 320 Punkt, die Leiste liegt rechts neben Ich | Gruppe und im Fenster", { gw, lage });
     const m = await p.evaluate(() => [...document.querySelectorAll("#bars .row:not(.sub)")].map((z) => z.querySelector(".nmt")?.textContent.trim()));
     assert(m.includes("Mitglied Eins") && m.includes("Mitglied Zwei"), "11.3 Gruppe: die Mitglieder als Zeilen", m);
+    /* Aufbau B (Spezifikation 4): ein Klick auf ein Mitglied klappt dessen Faehigkeiten darunter auf (hoechstens vier, 22 Punkt, eingerueckt),
+       ein zweiter schliesst; Eingabetaste, Leertaste und Esc auf der Zeile tun dasselbe; das Fenster waechst und kehrt zurueck. */
+    const zeileMass = () => p.evaluate(() => {
+      const z = document.querySelector("#bars .row:not(.sub)"), subs = [...document.querySelectorAll("#bars .row.sub")].filter((x) => x.getClientRects().length);
+      const zr = z.getBoundingClientRect(), r = subs.map((x) => x.getBoundingClientRect());
+      return { auf: z.getAttribute("aria-expanded"), n: subs.length, hoehen: r.map((b) => Math.round(b.height)), eingerueckt: r.every((b) => b.left >= zr.left + 10),
+        gestapelt: r.every((b, i) => i === 0 ? b.top >= zr.bottom - 0.5 : b.top >= r[i - 1].bottom - 0.5), quer: document.documentElement.scrollWidth > innerWidth,
+        label: z.getAttribute("aria-label"), h: innerHeight };
+    });
+    const vor = await zeileMass();
+    await p.evaluate(() => document.querySelector("#bars .row:not(.sub)").click());
+    await p.waitForFunction(() => document.querySelector("#bars .row:not(.sub)").getAttribute("aria-expanded") === "true");
+    await p.waitForFunction(() => document.querySelectorAll("#bars .row.sub").length > 0);
+    const offen = await zeileMass();
+    assert(vor.auf === "false" && offen.auf === "true" && offen.n >= 1 && offen.n <= 4 && offen.hoehen.every((h) => h === 22) && offen.eingerueckt && offen.gestapelt && !offen.quer,
+      "11.3 Gruppe: ein Klick auf ein Mitglied klappt dessen Faehigkeiten auf (hoechstens vier, 22 Punkt, eingerueckt, nichts ueberlappt)", { vor, offen });
+    const gw2 = await fensterWie(g);
+    await p.evaluate(() => document.querySelector("#bars .row:not(.sub)").focus());
+    await p.keyboard.press("Escape");
+    await p.waitForFunction(() => document.querySelector("#bars .row:not(.sub)").getAttribute("aria-expanded") === "false");
+    await p.keyboard.press("Enter");
+    await p.waitForFunction(() => document.querySelector("#bars .row:not(.sub)").getAttribute("aria-expanded") === "true");
+    await p.evaluate(() => document.querySelector("#bars .row:not(.sub)").focus());
+    await p.keyboard.press("Space");
+    await p.waitForFunction(() => document.querySelector("#bars .row:not(.sub)").getAttribute("aria-expanded") === "false");
+    const gw3 = await fensterWie(g);
+    assert(gw2.h > gw3.h && gw3.h >= 100, "11.3 Gruppe: das Fenster waechst mit der aufgeklappten Zeile und geht beim Zuklappen zurueck", { auf: gw2.h, zu: gw3.h });
     assert(!g.fehler.length, "11.3 keine Fehler", g.fehler);
     await p.close();
   }
@@ -4865,7 +4892,7 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
           return c ? ueber([c[0], c[1], c[2], a], g) : g; };
         // gemessen wird das Element, das den Text traegt (nicht sein Kasten)
         const was = { boss: "#hName .hnt", zeit: '#hMeta [data-f="zeit"] .wt', dauer: '#hMeta [data-f="dauer"]', dps: "#hDps", einheit: "#hDpsKurz", lese: "#hCompact > span",
-          name: "#bars .row:not(.sub) .nmt", zahl: '#bars .row:not(.sub) [data-k="share"]' };
+          name: "#bars .row:not(.sub) .nmt", schaden: '#bars .row:not(.sub) [data-k="damage"]', zeile: '#bars .row:not(.sub) [data-k="dps"]' };
         const out = {};
         for (const [n, q] of Object.entries(was)) {
           const e = document.querySelector(q); if (!e || !e.getClientRects().length) { out[n] = null; continue; }
@@ -4876,11 +4903,26 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
         // der Live-Punkt (#158): Flaeche gegen den Grund, 3 : 1
         { const m = document.querySelector("#hMeta"), b = getComputedStyle(m, "::before"), f = parse(b.backgroundColor), ring = parse((/rgba?\([^)]+\)/.exec(b.boxShadow) || [""])[0]), g0 = grund(m), g = ring ? ueber(ring, g0) : g0;
           out.punkt = f ? { k: Math.round(k(ueber(f, g), g) * 100) / 100 } : null; }
+        /* Aufbau B: Name, Schaden und DPS liegen auf der Fuellung der Reihenfarbe (deckend, 62 % Farbe in --comb). Gemessen wird jede Zeile
+           des Streifens gegen ihre eigene Fuellung (kleinster Wert), mit der Kontur der Schrift wie oben. */
+        { let kleinst = null;
+          for (const z of document.querySelectorAll("#bars .row:not(.sub)")) {
+            const fl = z.querySelector(".fill"); if (!fl || !z.getClientRects().length) continue;
+            const bg = getComputedStyle(fl).backgroundColor, sm = /color\(srgb ([\d.]+) ([\d.]+) ([\d.]+)(?: \/ ([\d.]+))?\)/.exec(bg);
+            const fc = sm ? [sm[1] * 255, sm[2] * 255, sm[3] * 255, sm[4] === undefined ? 1 : +sm[4]] : parse(bg); if (!fc) continue;
+            const g0 = ueber(fc, grund(z));
+            for (const q of [".nmt", '[data-k="damage"]', '[data-k="dps"]']) {
+              const e = z.querySelector(q); if (!e) continue;
+              const g = halo(e, g0), f = parse(getComputedStyle(e).color);
+              const w = Math.round(k(ueber(f, g), g) * 100) / 100;
+              kleinst = kleinst === null ? { k: w, deckend: f[3] === 1, fs: 12.5 } : { k: Math.min(kleinst.k, w), deckend: kleinst.deckend && f[3] === 1, fs: 12.5 };
+            } }
+          out.fuellung = kleinst; }
         out.zahlFarbe = getComputedStyle(document.querySelector("#hDps")).color;
         out.glas = getComputedStyle(document.documentElement).getPropertyValue("--glass-a").trim();
         return out;
       }, [szene_]);
-      const teile = ["boss", "zeit", "dauer", "dps", "einheit", "lese", "name", "zahl"];
+      const teile = ["boss", "zeit", "dauer", "dps", "einheit", "lese", "name", "schaden", "zeile", "fuellung"];
       const gut = teile.every((n) => m[n] && m[n].deckend && m[n].k >= (m[n].fs >= 24 ? 3 : 4.5)) && m.punkt && m.punkt.k >= 3 && (theme !== "light" || m.zahlFarbe === "rgb(109, 60, 0)");
       // Toenung am Anschlag .10 (Kompakt neu, 14.10.2026: leichte Toenung .25; klarer seit #328, 27.10.2026); seit dem Panel (21.10.2026) liegt die Schrift auf ihrer Kontur statt auf Inseln
       assert(m.glas === "0.100" && gut, `11.7 ${theme}, ${wo}e Szene: bei 55 % Durchsicht (Toenung 0,10, Schrift auf ihrer Kontur) alles deckend, Text mindestens 4,5 : 1, die Zahl 3 : 1, der Live-Punkt 3 : 1, im hellen Thema die Zahl #6d3c00 (#156)`, m);

@@ -200,5 +200,59 @@ eq(/max: win\.isMaximized\(\)/.test(win), false, "window.ts: gemerkt wird nie ei
   for (const l of ["de", "en"]) eq(Object.hasOwn(I18N[l], "win.max"), false, l + ": kein Wort win.max mehr");
 }
 
+// --- was der Fehlerbericht ueber das Kompaktfenster sagt (#382): offen, wo, oben
+{
+  eq(k.kompaktLage(null), { offen: false, oben: false, sichtbar: false, ort: null }, "Lage: kein Kompaktfenster -> nicht offen, kein Ort");
+  const fenster = (oben, weg = false) => ({ isDestroyed: () => weg, isAlwaysOnTop: () => oben, isVisible: () => true,
+    getBounds: () => ({ x: 1039, y: 546, width: 316, height: 297 }) });
+  eq(k.kompaktLage(fenster(false)), { offen: true, oben: false, sichtbar: true, ort: { x: 1039, y: 546, w: 316, h: 297 } },
+    "Lage: offen und sichtbar, aber nicht oben - der Befund aus #382");
+  eq(k.kompaktLage(fenster(true)).oben, true, "Lage: oben, wenn das Fenster es ist");
+  eq(k.kompaktLage(fenster(true, true)).offen, false, "Lage: ein zerstoertes Fenster gilt als zu");
+}
+
+// --- wer das Anheften loest (#382, Folge): ein Ringpuffer mit den letzten Ereignissen des Kompaktfensters
+{
+  let uhr = Date.UTC(2026, 10, 3, 0, 56, 15, 120);
+  const puffer = k.neuerKompaktPuffer(4, () => uhr);
+  eq(puffer.liste(), [], "Puffer: leer am Anfang");
+  const fenster = (oben, weg = false) => ({ isDestroyed: () => weg, isAlwaysOnTop: () => oben });
+  puffer.beobachte(fenster(true));
+  eq(puffer.liste().map((e) => e.art), ["oben:true"], "Puffer: die erste Messung wird festgehalten");
+  uhr += 300; puffer.beobachte(fenster(true));
+  eq(puffer.liste().length, 1, "Puffer: gleicher Stand, kein neuer Eintrag");
+  uhr += 300; puffer.merke("event:focus");
+  uhr += 5; puffer.beobachte(fenster(false));
+  eq(puffer.liste().map((e) => e.art), ["oben:true", "event:focus", "oben:false"],
+    "Puffer: der Wechsel von oben auf nicht oben steht hinter dem Ereignis, das ihm voranging");
+  eq(puffer.liste()[2].t, "2026-11-03T00:56:15.725Z", "Puffer: die Zeit ist die des Wechsels, auf die Millisekunde");
+  puffer.beobachte(fenster(true, true));
+  puffer.beobachte(null);
+  eq(puffer.liste().length, 3, "Puffer: ein zerstoertes oder fehlendes Fenster wird nicht gemessen");
+  puffer.merke("win:resize"); puffer.merke("win:resize"); puffer.merke("win:resize");
+  const l = puffer.liste();
+  eq([l.length, l[l.length - 1].art, l[l.length - 1].n], [4, "win:resize", 3], "Puffer: gleiche Ereignisse hintereinander zaehlen, sie fuellen ihn nicht");
+  puffer.merke("event:blur"); puffer.merke("win:pin:aus");
+  eq(puffer.liste().map((e) => e.art), ["oben:false", "win:resize", "event:blur", "win:pin:aus"],
+    "Puffer: hoechstens so viele Eintraege wie genannt, die aeltesten gehen zuerst");
+  const kopie = puffer.liste(); kopie.length = 0;
+  eq(puffer.liste().length, 4, "Puffer: die Liste ist eine Kopie");
+  // der Bericht: die Lage und die Ereignisse zusammen
+  const messen = (oben) => ({ isDestroyed: () => false, isAlwaysOnTop: () => oben, isVisible: () => true,
+    getBounds: () => ({ x: 1, y: 2, width: 3, height: 4 }) });
+  const b = k.kompaktBericht(messen(false), puffer);
+  eq([b.offen, b.oben, b.ereignisse.length], [true, false, 4], "Bericht: Lage und Ereignisse in einem");
+  eq(k.kompaktBericht(null, puffer).offen, false, "Bericht: ohne Fenster nicht offen, die Ereignisse bleiben");
+  // die Anfragen der Seite: nur eine feste Art, nie der Rest der Anfrage
+  eq(k.kompaktAnfrage({ do: "pin", on: false, win: "kompakt" }), "win:pin:aus", "Anfrage: Pin aus im Kompaktfenster");
+  eq(k.kompaktAnfrage({ do: "pin", on: true, win: "kompakt", remember: false }), "win:pin:an", "Anfrage: Pin an im Kompaktfenster");
+  eq(k.kompaktAnfrage({ do: "resize", w: 300, h: 28, win: "kompakt" }), "win:resize", "Anfrage: Groesse ohne die Zahlen");
+  eq(k.kompaktAnfrage({ do: "pin", on: true, win: "main" }), null, "Anfrage: fuer die Vollansicht nichts");
+  eq(k.kompaktAnfrage({ do: "pin", on: true }), null, "Anfrage: ohne Fenster nichts");
+  eq(k.kompaktAnfrage({ do: "chrome", win: "kompakt" }), null, "Anfrage: was das Kompaktfenster nicht nimmt, nichts");
+  // nur Art und Zeit: nichts, was ein Spieler oder eine Datei heissen koennte
+  eq(puffer.liste().every((e) => /^[a-z:\-]+$/.test(e.art)), true, "Puffer: die Arten sind feste Woerter");
+}
+
 if (failed) { console.log(`\n${failed} FAILED`); process.exit(1); }
 console.log("\nALL PASSED");

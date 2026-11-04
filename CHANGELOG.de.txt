@@ -1,6 +1,19 @@
 BOROMETER — ÄNDERUNGSPROTOKOLL
 ==============================
 
+v2.1
+------
+Hinzugefügt
+  - Kompakt: Die Weeklies-Liste rollt mit dem Mausrad; wer das Fenster höher zieht, sieht mehr Fähigkeiten und Weeklies (#328)
+  - Kompakt: In der Gruppe klappt ein Klick auf ein Mitglied seine vier stärksten Fähigkeiten auf, Esc schließt (#328)
+Angepasst
+  - Kompaktfenster im neuen Look: schlanke Leiste mit Reitern, große Zahl im Kopf, eine Zeile je Fähigkeit mit Symbol, Name, Schaden und DPS (#328)
+  - Kompakt: Der Hinweis „weitere“ ist nicht mehr im Bild; Mausrad oder ein höheres Fenster, der Knopf bleibt für Tastatur und Vorleser (#328)
+Behoben
+  - Das Kompaktfenster bleibt nach einem Klick über dem Spiel (#382)
+  - Rekorde: Die Karte Vegamor zählt nur Kämpfe gegen Vegamor selbst; die Teile, Vegarion und die anderen, zählen nicht mehr mit (#393)
+  - Archiv: Die Bossseite Vegamor listet nur Kämpfe gegen Vegamor; die Teile haben eigene Plätze und sind über die Suche zu finden (#395)
+
 v2.0.1
 ------
 Behoben

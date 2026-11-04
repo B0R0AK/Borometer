@@ -163,8 +163,8 @@ function eq(got, want, name) {
   eq(core.erinnerungFaellig([er({ zeit: "20:00" }), er({ zeit: "18:00" })], 1, mo(18, 30), null), true, "eine von zwei reicht");
   // die Texte
   const SCHL = ["compact.restKurz", "compact.tabK", "compact.tabW", "compact.tabs", "compact.tabWErinnerung", "compact.wkOffen", "compact.wkErledigt", "compact.wkReset", "compact.wkAlles",
-    "compact.wkPunkt", "compact.wkErledigtAnsage", "compact.wkWahl", "compact.wkOeffnen", "compact.wkDurchklick", "compact.platte", "compact.ansageK", "compact.ansageW"];
-  const probe = { n: 2, m: 3, g: 36, name: "Zitadelle", in: "14 Std", anteil: "91,1 %", dps: "425.2k" };
+    "compact.wkPunkt", "compact.wkErledigtAnsage", "compact.wkWahl", "compact.wkOeffnen", "compact.wkDurchklick", "compact.zeileName", "compact.gruppeAuf", "compact.gruppeZu", "compact.ansageK", "compact.ansageW"];
+  const probe = { n: 2, m: 3, g: 36, name: "Zitadelle", in: "14 Std", anteil: "91,1 %", dps: "425.2k", schaden: "14.2M" };
   const text = (l, k) => { const v = core.I18N[l][k]; return typeof v === "function" ? v(probe) : v; };
   const leer = ["de", "en"].flatMap((l) => SCHL.filter((k) => { const s = text(l, k); return typeof s !== "string" || !s || /undefined|NaN/.test(s); }).map((k) => l + ":" + k));
   eq(leer, [], "jeder neue Text in DE und EN da und ohne Luecke");

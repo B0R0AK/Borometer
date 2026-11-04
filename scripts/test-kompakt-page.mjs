@@ -122,7 +122,7 @@ async function messe(page) {
     const sicht = (e) => { const cs = getComputedStyle(e); return cs.display !== "none" && cs.visibility !== "hidden" && e.getClientRects().length > 0; };
     const r4 = (e) => { const q = e.getBoundingClientRect(); return { x: q.x, y: q.y, w: q.width, h: q.height, r: q.right, b: q.bottom }; };
     const kaesten = [];
-    const nimm = (sel, art) => document.querySelectorAll(sel).forEach((e, i) => { if (sicht(e) && !e.closest("[hidden]")) kaesten.push({ art, i, id: e.id || "", ...r4(e) }); });
+    const nimm = (sel, art) => document.querySelectorAll(sel).forEach((e, i) => { if (sicht(e) && !e.closest("[hidden]") && +getComputedStyle(e).opacity > 0) kaesten.push({ art, i, id: e.id || "", ...r4(e) }); });
     nimm(".kn-tabs", "tabs"); nimm("body:not(.kn-wk) .head", "kopf"); nimm("#kwk:not([hidden]) .kn-insel", "kopf");
     // Kampf (#328): die Liste rollt in sich; Zeilen ausserhalb ihres Kastens sind abgeschnitten und zaehlen nicht als Baustein
     const kb = document.querySelector("body:not(.kn-wk) #bars");
@@ -131,7 +131,13 @@ async function messe(page) {
       if (sicht(e) && q.top >= k.top - 1 && q.bottom <= k.bottom + 1) kaesten.push({ art: "platte", i, id: "", ...r4(e) });
     });
     nimm("#kRest:not([hidden])", "rest"); nimm("#kwkRest", "rest");
-    nimm("#kwkPlatten .kn-wplatte", "wplatte"); nimm("body:not(.kn-wk) #bars", "kasten"); nimm("#kwkPlatten", "wkasten");
+    // Weeklies: wie im Kampf rollt die Liste in sich; Zeilen ausserhalb ihres Kastens sind abgeschnitten und zaehlen nicht
+    const wb = document.querySelector("#kwkPlatten");
+    document.querySelectorAll("#kwkPlatten .kn-wplatte").forEach((e, i) => {
+      const q = e.getBoundingClientRect(), k = wb.getBoundingClientRect();
+      if (sicht(e) && !e.closest("[hidden]") && q.top >= k.top - 1 && q.bottom <= k.bottom + 1) kaesten.push({ art: "wplatte", i, id: "", ...r4(e) });
+    });
+    nimm("body:not(.kn-wk) #bars", "kasten"); nimm("#kwkPlatten", "wkasten");
     // Textbefunde: jedes sichtbare Element mit eigenem Text im Streifen (ohne den nur fuer Vorleser da ist)
     const text = [];
     const feld = document.querySelector("#kwk:not([hidden])") ? "#kwk, .top" : ".head, #bars, #kRest, .top";
@@ -219,19 +225,19 @@ for (const f of faelle) {
 {
   const s = await oeffne({ zoom: 100 });
   const hK = s.groesse.h;
-  assert(hK >= 250 && hK <= 350, "Kampf: Leiste (34), Kopf, fuenf Zeilen und der Hinweis, rund 300 Punkt hoch", hK);
+  assert(hK >= 200 && hK <= 350, "Kampf: Leiste (26), Kopf, fuenf Zeilen und der Hinweis, rund 220 Punkt hoch", hK);
   const n0 = s.win.length;
   await s.page.mouse.move(150, 200);
   await s.page.mouse.wheel(0, 400);
   await warte(s.page, () => document.querySelector("#bars").scrollTop > 0);
   await bisFenster(s, () => true, "nichts Neues bestellt");
   assert(s.win.length === n0 || Math.abs(s.win[s.win.length - 1].h - hK) <= 2, "Rollen aendert die Fensterhoehe nicht", [hK, s.win.slice(n0)]);
-  assert(await s.page.evaluate(() => document.querySelector("#bars").clientHeight) === 130, "die Liste ist fuenf mal 26 Punkt hoch");
+  assert(await s.page.evaluate(() => document.querySelector("#bars").clientHeight) === 130, "die Liste ist fuenf mal 26 Punkt (24 Zeile, 2 Abstand) hoch");
   await s.page.evaluate(() => document.querySelector("#knTabW").click());
   await warte(s.page, () => document.querySelectorAll("#kwkPlatten .kn-wplatte").length > 0);
   await bisFenster(s, (a) => a.h !== hK, "Fenster misst sich fuer die Weeklies neu");
   await passen(s, 100);
-  assert(s.groesse.h >= 200 && s.groesse.h <= 380, "Weeklies: Kopf, vier Zeilen und der Knopf", s.groesse.h);
+  assert(s.groesse.h >= 200 && s.groesse.h <= 380, "Weeklies: Kopf und fuenf Zeilen", s.groesse.h);
   assert(s.groesse.w === 300, "die Breite bleibt 300", s.groesse.w);
   await s.page.close();
 }
@@ -267,20 +273,31 @@ for (const f of faelle) {
   const p = s.page;
   const plattenKeys = () => p.evaluate(() => [...document.querySelectorAll("#kwkPlatten .kn-wplatte")].map((b) => b.dataset.k));
   const zahl = () => p.evaluate(() => document.querySelector(".kn-wkopf .kn-offen").firstChild.textContent);
-  assert((await plattenKeys()).length === 4, "Weeklies zu: vier Zeilen", await plattenKeys());
+  const sichtbareKeys = () => p.evaluate(() => { const k = document.querySelector("#kwkPlatten").getBoundingClientRect(); return [...document.querySelectorAll("#kwkPlatten .kn-wplatte")].filter((b) => { const q = b.getBoundingClientRect(); return q.top >= k.top - 1 && q.bottom <= k.bottom + 1; }).map((b) => b.dataset.k); });
+  assert((await sichtbareKeys()).length === 5, "Weeklies zu: fuenf Zeilen im Bild, der Rest rollt", await sichtbareKeys());
+  assert(await p.evaluate(() => { const l = document.querySelector("#kwkPlatten"); return l.scrollHeight > l.clientHeight + 20 && getComputedStyle(l).overflowY === "auto"; }), "Weeklies zu: die Liste traegt mehr Zeilen als sichtbar und rollt");
+  {
+    const n = await p.evaluate(() => document.querySelectorAll("#kwkPlatten .kn-wplatte").length);
+    assert(await p.evaluate(() => document.querySelector("#kwkPlatten").getAttribute("aria-label")) === "Weeklies, rows 1 to 5 of " + n, "Weeklies zu: die Liste traegt fuer Vorleser einen Namen mit ihrem Ausschnitt", await p.evaluate(() => document.querySelector("#kwkPlatten").getAttribute("aria-label")));
+    await p.evaluate(() => { const l = document.querySelector("#kwkPlatten"); l.scrollTop = l.scrollHeight; });
+    await warte(p, () => !/rows 1 to/.test(document.querySelector("#kwkPlatten").getAttribute("aria-label")));
+    assert(/^Weeklies, rows \d+ to \d+ of \d+$/.test(await p.evaluate(() => document.querySelector("#kwkPlatten").getAttribute("aria-label"))), "Weeklies zu: der Name folgt dem Rollen");
+    await p.evaluate(() => { document.querySelector("#kwkPlatten").scrollTop = 0; });
+    await warte(p, () => /rows 1 to/.test(document.querySelector("#kwkPlatten").getAttribute("aria-label")));
+  }
   const wr = () => p.evaluate(() => { const k = document.querySelector("#kwkRest"); return k && { text: k.querySelector(".krestn").textContent, auf: k.getAttribute("aria-expanded"), name: k.getAttribute("aria-label"), tag: k.tagName }; });
   let w0 = await wr();
   assert(w0 && /^\+\d+$/.test(w0.text) && w0.auf === "false" && w0.tag === "BUTTON" && /^Show \d+ more items$/.test(w0.name), "unter den Zeilen steht der Knopf +n, zu", w0);
-  await p.click("#kwkRest");
+  await p.focus("#kwkRest"); await p.keyboard.press("Enter");
   await warte(p, () => document.querySelector("#kwkRest")?.getAttribute("aria-expanded") === "true" && document.activeElement?.id === "kwkRest");
   w0 = await wr();
-  assert((await plattenKeys()).length > 4 && w0.auf === "true" && w0.text === "−" && w0.name === "Show fewer" && await p.evaluate(() => document.activeElement.id) === "kwkRest", "Klick klappt auf: alle offenen Punkte, der Knopf heisst weniger, der Fokus bleibt", { ...w0, n: (await plattenKeys()).length, fokus: await p.evaluate(() => document.activeElement.id + "/" + document.activeElement.tagName) });
+  assert((await plattenKeys()).length > 5 && w0.auf === "true" && w0.text === "−" && w0.name === "Show fewer" && await p.evaluate(() => document.activeElement.id) === "kwkRest", "Klick klappt auf: alle offenen Punkte, der Knopf heisst weniger, der Fokus bleibt", { ...w0, n: (await plattenKeys()).length, fokus: await p.evaluate(() => document.activeElement.id + "/" + document.activeElement.tagName) });
   // ARIA: in der Liste stehen nur listitems, der Knopf steht daneben (zu und auf)
   for (const zustand of ["auf", "zu"]) {
-    if (zustand === "zu") { await p.click("#kwkRest"); await warte(p, () => document.querySelector("#kwkRest")?.getAttribute("aria-expanded") === "false"); }
+    if (zustand === "zu") { await p.focus("#kwkRest"); await p.keyboard.press("Enter"); await warte(p, () => document.querySelector("#kwkRest")?.getAttribute("aria-expanded") === "false"); }
     const aria = await p.evaluate(() => ({ kinder: [...document.querySelector("#kwkPlatten").children].map((c) => c.getAttribute("role")), knopfInListe: !!document.querySelector("#kwkRest")?.closest('[role="list"]'), n: document.querySelector("#kwkPlatten").children.length }));
     assert(aria.n > 0 && aria.kinder.every((r) => r === "listitem") && !aria.knopfInListe, "Weeklies " + zustand + ": die Kinder der Liste sind nur listitems, der Knopf steht nicht in ihr", aria);
-    if (zustand === "zu") { await p.click("#kwkRest"); await warte(p, () => document.querySelector("#kwkRest")?.getAttribute("aria-expanded") === "true"); }
+    if (zustand === "zu") { await p.focus("#kwkRest"); await p.keyboard.press("Enter"); await warte(p, () => document.querySelector("#kwkRest")?.getAttribute("aria-expanded") === "true"); }
   }
   const keys = await plattenKeys();
   assert(keys[0] === "vertragNyx" || /^(phantomstein|vertragNyx)$/.test(keys[0]), "die taeglichen Punkte stehen zuerst", keys.slice(0, 3));
@@ -319,6 +336,14 @@ for (const f of faelle) {
   // der Name steht in der Zeile selbst, nicht mehr beim Zeigen darueber
   const wz = await p.evaluate(() => { const z = document.querySelector('#kwkPlatten [data-k="regionszertifikat"]'); return { name: z.querySelector(".kn-wn")?.textContent, label: z.getAttribute("aria-label"), m: z.querySelector(".kn-m")?.textContent }; });
   assert(wz.name && wz.label.startsWith(wz.name) && /\d+/.test(wz.m || ""), "die Zeile zeigt Name und Stand und traegt beides im Namen fuer Vorleser", wz);
+  /* Aufbau B: die Zeile der Weeklies ist 24 Punkt hoch wie im Kampf, ihre Fuellung zeigt den Fortschritt n/Menge (--w), deckend in der Reihenfarbe */
+  const wzeilen = await p.evaluate(() => [...document.querySelectorAll("#kwkPlatten .kn-wplatte")].map((b) => {
+    const m = /^(\d+)\/(\d+)$/.exec(b.querySelector(".kn-m")?.textContent ?? ""), f = b.querySelector(".kn-fuell"), br = b.getBoundingClientRect();
+    return { h: br.height, w: parseFloat(getComputedStyle(b).getPropertyValue("--w")), n: m ? +m[1] / +m[2] : null, fuell: f ? f.getBoundingClientRect().width / br.width : null,
+      deckend: f ? !/rgba\([^)]*,\s*0?\.\d+\)/.test(getComputedStyle(f).backgroundColor) : false };
+  }));
+  assert(wzeilen.length > 0 && wzeilen.every((z) => Math.abs(z.h - 24) < 0.6 && z.fuell !== null && z.deckend && (z.n === null || (Math.abs(z.w - z.n) < 0.01 && Math.abs(z.fuell - z.n) < 0.02))),
+    "Weeklies: Zeile 24 Punkt hoch, die Fuellung zeigt den Fortschritt n/Menge und ist deckend", wzeilen);
   // Charakter wechseln (die Lesezeile zeigt wieder ihren Grund, sobald der Fokus die Platte verlaesst)
   await p.evaluate(() => document.activeElement.blur());
   await p.click("#knVor");
@@ -374,8 +399,8 @@ for (const f of faelle) {
   let z = await lies();
   assert(z.alle > 6 && z.ganz === 5 && z.hoch === 130 && z.oben === 0, "oben: fuenf ganze Zeilen in einer Liste von 130 Punkt, die Liste hat mehr", z);
   const n = z.alle - 5;
-  assert(z.hinweis.da && z.hinweis.chip === "\u2193" + n && z.hinweis.wort === "more" && /^\d+\u00a0?%$|^[<>] ?\d+\u00a0?%$/.test(z.hinweis.p) && z.hinweis.tag === "BUTTON" && z.hinweis.versteckt === null,
-    "der Hinweis zeigt \u2193n, Wort und Anteil; seit B (#348) ist er der Knopf zum Aufklappen, fuer den Vorleser da", z.hinweis);
+  assert(z.hinweis.da && z.hinweis.chip === "\u2193" + n && z.hinweis.wort === "more" && z.hinweis.p === "" && z.hinweis.tag === "BUTTON" && z.hinweis.versteckt === null,
+    "der Hinweis zeigt \u2193n, Wort, keinen Anteil; seit B (#348) ist er der Knopf zum Aufklappen, fuer den Vorleser da", z.hinweis);
   assert(z.name === `Skills, rows 1 to 5 of ${z.alle}`, "die Liste nennt ihren Ausschnitt", z.name);
   assert(!(await p.evaluate(() => document.body.classList.contains("kn-alle"))) && !(await p.evaluate(() => document.querySelector(".kn-weg"))), "zu Beginn ist nichts aufgeklappt und nichts versteckt");
   await p.mouse.move(150, 200);
@@ -405,7 +430,7 @@ for (const f of faelle) {
   await warte(p, () => document.querySelector("#bars").scrollTop === 0);
   assert((await fokusZeile()).i === 0, "Pos1: zurueck an den Anfang der Liste");
   const erste = await p.evaluate(() => { const z = document.querySelector("#bars .row:not(.sub)"); return { name: z.querySelector(".nmt").textContent, label: z.getAttribute("aria-label") }; });
-  assert(erste.label && erste.label.includes(erste.name) && /DPS/.test(erste.label), "die Zeile traegt einen Namen fuer Vorleser: Name, DPS, Anteil", erste);
+  assert(erste.label && erste.label.includes(erste.name) && /DPS/.test(erste.label) && !/%/.test(erste.label) && !/%/.test(erste.label), "die Zeile traegt einen Namen fuer Vorleser: Name, Schaden, DPS, ohne Anteil", erste);
   const leseAlt = await p.evaluate(() => getComputedStyle(document.querySelector("#hCompact")).display);
   await p.hover("#bars .row:not(.sub)");
   assert(await p.evaluate(() => getComputedStyle(document.querySelector("#hCompact")).display) === leseAlt && !(await p.evaluate(() => document.querySelector("#knHover"))), "Zeigen ersetzt die Lesezeile nicht mehr (der Name steht in der Zeile)");
@@ -413,7 +438,7 @@ for (const f of faelle) {
   const g = await p.evaluate(() => { const b = getComputedStyle(document.body, "::before"), z = getComputedStyle(document.querySelector("#hDps")), t = getComputedStyle(document.querySelector("#knTabK .kn-lab"));
     return { kante: b.content !== "none" && b.width, zahl: z.webkitTextStrokeWidth, zahlPx: parseFloat(z.fontSize), tab: t.textTransform, kontur: getComputedStyle(document.body).getPropertyValue("--kn-kontur").trim(), font: getComputedStyle(document.body).getPropertyValue("--kn-font-zahl").trim() }; });
   assert(g.kante === "3px", "die Akzentkante links ist 3 Punkt breit", g);
-  assert(g.zahl === "3px" && g.zahlPx >= 40, "die grosse Zahl ist 42 Punkt gross und hat 3 Punkt Kontur", g);
+  assert(g.zahl === "3px" && Math.abs(g.zahlPx - 26) < 0.6, "die grosse Zahl ist 26 Punkt gross (Aufbau B, vorher 42) und hat 3 Punkt Kontur", g);
   assert(g.tab === "uppercase" && g.kontur && g.font, "die Reiter stehen in Grossbuchstaben, Kontur und Schrift der Zahl sind Variablen", g);
   assert(s.fehler.length === 0, "keine Fehler auf der Seite", s.fehler);
   await s.page.close();
@@ -428,7 +453,18 @@ for (const f of faelle) {
     return { h: tr.height, drag: v.getPropertyValue("-webkit-app-region") || v.getPropertyValue("app-region"), b: parseFloat(v.width), breite: tr.width, hoch: parseFloat(v.height),
       pos: v.position, knoepfe: knoepfe.length, falsch: knoepfe.filter((e) => (getComputedStyle(e).getPropertyValue("-webkit-app-region") || getComputedStyle(e).getPropertyValue("app-region")) !== "no-drag").map((e) => e.id || e.tagName) };
   });
-  assert(leiste.h === 34, "die Leiste ist 34 Punkt hoch (vorher 26)", leiste);
+  assert(leiste.h === 26, "die Leiste ist 26 Punkt hoch (Aufbau B; vorher 34)", leiste);
+  /* Aufbau B: der Kopf ist ein Panel (deckend auf --comb mit Haarfuge), links Boss und Schaden, rechts die DPS ueber beide Zeilen */
+  const kopf = await p.evaluate(() => {
+    const h = document.querySelector(".head"), cs = getComputedStyle(h), hr = h.getBoundingClientRect(), r = (q) => document.querySelector(q).getBoundingClientRect();
+    const bg = cs.backgroundColor, sm = /color\(srgb [\d. ]+(?: \/ ([\d.]+))?\)/.exec(bg), a = sm ? (sm[1] === undefined ? 1 : +sm[1]) : /rgba\(.*,\s*([\d.]+)\)/.exec(bg) ? +/rgba\(.*,\s*([\d.]+)\)/.exec(bg)[1] : 1;
+    return { alpha: a, schatten: cs.boxShadow !== "none", rund: parseFloat(cs.borderTopLeftRadius), h: hr.height, links: hr.left, rechts: hr.right,
+      boss: r("#hName .hnt").toJSON(), dps: r("#hDps").toJSON(), meta: r("#hMeta").toJSON(), schadenKurz: document.querySelector('#hMeta [data-f="schaden"] .dmgk')?.textContent ?? "" };
+  });
+  assert(kopf.alpha === 1 && kopf.schatten && kopf.rund >= 6, "der Kopf ist ein deckendes Panel mit Haarfuge und Rundung", kopf);
+  assert(kopf.dps.left > kopf.boss.right - 1 && kopf.dps.right <= kopf.rechts + 0.5 && kopf.meta.top >= kopf.boss.bottom - 1 && kopf.meta.right <= kopf.dps.left + 1 && kopf.schadenKurz !== "",
+    "Kopf: Boss links, darunter Schaden, Uhrzeit und Dauer; die DPS rechts neben beiden", kopf);
+  assert(kopf.h <= 80, "der Kopf ist kompakt (hoechstens 80 Punkt mit Lesezeile)", kopf.h);
   assert(leiste.drag === "drag" && leiste.pos === "absolute" && Math.abs(leiste.b - leiste.breite) <= 1 && Math.abs(leiste.hoch - leiste.h) <= 1, "die ganze Leiste ist Ziehflaeche (::before, volle Breite und Hoehe)", leiste);
   assert(leiste.knoepfe > 0 && leiste.falsch.length === 0, "jeder Knopf in der Leiste ist no-drag", leiste.falsch);
   await s.page.close();
@@ -492,24 +528,24 @@ for (const zoom of [100, 200]) {
 {
   for (const zoom of [100, 200]) {
     const z = zoom / 100;
-    // Kampf: die Breite des Streifens (Leiste mit allen Knoepfen), die Hoehe bis zur ersten Zeile und dem Knopf "weitere"
+    // Kampf: die Breite des Streifens (Leiste mit allen Knoepfen), die Hoehe bis zur ersten Zeile (der Knopf liegt ausserhalb des Flusses)
     const s = await oeffne({ zoom });
     const a = s.groesse;
     const m = await s.page.evaluate(() => ({ barsTop: document.querySelector("#bars").getBoundingClientRect().top, rest: document.querySelector("#kRest:not([hidden])")?.getBoundingClientRect().height ?? 0 }));
     assert(a.min && a.min.w === a.w, zoom + " %: Kampf: die Mindestbreite ist die Breite des Streifens, die Leiste mit allen Knoepfen passt hinein", { min: a.min, w: a.w });
-    const erwartet = Math.round(m.barsTop + 26 * z + (m.rest ? m.rest + 6 * z : 0) + 8 * z) + 2;
-    assert(a.min && Math.abs(a.min.h - erwartet) <= 2 && a.min.h < a.h, zoom + " %: Kampf: die Mindesthoehe reicht bis zur ersten Zeile und dem Knopf weitere", { min: a.min, erwartet, h: a.h });
+    const erwartet = Math.round(m.barsTop + 24 * z + 2 * z) + 2;
+    assert(a.min && Math.abs(a.min.h - erwartet) <= 2 && a.min.h < a.h, zoom + " %: Kampf: die Mindesthoehe reicht bis zur ersten Zeile (der Hinweis liegt nicht mehr im Fluss)", { min: a.min, erwartet, h: a.h });
     await s.page.close();
     // ohne Kampf: der Streifen ist schon der kleinste
     const r = await oeffne({ zoom, beispiel: false });
     assert(r.groesse.min && r.groesse.min.w === r.groesse.w && r.groesse.min.h === r.groesse.h, zoom + " %: ohne Kampf ist der Streifen selbst der Boden", r.groesse);
     await r.page.close();
-    // Weeklies: Kopf, eine Zeile und der Knopf
+    // Weeklies: Kopf und eine Zeile
     const w = await oeffne({ zoom, ansicht: "weeklies" });
     const g = w.groesse;
     const wm = await w.page.evaluate(() => ({ top: document.querySelector("#kwkPlatten").getBoundingClientRect().top, rest: document.querySelector("#kwkRest")?.getBoundingClientRect().height ?? 0 }));
-    const we = Math.round(wm.top + 32 * z + (wm.rest ? wm.rest + 6 * z : 0) + 8 * z) + 2;
-    assert(g.min && g.min.w === g.w && Math.abs(g.min.h - we) <= 2 && g.min.h < g.h, zoom + " %: Weeklies: Mindestbreite und Mindesthoehe (eine Zeile und der Knopf)", { min: g.min, we, h: g.h });
+    const we = Math.round(wm.top + 24 * z + 2 * z) + 2;
+    assert(g.min && g.min.w === g.w && Math.abs(g.min.h - we) <= 2 && g.min.h < g.h, zoom + " %: Weeklies: Mindestbreite und Mindesthoehe (eine Zeile)", { min: g.min, we, h: g.h });
     await w.page.close();
   }
 }
@@ -574,7 +610,7 @@ for (const zoom of [100, 200]) {
       alle: b.querySelectorAll(".row:not(.sub)").length, sh: b.scrollHeight, ch: b.clientHeight, fokus: document.activeElement?.id, hinweisDa: !k.hidden && k.getClientRects().length > 0, breit: document.documentElement.scrollWidth <= innerWidth + 1 }; });
   const z0 = await lies(), h0 = s.groesse.h;
   assert(z0.auf === "false" && z0.alle > 6 && z0.sh > z0.ch && z0.name === "Show all " + z0.alle + " rows", "zu: fuenf Zeilen, der Knopf nennt die Zahl aller Zeilen", z0);
-  await p.click("#kRest");
+  await p.focus("#kRest"); await p.keyboard.press("Enter");
   await warte(p, () => document.querySelector("#kRest")?.getAttribute("aria-expanded") === "true" && document.activeElement?.id === "kRest");
   await bisFenster(s, (a) => a.h > h0, "Fenster waechst mit der Liste");
   await passen(s, 100);
@@ -594,6 +630,43 @@ for (const zoom of [100, 200]) {
   await p.evaluate(() => document.querySelector("#knTabK").click());
   await warte(p, () => !document.body.classList.contains("kn-alle") && document.querySelector("#kRest")?.getAttribute("aria-expanded") === "false");
   await s.page.close();
+}
+// 13. Von Hand hoeher gezogen: die Liste fuellt die Hoehe und zeigt mehr Zeilen, darunter bleibt kaum graue Flaeche
+{
+  const hand = async (s) => {
+    s.handN = 1;
+    const e0 = s.evN;
+    { const ende = performance.now() + 8000; while (s.evN < e0 + 2 && performance.now() < ende) await new Promise((r) => setTimeout(r, 50)); }
+  };
+  const viele = (n) => { const d = stand0(); d.profile[0].eigene = Array.from({ length: n }, (_, i) => ({ schluessel: "eigen" + (i + 1).toString(36).padStart(2, "0"), name: "Punkt " + (i + 1), menge: 1, takt: "woche" })); return d; };
+  const imBild = (sel) => (ziel) => ziel.evaluate((q) => { const k = document.querySelector(q.l).getBoundingClientRect(); return { n: [...document.querySelectorAll(q.z)].filter((b) => { const r = b.getBoundingClientRect(); return r.top >= k.top - 1 && r.bottom <= k.bottom + 1; }).length, unten: k.bottom, h: innerHeight }; }, sel);
+  const luft = 14;
+  {
+    const s = await oeffne({ zoom: 100, adresse: "?win=1&kompakt=1" });
+    const p = s.page;
+    const vorher = await imBild({ l: "#bars", z: "#bars .row:not(.sub)" })(p);
+    await hand(s);
+    await p.setViewportSize({ width: 300, height: 700 });
+    await warte(p, () => document.body.classList.contains("kn-hand"));
+    await warte(p, () => document.querySelector("#bars").clientHeight > 5 * 26 + 10 || document.querySelector("#bars").scrollHeight <= document.querySelector("#bars").clientHeight + 1);
+    const m = await imBild({ l: "#bars", z: "#bars .row:not(.sub)" })(p);
+    assert(vorher.n === 5 && m.n > 5, "Kampf: hoeher gezogen zeigt die Liste mehr Zeilen als die fuenf", { vorher, m });
+    assert(m.h - m.unten <= luft + 10, "Kampf: hoeher gezogen bleibt unter der Liste kaum graue Flaeche", m);
+    await p.close();
+  }
+  {
+    const s = await oeffne({ weeklies: viele(16), ansicht: "weeklies", bildschirm: { width: 1920, height: 2400 }, adresse: "?win=1&kompakt=1" });
+    const p = s.page;
+    await hand(s);
+    await p.setViewportSize({ width: 300, height: 760 });
+    await warte(p, () => document.body.classList.contains("kn-hand"));
+    await warte(p, () => document.querySelector("#kwkPlatten").clientHeight > 5 * 26 + 10);
+    const m = await imBild({ l: "#kwkPlatten", z: "#kwkPlatten .kn-wplatte" })(p);
+    const rest = await p.evaluate(() => document.querySelector("#kwkRest")?.getBoundingClientRect().bottom ?? 0);
+    assert(m.n > 5, "Weeklies: hoeher gezogen zeigt die Liste mehr Zeilen als die fuenf", m);
+    assert(m.h - Math.max(m.unten, rest) <= luft + 10, "Weeklies: hoeher gezogen bleibt unter der Liste kaum graue Flaeche", { m, rest });
+    await p.close();
+  }
 }
 console.log();
 await browser.close();

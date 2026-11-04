@@ -177,6 +177,80 @@ export function vorholen(w: Fenster | null): void {
   w.focus();
 }
 
+/** What the bug report says about the compact window (#382): open, whether
+    shown, where it lies, and whether it is on top. A read only; the flag
+    itself is written in one place, the pin case of window.ts. */
+export interface KompaktMesswerte { isDestroyed(): boolean; isAlwaysOnTop(): boolean; isVisible(): boolean; getBounds(): Rect }
+export interface KompaktLage { offen: boolean; oben: boolean; sichtbar: boolean; ort: { x: number; y: number; w: number; h: number } | null }
+export function kompaktLage(w: KompaktMesswerte | null): KompaktLage {
+  if (!w || w.isDestroyed()) return { offen: false, oben: false, sichtbar: false, ort: null };
+  const b = w.getBounds();
+  return { offen: true, oben: w.isAlwaysOnTop(), sichtbar: w.isVisible(), ort: { x: b.x, y: b.y, w: b.width, h: b.height } };
+}
+
+/*
+ * Who takes the flag away (#382, second report): measured, the compact window
+ * was on top when it opened and not any more after the first click, and nothing
+ * in the code writes the flag but the pin case. So the last few things that
+ * happened to the window are kept in a ring and go into the bug report next to
+ * its place: what the page asked (win:<do>), what Electron said (event:...) and
+ * every change of the flag seen by a look every few hundred ms (oben:true,
+ * oben:false). Read only: the ring never touches the window. The kinds are
+ * fixed words, never a name or a path; the time is the clock's, to the ms.
+ */
+export interface KompaktEreignis { t: string; art: string; n: number }
+export interface KompaktBlick { isDestroyed(): boolean; isAlwaysOnTop(): boolean }
+export interface KompaktPuffer {
+  merke(art: string): void;
+  /** Looks at the flag; writes down the first value and every change. */
+  beobachte(w: KompaktBlick | null): void;
+  liste(): KompaktEreignis[];
+}
+export function neuerKompaktPuffer(max = 60, jetzt: () => number = Date.now): KompaktPuffer {
+  const eintraege: KompaktEreignis[] = [];
+  let zuletzt: boolean | null = null;
+  const merke = (art: string): void => {
+    const t = new Date(jetzt()).toISOString();
+    const letzter = eintraege[eintraege.length - 1];
+    if (letzter && letzter.art === art) {
+      letzter.n++;
+      letzter.t = t;
+      return;
+    }
+    eintraege.push({ t, art, n: 1 });
+    while (eintraege.length > max) eintraege.shift();
+  };
+  return {
+    merke,
+    beobachte(w) {
+      if (!w || w.isDestroyed()) return;
+      const oben = w.isAlwaysOnTop();
+      if (oben === zuletzt) return;
+      zuletzt = oben;
+      merke("oben:" + (oben ? "true" : "false"));
+    },
+    liste: () => eintraege.map((e) => ({ ...e })),
+  };
+}
+
+/* The words of the actions the compact window may be asked (window.ts, KOMPAKT_AKTIONEN). */
+const KOMPAKT_ARTEN = ["kompakt", "close", "resize", "pin", "seethrough", "clickthrough"];
+
+/** What a POST /api/win asked of the compact window, as one fixed word for the
+    ring ("win:pin:an"), or null when it is meant for another window or asks
+    something the compact window does not take. Nothing else of the request is kept. */
+export function kompaktAnfrage(sent: { do?: unknown; win?: unknown; on?: unknown }): string | null {
+  if (sent.win !== "kompakt") return null;
+  const art = KOMPAKT_ARTEN.find((a) => a === sent.do);
+  if (!art) return null;
+  return "win:" + art + (art === "pin" ? (sent.on ? ":an" : ":aus") : "");
+}
+
+/** The place report and the ring in one (GET /api/state, the bug report). */
+export function kompaktBericht(w: KompaktMesswerte | null, puffer: KompaktPuffer): KompaktLage & { ereignisse: KompaktEreignis[] } {
+  return { ...kompaktLage(w), ereignisse: puffer.liste() };
+}
+
 export interface Rect { x: number; y: number; width: number; height: number }
 /** A strip lifted off the bottom edge: where it stood (von) and where it was put (nach). */
 export interface Lift { von: number; nach: number }

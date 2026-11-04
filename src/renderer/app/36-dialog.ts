@@ -123,7 +123,9 @@ export const COMPACT_ROWS = 5;      // rows visible before the list scrolls
 export const COMPACT_FADE = 14;
 /* Kompakt neu, Panel (Spezifikation 21.10.2026, 6): die Hoehe folgt dem Inhalt. KN_MAX_ZEILEN Zeilen hoechstens (darueber rollt die
    Liste in sich, styles.css --kn-max), KN_LUFT_K unter der Liste (Kampf, ohne den Hinweis), KN_LUFT_W in den Weeklies, in Layoutpunkten. */
-export const KN_MAX_ZEILEN = 12, KN_LUFT_K = 8, KN_LUFT_W = 8;
+export const KN_MAX_ZEILEN = 12, KN_LUFT_K = 2, KN_LUFT_W = 2;
+/* Aufbau B: eine Zeile (Kampf und Weeklies) ist 24 Punkt hoch mit 2 Punkt Abstand (styles.css) */
+export const KN_ZEILE = 24, KN_ABSTAND = 2;
 let lastCompactH = 0, lastCompactW = 0, compactSettle: ReturnType<typeof setTimeout> | null = null;
 /* A visible element's box, or null. Hidden ones answer with a zero box at
    0,0, which any sum over children would otherwise take at face value. */
@@ -144,7 +146,7 @@ function compactWindowSize(){
     return el.getBoundingClientRect().height || 0;
   };
   /* Kompakt neu, Panel (Spezifikation 21.10.2026, 6): der Streifen ist ein Panel aus Kopf, Lesezeile und Zeilen. Gemessen werden die
-     Zeilen selbst (die sichtbaren, hoechstens KN_MAX_ZEILEN) und der Knopf "+N weitere", dazu die feste Luft unten. Die Hoehe folgt
+     Zeilen selbst (die sichtbaren, hoechstens KN_MAX_ZEILEN) dazu die feste Luft unten (der Knopf "+N weitere" liegt ausserhalb des Flusses und zaehlt nicht). Die Hoehe folgt
      dem Inhalt, solange keine Hand sie zog. */
   const wkAn = document.body.classList.contains("kn-wk"), zRow = uiZoomFactor();
   const sichtbar = (e: HTMLElement) => e.getClientRects().length > 0 && getComputedStyle(e).display !== "none";
@@ -158,12 +160,14 @@ function compactWindowSize(){
   const zeilenMax = !wkAn && kasten?.classList.contains("kn-rollt") ? KN_SICHT : KN_MAX_ZEILEN;
   /* Weeklies ganz (#348): aufgeklappt hat die Liste keinen Deckel von zwoelf Zeilen, das Fenster waechst mit ihr, bis der Bildschirm endet */
   const wkGanz = wkAn ? document.body.classList.contains("kn-alle") : !!kasten?.classList.contains("kn-offen");
-  const deckel = !wkGanz && kasten && sichtbar(kasten) ? kasten.getBoundingClientRect().top + zeilenMax * (wkAn ? 32 : 26) * zRow + (wkAn ? 40 * zRow : 0) : Infinity;
+  /* Weeklies: die Liste traegt alle Punkte und zeigt zugeklappt --kn-wz Zeilen (72-kompakt-leiste.ts), den Rest rollt sie */
+  const wkZeilen = wkAn && kasten ? Number(kasten.style.getPropertyValue("--kn-wz")) || KN_MAX_ZEILEN : zeilenMax;
+  const deckel = !wkGanz && kasten && sichtbar(kasten) ? kasten.getBoundingClientRect().top + wkZeilen * (KN_ZEILE + KN_ABSTAND) * zRow : Infinity;
   const zeilenEnde = Math.min(unten(wkAn ? "#kwkPlatten .kn-wplatte, #kwkPlatten .kn-alles" : "#bars .row"), deckel);
   /* Der Knopf steht unter der Liste, so hoch wie er ist; seine Unterkante allein reicht nicht: gibt die Liste nach (Fenster niedriger als
      sie), rueckt er hoch, und die Zeilen reichen dann unter ihn. Darum Unterkante der Zeilen plus seine Hoehe und sein Abstand. */
-  const knopf = document.querySelector<HTMLElement>(wkAn ? "#kwkRest" : "#kRest");
-  const knopfH = knopf && !knopf.hidden && sichtbar(knopf) ? knopf.getBoundingClientRect().height + 6 * zRow : 0;
+  /* Der Knopf liegt ausserhalb des Flusses (styles.css, nur beim Fokus sichtbar): er nimmt keine Hoehe */
+  const knopfH = 0;
   const ende = zeilenEnde + knopfH;
   const block = ende > 0 ? Math.max(0, ende - chrome) : 0;
   /* Ohne Kampf ist nur das Chrom da - der Streifen. Mit Meldung (der Randlos-Hinweis beim ersten Mal) nimmt das Fenster
@@ -278,7 +282,7 @@ function compactWindowSize(){
   /* Der Boden (#348): so klein, dass der Streifen lesbar bleibt - in der Breite die Leiste mit allen Knoepfen, in der Hoehe Kopf, eine
      Zeile und der Knopf. Ohne Kampf ist der Streifen selbst der Boden. Der Hauptprozess setzt ihn als Mindestgroesse des Fensters. */
   const ersteZeile = (wkAn ? document.querySelector<HTMLElement>("#kwkPlatten .kn-wplatte, #kwkPlatten .kn-alles") : document.querySelector<HTMLElement>("#bars .row:not(.sub):not(.kn-weg)"));
-  const ersteH = ersteZeile && sichtbar(ersteZeile) ? ersteZeile.getBoundingClientRect().height : (wkAn ? 32 : 26) * zRow;
+  const ersteH = ersteZeile && sichtbar(ersteZeile) ? ersteZeile.getBoundingClientRect().height : (KN_ZEILE + KN_ABSTAND) * zRow;
   const hBoden = ruht || !kasten || !sichtbar(kasten) ? hFenster : Math.min(hFenster, Math.round(kasten.getBoundingClientRect().top + ersteH + knopfH + (wkAn ? KN_LUFT_W : KN_LUFT_K) * zRow) + 2);
   return {w: wFenster, h: hFenster, min: {w: wFenster, h: hBoden}};
 }

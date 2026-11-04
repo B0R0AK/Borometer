@@ -12,7 +12,7 @@ import { switchTab } from "./34-menus-drop-and-tabs";
 import { ABRISS_FENSTER, konfigGelesen, SERVED } from "./41-server-mode";
 import { isWatching } from "./45-startup";
 import { archivNamenHaken, charakterNamen } from "./59-weeklies";
-import { archivEintrag, archivKurve, archivMenge, type MengeKampf, archivOrte, archivPlatz, archivSchluessel, archivStatistik, archivZahlen, auswahlUmschalten, bestaetigungOk, bossListeAus, geloesteGruppen, kampfStueck, loeschSoll, logZeilen, type ArchivFilter, type ArchivKampf, type ArchivOrt, type LogZeilen } from "../archiv-core";
+import { archivEintrag, archivKurve, archivMenge, type MengeKampf, archivOrte, archivPlatz, archivPlatzJetzt, archivSchluessel, archivStatistik, archivZahlen, auswahlUmschalten, bestaetigungOk, bossListeAus, geloesteGruppen, kampfStueck, loeschSoll, logZeilen, type ArchivFilter, type ArchivKampf, type ArchivOrt, type LogZeilen } from "../archiv-core";
 import { abendText } from "../build-core";
 import { besterPull } from "../best-pull-core";
 import { abendAchse, imZeitraum, zeitSpanne, type Zeitraum } from "../verlauf-core";
@@ -442,11 +442,9 @@ const KEINE = new Map<string, {n: number; bester: number}>();
 function kaempfeJetzt(): ArchivKampf[] {
   if(!SERVED || !stand) return [];
   if(jetzt && jetzt.nr === standNr) return jetzt.liste;
-  const ids = new Set(plaetze().map(o => o.id));
   const liste = stand.map(k => {
-    if(ids.has(k.platz)) return k;
-    const neu = archivPlatz(k.boss, plaetze(), k.c);
-    return neu ? {...k, platz: neu} : k;
+    const neu = archivPlatzJetzt(k, plaetze());
+    return neu === k.platz ? k : {...k, platz: neu};
   });
   // je Platz die Kaempfe, aelteste zuerst (fuer die Kurven), ohne geloeste
   const proPlatz = new Map<string, ArchivKampf[]>();

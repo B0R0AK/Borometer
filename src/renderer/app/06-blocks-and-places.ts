@@ -310,6 +310,9 @@ export function histKey(name: string){
     const g = bossGroup(n) || bossGroup(bare);
     if(g) return g[0];
     const o = openBoss(n);
+    /* Ein Teil eines Kolosses (Vegarion von Vegamor) ist nicht der Boss: eigener Schluessel,
+       sonst liefe sein Kampf als Kampf gegen Vegamor (Issue #393). Die Form (Vagamont) ist Vegamor selbst. */
+    if(o && o.kind === "koloss" && !formBoss(roh) && !(o.forms || []).includes(bare) && bare.toLowerCase() !== o.names[0]!.toLowerCase()) return bare;
     if(o) return o.names[0];
     return n;
   }).join(" · ");

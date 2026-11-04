@@ -683,7 +683,7 @@ try {
         return { platte: !!e.style.getPropertyValue("--sic-c") && bg === farbe && bg !== "rgba(0, 0, 0, 0)" && r.width === seite && r.height === seite, bg, farbe, w: r.width, h: r.height };
       }), [BILDER, seite]);
     const ohneSym = " (ohne Spielbilder: Platte in --sic-c, 16 Punkt)";
-    const ohneSymKompakt = " (ohne Spielbilder: Platte in --sic-c, 18 Punkt)"; /* Kompakt neu, Panel (#287): 18 statt 26 Punkt */
+    const ohneSymKompakt = " (ohne Spielbilder: Platte in --sic-c, 20 Punkt)"; /* Aufbau B: 20 Punkt (vorher 18, Panel #287) */
     let r = await ringe();
     assert(r.length >= 3 && r.every((x) => BILDER ? !x : x.platte), "Liste: Symbole ohne Farbring" + (BILDER ? "" : ohneSym), r);
 
@@ -775,16 +775,16 @@ try {
       const z = document.querySelector("#bars .row:not(.sub)");
       const f = z.querySelector(".fill").getBoundingClientRect(), zb = z.getBoundingClientRect();
       return { zellen: [...z.querySelectorAll("[role=gridcell]")].filter(sicht).map((c) => c.dataset.k || c.className.split(" ")[0]),
-        fuellt: f.height >= 18 && f.left <= zb.left + 1, nameSicht: sicht(z.querySelector(".nmt")),
-        dmg: getComputedStyle(z.querySelector('[data-k="share"]')).fontFamily };
+        fuellt: f.height >= 24 && f.left <= zb.left + 1, nameSicht: sicht(z.querySelector(".nmt")),
+        dmg: getComputedStyle(z.querySelector('[data-k="damage"]')).fontFamily };
     });
     /* Kompakt neu (14.10.2026, #241): je Zeile eine Platte - Schaden und Anteil stehen, der Name nur fuer Vorleser (Zelle ohne eigenen
        Kasten), die Spur liegt unter der Zahl in der Breite der Platte, die Zahl in der Textschrift (die Platte ist 44 Punkt breit) */
     /* Kompakt neu, Panel (21.10.2026, #287): je Zeile steht der Anteil (der Schaden nur im Namen fuer Vorleser), der Name ist sichtbar,
        der Balken fuellt die Zeile von der Kante an, die Zahl steht in der Textschrift. */
-    assert(JSON.stringify(kompakt.zellen) === JSON.stringify(["share"]) && kompakt.fuellt && kompakt.nameSicht && !/Anton/.test(kompakt.dmg),
-      "Kompakt (Panel): Anteil je Zeile, der Name sichtbar, der Balken fuellt die Zeile, die Zahl in der Textschrift", kompakt);
-    r = await ringe(18);
+    assert(JSON.stringify(kompakt.zellen) === JSON.stringify(["damage", "dps"]) && kompakt.fuellt && kompakt.nameSicht && !/Anton/.test(kompakt.dmg),
+      "Kompakt (Panel): Schaden und DPS je Zeile (Aufbau B, kein Anteil), der Name sichtbar, die Fuellung deckt die Zeile, der Schaden in der Textschrift", kompakt);
+    r = await ringe(20);
     assert(r.length >= 3 && r.every((x) => BILDER ? x : x.platte), "Kompakt: die Symbole behalten ihren Farbring" + (BILDER ? "" : ohneSymKompakt), r);
     await page.evaluate(() => document.querySelector("#btnCompact").click());
     await page.waitForTimeout(300);

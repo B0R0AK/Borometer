@@ -1,6 +1,19 @@
 BOROMETER — CHANGELOG
 =====================
 
+v2.1
+------
+Added
+  - Compact: the Weeklies list scrolls with the mouse wheel; drag the window taller to see more skills and Weeklies (#328)
+  - Compact: in a group, a click on a member opens their four strongest skills; Esc closes (#328)
+Changed
+  - Compact window in a new look: slim bar with tabs, big number in the head, one row per skill with icon, name, damage and DPS (#328)
+  - Compact: the “more” hint is no longer in the view; use the mouse wheel or a taller window, the button stays for keyboard and screen reader (#328)
+Fixed
+  - Compact window stays on top of the game after a click (#382)
+  - Records: the Vegamor card counts only fights against Vegamor itself; its parts, Vegarion and the others, no longer count (#393)
+  - Archive: the Vegamor boss page lists only fights against Vegamor; the parts have places of their own and are found by search (#395)
+
 v2.0.1
 ------
 Fixed

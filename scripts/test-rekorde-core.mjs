@@ -143,13 +143,24 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
   // Kolosse: ueber alle Teile, und der Treffer nennt den Teil
   const a = core.rekorde([
     k("Akman", 180000, 0, { top: 400000 }), k("Aufgestiegener Deckman", 210000, 1, { top: 700000 }),
-    k("Vegarus", 90000, 2, { top: 200000 }), k("Vagamont", 95000, 2, { min: 5, top: 260000 }), k("Vegamor's Claw", 80000, 2, { min: 9, top: 250000 }),
   ], T, false);
-  const m = platz(a, "Manticus").wert, v = platz(a, "Vegamor").wert;
+  const m = platz(a, "Manticus").wert;
   eq([m.n, m.bester, m.dps, m.vorher, m.top, m.topTeil], [2, true, 210000, 180000, 700000, "Deckman"], "Manticus: ein Boss ueber beide Haelften, der Treffer nennt Deckman");
-  eq([v.n, v.top, v.topTeil], [3, 260000, null], "Vegamor: drei Teile ein Boss; der Treffer an Vagamont (seiner Form) nennt keinen Teil");
-  const v2 = core.rekorde([k("Vegarion", 90000, 2, { top: 300000 })], T, false);
-  eq(platz(v2, "Vegamor").wert.topTeil, "Vegarion", "ein Treffer an Vegarion nennt Vegarion");
+}
+{
+  /* Vegamor (Issue #393, Entscheidung 03.11.2026): die Karte zaehlt nur Kaempfe gegen
+     Vegamor selbst, auch unter seinem inneren Namen Vagamont. Die Teile (Vegarus,
+     Vegarion, Vegaorb, Klaue) fliessen nicht ein, auch nicht mit hoeherem Wert. */
+  const a = core.rekorde([
+    k("Vegarion", 28700, 0, { top: 900000 }), k("Vegarus", 90000, 1, { top: 950000 }), k("Vegamor's Claw", 80000, 1, { min: 9, top: 250000 }),
+    k("Vegamors Klaue", 70000, 1, { min: 12, top: 250000 }),
+    k("Vegamor", 100000, 2, { top: 300000 }), k("Vagamont", 450000, 3, { top: 260000 }),
+  ], T, false);
+  const v = platz(a, "Vegamor").wert;
+  eq([v.n, v.bester, v.dps, v.vorher, v.top, v.topTeil, a.ohneOrt], [2, true, 450000, 100000, 300000, null, 4],
+    "Vegamor: nur die Kaempfe gegen Vegamor (und Vagamont) zaehlen; die Teile sind weder Karte noch Bestwert noch Treffer");
+  const nurTeil = core.rekorde([k("Vegarion", 28700, 0, { top: 900000 })], T, false);
+  eq([platz(nurTeil, "Vegamor").wert, nurTeil.ohneOrt], [null, 1], "ein Kampf nur gegen Vegarion legt die Karte Vegamor nicht an");
 }
 {
   // Zairos und Vulkan: ein Medaillon; ein Pull nur auf Vulkan ist sein Rest. Radeth bleibt fuer sich.
@@ -255,14 +266,17 @@ const platz = (a, de, klasse) => a.seiten.flatMap((s) => s.gruppen.flatMap((g) =
     eq(t[3].gruppen.find((g) => g.key === "separat").orte.map((x) => x.de), ["Verence", "Marta", "Haylock", "Gaudian", "Molgras", "Murdock"],
       "echte Tabelle: die Halle der Illusionen hat sechs Plaetze (#252)");
     ok(o.length === new Set(o.map((x) => x.id)).size && o.length > 60, "echte Tabelle: jeder Boss einmal", o.length);
-    const a = core.rekorde([k("Deluzhnoa", 1, 0), k("Ascended Aridus [Undead]", 1, 0), k("King Khanzaizin", 1, 0), k("Vegamor's Claw", 1, 0)], t, false);
-    eq(a.ohneOrt, 0, "echte Tabelle: Erzboss, Feldboss mit Zustand, Dungeonboss und Kolossteil finden ihren Platz");
+    const a = core.rekorde([k("Deluzhnoa", 1, 0), k("Ascended Aridus [Undead]", 1, 0), k("King Khanzaizin", 1, 0), k("Vagamont", 1, 0)], t, false);
+    eq(a.ohneOrt, 0, "echte Tabelle: Erzboss, Feldboss mit Zustand, Dungeonboss und Koloss (Form Vagamont) finden ihren Platz");
+    const teile = core.rekorde(["Vegarus", "Vegarion", "Vegaorb", "Vegamor's Claw", "Vegamors Klaue"].map((n) => k(n, 1, 0)), t, false);
+    eq([teile.ohneOrt, teile.kaempfe], [5, 0], "echte Tabelle: die Teile von Vegamor haben keinen Platz in seiner Karte (#393)");
     /* Bester Pull 5.3: ein Pull aus boro-best.json kann als Namen nur seinen
        Schluessel "boss:<histKey>" haben - der histKey jeder Schreibweise
        muss denselben Platz finden wie die Schreibweise selbst */
     const hk = await bundle('export { histKey } from "./src/renderer/app/06-blocks-and-places";', "node");
     const platz = (n) => core.rekorde([k(n, 1, 0)], t, false).seiten.flatMap((s) => s.gruppen.flatMap((g) => g.plaetze)).find((p) => p.wert)?.ort.id ?? null;
-    const falsch = o.filter((x) => x.klasse == null).flatMap((x) => x.namen.map((n) => [x.id, n, hk.histKey(n)]))
+    // die Teile eines Kolosses (ort.ohne) zaehlen nicht in die Karte und haben einen eigenen Schluessel (#393)
+    const falsch = o.filter((x) => x.klasse == null).flatMap((x) => x.namen.filter((n) => !(x.ohne || []).includes(n)).map((n) => [x.id, n, hk.histKey(n)]))
       .filter(([id, , key]) => platz(key) !== id);
     eq(falsch, [], "echte Tabelle: der histKey jeder Schreibweise findet ihren Platz (Schluessel aus boro-best.json)");
   }

@@ -25,7 +25,7 @@ import {
 import { meldeKampf } from "./notify";
 import { setLiveBadge } from "./taskbar";
 import { auftragErledigt } from "./start";
-import { abrissTeil, fensterOptionen, kompaktMinimum, menueArt, streifenLage, type AbrissTeil, type Ansicht, type Lift } from "./windows-core";
+import { abrissTeil, fensterOptionen, kompaktBericht, kompaktMinimum, menueArt, neuerKompaktPuffer, streifenLage, type AbrissTeil, type Ansicht, type Lift } from "./windows-core";
 import { zeigeMenue } from "./menue";
 import type { Json } from "./http";
 
@@ -136,6 +136,22 @@ function kampfZeit(v: unknown): number | null {
 export function kompaktStand(): { offen: boolean; live: boolean; durch: boolean; grund: string; datei: string; kampf: number | null } {
   return { offen: kompaktWindow() !== null, live: kompakt.start.live, durch: kompakt.start.durch,
     grund: vollStand.grund, datei: vollStand.datei, kampf: vollStand.kampf };
+}
+
+/** For GET /api/state and the bug report: whether the compact window is
+    open, shown, where it lies and whether it is on top (#382). */
+export function kompaktLageJetzt(): ReturnType<typeof kompaktBericht> {
+  return kompaktBericht(kompaktWindow(), kompaktPuffer);
+}
+
+/* The last things that happened to the compact window, for the report: who
+   takes its place on top away is not known (#382). Written here, read in
+   kompaktLageJetzt; nothing in it acts on the window. */
+const kompaktPuffer = neuerKompaktPuffer();
+
+/** What the page asked of the compact window (server.ts names it with kompaktAnfrage): one word into the ring. */
+export function kompaktMerke(art: string): void {
+  kompaktPuffer.merke(art);
 }
 
 /* Whether compact can be a window of its own here: in the app's own window
@@ -382,6 +398,14 @@ function openKompakt(start: { live: boolean; durch: boolean }): boolean {
   });
   kompakt.win = kw;
   kompakt.through = false;
+  // what is seen of it from here on (see kompaktPuffer): Electron's own words,
+  // and a look at the flag every 250 ms, which also sees a change Electron
+  // does not report (measured: a flag changed from outside raises no event)
+  kompaktPuffer.merke("offen");
+  kw.on("always-on-top-changed", (_e, on) => kompaktPuffer.merke("event:always-on-top-changed:" + (on ? "true" : "false")));
+  kw.on("focus", () => kompaktPuffer.merke("event:focus"));
+  kw.on("blur", () => kompaktPuffer.merke("event:blur"));
+  const wache = setInterval(() => kompaktPuffer.beobachte(kw), 250);
   // a new strip measures itself anew: its limit starts from its first size
   streifen.grenze = { w: 0, h: 0 };
   streifen.vorMenue = null;
@@ -412,6 +436,8 @@ function openKompakt(start: { live: boolean; durch: boolean }): boolean {
   });
   kw.on("close", () => kompaktMerker.jetzt());
   kw.on("closed", () => {
+    clearInterval(wache);
+    kompaktPuffer.merke("zu");
     if (kompakt.win === kw) {
       kompakt.win = null;
       kompakt.through = false;
@@ -994,7 +1020,10 @@ export function winAction(sent: Json): Answer {
          * Discord or browser window uses while gaming.
          */
         const want = !!sent.on;
-        win.setAlwaysOnTop(want);
+        // The compact window alone is pinned at the "screen-saver" level: on the
+        // plain level the flag was taken back ~120 ms after the first click in a
+        // borderless game (#382). Full view stays on the plain level.
+        if (want && win === kompaktWindow()) { win.setAlwaysOnTop(true, "screen-saver"); kompaktPuffer.merke("ebene:screen-saver"); } else win.setAlwaysOnTop(want);
         // Only a pin made in compact is kept for the next start; the page
         // sends remember:false for a pin in the full view (frame spec 3.1).
         // The compact window (N4) is on top by itself: its pin is never kept.

@@ -6064,7 +6064,7 @@ body.compact .top > *{opacity:.50;transition:opacity .16s ease}
    leise genug; an muss man es sehen, ohne hinzuzeigen. */
 body.compact .top #btnWatch{opacity:1}
 body.compact .top{
-  height:34px;padding:0 0 0 8px;gap:6px;flex-wrap:nowrap;align-items:center;
+  height:26px;padding:0 0 0 8px;gap:6px;flex-wrap:nowrap;align-items:center;
   /* Kein Verlauf, keine Trennlinie, keine runden Ecken mehr: das waren die
      drei Dinge, die aus diesen 26 Punkten eine Werkzeugleiste gemacht haben.
      Die Ecken sassen ausserdem seit dem Wegfall des Fensterradius auf einer
@@ -6081,7 +6081,7 @@ body.compact .top{
    document (placeWindowChrome, #188), so among the controls at 2 it would
    come first; at 3 it comes after all of them and, being earlier in the
    document, still ahead of the window buttons. */
-body.compact .top .tdrag{order:3;min-width:60px;height:34px;align-self:auto}
+body.compact .top .tdrag{order:3;min-width:60px;height:26px;align-self:auto}
 /* Die ganze Leiste ist Ziehflaeche (#328, 27.10.2026: das Verschieben war schwer, der Griff zu schmal): eine unsichtbare Flaeche
    hinter dem Inhalt der Leiste (z-index:-1 in einem eigenen Stapel), im Dokument vor allen Knoepfen; die Knoepfe nehmen sich unten
    als no-drag wieder heraus (#188: der Griff steht vorn, die Knoepfe sagen no-drag - beides zusammen). Kein Zeiger, keine Farbe. */
@@ -8268,41 +8268,60 @@ body.compact #bars .bhead{position:absolute;width:1px;height:1px;margin:-1px;pad
    "+N weitere" (#kRest, im Fluss); die Zeilen darueber hinaus tragen kn-weg (16-fight-analysis.ts, restZeileSetzen). */
 /* .table steht davor (body.compact .table #bars{max-height:none}, weiter oben): gleiche Spezifitaet, spaeter, also gilt der Deckel. Die Liste gibt nach, wenn das
    Fenster niedriger ist als sie (flex-shrink), und rollt dann in sich; der Knopf darunter bleibt (flex:none). */
-body.compact .table #bars{display:block;flex:0 1 auto;min-height:0;height:auto;margin:6px 12px 0 14px;padding:0;max-height:calc(var(--kn-zeilen,5) * 26px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;scroll-snap-type:y mandatory;scroll-padding-top:0}
+body.compact .table #bars{display:block;flex:0 1 auto;min-height:0;height:auto;margin:4px 4px 0;padding:0;max-height:calc(var(--kn-zeilen,5) * 26px);overflow-y:auto;overscroll-behavior:contain;scrollbar-width:none;scroll-snap-type:y mandatory;scroll-padding-top:0}
 body.compact #bars .row:not(.sub){scroll-snap-align:start}
-body.compact #bars .row:not(.sub){--spur:0px;position:relative;display:grid;grid-template-columns:auto minmax(0,1fr) auto;column-gap:8px;align-items:center;
-  height:26px;min-height:0;margin:0;padding:0 6px 0 4px;text-align:left;overflow:hidden;border-radius:3px;background:none;box-shadow:none;cursor:default}
+/* Aufbau B (Spezifikation 02.11.2026, Vorhaben Kompakt im neuen Design): Symbol 20 | Name | Schaden | DPS, 24 Punkt hoch, 2 Punkt Abstand.
+   Zeile und Fuellung sind deckend (Wunsch #328: Balken bleiben deckend, nur der Fensterhintergrund scheint durch); den Anteil zeigt die
+   Fuellung, keine Prozentzahl. */
+body.compact #bars .row:not(.sub){--spur:0px;position:relative;display:grid;grid-template-columns:minmax(20px,auto) minmax(0,1fr) auto auto;column-gap:6px;align-items:center;
+  height:24px;min-height:0;margin:0 0 2px;padding:0 8px 0 3px;text-align:left;overflow:hidden;border-radius:5px;background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule);cursor:default}
 body.compact #bars .row.kn-weg{display:none}
-body.compact #bars .row:not(.sub):hover{background:none;box-shadow:none}
+body.compact #bars .row:not(.sub):hover{background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
 body.compact #bars .row:not(.sub):focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
-body.compact #bars .row:not(.sub) :is(.rank,.twist,.cmark,.v:not([data-k="share"])){display:none}
+body.compact #bars .row:not(.sub) :is(.rank,.twist,.cmark,.v:not([data-k="damage"],[data-k="dps"])){display:none}
 body.compact #bars .row:not(.sub) .nm{display:contents}
-body.compact #bars .row:not(.sub) .nm img.sic,body.compact #bars .row:not(.sub) .nm .sic{position:relative;z-index:1;grid-column:1;width:18px;height:18px;margin:0;border-radius:4px;flex:none}
+body.compact #bars .row:not(.sub) .nm img.sic,body.compact #bars .row:not(.sub) .nm .sic{position:relative;z-index:1;grid-column:1;width:20px;height:20px;margin:0;border-radius:4px;flex:none}
 body.compact #bars .row:not(.sub) .nm .sic.leer{margin:0}
 body.compact #bars .row:not(.sub) .nmt{position:relative;z-index:1;grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;
-  font:var(--fs-sm)/1.3 var(--kn-font-text);color:var(--text);text-shadow:var(--kn-schatten)}
-body.compact #bars .row:not(.sub) .v[data-k="share"]{position:relative;z-index:1;grid-column:3;display:block;justify-self:end;height:auto;font:600 var(--fs-sm)/1.3 var(--kn-font-text);
+  font:600 var(--fs-sm)/1.3 var(--kn-font-text);color:var(--text);text-shadow:var(--kn-schatten)}
+body.compact #bars .row:not(.sub) .v[data-k="damage"]{position:relative;z-index:1;grid-column:3;display:block;justify-self:end;height:auto;font:var(--fs-sm)/1.3 var(--kn-font-text);
   font-variant-numeric:tabular-nums;color:var(--text);text-shadow:var(--kn-schatten);white-space:nowrap}
-body.compact #bars .row:not(.sub) .fill,body.compact #bars .row:not(.sub):hover .fill{position:absolute;z-index:0;left:0;top:2px;bottom:2px;height:auto;
-  width:calc(100% * var(--w,0));border-radius:2px;opacity:1;background:var(--fill-tex-kompakt),color-mix(in srgb,var(--c,var(--gold)) 44%,transparent);
+body.compact #bars .row:not(.sub) .v[data-k="dps"]{position:relative;z-index:1;grid-column:4;display:block;justify-self:end;height:auto;min-width:56px;text-align:right;
+  font:400 14px/1 var(--kn-font-zahl);letter-spacing:-.005em;font-variant-numeric:tabular-nums;color:var(--text);text-shadow:var(--kn-schatten);white-space:nowrap}
+body.compact #bars .row:not(.sub) .fill,body.compact #bars .row:not(.sub):hover .fill{position:absolute;z-index:0;left:0;top:0;bottom:0;height:auto;
+  width:calc(100% * var(--w,0));border-radius:0;opacity:1;background:var(--fill-tex-kompakt),color-mix(in srgb,var(--c,var(--gold)) 62%,var(--comb));
   box-shadow:inset 3px 0 0 var(--c,var(--gold));filter:none;mix-blend-mode:normal}
 /* im Gruppenbild steht das Waffenpaar statt des Symbols: zwei kleine Symbole */
 body.compact #bars .row:not(.sub) .nm .wpair{grid-column:1;min-width:34px;width:34px;gap:2px}
 body.compact #bars .row:not(.sub) .nm .wpair .wic{width:16px;height:16px;margin:0}
+/* Aufbau B: die aufgeklappten Zeilen eines Mitglieds (Gruppe) und die Trefferarten einer Faehigkeit: 26 Punkt, 16 Punkt eingerueckt,
+   Symbol, Name, DPS; deckend wie die Hauptzeilen, die Fuellung schwaecher (40 %). */
+body.compact #bars .row.sub{position:relative;display:grid;grid-template-columns:minmax(18px,auto) minmax(0,1fr) auto auto;column-gap:6px;align-items:center;height:22px;min-height:0;margin:0 0 2px 12px;
+  padding:0 8px 0 3px;border-radius:5px;overflow:hidden;background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule);font:var(--fs-xs)/1 var(--kn-font-text);cursor:default;scroll-snap-align:none}
+body.compact #bars .row.sub.lvl3{display:none}
+body.compact #bars .row.sub :is(.rank,.twist,.v:not([data-k="dps"])){display:none}
+body.compact #bars .row.sub .cmark{position:relative;z-index:1;grid-column:3;justify-self:end}
+body.compact #bars .row.sub .nm{display:contents}
+body.compact #bars .row.sub .nm img.sic,body.compact #bars .row.sub .nm .sic{position:relative;z-index:1;grid-column:1;width:16px;height:16px;margin:0;border-radius:4px}
+body.compact #bars .row.sub .nmt{position:relative;z-index:1;grid-column:2;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font:var(--fs-xs)/1.2 var(--kn-font-text);color:var(--text);text-shadow:var(--kn-schatten)}
+body.compact #bars .row.sub .v[data-k="dps"]{position:relative;z-index:1;grid-column:4;display:block;justify-self:end;font:400 13px/1 var(--kn-font-zahl);font-variant-numeric:tabular-nums;color:var(--text);text-shadow:var(--kn-schatten);white-space:nowrap}
+body.compact #bars .row.sub .fill{position:absolute;z-index:0;left:0;top:0;bottom:0;height:auto;width:calc(100% * var(--w,0));border-radius:0;opacity:1;
+  background:color-mix(in srgb,var(--c,var(--gold)) 40%,var(--comb));box-shadow:none;filter:none;mix-blend-mode:normal}
+body.compact #bars .row:not(.sub).open{box-shadow:inset 0 0 0 1px var(--gold-ink)}
 
-/* Der Hinweis unter der Liste im Kampf (#328, vorher der Knopf "+N weitere", #287): ein stiller Text im Fluss, kein Knopf, 22 Punkt,
+/* Der Hinweis unter der Liste im Kampf (#328, vorher der Knopf "+N weitere", #287): ein stiller Text im Fluss, kein Knopf (seit 03.11.2026 liegt er ausserhalb des Flusses, nur bei Fokus sichtbar, siehe Dateiende),
    Chip mit Pfeil und Zahl, Wort, Anteil; am Ende "\2191 Ende". Er steht unter der Liste, nie darueber. In den Weeklies bleibt der Knopf
    (#kwkRest, Gestalt wie bisher); der Hinweis nimmt unten seine eigene Regel (#kRest). */
 .krest{display:none}
 body.compact #app{position:relative}
-body.compact .krest:not([hidden]){display:flex;flex:none;align-items:center;gap:7px;box-sizing:border-box;height:28px;margin:6px 12px 0 14px;padding:0 8px;
+body.compact .krest:not([hidden]){display:flex;flex:none;align-items:center;gap:6px;box-sizing:border-box;height:14px;margin:2px 4px 0;padding:0 8px;
   border:1px dashed var(--hair-rule-strong);border-radius:3px;background:none;color:var(--text);font:inherit;font-size:var(--fs-xs);text-align:left;
   cursor:pointer;text-shadow:var(--kn-schatten)}
 body.compact .krest .kresttext,body.compact .krest .krestwert{position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
 body.compact .krest .krestbahn{display:none}
-body.compact .krest .krestn{display:inline-flex;align-items:center;justify-content:center;min-width:24px;height:18px;padding:0 5px;border-radius:9px;flex:none;
-  background:color-mix(in srgb,var(--gold-ink) 20%,transparent);color:var(--gold-ink);font-weight:700;font-size:var(--fs-xs);text-shadow:none}
-body.compact .krest .krestw{flex:1;min-width:0;color:var(--text)}
+body.compact .krest .krestn{display:inline-flex;align-items:center;justify-content:center;min-width:20px;height:12px;padding:0 4px;border-radius:6px;flex:none;line-height:1;
+  background:color-mix(in srgb,var(--gold-ink) 20%,transparent);color:var(--gold-ink);font-weight:700;font-size:var(--fs-2xs);text-shadow:none}
+body.compact .krest .krestw{flex:1;min-width:0;color:var(--text);font-size:var(--fs-2xs)}
 body.compact .krest .krestp{font-weight:600;font-variant-numeric:tabular-nums;color:var(--text)}
 body.compact .krest::after{content:"";flex:none;width:6px;height:6px;margin:0 3px 3px 4px;border:solid var(--ink-soft);border-width:0 1.6px 1.6px 0;transform:rotate(45deg)}
 body.compact .krest[aria-expanded="true"]::after{margin-bottom:-2px;transform:rotate(225deg)}
@@ -8310,8 +8329,8 @@ body.compact .krest:hover{background:rgba(255,255,255,.07)}
 :root[data-theme="light"] body.compact .krest:hover{background:rgba(0,0,0,.06)}
 body.compact .krest:focus-visible{outline:2px solid var(--focus);outline-offset:1px}
 body.compact.durchsicht .krest{color:var(--text)}
-/* #kRest ist ein stiller Text (#328), seit #348 der Knopf zum Aufklappen: 22 Punkt, ohne Kante, der Pfeil steht im Chip; Zeiger und Hover wie die anderen Knoepfe */
-body.compact #kRest:not([hidden]){height:22px;margin:6px 12px 0 14px;padding:0 6px;border:0;border-radius:3px;cursor:pointer;user-select:none}
+/* #kRest ist ein stiller Text (#328), seit #348 der Knopf zum Aufklappen: 12 Punkt hoch, ohne Kante, der Pfeil steht im Chip; Zeiger und Hover wie die anderen Knoepfe */
+body.compact #kRest:not([hidden]){height:12px;margin:2px 12px 0 14px;padding:0 6px;border:0;border-radius:3px;cursor:pointer;user-select:none}
 body.compact #kRest::after{content:none}
 body.compact #kRest .krestw{flex:none}
 
@@ -8890,7 +8909,7 @@ html.mica[data-theme="glas"] body:not(.compact) .gl :is(.gl-spalte,.gl-agenda,.g
 body.compact{--insel:rgba(var(--glass),.88);--insel-hi:rgba(var(--glass),.97);--insel-rand:var(--hair-rule)}
 .kn-tabs{display:none}
 body.compact .kn-tabs{display:flex;gap:2px;padding:0;order:-2;flex:none;align-self:center;margin-left:6px;border-radius:0;background:none;box-shadow:none}
-body.compact .kn-tabs button{all:unset;box-sizing:border-box;height:24px;padding:0 7px;border-radius:3px;font-family:var(--kn-font-text);font-size:var(--fs-2xs);letter-spacing:.06em;
+body.compact .kn-tabs button{all:unset;box-sizing:border-box;height:22px;padding:0 7px;border-radius:3px;font-family:var(--kn-font-text);font-size:var(--fs-2xs);letter-spacing:.06em;
   text-transform:uppercase;color:var(--ink-soft);cursor:pointer;display:inline-flex;align-items:center;gap:5px;white-space:nowrap;text-shadow:var(--kn-schatten)}
 body.compact .kn-tabs button:hover{color:var(--text)}
 body.compact .kn-tabs button[aria-selected="true"]{color:var(--text);box-shadow:inset 0 -2px 0 var(--gold-ink)}
@@ -8929,6 +8948,24 @@ body.compact #hMeta{grid-row:auto;grid-column:auto;justify-content:flex-end;max-
 body.compact .compactread:not([hidden]){display:block;margin:6px 12px 0 14px;padding:0;max-height:2.6em;overflow:hidden;white-space:normal;overflow-wrap:anywhere;
   font-size:var(--fs-sm);line-height:1.3;color:var(--text);text-shadow:var(--kn-schatten)}
 
+/* Aufbau B: der Kopf als Panel (Spezifikation 02.11.2026): links Boss und darunter Schaden, Uhrzeit und Dauer, rechts die DPS ueber beide
+   Zeilen; der Vergleich zum letzten Pull steht in einer dritten Zeile, nur wenn es einen gibt. Zeile und Panel liegen deckend auf --comb. */
+body.compact .head{margin:0 4px 4px;padding:4px 8px 5px;border-radius:7px;background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+body.compact .headtop{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:auto auto auto;column-gap:6px;row-gap:0;align-items:center}
+body.compact .headmeta,body.compact .big,body.compact #hName{display:contents}
+body.compact #hName .hnt{grid-column:1;grid-row:1;max-width:none;text-align:left;font:400 15px/1.2 var(--display);letter-spacing:-.005em;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;min-width:0}
+body.compact #snapBadge{grid-column:1;grid-row:1;justify-self:end}
+body.compact #hMeta{grid-column:1;grid-row:2;justify-content:flex-start;max-width:none;font-family:var(--kn-font-text);font-variant-numeric:tabular-nums}
+body.compact #hMeta [data-f="schaden"]{display:inline;order:-1}
+body.compact #hMeta [data-f="zeit"]::before{content:"\0020\00b7\0020";white-space:pre}
+body.compact #hMeta [data-f="schaden"] + [data-f="zeit"]::before{content:"\0020\00b7\0020"}
+body.compact #hMeta:not(:has([data-f="schaden"])) [data-f="zeit"]::before{content:none}
+body.compact .big .v{grid-column:2;grid-row:1 / 3;justify-self:end;align-self:center;font-size:26px;line-height:1;-webkit-text-stroke:3px var(--kn-kontur)}
+body.compact .big .ukurz{grid-column:3;grid-row:1 / 3;align-self:end;margin:0 0 3px}
+body.compact .big .prevline:not([hidden]){grid-column:1 / -1;grid-row:3;justify-self:start;margin:2px 0 0}
+body.compact #hMeta [data-f="schaden"] .dmgv{display:none}
+body.compact #hMeta [data-f="schaden"] .dmgk{display:inline}
+body.compact .head .compactread:not([hidden]){margin:3px 0 0}
 /* die Ansicht Weeklies */
 #kwk{display:none}
 body.compact #kwk:not([hidden]){display:flex;flex-direction:column;flex:1 1 auto;min-height:0}
@@ -8973,6 +9010,25 @@ body.kn-wk.kn-alle .kn-wplatten{max-height:none}
 .kn-wplatte .kn-m{font:var(--fs-xs)/1.2 var(--kn-font-mono);color:var(--ink-soft);white-space:nowrap;text-shadow:var(--kn-schatten)}
 body.compact.durchsicht .kn-wplatte .kn-n,body.compact.durchsicht #bars .row .v[data-k="share"]{color:var(--text)}
 .kn-alles{grid-column:1/-1;margin:0;padding:10px 4px;text-align:center;font-size:var(--fs-sm);color:var(--dim);border-radius:var(--r-nest);background:var(--insel)}
+/* Aufbau B: Weeklies im Streifen wie die Zeilen im Kampf (Spezifikation 02.11.2026): Panel als Kopf, Zeilen 28 Punkt mit 2 Punkt Abstand, deckend auf
+   --comb; die Fuellung zeigt den Fortschritt n/Menge (--w) in der Reihenfarbe (fest je Punkt), rechts steht "1/2" oder "taeglich". */
+body.compact .kwk .kn-insel{margin:0 4px 4px;padding:4px 8px 5px;border-radius:7px;background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+body.compact .kn-wkopf{grid-template-columns:minmax(0,1fr) auto}
+body.compact .kn-wkopf .kn-ring{display:none}
+body.compact .kn-wkopf .kn-wer b{font:400 15px/1.2 var(--display);letter-spacing:-.005em}
+body.compact .kn-wkopf .kn-offen{font-size:26px}
+body.compact .kn-wplatten{margin:4px 4px 0;max-height:calc(var(--kn-wz,12) * 26px);scroll-snap-type:y mandatory;scroll-padding-top:0}
+body.compact .kn-wplatte{scroll-snap-align:start}
+body.compact.kn-wk.kn-alle .kn-wplatten{max-height:none}
+body.compact .kn-wplatte{grid-template-columns:20px minmax(0,1fr) auto;column-gap:6px;height:24px;margin:0 0 2px;padding:0 8px 0 3px;border-radius:5px;overflow:hidden;
+  background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule)}
+body.compact .kn-wplatte:hover{background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule-strong)}
+body.compact .kn-wplatte > *{position:relative;z-index:1}
+body.compact .kn-wplatte .kn-fuell{position:absolute;z-index:0;inset:0 auto 0 0;width:calc(100% * var(--w,0));background:color-mix(in srgb,var(--c,var(--gold)) 62%,var(--comb));box-shadow:inset 3px 0 0 var(--c,var(--gold))}
+body.compact .kn-wplatte .kn-ringsym svg{display:none}
+body.compact .kn-wplatte .kn-ringsym .kn-sym{width:20px;height:20px;border-radius:4px}
+body.compact .kn-wplatte .kn-wn{font-weight:600}
+body.compact .kn-wplatte .kn-m{font:var(--fs-sm)/1 var(--kn-font-text);font-variant-numeric:tabular-nums;color:var(--text)}
 @media (prefers-reduced-motion:no-preference){.kn-ring .f,.kn-ringsym .f{transition:stroke-dasharray .2s ease}}
 /* der Ruhesatz ohne Kampf steht auf dem klaren Grund und braucht eine Insel wie alles andere (Kompakt neu) */
 body.compact.noFight #compactIdle{padding:2px 8px;border-radius:var(--r-nest);background:var(--insel);box-shadow:inset 0 0 0 1px var(--insel-rand)}
@@ -9353,3 +9409,17 @@ body:not(.compact) .top .mark .wort,
 .wbtn.on *,
 .gl-anw[data-m="da"] .gl-plakette *,
 .bwer > i *{-webkit-text-stroke-width:0;text-shadow:none}
+/* Aufbau B, Nachbesserung (02.11.2026): die Lesezeile steht im Kampf nur noch fuer Vorleser da (der Kopf sagt Zahlen, der Streifen soll flach
+   sein); der Live-Punkt steht vor dem Schaden, nicht dahinter. */
+body.compact .head .compactread:not([hidden]){position:absolute;width:1px;height:1px;margin:-1px;padding:0;overflow:hidden;clip-path:inset(50%);white-space:nowrap}
+body.compact.watching #hMeta::before{order:-2}
+
+/* Von Hand hoeher gezogen (kn-hand): die Liste fuellt die Hoehe und zeigt mehr Zeilen, statt grauer Flaeche darunter; die Zeilen rollen wie sonst */
+body.compact.kn-hand .table #bars{flex:1 1 auto;max-height:none}
+body.compact.kn-hand .kn-wplatten{flex:1 1 auto;max-height:none}
+
+/* Kein Hinweis "weitere" mehr im Bild (03.11.2026): man rollt mit dem Mausrad oder zieht das Fenster nach unten. Der Knopf bleibt fuer
+   Tastatur und Vorleser da (aria-expanded, Name mit Zaehlung), liegt ausserhalb des Flusses und wird nur beim Fokus sichtbar; er nimmt keine Hoehe. */
+body.compact #kRest:not([hidden]),body.compact #kwkRest{position:absolute;right:8px;bottom:4px;left:auto;z-index:5;width:auto;height:16px;margin:0;opacity:0;pointer-events:none;
+  background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule-strong);border-radius:8px}
+body.compact #kRest:focus-visible,body.compact #kwkRest:focus-visible{opacity:1;pointer-events:auto}

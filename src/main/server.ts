@@ -34,8 +34,8 @@ import { leseFortschritt } from "./taskbar";
 import { startAuftrag } from "./start";
 import { autostartAn, autostartDa } from "./autostart";
 import { jumpListBauen } from "./jumplist";
-import { zuletztNeu } from "./windows-core";
-import { acrylicNow, currentWindow, kompaktMoeglich, kompaktStand, micaGrund, micaNow, themeChanged, winAction } from "./window";
+import { kompaktAnfrage, zuletztNeu } from "./windows-core";
+import { acrylicNow, currentWindow, kompaktLageJetzt, kompaktMerke, kompaktMoeglich, kompaktStand, micaGrund, micaNow, themeChanged, winAction } from "./window";
 
 export const FIRST_PORT = 8731;
 
@@ -175,6 +175,8 @@ async function handleGet(url: URL, res: http.ServerResponse): Promise<void> {
         // logging ran in full view, the hotkey asked for it)
         kompaktFenster: kompaktMoeglich(),
         kompakt: kompaktStand(),
+        // where the compact window lies and whether it is on top, for the bug report (#382)
+        kompaktLage: kompaktLageJetzt(),
         // an order from the jump list until the page has done it (start.ts)
         start: startAuftrag(),
         // a newer release, if the one check at start found one (update.ts)
@@ -411,6 +413,9 @@ const FIRST_START = isFirstStart(loadConfig(),
 async function handlePost(url: URL, sent: Json, res: http.ServerResponse): Promise<void> {
   switch (url.pathname) {
     case "/api/win": {
+      // a request for the compact window goes into the ring of the bug report first (#382)
+      const art = kompaktAnfrage(sent);
+      if (art) kompaktMerke(art);
       const { status, body } = winAction(sent);
       return reply(res, body, status);
     }

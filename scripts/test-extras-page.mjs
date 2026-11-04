@@ -24,7 +24,7 @@ const BILDER = gebauterModus(root) === "voll";
 let failed = 0;
 function assert(cond, name, detail) {
   if (cond) console.log("  ok    " + name);
-  else { failed++; console.log("  FAIL  " + name + (detail === undefined ? "" : "  " + JSON.stringify(detail).slice(0, 400))); }
+  else { failed++; console.log("  FAIL  " + name + (detail === undefined ? "" : "  " + JSON.stringify(detail).slice(0, 1600))); }
 }
 const html = readFileSync(join(root, "dist", "renderer", "index.html"), "utf8");
 const browser = await chromium.launch(process.env.PARITY_CHROMIUM ? { executablePath: process.env.PARITY_CHROMIUM } : {});
@@ -653,8 +653,8 @@ try {
       klasse: document.documentElement.classList.contains("kfenster"),
       zu: document.querySelector("#winClose").getClientRects().length,
       quer: document.documentElement.scrollWidth > innerWidth }));
-    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 34) < 0.5 && k.klasse && k.zu === 1,
-      "Kompaktfenster: der Streifen (34 Punkt, #328) ohne Kampfwahl, Leisten und Minimieren, mit Schliessen", k);
+    assert(k.weg.every((n) => n === 0) && Math.abs(k.top - 26) < 0.5 && k.klasse && k.zu === 1,
+      "Kompaktfenster: der Streifen (26 Punkt, Aufbau B; vorher 34, #328) ohne Kampfwahl, Leisten und Minimieren, mit Schliessen", k);
     await warte(p, () => document.querySelector("#toast").classList.contains("on"), undefined, 5000);
     const m = await meldung(s);
     assert(m.an && m.text === TEXT.en.kurz, "Kompaktfenster: der Randlos-Hinweis beim ersten Mal", m);
@@ -665,12 +665,19 @@ try {
     assert(s.win.every((b) => b.win === "kompakt"), "jede Anfrage an /api/win nennt das Kompaktfenster", s.win);
     assert(!s.win.some((b) => ["material", "chrome", "size", "restore_size", "live", "maximize", "minimize"].includes(b.do)),
       "nichts fuer Rahmen, Material, Groesseneinstellung oder Taskleiste", s.win.map((b) => b.do));
-    assert(!s.win.some((b) => b.do === "pin"), "Anheften steht an, ohne dass die Seite es erst setzt", s.win);
+    /* #382: das Kompaktfenster heftet sich beim Sichtbarwerden noch einmal an (on:true, nur fuer sich).
+       Vor dem Klick darf es also nur solche Posts geben, mindestens einen; nie on:false, remember oder ein anderes Fenster. */
+    await bisDa(() => s.win.some((b) => b.do === "pin"));
+    const pinVor = s.win.filter((b) => b.do === "pin");
+    assert(pinVor.length >= 1 && pinVor.every((b) => b.on === true && b.win === "kompakt" && !("remember" in b)),
+      "Anheften steht an; die Seite heftet beim Sichtbarwerden nur an (on:true, win kompakt, nicht gemerkt) (#382)", pinVor);
+    const pinAnzahlVor = s.win.filter((b) => b.do === "pin").length;
     // Anheften loesen gilt dem Kompaktfenster, und gemerkt wird es nicht
     await p.hover(".top");
     await p.click("#btnPin", { timeout: FRIST }).catch((e) => assert(false, "Zeitablauf beim Klick auf #btnPin", String(e).split("\n")[0]));
     await warte(p, () => document.querySelector("#btnPin").getAttribute("aria-pressed") === "false", undefined, 5000);
-    const pin = s.win.filter((b) => b.do === "pin");
+    // genau ein Post kommt durch den Klick dazu
+    const pin = s.win.filter((b) => b.do === "pin").slice(pinAnzahlVor);
     assert(pin.length === 1 && pin[0].on === false && pin[0].win === "kompakt" && pin[0].remember === false,
       "Anheften im Kompaktfenster: fuer dieses Fenster, nicht gemerkt", pin);
     // Vollansicht: zum grossen Fenster, der Streifen geht zu - er selbst wechselt nicht
@@ -1356,7 +1363,7 @@ try {
     const m = await trifft(p, "#morePanel > *");
     assert(m.da && m.trifft && m.unten <= m.ih, "Menue per Klick: der unterste Eintrag ist zu sehen und zu treffen (elementFromPoint)", m);
     await p.keyboard.press("Escape");
-    await warte(p, () => innerHeight === 36, undefined, 5000);
+    await warte(p, () => innerHeight === 28, undefined, 5000);
     // der Dialog: Live ohne Log-Ordner fragt nach dem Ordner
     /* Live ist im Streifen ausgeblendet, kein Knopf dort oeffnet heute
        einen Dialog. Ausgeloest wird er hier ueber den verborgenen Knopf, um
@@ -1368,8 +1375,8 @@ try {
     const ok = await trifft(p, "#modalOk"), ab = await trifft(p, "#modalCancel"), feld = await trifft(p, "#modalInput");
     assert(ok.trifft && ab.trifft && feld.trifft && ok.unten <= ok.ih, "Dialog im Streifen: Feld, OK und Abbrechen sind zu sehen und zu treffen", { ok, ab, feld });
     await p.click("#modalCancel");
-    await warte(p, () => innerHeight === 36, undefined, 5000);
-    assert(p.viewportSize().height === 36 && s.win.filter((b) => b.art === "zurueck").length === 2,
+    await warte(p, () => innerHeight === 28, undefined, 5000);
+    assert(p.viewportSize().height === 28 && s.win.filter((b) => b.art === "zurueck").length === 2,
       "Dialog zu: das Fenster ist wieder der Streifen", { v: p.viewportSize(), arten: s.win.map((b) => b.art || b.do) });
     assert(!s.fehler.length, "keine Fehler auf der Seite", s.fehler);
     await p.close();
@@ -1381,8 +1388,8 @@ try {
     const k = await trifft(t.page, "#toast .tact");
     assert(k.trifft && k.unten <= k.ih, "Meldung im leeren Streifen: ganz zu sehen, ihr Knopf zu treffen", k);
     await t.page.click("#toast .tact").catch((e) => assert(false, "Zeitablauf beim Klick auf #toast .tact", String(e).split("\n")[0]));
-    await warte(t.page, () => innerHeight === 36, undefined, 5000);
-    assert(t.page.viewportSize().height === 36, "Meldung weg: das Fenster ist wieder der Streifen", t.page.viewportSize());
+    await warte(t.page, () => innerHeight === 28, undefined, 5000);
+    assert(t.page.viewportSize().height === 28, "Meldung weg: das Fenster ist wieder der Streifen", t.page.viewportSize());
     await t.page.close();
   }
   /* --- 29. Gutachten M1, M3, N3, N4, N6: der Streifen sagt, wenn er der

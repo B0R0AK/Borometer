@@ -70,7 +70,7 @@ const ALT = "TLCombatLog-20260920.txt";   // ein frueheres Log fuer den Auftrag 
    GET /api/log in s.logs. Zum Stellen: s.text (das wachsende Log), s.start
    (start in /api/state), s.counts (die Zaehler von /api/events). */
 async function oeffne({ app = true, kompakt = false, teil = null, lang = "en", uhr = false, start = null, config = {}, grenze = 0, breite = 1280, hoehe = 860,
-  vollStand = null, mica = false, logVerzug = 0, logExtra = "" } = {}) {
+  vollStand = null, mica = false, logVerzug = 0, logExtra = "", stateVerzug = 0 } = {}) {
   const page = await browser.newPage({ viewport: { width: breite, height: hoehe } });
   const s = { page, fehler: [], posts: [], schreib: [], win: [], ordner: [], gelesen: [], latest: [], logs: [],
     text: Buffer.from(LOG), start, counts: { pin: 0, start: 0 }, config, vollStand };
@@ -83,6 +83,8 @@ async function oeffne({ app = true, kompakt = false, teil = null, lang = "en", u
     const gesendet = () => JSON.parse(req.postData() || "{}");
     // jede schreibende Anfrage ausser /api/win, mit Pfad (fuer "das abgerissene Fenster schreibt nichts")
     if (req.method() !== "GET" && path !== "/api/win") s.schreib.push(path);
+    // stateVerzug: der erste Abruf (Log-Ordner, "Seite fertig") kommt gleich, jeder weitere (vollStandHolen) spaet
+    if (path === "/api/state" && stateVerzug) { if (s.stateGesehen) await schlafe(stateVerzug); s.stateGesehen = true; }
     if (path === "/api/state") return json({ dir: "C:\\Logs", file: LOGNAME, size: s.text.length, mtime: s.text.length,
       nativeFrame: app, material: false, stayOnTop: false, start: s.start, kompakt: s.vollStand, mica });
     if (path === "/api/latest") {
@@ -378,6 +380,39 @@ try {
     await bisNode(() => g.posts.some((b) => b.lang === "en"), "lang en nach dem Wechsel");
     assert(g.posts.filter((b) => "lang" in b).length === 1, "nach dem Wechsel genau einmal", g.posts);
     await g.page.close();
+  }
+  // --- 7b. das Kompaktfenster haelt sich oben (#382): ist die Seite sichtbar, heftet sie sich ueber den
+  //         einen Weg pin neu an; ein Loesen durch den Nutzer bleibt gelost
+  {
+    const k = await oeffne({ kompakt: true });
+    const pins = () => k.win.filter((b) => b.do === "pin");
+    await bisNode(() => pins().length >= 1, "Kompaktfenster: pin beim Sichtbarwerden");
+    assert(pins()[0].on === true && pins()[0].win === "kompakt",
+      "Kompaktfenster: das Anheften geht an das Kompaktfenster, an", pins()[0]);
+    const vor = pins().length;
+    const zeigen = (wert) => k.page.evaluate((w) => {
+      Object.defineProperty(document, "visibilityState", { configurable: true, get: () => w });
+      document.dispatchEvent(new Event("visibilitychange"));
+    }, wert);
+    await zeigen("hidden");
+    await schlafe(300);
+    assert(pins().length === vor, "Kompaktfenster: verborgen heftet es nichts an", pins());
+    await zeigen("visible");
+    await bisNode(() => pins().length === vor + 1 && pins().at(-1).on === true, "Kompaktfenster: sichtbar geworden heftet es neu an");
+    // der Nutzer loest das Anheften: danach zieht das Sichtbarwerden es nicht wieder hoch
+    await k.page.evaluate(() => document.querySelector("#btnPin").click());
+    await bisNode(() => pins().at(-1).on === false, "Kompaktfenster: der Knopf loest das Anheften");
+    const nachLoesen = pins().length;
+    await zeigen("hidden");
+    await zeigen("visible");
+    await schlafe(300);
+    assert(pins().length === nachLoesen, "Kompaktfenster: ein vom Nutzer geloestes Anheften wird nicht neu gesetzt", pins());
+    await k.page.close();
+    // die Vollansicht im Fenster heftet sich nie von selbst an
+    const v = await oeffne({});
+    await schlafe(500);
+    assert(!v.win.some((b) => b.do === "pin"), "Vollansicht: heftet sich beim Start nicht an", v.win);
+    await v.page.close();
   }
   // --- 8. der Abschnitt "Windows" in den Einstellungen (Spezifikation Windows-Einbindung 9, 3.4)
   const WIN = (w = {}, mehr = {}) => ({ windows: { da: true, autostartDa: true, autostart: false, ...w }, ...mehr });
@@ -895,15 +930,25 @@ try {
   for (const [grund, wort, satzDe] of [["beispiel", "sample", "Beispielkampf"], ["archiv", "archive", "Archiv"]]) {
     // #352: zeigt die Vollansicht ein Beispiel oder einen Archivkampf, sagt der Leertext das und nicht "kein Kampf"
     const s = await oeffne({ app: true, teil: "kampf", lang: "en", vollStand: { grund, datei: "", kampf: null } });
-    await bisWahr(s, () => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden; }, "Leertext steht (" + grund + ")");
+    await bisWahr(s, (w) => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden && l.textContent.toLowerCase().includes(w); }, "Leertext nennt " + wort + " (" + grund + ")", wort);
     const satz = await s.page.evaluate(() => document.querySelector("#abrissLeer").textContent.trim());
     assert(satz.toLowerCase().includes(wort) && !/no fight/i.test(satz), "#352 en: der Leertext nennt " + grund, satz);
     await s.page.close();
-    const d = await oeffne({ app: true, teil: "kampf", lang: "de", vollStand: { grund, datei: "", kampf: null } });
-    await bisWahr(d, () => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden; }, "Leertext steht de (" + grund + ")");
+    const d = await oeffne({ app: true, teil: "kampf", lang: "de", vollStand: { grund, datei: "", kampf: null }, stateVerzug: 1500 });
+    await bisWahr(d, (w) => { const l = document.querySelector("#abrissLeer"); return !!l && !l.hidden && l.textContent.includes(w); }, "Leertext nennt " + satzDe + " (" + grund + ")", satzDe);
     const satzD = await d.page.evaluate(() => document.querySelector("#abrissLeer").textContent.trim());
     assert(satzD.includes(satzDe) && !/Noch kein Kampf/.test(satzD), "#352 de: der Leertext nennt " + grund, satzD);
     await d.page.close();
+  }
+  {
+    /* Gegenprobe zu #374: kommt der Stand der Vollansicht spaet, steht zuerst der
+       Standardtext sichtbar da. "Sichtbar" allein ist also kein Endzustand; die
+       Wartebedingung oben nimmt den Satz selbst. */
+    const s = await oeffne({ app: true, teil: "kampf", lang: "de", vollStand: { grund: "archiv", datei: "", kampf: null }, stateVerzug: 2500 });
+    const frueh = await s.page.evaluate(() => { const l = document.querySelector("#abrissLeer"); return l && !l.hidden ? l.textContent.trim() : null; });
+    assert(frueh === "Noch kein Kampf in der Vollansicht.", "#374 Gegenprobe: vor dem Stand ist nur der Standardtext sichtbar", frueh);
+    await bisWahr(s, (w) => { const l = document.querySelector("#abrissLeer"); return !l.hidden && l.textContent.includes(w); }, "Leertext nennt Archiv nach dem Stand", "Archiv");
+    await s.page.close();
   }
   {
     // #351: Strg+K, Strg+Pfeile und das Ablegen von Dateien gelten im abgerissenen Fenster nicht

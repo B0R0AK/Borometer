@@ -784,14 +784,14 @@ try {
       lb: document.querySelector("#arBosse")?.getAttribute("role"), such: document.querySelector("#arSuche")?.getAttribute("aria-label") || document.querySelector("#arSuche")?.labels?.[0]?.textContent }));
     assert(o.app && o.land && o.cur === "archiv" && o.h2 === "Archiv" && o.h2t === -1 && o.lb === "listbox" && !!o.such,
       "Archiv: der Bereich steht ohne geladenes Log, die Liste ist eine listbox, das Suchfeld ist benannt", o);
-    /* alle Bosse der Tabelle, auch ohne Kampf: so viele wie Plaetze im Album der Rekorde */
+    /* alle Bosse der Tabelle, auch ohne Kampf: so viele wie Plaetze im Album der Rekorde, dazu die fuenf Teile von Vegamor (Vegarus, Vegarion, Vegaorb, Klaue in zwei Schreibweisen), die als eigene Plaetze auffindbar bleiben (#395) */
     const n = await s.page.evaluate(() => document.querySelectorAll("#arBosse [role=option]").length);
     await s.page.click('#bereiche [data-tab="rekorde"]');
     await s.page.waitForFunction(() => document.querySelectorAll("#rkInhalt .rkmed").length > 0);
     const album = await s.page.evaluate(() => document.querySelectorAll("#rkInhalt .rkmed").length);
     await s.page.click('#bereiche [data-tab="archiv"]');
     await archivOffen(s);
-    assert(n > 50 && n === album, "Archiv: jeder Platz der Tabelle steht in der Liste (so viele wie Medaillons im Album)", { n, album });
+    assert(n > 50 && n === album + 5, "Archiv: jeder Platz der Tabelle steht in der Liste (so viele wie Medaillons im Album, dazu die fuenf Teile von Vegamor)", { n, album });
     const gruppen = await s.page.evaluate(() => [...document.querySelectorAll("#arBosse [role=group]")].map((g) => document.getElementById(g.getAttribute("aria-labelledby"))?.textContent.trim()));
     assert(gruppen.slice(0, 5).join("|") === "Raid|Übungspuppe|Feldbosse|Erzbosse|Kolosse" && gruppen.some((g) => /Dungeons.*Vier Sterne/.test(g)) && gruppen.some((g) => /Halle der Illusionen/.test(g)),
       "Archiv: gegliedert wie das Album (Raid, Übungspuppe, Feldbosse, Erzbosse, Kolosse, Dungeons nach Sternen …)", gruppen);

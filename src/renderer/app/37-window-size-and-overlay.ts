@@ -561,6 +561,20 @@ export function kompaktFensterAuf(){
   kompaktSchalten(true);
   /* Es entsteht immer vorn (window.ts), also steht Anheften an. */
   setPinButton(true);
+  /* ... aber "entsteht vorn" hielt nicht: gemessen lag das Fenster ueber einem
+     randlosen Spiel an 12. Stelle und trug WS_EX_TOPMOST nicht (#382), obwohl
+     window.ts es mit alwaysOnTop anlegt und im Code nichts das Flag loest.
+     Ursache nicht belegt (Vermutung: das Flag aus dem Anlegen eines verborgenen
+     Fensters). Das Fenster wird verborgen angelegt und erst nach dem Laden
+     gezeigt; erst dann ist die Seite sichtbar. Dann heftet sie sich noch
+     einmal an, ueber denselben einen Weg (pin) wie der Knopf. Ein Anheften,
+     das der Nutzer geloest hat, bleibt geloest. */
+  const obenNachziehen = () => {
+    if(document.visibilityState !== "visible" || $("#btnPin").getAttribute("aria-pressed") !== "true") return;
+    void winPost({do:"pin", on:true});
+  };
+  document.addEventListener("visibilitychange", obenNachziehen);
+  obenNachziehen();
 }
 /* ... und sobald /api/state da ist: vom Kuerzel geoeffnet, gleich
    durchklickbar (wie das Kuerzel aus der Vollansicht es bisher tat). */
@@ -694,7 +708,7 @@ async function horcheAufEreignisse(){
       if(FENSTER === "main" && neu("handsize") > 0 && document.body.classList.contains("compact"))
         state.compactHandSized = true;
       /* Dasselbe fuer das Kompaktfenster, das seinen eigenen Rand hat (N4). */
-      if(KOMPAKT_FENSTER && neu("kompakthand") > 0) state.compactHandSized = true;
+      if(KOMPAKT_FENSTER && neu("kompakthand") > 0){ state.compactHandSized = true; markiereRest(); }
       /* Das Kompaktfenster ging auf oder zu - auch von selbst (Vollansicht,
          Schliessen im Streifen): der Knopf im grossen Fenster folgt. */
       if(state.zweiFenster && neu("kompakt") > 0) await kompaktStandHolen();

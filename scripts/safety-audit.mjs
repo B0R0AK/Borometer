@@ -1598,17 +1598,22 @@ function auditMain() {
   if (quitListeners.length !== 1 || quitListeners[0] !== "ok") appStray.push(`before-quit listeners: ${quitListeners.join(" | ") || "none"}`);
   check(!appStray.length, "app listens only to its listed events (will-quit, activate, window-all-closed, second-instance, before-quit)",
     `found: ${appStray.join(" | ")}`);
-  const PIN = "const want = !!sent.on; win.setAlwaysOnTop(want); updateConfig({ stayOnTop: want && sent.remember !== false && win === state.win }); "
+  const PIN = "const want = !!sent.on; if (want && win === kompaktWindow()) { win.setAlwaysOnTop(true, \"screen-saver\"); kompaktPuffer.merke(\"ebene:screen-saver\"); } else win.setAlwaysOnTop(want); updateConfig({ stayOnTop: want && sent.remember !== false && win === state.win }); "
     + "return ok({ on_top: want }); }";
   const SEE = "let alpha = Number(sent.alpha); if (!isFinite(alpha)) alpha = 1; alpha = Math.max(0.35, Math.min(1, alpha)); if "
     + "(process.platform !== \"win32\" && process.platform !== \"darwin\") { return fail(\"this window cannot fade\"); } "
     + "win.setOpacity(alpha); updateConfig({ compactAlpha: alpha }); return ok({ alpha }); }";
-  // the tray may only read it (isAlwaysOnTop() for its tick), once
-  const onTop = files.flatMap((f) => [...(f === "tray.ts" ? code[f].replace(/\?\.isAlwaysOnTop\(\)/, "") : code[f]).matchAll(/alwaysOnTop/gi)].map(() => f));
+  // the tray may only read it (isAlwaysOnTop() for its tick), once; windows-core.ts may read it for the bug report
+  // (kompaktLage, #382). The reads are taken out before counting; every write (setAlwaysOnTop, the option) still counts.
+  const lesen = (f) => f === "tray.ts" ? code[f].replace(/\?\.isAlwaysOnTop\(\)/, "")
+    : f === "windows-core.ts" ? code[f].replace(/\bisAlwaysOnTop\(\)/g, "") : code[f];
+  const onTop = files.flatMap((f) => [...lesen(f).matchAll(/alwaysOnTop/gi)].map(() => f));
   check(win.split('case "pin":').length === 2 && norm(pin ?? "").replace(/^\{ /, "") === PIN
-      && onTop.join() === "window.ts,window.ts" && win.split("win.setAlwaysOnTop(want);").length === 2
+      && onTop.join() === "window.ts,window.ts,window.ts" && win.split("win.setAlwaysOnTop(want);").length === 2
+      && win.split(".setAlwaysOnTop(").length === 3 && win.split("win.setAlwaysOnTop(true, \"screen-saver\");").length === 2
+      && files.every((f) => f === "window.ts" ? code[f].split("screen-saver").length === 3 : !/screen-saver/i.test(code[f]))
       && /\n  const kw = new BrowserWindow\(\{\n(?:    [^\n]*\n)*?    alwaysOnTop: true,\n/.test(win),
-    "the window's always-on-top is set only in pin: one call, win.setAlwaysOnTop(want), in the one pin case as written (and the compact window's own option)",
+    "the window's always-on-top is set only in pin: win.setAlwaysOnTop(want), plus the compact window's own win.setAlwaysOnTop(true, \"screen-saver\") (the level named nowhere else), in the one pin case as written (and the compact window's own option)",
     `pin: ${norm(pin ?? "")}; alwaysOnTop in: ${onTop.join(", ")}`);
   const opacity = files.flatMap((f) => [...code[f].matchAll(/opacity/gi)].map(() => f));
   check(win.split('case "seethrough":').length === 2 && norm(see ?? "").replace(/^\{ /, "") === SEE
@@ -4632,6 +4637,70 @@ const builderPath = join(lizenzenDir, "electron-builder.yml");
 const builderYml = existsSync(builderPath) ? readFileSync(builderPath, "utf8") : "";
 check(/^ {2}- from: licenses\n {4}to: licenses$/m.test(builderYml), "electron-builder.yml packs licenses/ into the installer (the font licences go with it)",
   existsSync(builderPath) ? "no 'from: licenses / to: licenses' entry" : "electron-builder.yml missing");
+
+// CI image paths (stage A of the lean CI): a pull request runs the job ohne-bilder
+// (the whole test list on a page built without the game images) only when it touches
+// a file that can change its outcome. That list is the line BILDER_PFADE in
+// .github/workflows/build.yml. Every file that reads BORO_BILDER or the image switch
+// (bilder-weiche, the game image tables) has to match it, or a change to it would
+// get past the pull request unchecked and only turn main red. Only the working repo
+// has that workflow (the public one has oeffentlich/ missing and its own, which
+// always runs the image job).
+const ciDir = process.env.AUDIT_CI_DIR;
+if (ciDir || existsSync(oeffentlichDir)) {
+  const wfPath = ciDir ? join(ciDir, "build.yml") : join(root, ".github", "workflows", "build.yml");
+  const wfText = existsSync(wfPath) ? readFileSync(wfPath, "utf8") : "";
+  const rohe = wfText.match(/^ *BILDER_PFADE='([^'\n]+)'$/m)?.[1];
+  let pfade = null;
+  try { pfade = rohe ? new RegExp(rohe) : null; } catch { pfade = null; }
+  const leser = [];
+  const sammle = (rel, tief) => {
+    const dir = join(root, rel);
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const r = posix.join(rel, e.name);
+      if (e.isDirectory()) { if (tief) sammle(r, tief); continue; }
+      if (!/\.(ts|mjs|json|yml)$/.test(e.name)) continue;
+      if (/BORO_BILDER|bilder-weiche|spielbilder/.test(readFileSync(join(root, r), "utf8"))) leser.push(r);
+    }
+  };
+  sammle("scripts", false);
+  sammle("src", true);
+  for (const f of ["package.json", "electron-builder.yml"]) if (existsSync(join(root, f)) && /BORO_BILDER|bilder-weiche|spielbilder/.test(readFileSync(join(root, f), "utf8"))) leser.push(f);
+  // the two game image files and the workflow itself always count, read or not
+  const pflicht = ["assets/spielbilder.ts", "src/renderer/spielbilder.ts", ".github/workflows/build.yml"];
+  const fehlen = pfade ? [...new Set([...leser, ...pflicht])].filter((f) => !pfade.test(f)) : [];
+  check(!!pfade && /^\^.*\$/.test(rohe) && leser.length > 5 && !fehlen.length,
+    "CI image paths: BILDER_PFADE in build.yml names every file that reads BORO_BILDER or the image switch",
+    !pfade ? "no usable BILDER_PFADE line in the workflow" : leser.length <= 5 ? "found almost no readers, the search is broken" : fehlen.join(", ") || "the pattern is not anchored with ^ and $");
+
+  // CI tree paths (stage C): a pull request runs the step "Export tree" in kern (the
+  // public export tree, built and checked without npm ci) only when it touches a file
+  // that can go into the tree or decide what it is checked with. That list is the line
+  // BAUM_PFADE in the same step. Every file in the folders the export takes, the files
+  // it takes from the top level and the overlay folder has to match it, or a change to
+  // it would get past the pull request unchecked and only turn the export red.
+  const baumRohe = wfText.match(/^ *BAUM_PFADE='([^'\n]+)'$/m)?.[1];
+  let baumMuster = null;
+  try { baumMuster = baumRohe ? new RegExp(baumRohe) : null; } catch { baumMuster = null; }
+  const baumDateien = [];
+  const geh = (rel) => {
+    const dir = join(root, rel);
+    if (!existsSync(dir)) return;
+    for (const e of readdirSync(dir, { withFileTypes: true })) {
+      const r = posix.join(rel, e.name);
+      if (e.isDirectory()) geh(r); else baumDateien.push(r);
+    }
+  };
+  for (const rel of ["src", "scripts", "BoroPartyServer", "licenses", "build", "docs/bilder", "oeffentlich", ".github"]) geh(rel);
+  for (const f of ["package.json", "package-lock.json", "tsconfig.json", "tsconfig.main.json", "tsconfig.renderer.json", "electron-builder.yml", "README.md", "README.de.md",
+    "GUIDE.md", "GUIDE.en.md", "CHANGELOG.txt", "CHANGELOG.de.txt", "SECURITY.md", "CONTRIBUTING.md", "LICENSE", ".gitattributes", ".gitignore"])
+    if (existsSync(join(root, f))) baumDateien.push(f);
+  const baumFehlen = baumMuster ? baumDateien.filter((f) => !baumMuster.test(f)) : [];
+  check(!!baumMuster && /^\^.*\$/.test(baumRohe) && baumDateien.length > 50 && !baumFehlen.length,
+    "CI tree paths: BAUM_PFADE in build.yml names every file the export tree takes",
+    !baumMuster ? "no usable BAUM_PFADE line in the workflow" : baumDateien.length <= 50 ? "found almost no files, the search is broken" : baumFehlen.slice(0, 5).join(", ") || "the pattern is not anchored with ^ and $");
+}
 
 for (const n of notes) console.log(`  ${n.status}  ${n.label}`);
 for (const f of failures) {

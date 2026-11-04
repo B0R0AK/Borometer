@@ -60,14 +60,16 @@ export function setzeAnsicht(a: Ansicht, fokus = false){
 }
 
 /* ---------- die Platten der Weeklies ---------- */
+/* Die Reihenfarbe einer Zeile: fest je Schluessel (nicht je Platz), damit sie beim Abhaken nicht wandert */
+function reihe(k: string): number { let h = 0; for(let i = 0; i < k.length; i++) h = (h * 31 + k.charCodeAt(i)) >>> 0; return h % 12 + 1; }
 function punktHtml(x: StreifenPunkt): string {
   const k = x.schluessel, flg = k.replace(FLUEGEL, "");
   const bild = wkHatBild(k) ? k : wkHatBild(flg) ? flg : "";
   const sym = bild ? '<i class="kn-sym wkb-' + bild + '"></i>' : '<span class="kn-sym kn-marke">' + (WK_MARKE[k] ?? WK_MARKE.eigen) + "</span>";
   const klein = x.menge > 1 ? x.stand + "/" + x.menge : x.takt === "tag" ? t("weeklies.taeglich") : "";
   return '<button type="button" class="kn-platte kn-wplatte" role="listitem" data-k="' + esc(k) + '" tabindex="' + (k === tabK ? 0 : -1) + '"' +
-    ' data-name="' + esc(x.name) + '" title="' + esc(x.name) + '" aria-label="' + esc(t("compact.wkPunkt", {name: x.name, n: x.stand, m: x.menge})) + '">' +
-    '<span class="kn-ringsym">' + ring(x.menge ? x.stand / x.menge : 0, 11, "") + sym + "</span>" +
+    ' data-name="' + esc(x.name) + '" title="' + esc(x.name) + '" style="--w:' + (x.menge ? Math.min(1, x.stand / x.menge) : 0).toFixed(3) + ';--c:var(--series-' + reihe(k) + ')" aria-label="' + esc(t("compact.wkPunkt", {name: x.name, n: x.stand, m: x.menge})) + '">' +
+    '<i class="kn-fuell" aria-hidden="true"></i><span class="kn-ringsym">' + sym + "</span>" +
     '<span class="kn-wn">' + esc(x.name) + '</span><span class="kn-m">' + esc(klein) + "</span></button>";
 }
 /** Der Knopf "+N weitere" (zu) und "weniger" (auf) unter den Zeilen der Weeklies; dieselbe Gestalt wie #kRest im Kampf. */
@@ -83,7 +85,25 @@ export function kompaktAufklappen(){
   renderAll();
   applyWindowSize();
 }
+/* Der Name der Liste fuer Vorleser mit ihrem Ausschnitt ("Weeklies, Zeile 1 bis 4 von 12"), wie bei #bars im Kampf; folgt dem Rollen. */
+function wkListeBenennen(){
+  const pl = $("#kwkPlatten"), z = [...pl.querySelectorAll<HTMLElement>(".kn-wplatte")];
+  if(!z.length){ pl.removeAttribute("aria-label"); return; }
+  const k = pl.getBoundingClientRect(), im = z.map((e, i) => ({i, q: e.getBoundingClientRect()})).filter(x => x.q.top >= k.top - 1 && x.q.bottom <= k.bottom + 1);
+  const a = (im[0]?.i ?? 0) + 1, b = im.length ? im[im.length - 1]!.i + 1 : z.length;
+  pl.setAttribute("aria-label", t("compact.wkListeName", {a, b, n: z.length}));
+  /* Von Hand hoeher gezogen (kn-hand): der Knopf zaehlt, was unter dem Ausschnitt noch liegt, und geht weg, wenn nichts mehr fehlt */
+  const knopf = document.querySelector<HTMLElement>("#kwkRest");
+  if(knopf && document.body.classList.contains("kn-hand") && !document.body.classList.contains("kn-alle")){
+    const rest = z.length - b;
+    knopf.hidden = rest <= 0;
+    const n = knopf.querySelector(".krestn"); if(n) n.textContent = "+" + rest;
+    knopf.setAttribute("aria-label", t("compact.wkRestName", {n: rest}));
+  }
+}
+let wkRollt = false;
 function zeichneWeeklies(){
+  if(!wkRollt){ wkRollt = true; $("#kwkPlatten").addEventListener("scroll", wkListeBenennen, {passive: true}); addEventListener("resize", wkListeBenennen); addEventListener("kn-hand", wkListeBenennen); }
   const kopf = $("#kwkKopf"), lese = $("#kwkLese"), pl = $("#kwkPlatten"), kb = $("#kwkRestBox");
   const lage = weekliesLage();
   if(lage !== "da"){
@@ -106,8 +126,12 @@ function zeichneWeeklies(){
   const knopf = sicht.rest > 0 ? restHtml(sicht.rest, false) : alleOffen && offen.length > zeilenSicht(offen.length, false, KN_GRUND_WK).zeigen ? restHtml(0, true) : "";
   const restFokus = fokusRest || document.activeElement?.id === "kwkRest";
   // in der Liste stehen nur listitems; der Knopf steht daneben
-  pl.innerHTML = offen.length ? offen.slice(0, sicht.zeigen).map(punktHtml).join("") : '<p class="kn-alles" role="listitem">' + esc(t("compact.wkAlles")) + "</p>";
+  /* Alle offenen Punkte stehen in der Liste; zugeklappt zeigt sie nur sicht.zeigen Zeilen (--kn-wz) und rollt mit dem Mausrad, der Knopf
+     klappt sie ganz auf (wie im Kampf). */
+  pl.innerHTML = offen.length ? offen.map(punktHtml).join("") : '<p class="kn-alles" role="listitem">' + esc(t("compact.wkAlles")) + "</p>";
+  if(sicht.rest > 0) pl.style.setProperty("--kn-wz", String(sicht.zeigen)); else pl.style.removeProperty("--kn-wz");
   kb.innerHTML = offen.length ? knopf : "";
+  wkListeBenennen();
   fokusRest = false;
   if(restFokus) kb.querySelector<HTMLElement>("#kwkRest")?.focus();
   if(fokusK){
@@ -139,17 +163,13 @@ export function syncLeiste(){
   hinweisSetzen();
 }
 
-/* ---------- Der Name steht in der Zeile; fuer Vorleser traegt sie Name, DPS und Anteil ---------- */
-function zeileText(z: HTMLElement): {name: string; text: string} {
-  const v = (k: string) => (z.querySelector<HTMLElement>('.v[data-k="' + k + '"]')?.textContent ?? "").trim();
-  return {name: (z.querySelector(".nmt")?.textContent ?? "").trim(), text: [v("dps") && v("dps") + " DPS", v("share")].filter(Boolean).join(" · ")};
-}
-/** Die Platten im Kampf tragen im Kompakt einen eigenen Namen fuer Vorleser: Name, DPS, Anteil (markiereRest, 16, ruft das). */
+/* ---------- Der Name steht in der Zeile; fuer Vorleser traegt sie Name, Schaden und DPS ---------- */
+/** Die Zeilen im Kampf tragen im Kompakt einen eigenen Namen fuer Vorleser: Name, Schaden, DPS, kein Anteil (markiereRest, 16, ruft das). */
 export function plattenBeschriften(box: HTMLElement, an: boolean){
   for(const z of box.querySelectorAll<HTMLElement>(".row:not(.sub)")){
     if(!an){ z.removeAttribute("aria-label"); continue; }
-    const q = zeileText(z), s = z.querySelector<HTMLElement>('.v[data-k="share"]')?.textContent?.trim() ?? "";
-    z.setAttribute("aria-label", t("compact.platte", {name: q.name, dps: z.querySelector<HTMLElement>('.v[data-k="dps"]')?.textContent?.trim() ?? "", anteil: s}));
+    const v = (k: string) => z.querySelector<HTMLElement>('.v[data-k="' + k + '"]')?.textContent?.trim() ?? "";
+    z.setAttribute("aria-label", t("compact.zeileName", {name: (z.querySelector(".nmt")?.textContent ?? "").trim(), schaden: v("damage"), dps: v("dps")}));
   }
 }
 

@@ -3,6 +3,15 @@
 // short, skimmable bullets, newest first
 export const BORO_CHANGELOG = {
   en: [
+    {v:"2.1", notes:[
+      "Added: Compact: the Weeklies list scrolls with the mouse wheel; drag the window taller to see more skills and Weeklies (#328)",
+      "Added: Compact: in a group, a click on a member opens their four strongest skills; Esc closes (#328)",
+      "Changed: Compact window in a new look: slim bar with tabs, big number in the head, one row per skill with icon, name, damage and DPS (#328)",
+      "Changed: Compact: the \u201cmore\u201d hint is no longer in the view; use the mouse wheel or a taller window, the button stays for keyboard and screen reader (#328)",
+      "Fixed: Compact window stays on top of the game after a click (#382)",
+      "Fixed: Records: the Vegamor card counts only fights against Vegamor itself; its parts, Vegarion and the others, no longer count (#393)",
+      "Fixed: Archive: the Vegamor boss page lists only fights against Vegamor; the parts have places of their own and are found by search (#395)",
+    ]},
     {v:"2.0.1", notes:[
       "Fixed: Window size of the full view follows the zoom: the window grows and shrinks with it, up to the work area (#372)",
     ]},
@@ -675,6 +684,15 @@ export const BORO_CHANGELOG = {
     ]},
   ],
   de: [
+    {v:"2.1", notes:[
+      "Hinzugef\u00fcgt: Kompakt: Die Weeklies-Liste rollt mit dem Mausrad; wer das Fenster h\u00f6her zieht, sieht mehr F\u00e4higkeiten und Weeklies (#328)",
+      "Hinzugef\u00fcgt: Kompakt: In der Gruppe klappt ein Klick auf ein Mitglied seine vier st\u00e4rksten F\u00e4higkeiten auf, Esc schlie\u00dft (#328)",
+      "Angepasst: Kompaktfenster im neuen Look: schlanke Leiste mit Reitern, gro\u00dfe Zahl im Kopf, eine Zeile je F\u00e4higkeit mit Symbol, Name, Schaden und DPS (#328)",
+      "Angepasst: Kompakt: Der Hinweis \u201eweitere\u201c ist nicht mehr im Bild; Mausrad oder ein h\u00f6heres Fenster, der Knopf bleibt f\u00fcr Tastatur und Vorleser (#328)",
+      "Behoben: Das Kompaktfenster bleibt nach einem Klick \u00fcber dem Spiel (#382)",
+      "Behoben: Rekorde: Die Karte Vegamor z\u00e4hlt nur K\u00e4mpfe gegen Vegamor selbst; die Teile, Vegarion und die anderen, z\u00e4hlen nicht mehr mit (#393)",
+      "Behoben: Archiv: Die Bossseite Vegamor listet nur K\u00e4mpfe gegen Vegamor; die Teile haben eigene Pl\u00e4tze und sind \u00fcber die Suche zu finden (#395)",
+    ]},
     {v:"2.0.1", notes:[
       "Behoben: Fenstergröße der Vollansicht folgt der Skalierung: Das Fenster wächst und schrumpft mit, bis zum Arbeitsbereich (#372)",
     ]},

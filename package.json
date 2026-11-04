@@ -1,7 +1,7 @@
 {
   "name": "borometer",
   "productName": "Borometer",
-  "version": "2.0.1",
+  "version": "2.1.0",
   "description": "Borometer - a DPS meter for Throne and Liberty that reads the combat log the game writes to disk.",
   "author": "B0R0AK",
   "license": "GPL-3.0-or-later",

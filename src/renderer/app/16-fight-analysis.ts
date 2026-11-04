@@ -164,8 +164,8 @@ function kopfBeschneiden(){
 }
 /* Die Liste im Kampf (#160; Kompakt neu, Panel, 21.10.2026; Mausrad statt Knopf seit #328, 27.10.2026): bis KN_ALLE_BIS Zeilen stehen alle
    da, darueber zeigt sie KN_SICHT Zeilen und rollt mit dem Mausrad, Zeile fuer Zeile (styles.css, scroll-snap, --kn-zeilen). Unter der Liste
-   steht ein stiller Hinweis (#kRest, kein Knopf): "\u2193 n weitere \u00b7 p %" mit dem Rest unter der letzten ganzen Zeile, am Ende
-   "\u2191 Ende". Fuer den Vorleser traegt die Liste einen Namen mit ihrem Ausschnitt statt des Hinweises. Zeilen tragen kein kn-weg mehr;
+   liegt der Knopf #kRest (seit 03.11.2026 nicht mehr im Bild, ausserhalb des Flusses, nur bei Tastaturfokus sichtbar): "\u2193 n weitere" mit dem Rest
+   unter der letzten ganzen Zeile, am Ende "\u2191 Ende". Fuer den Vorleser traegt die Liste einen Namen mit ihrem Ausschnitt statt des Hinweises. Zeilen tragen kein kn-weg mehr;
    die Pfeiltasten der Zeilen (24) rollen den Fokus ins Bild. Ausserhalb des Kompakts gibt es weder Hinweis noch Rollen. */
 function restZeileSetzen(box: HTMLElement, kompakt: boolean){
   const knopf = document.querySelector<HTMLElement>("#kRest");
@@ -204,10 +204,12 @@ function restZeileSetzen(box: HTMLElement, kompakt: boolean){
   const erste = Math.round(box.scrollTop / zeile), sicht = Math.min(haupt.length, Math.round(box.clientHeight / zeile));
   const wert = (z: HTMLElement) => Number(z.dataset.dmg) || 0;
   const r = restUnten(haupt.map(wert), erste, sicht);
+  /* Alles passt in die hoeher gezogene Liste: nichts zu melden */
+  if(!r && erste === 0 && sicht >= haupt.length){ knopf.hidden = true; knopf.removeAttribute("aria-label"); return; }
   knopf.hidden = false;
   knopf.querySelector(".krestn")!.textContent = r ? "\u2193" + r.n : "\u2191";
   knopf.querySelector(".krestw")!.textContent = r ? t("compact.restKurz") : t("compact.restEnde");
-  knopf.querySelector(".krestp")!.textContent = r ? pctMin(r.anteil, 0) : "";
+  knopf.querySelector(".krestp")!.textContent = "";
   knopf.setAttribute("aria-label", t("compact.alleName", {n: haupt.length}));
   box.setAttribute("aria-label", t(state.group === "party" ? "compact.listeNameGruppe" : "compact.listeName", {a: erste + 1, b: erste + sicht, n: haupt.length}));
 }
@@ -225,6 +227,10 @@ export function markiereRest(){
   const box = $("#bars");
   if(!box) return;
   const kompakt = document.body.classList.contains("compact");
+  /* Hat eine Hand das Fenster hoeher gezogen, fuellt die Liste die Hoehe und zeigt mehr Zeilen (styles.css, kn-hand) */
+  const handAlt = document.body.classList.contains("kn-hand");
+  document.body.classList.toggle("kn-hand", kompakt && state.compactHandSized);
+  if(handAlt !== document.body.classList.contains("kn-hand")) dispatchEvent(new Event("kn-hand"));
   kopfBeschneiden();
   schneideAufZeilen(box, kompakt);
   restZeileSetzen(box, kompakt);
