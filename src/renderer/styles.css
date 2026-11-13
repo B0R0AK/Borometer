@@ -1919,8 +1919,8 @@ body.tafel .tafelkopf > #groupSeg{margin:0 0 0 auto}
 #kurve{display:block;width:100%;flex:1 1 auto;min-height:140px;min-width:0}
 .kurveunter{margin:-4px 0 6px;font-size:var(--fs-xs);color:var(--dim)}
 /* Erkannte Mechanik in der Kurve (Feinschliff 02.10., Abschnitt 3): die
-   Legende zeigt dieselbe Schraffur wie Analyse und Zeitverlauf (.vleg
-   i.lmech), darunter eine leise Zeile mit der Strecke. Kein Urteil. */
+   Legende zeigt dieselbe Schraffur wie Analyse und Zeitverlauf (.a2legende
+   .lm), darunter eine leise Zeile mit der Strecke. Kein Urteil. */
 .klg i.m{height:10px;border-top:0;border-radius:2px;box-shadow:inset 0 0 0 1px var(--invuln-edge);
   background:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 4px),var(--invuln-band)}
 .kurvemech{flex:none;margin:6px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--ink-soft)}
@@ -2055,6 +2055,9 @@ body.tafel.glut #ringRechts .headmeta,body.tafel.glut #ringLinks .headmeta{min-w
 body.tafel.glut #ringRechts .factline{justify-content:flex-end}
 body.tafel.glut #ringRechts .headact{display:flex;align-items:center;gap:8px}
 body.tafel.glut #ringSatz .readline{margin-top:0;white-space:normal}
+/* Der Nebenziel-Hinweis (#401) steht unter der Einordnung statt in der Mitte: leise, links, mit Umbruch */
+body.tafel.glut #ringSatz > .sideline{display:block;margin-top:4px;max-width:46ch;font-size:var(--fs-xs);line-height:1.4;color:var(--ink-soft);text-align:left}
+body.tafel.glut #ringSatz > .sideline[hidden]{display:none}
 body.tafel.glut #ringLinks .kurvemech{margin:0}
 body.tafel.glut #ringBuehne{position:absolute;inset:0}
 body.tafel.glut #ring{position:absolute;inset:0;width:100%;height:100%;display:block}
@@ -2231,6 +2234,8 @@ body:not(.compact) #hMeta .scope + .f{margin-left:0;padding-left:0;border-left:0
 #urteilFeld .usatz{font-family:var(--display);font-size:var(--fs-lg);line-height:1.3;margin:0 0 14px;max-width:34ch}
 #urteilFeld .usatz b{color:var(--gold-ink);font-weight:inherit}
 #urteilFeld .ubezug,#urteilFeld .ulog{font-size:var(--fs-xs);color:var(--ink-soft);margin:8px 0 0;max-width:52ch;line-height:1.45}
+/* #414: das Urteil kommt aus dem Kopf-Befund und ist laenger als der Ruhe-Satz; in der Tafel bleibt die Erklaerung auf zwei Zeilen (ganz bei "Ganze Analyse", fuer Vorleser vollstaendig), damit Ring und Band ihre Hoehe behalten */
+#urteilInhalt .un{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
 /* Bezug ohne gespeicherten Lauf (Bester Pull 5.2): der Satz unter der
    Zeile des Bezugs in derselben leisen Tinte, daneben "Log oeffnen". Der
    Knopf bricht mit um, statt die Zeile zu verbreitern (560 px). */
@@ -4051,81 +4056,16 @@ body.felder #p-analysis > .urteil > *{max-width:62ch}
    wie "Ganze Analyse" im Bereich Kampf - Textfarbe gedaempft, ohne Platte,
    beim Zeigen in Textfarbe. Kein Gold: sie sind Wege, kein Befund. Das Feld,
    auf das "Zum Beleg" den Fokus setzt, zeigt ihn mit derselben Fokuslinie. */
-#p-analysis .zubeleg,#p-analysis .inrot{border:0;background:transparent;color:var(--dim);font:inherit;
+#p-analysis .zubeleg,#p-analysis .inrot,#p-analysis .inzeit{border:0;background:transparent;color:var(--dim);font:inherit;
   font-size:var(--fs-sm);line-height:1.4;padding:4px 0;cursor:pointer;text-align:left}
-#p-analysis .zubeleg:hover,#p-analysis .inrot:hover{color:var(--text)}
-#p-analysis .zubeleg:focus-visible,#p-analysis .inrot:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+#p-analysis .zubeleg:hover,#p-analysis .inrot:hover,#p-analysis .inzeit:hover{color:var(--text)}
+#p-analysis .zubeleg:focus-visible,#p-analysis .inrot:focus-visible,#p-analysis .inzeit:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 .urteil .zubeleg{padding:0 2px;font-size:inherit}
 .urteil .ganz{margin:8px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--dim)}
 #p-analysis [tabindex="-1"]:focus{outline:none}
 #p-analysis [tabindex="-1"]:focus-visible{outline:2px solid var(--focus);outline-offset:-2px}
 
-/* Die Form des Kampfes: Saeulen je Sekunde, Luecken hinterlegt, Median
-   gestrichelt. Die Hoehe waechst mit dem Fenster (grosse Fenster nutzen
-   die Hoehe), von 112 bis 240 Punkt: bei 2000 x 1480 bleibt der Fuss so
-   ohne Rollen im Blick. */
-.form{padding:12px 22px 12px}
-.form[hidden]{display:none}
-.form .fkx{display:flex;align-items:baseline;gap:6px 12px;margin-bottom:4px;flex-wrap:wrap}
-.form #formTitel{margin:0;font:400 var(--fs-lg)/1.2 var(--display);color:var(--ink-soft)}
-.form p.fein{margin:0;color:var(--dim);font-size:var(--fs-xs);line-height:1.45;max-width:none}
-/* Die Erklaersaetze laufen nicht ueber die ganze Flaeche (Issue #110): wie
-   #verdictText hoechstens etwa 70 Zeichen je Zeile. */
-.form #lueckeDef{margin-bottom:10px;max-width:70ch}
-.form #verdictText{margin-top:10px;font-size:var(--fs-sm);color:var(--ink-soft);max-width:75ch}
-.vform{position:relative}
-.saeulen{position:relative;height:clamp(112px,calc(var(--winh,100vh) * .14),240px);
-  box-shadow:inset 0 -1px 0 var(--ridge)}
-.saeulen svg{position:absolute;inset:0;width:100%;height:100%;display:block;overflow:visible}
-.saeulen .gapz,.saeulen .invz{position:absolute;top:0;bottom:0;pointer-events:none}
-.saeulen .gapz{background:var(--gap-band);box-shadow:inset 1px 0 0 var(--gap-edge),inset -1px 0 0 var(--gap-edge)}
-/* Ruling 24: im Kampfstreifen der Analyse ist eine Luecke schraffiert in
-   Tinte, nicht rot getoent (45 Grad, die Mechanik liegt auf 135 Grad und
-   hat ein Band); die anderen Bereiche behalten --gap-band. */
-#p-analysis{--gap-hatch:color-mix(in srgb,var(--ink-faint) 70%,transparent)}
-#p-analysis .saeulen .gapz{background:repeating-linear-gradient(45deg,var(--gap-hatch) 0 1px,transparent 1px 6px);
-  box-shadow:inset 1px 0 0 var(--ink-faint),inset -1px 0 0 var(--ink-faint)}
-#p-analysis .saeulen .gapz .vgap{padding:0 4px;border-radius:var(--r-mark);background:var(--comb)}
-.saeulen .invz{background:var(--invuln-band);box-shadow:inset 1px 0 0 var(--invuln-edge),inset -1px 0 0 var(--invuln-edge)}
-/* Eine erkannte Mechanik des Bosses (Spezifikation Mechanik 3): der Ton des
-   Unverwundbar-Bandes, dazu eine leise Schraffur - die Treffer liefen dort
-   weiter, der Boss nahm sie kaum. Kein Rot, kein Gruen, kein Urteil. */
-.saeulen .mechz{position:absolute;top:0;bottom:0;pointer-events:none;
-  background:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 7px),var(--invuln-band);
-  box-shadow:inset 1px 0 0 var(--invuln-edge),inset -1px 0 0 var(--invuln-edge)}
-.saeulen .mechz .vgap{padding:0 4px;border-radius:var(--r-mark);background:var(--comb)}
-.saeulen .med{position:absolute;left:0;right:0;border-top:1px dashed var(--avg-line);pointer-events:none}
-/* Luecken und unverwundbare Strecken tragen ihre Dauer im Bild, oben im Band. */
-.vgap{position:absolute;z-index:2;top:5px;left:50%;font-family:var(--mono);
-  font-size:var(--fs-xs);color:var(--dim);white-space:nowrap;transform:translateX(-50%)}
-.fachse{position:relative;height:16px;margin-top:6px;font:var(--fs-xs)/16px var(--mono);color:var(--dimmer)}
-.fachse span{position:absolute;top:0;transform:translateX(-50%);white-space:nowrap}
-.fachse span.a0{transform:none}
-.fachse span.a1{transform:translateX(-100%)}
-/* Was im Bild steht, ohne Legende aber nichts heisst. Genannt wird nur,
-   was gerade gezeichnet ist. */
-.vlegend{display:inline-flex;align-items:center;gap:4px 14px;flex-wrap:wrap;
-  font-family:var(--sans);font-size:var(--fs-xs);color:var(--dim)}
-.vleg{display:flex;align-items:center;gap:6px}
-.vleg[hidden]{display:none}
-/* Dieselbe Kachel wie das Bild: Mulde als Grund, darauf das, was die
-   Saeulen zeigen; wahrnehmbar macht sie ihr Rand (--dim). */
-.vleg i{display:inline-block;position:relative;width:15px;height:11px;flex:none;
-  border:0;border-radius:var(--r-mark);background-color:var(--well);
-  box-shadow:inset 0 0 0 1px var(--dim)}
-.vleg i.lschnitt::before{content:"";position:absolute;left:2px;right:2px;top:5px;
-  border-top:1px dashed var(--avg-line)}
-.vleg i.lpause{background-image:linear-gradient(var(--gap-band),var(--gap-band))}
-#p-analysis .vleg i.lpause{background-image:repeating-linear-gradient(45deg,var(--gap-hatch) 0 1px,transparent 1px 4px)}
-.vleg i.linvuln{background-image:linear-gradient(var(--invuln-band),var(--invuln-band))}
-.vleg i.lmech{background-image:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 4px),linear-gradient(var(--invuln-band),var(--invuln-band))}
-/* der beste Pull im Kampfstreifen: gestrichelt in seinem Ton (path.wbgeist, #218) */
-.vleg i.lgeist::before{content:"";position:absolute;left:2px;right:2px;top:5px;
-  border-top:1px dashed var(--wbspiegel)}
-.form #mechanikZeile{margin-bottom:10px;max-width:70ch}
-.form #mechanikZeile[hidden]{display:none}
-
-/* ---------- Analyse #218: Kopf und Kampfstreifen ----------
+/* ---------- Analyse #218: Kopf und Kampf ----------
    Spezifikation 2026-10-07, 2 und 6; Entwurf docs/entwurf/analyse-neu.
    Hitze in vier Stufen: Asche, Bernstein (stark), Gold (kritisch),
    Weissglut (kritisch stark) mit heller Kappe. Die Werte hier gelten fuer
@@ -4157,75 +4097,11 @@ body.felder #p-analysis > .urteil.wbkopf > *{max-width:none}
 .wbkenn .n.wbspiel{font:400 var(--fs-sm)/1.25 var(--serif);letter-spacing:.02em;color:var(--ink-soft)}
 #p-analysis .wbkenn .inrot{font-size:var(--fs-xs);padding:2px 0}
 
-/* Der Streifen: links sein Kopf mit der Glut-Rampe, rechts die Bahn. */
-.wbstreifen{display:grid;grid-template-columns:minmax(0,24ch) minmax(0,1fr);gap:0 28px;align-items:start}
-.wbstreifen[hidden],#wbGraf[hidden]{display:none}
-.wbbahn{min-width:0}
-.wbwie{margin:6px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--dim)}
-.wbwie .ant{display:block;margin:8px 0 4px;font-size:var(--fs-sm);line-height:1.4;color:var(--ink-soft)}
-.wbwie .fein{display:block}
-.wbrampe{display:flex;height:6px;max-width:180px;margin-top:10px;border-radius:3px;overflow:hidden}
-.wbrampe i{display:block;flex:none;min-width:0}
-.wbwie .h0{background:var(--h0);opacity:var(--h0o)}
-.wbwie .h1{background:var(--h1)}
-.wbwie .h2{background:var(--h2)}
-.wbwie .h3{background:var(--h3);box-shadow:inset 0 2px 0 var(--hcap)}
-.wbwie .hs{background:var(--cat-shield,var(--dimmer))}
-/* die Anteile der Trefferarten sichtbar unter der Rampe (vorher die Legende von "Wie triffst du?") */
-.wbwie .lg{display:flex;flex-wrap:wrap;gap:2px 10px;margin:6px 0 0}
-.wbstreifen .fkx{margin-bottom:6px}
-
-/* Die Fahnen ueber der Kurve: Umschalter, gedrueckt in Gold. */
-.wbfahnen{position:relative;height:26px;margin-bottom:4px}
-.wbfahnen[hidden]{display:none}
-.wbfahne{position:absolute;top:0;display:inline-flex;align-items:center;gap:5px;height:22px;padding:0 9px 0 7px;border:0;
-  border-radius:0 var(--r-control) var(--r-control) 0;background:var(--raise);color:var(--ink-soft);font:500 var(--fs-xs)/1 var(--sans);
-  white-space:nowrap;cursor:pointer;box-shadow:inset 1px 0 0 var(--gold),var(--cast-ctl);transition:background .15s,color .15s}
-.wbfahne svg{width:12px;height:12px;flex:none;fill:none;stroke:var(--gold-ink);stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
-.wbfahne:hover{background:var(--surf-on);color:var(--text)}
-.wbfahne[aria-pressed="true"]{background:var(--gold);color:var(--ink-on-gold);box-shadow:var(--cast-ctl-hi)}
-.wbfahne[aria-pressed="true"] svg{stroke:var(--ink-on-gold)}
-.wbfahne:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-
-/* Die Glutkurve im Feld der Form: Lichtsaeule der staerksten 5 s, die
-   gewaehlte Strecke mit goldenem Rand, die Kerben eines Fachs. */
-.saeulen .wbstrecke,.saeulen .wbwahl{position:absolute;top:0;bottom:0;pointer-events:none}
-.saeulen .wbstrecke{background:linear-gradient(var(--gold),var(--gold)) top/100% 2px no-repeat}
-.saeulen .wbstrecke::before,.saeulen .wbwahl::before{content:"";position:absolute;inset:0;background:var(--gold);opacity:.1}
-.saeulen .wbwahl{box-shadow:inset 1px 0 0 var(--gold),inset -1px 0 0 var(--gold)}
-.saeulen .wbwahl[hidden]{display:none}
-/* Zeigen (#269): die Stelle eines Befundes auf der Kurve, neutral im Ton des
-   Textes - Gold bleibt der Auswahl. Dasselbe, schmaler, am Befund und an der Fahne. */
-.saeulen .wbzeig{position:absolute;top:0;bottom:0;pointer-events:none;background:color-mix(in srgb,var(--text) 10%,transparent);
-  box-shadow:inset 1px 0 0 var(--text),inset -1px 0 0 var(--text)}
-.saeulen .wbzeig[hidden]{display:none}
-.wbfahne[data-zeig="true"]:not([aria-pressed="true"]){background:var(--surf-on);color:var(--text);box-shadow:inset 1px 0 0 var(--text),var(--cast-ctl)}
-.wbbefunde .find[data-zeig="true"]{margin-left:-8px;padding-left:6px;box-shadow:inset 2px 0 0 var(--text)}
-.saeulen .wbkerbe{position:absolute;bottom:0;width:2px;height:9px;margin-left:-1px;background:var(--gold);pointer-events:none}
-
-/* Die Lesezeile der gedrueckten Fahne und die Saetze darunter: hoechstens
-   75 Zeichen je Zeile (Spezifikation 8.3). */
-.wblese{margin:8px 0 0;max-width:75ch;font-size:var(--fs-sm);line-height:1.5;color:var(--ink-soft)}
-.wblese:empty{margin:0}
-.wblese .k{font-weight:600;color:var(--text)}
-#p-analysis .wblese .inrot,#p-analysis .wbaufheben,#p-analysis .wbrk{padding:0 2px;font-size:inherit}
-#p-analysis .wbaufheben,#p-analysis .wbrk{border:0;background:transparent;color:var(--dim);font:inherit;line-height:1.4;cursor:pointer;
+/* Der Knopf zu den Rekorden am Fach Auge von Ventius (69). */
+#p-analysis .wbrk{padding:0 2px;font-size:inherit;border:0;background:transparent;color:var(--dim);font:inherit;line-height:1.4;cursor:pointer;
   text-decoration:underline;text-underline-offset:3px}
-#p-analysis .wbaufheben:hover,#p-analysis .wbrk:hover{color:var(--text)}
-#p-analysis .wbaufheben:focus-visible,#p-analysis .wbrk:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
-.wbstreifen #lueckeDef{margin:8px 0 0}
-.wbstreifen #mechanikZeile{margin:6px 0 0}
-/* Im breiten Streifen stehen der Haelftensatz und die Erklaerung der Luecke
-   nebeneinander (jeder hoechstens 75 Zeichen), und die Befunde darunter
-   finden bis fuenf nebeneinander Platz, auch mit breiterer Schrift. */
-@container ana (min-width:1600px){
-  #wbGraf:has(> #verdictText:not([hidden]):not(:empty)){display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);column-gap:32px;align-items:start}
-  #wbGraf > *{grid-column:1/-1}
-  #wbGraf > #verdictText{grid-column:1}
-  #wbGraf > #verdictText + #lueckeDef{grid-column:2;margin-top:10px}
-  #weitereListe{grid-template-columns:repeat(auto-fill,minmax(min(30ch,calc(20% - 25.6px)),1fr))}
-}
-
+#p-analysis .wbrk:hover{color:var(--text)}
+#p-analysis .wbrk:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
 /* Die Befundliste unter dem Streifen (vorher "Weitere Befunde"): Begriff
    ueber Wert, der Satz darunter; der Eintrag der gedrueckten Fahne mit
    der Zustandskante "gewaehlt" (3 px --pick, DESIGN.md). */
@@ -4238,21 +4114,18 @@ body.felder #p-analysis > .urteil.wbkopf > *{max-width:none}
 .wbbefunde .n{color:var(--dimmer);font-size:var(--fs-xs);line-height:1.4}
 .wbbefunde .find.zaehlt .v{color:var(--lite-ink)}
 .wbbefunde .find dd.w{margin:2px 0 0}
-#p-analysis .wbbefunde .inrot{font-size:var(--fs-xs);padding:2px 0}
-.wbbefunde .find[aria-current="true"]{margin-left:-12px;padding-left:10px;box-shadow:inset 3px 0 0 var(--pick)}
-.wbstreifen .noclock{margin:8px 0 0;max-width:75ch}
+#p-analysis .wbbefunde .inrot,#p-analysis .wbbefunde .inzeit{font-size:var(--fs-xs);padding:2px 0}
+.wbbefunde .find dd.w{display:flex;flex-wrap:wrap;gap:0 14px}
 
 @container ana (max-width:760px){
   .urteil.wbkopf{grid-template-columns:minmax(0,1fr)}
-  .wbstreifen{grid-template-columns:minmax(0,1fr)}
-  .wbfahne .l{display:none}
-  .wbfahne{padding:0 6px;border-radius:var(--r-control)}
 }
-@media (prefers-reduced-motion:reduce){.wbfahne{transition:none}}
 
 /* #findings: die Felder darunter, mit Fugen wie das Panel. */
 body.felder #findings{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--hair-rule)}
 body.felder #findings > *{background:var(--comb);min-width:0}
+/* leer (seit #414 steht dort nur noch das Fenster und die Ziele): kein Feld und keine doppelte Fuge */
+body.felder #findings:empty{display:none}
 #findings:empty{display:none}
 /* Die Ueberschriften der Analyse stehen wie im Entwurf ohne die goldene Marke davor. */
 #p-analysis h3::before{display:none}
@@ -4287,8 +4160,6 @@ body.felder #findings > .wbbank{background:var(--hair-rule)}
 /* Nachbeben je Salve und Schaden je Salve (Spezifikation 3.3), wie die Zahlen darueber */
 @container wbf (min-width:820px){.wbteile{grid-template-columns:minmax(0,1fr) minmax(0,1fr)}}
 .wbfach.zeigt{background:var(--comb2)}
-.wbfach.wbzurueck > :not(.wbfkopf){opacity:.38;transition:opacity .2s}
-.wbfach.wbzurueck > .wbfkopf{opacity:.6}
 .wbfkopf{display:grid;grid-template-columns:auto minmax(0,1fr) auto;align-items:center;gap:0 12px}
 /* Schmales Fach (Zoom 150-200 % im 560-Punkt-Fenster, #236): der Anteil stand neben dem
    Namen und liess ihm 80 Punkt - "Detonierendes" brach Buchstabe fuer Buchstabe. Jetzt
@@ -4442,7 +4313,7 @@ body.felder #findings > .wbbank{background:var(--hair-rule)}
 :where(html.w-max-899, html.h-max-699) .ringlegende{position:static;margin:6px 22px 0}
 .art-shield{background:var(--cat-shield,var(--dimmer))}
 
-/* Das Fach Auge von Ventius (69-werkbank.ts). */
+/* Das Fach Auge von Ventius (die Werkbank ist seit #414 abgeloest; Stile bleiben bis zum Aufraeum-PR). */
 .vfeld{padding:12px 22px}
 .salvenwort{max-width:68ch}
 .vkz{margin:0;display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:14px 12px;padding-top:12px;box-shadow:inset 0 1px 0 var(--hair-rule)}
@@ -6984,7 +6855,7 @@ body:not(.compact) .stage > :is(#app,#weeklies){max-width:1680px;margin-inline:a
 .wk-geheimdungeon{grid-area:geheimdungeon}.wk-events{grid-area:events}.wk-dimension{grid-area:dimension}.wk-haendler{grid-area:haendler}
 .wk-eigene{grid-column:1/-1}
 .wkleerfeld{background:var(--comb2)}
-/* Das Wochenband: Do 10:00 bis Do 10:00, die Tagesabschnitte an ihren echten Resets, "jetzt" als goldener Strich */
+/* Das Wochenband: Mi 06:00 bis Mi 06:00 UTC, die Tagesabschnitte an ihren echten Resets, "jetzt" als goldener Strich */
 .wkband{grid-area:band;padding:12px 16px 10px}
 .wkbandoben{position:relative;height:22px}
 .wkbandjetzt{position:absolute;bottom:3px;white-space:nowrap;font-size:var(--fs-xs);color:var(--ink-soft)}
@@ -7203,6 +7074,38 @@ body:not(.compact) .stage > :is(#app,#weeklies){max-width:1680px;margin-inline:a
 .wkerin input[type=time]{color-scheme:dark}
 :root[data-theme="light"] .wkerin input[type=time]{color-scheme:light}
 @media (prefers-reduced-motion:reduce){.wkkarte,.wkfeld,.wkring .rf,.wkzelle,.wkhaekchen,.wkpfeil,.wkbalken i{transition:none}}
+/* Turm der Gier (Spezifikation 2026-11-11, Entwurf D): Turmbild als Hintergrund der ganzen Flaeche, Stufen als dunkle Glaskarten.
+   Alle Zahlen in Textgroesse (Source Sans), nie Anton. Die Flaeche nimmt die Resthoehe des Tabs (Flex in .wkinhalt), die Plaketten richten sich nach Zeilenhoehe und Spaltenbreite.
+   Die Flaeche bleibt in allen Themen dunkel: ihre Farben stehen hier fest (lokale Werte), sonst waere der Text im hellen Thema dunkel auf dunkel. */
+.wkt-unter{display:flex;gap:6px;margin:0 0 12px;flex-wrap:wrap}
+.wkt-unterknopf{font-weight:600;font-size:var(--fs-sm);font-family:inherit;padding:7px 14px;border:0;border-radius:var(--r-surface);background:var(--comb);color:var(--ink-soft);cursor:pointer}
+.wkt-unterknopf[aria-selected="true"]{background:var(--surf-on);color:var(--text);box-shadow:inset 0 0 0 1px var(--pick),var(--edge-lit)}
+.wkt-unterknopf:focus-visible,.wkt-ebene:focus-visible,.wkt-alle:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.wkt-zahl b{font-family:inherit;font-weight:700;font-size:1em;color:var(--gold-ink)}
+.wkt{--hair-rule-strong:rgba(255,255,255,.15);--text:#f4ece1;--ink-soft:#e6d9c4;--dim:#b3a189;--gold:#e0a64a;--gold-ink:#e0a64a;--focus:#f0c070;color:var(--text);position:relative;display:flex;flex-direction:column;flex:1 1 auto;min-height:430px;padding:14px;border-radius:var(--r-surface);overflow:hidden;isolation:isolate;background:#06040a center 30%/cover no-repeat}
+.wkt::before{content:"";position:absolute;inset:0;z-index:-1;background:linear-gradient(180deg,rgba(6,4,2,.25) 0%,rgba(6,4,2,.55) 38%,rgba(6,4,2,.86) 100%)}
+.wkt.wkt-ohnebild{background:linear-gradient(160deg,#1a1030 0%,#2a1018 70%,#120805 100%)}
+.wkt-kopf{display:flex;flex:4.5 0 auto;align-content:flex-start;align-items:center;gap:6px 14px;flex-wrap:wrap;margin:0 0 12px;text-shadow:0 1px 6px #000}
+.wkt-kopf h3{margin:0;font-size:var(--fs-lg)}
+.wkt-sub{color:#e6d9c4;font-size:var(--fs-sm)}
+.wkt-bar{height:6px;border-radius:3px;background:rgba(255,255,255,.14);overflow:hidden;flex:1 1 140px;min-width:100px}
+.wkt-bar i{display:block;height:100%;background:var(--gold)}
+.wkt-stufen{flex:5 1 0;min-height:0;display:grid;grid-template-columns:repeat(2,minmax(0,1fr));grid-auto-rows:minmax(0,1fr);gap:8px}
+.wkt-stufe{display:grid;grid-template-columns:minmax(0,1fr) auto auto;grid-template-rows:auto minmax(0,1fr);align-items:center;gap:6px 10px;min-height:0;padding:6px 10px 8px;border-radius:var(--r-surface);background:rgba(10,7,4,.62);backdrop-filter:blur(6px);box-shadow:inset 0 0 0 1px rgba(224,166,74,.22)}
+.wkt-stufe.fertig{background:rgba(10,7,4,.48)}
+.wkt-stufe h4{margin:0;font-size:var(--fs-md)}
+.wkt-stufe.fertig h4{color:var(--dim)}
+.wkt-alle{font-weight:600;font-size:var(--fs-xs);font-family:inherit;padding:4px 10px;border:0;border-radius:var(--r-surface);background:rgba(255,255,255,.08);color:var(--ink-soft);cursor:pointer}
+.wkt-alle:hover{background:rgba(255,255,255,.16);color:var(--text)}
+.wkt-reihe{grid-column:1 / -1;align-self:stretch;display:grid;grid-template-columns:repeat(5,minmax(0,1fr));grid-template-rows:minmax(0,1fr);gap:8px;min-height:0;align-items:center;container-type:size}
+.wkt-ebene{position:relative;display:block;width:min(100%,100cqh);height:auto;aspect-ratio:1;justify-self:center;padding:0;border:0;border-radius:10px;overflow:hidden;cursor:pointer;opacity:.55;filter:saturate(.6);background:rgba(255,255,255,.03);box-shadow:inset 0 0 0 1px var(--hair-rule-strong)}
+.wkt-ebene.an{opacity:1;filter:none;box-shadow:0 0 0 2px var(--gold)}
+.wkt-pl{position:absolute;inset:0;background:center/contain no-repeat}
+.wkt-ziffer{display:flex;align-items:center;justify-content:center;font-family:inherit;font-weight:700;font-size:clamp(20px,3vw,40px);line-height:1;color:#d8cbff;background:none}
+.wkt-ebene .wkhk{position:absolute;right:5px;top:3px;width:16px;height:16px;color:var(--gold);filter:drop-shadow(0 0 3px #000)}
+/* schmal (<= 700): wachsen statt schrumpfen. Karte mindestens 100 = Polster 6+8 + Kopfzeile ~26 + Luecke 6 + Plakette >= 52 (gemessen: 54 bei 560 x 700, 57 bei 560 x 900).
+   Vier Karten + drei Luecken (6) = 4*100+18 = 418 Mindesthoehe der Stufen. Bei 560 x 900 passt der Turm ohne Rollen, darunter rollt die Seite (.wkrollt), die Plaketten bleiben gross. */
+@media (max-width:700px){.wkt{padding:10px;min-height:440px}.wkt-kopf{flex:0 0 auto}.wkt-stufen{flex:1 1 auto;grid-template-columns:minmax(0,1fr);grid-auto-rows:minmax(100px,1fr);gap:6px;min-height:418px}.wkt-stufe{padding:6px 8px 8px}.wkt-reihe{gap:6px}}
 /* schmal: der Kopf in zwei Zeilen, die Reset-Anzeige links */
 :where(html.w-max-640) .wkreset{align-items:flex-start;margin-left:0;text-align:left}
 :where(html.w-max-640) .wkinhalt{padding-inline:14px}
@@ -8400,6 +8303,12 @@ html.mica[data-theme="glas"] body:not(.compact) :is(.top,.bereiche,.statusleiste
 html.mica[data-theme="glas"] body.tafel.glut:not(.compact) :is(#ringFeld,.table,#kurveFeld),
 html.mica[data-theme="glas"] body.felder:not(.compact) :is(#clearedNote,.panel.on > *,#cmpBestWrap,#cmpPick,#cmpOut > *,#histWrap > *,#findings > *,#findings > .wbbank > *,.bkopf,.gweg),
 html.mica[data-theme="glas"] body:not(.compact) :is(.wkopf,.rkkopf,.wkfeld,.wkleerfeld,.wkgruppe.fertig){background:var(--mica-scheibe)}
+/* die neue Analyse (#414): #a2 ist als Kind des Feldes die eine Scheibe; Abschnitte und Karten liegen durchsichtig darin */
+html.mica[data-theme="glas"] body:not(.compact) :is(.a2 > section,.a2mitte > section){background:transparent}
+html.mica[data-theme="glas"] body:not(.compact) .a2karte{background:transparent}
+/* #439: auf Glas bleibt es wie vorher: nur der Aussenrahmen, keine inneren Linien (die Karten liegen durchsichtig auf der Scheibe) */
+html.mica[data-theme="glas"] body:not(.compact) .a2karten{padding:0;border-width:0;margin:0;box-shadow:0 0 0 1px var(--hair-rule)}
+html.mica[data-theme="glas"] body:not(.compact) .a2karte{border-width:0;margin:0}
 /* die Gilde (68): ihr Inhalt traegt Schrift ausserhalb der Felder (Satz, Filter, Koepfe) und liegt darum ganz auf einer Scheibe */
 html.mica[data-theme="glas"] body:not(.compact) .gl .wkinhalt{background:var(--mica-scheibe)}
 /* darin keine zweite Scheibe (#gilde: die Regel davor zaehlt mit #pNameFeld eine Kennung): die Saetze, die Spalten und das Feld liegen auf ihr, die Fugen als Haarlinie */
@@ -9279,7 +9188,6 @@ h3,
 .row .v.dps,
 .catb,
 .urteil .uv,
-.form #formTitel,
 .wbkenn .v,
 .fsec > h3,
 .wbanteil,
@@ -9385,13 +9293,15 @@ body:not(.compact) .top .mark .wort,
 .fclear.on:hover,
 .fight .ptag,
 .cmpbtn .cmpn,
-.wbfahne[aria-pressed="true"],
 .cmpzeile.fuehrt .nm,
 .cmpzeile.fuehrt .nm i,
 .gleis .wbtn.on,
 .wbtn.on,
 .gl-anw[data-m="da"] .gl-plakette,
 .bwer > i,
+.a2chip[aria-pressed="true"],
+.a2marke[aria-pressed="true"],
+.a2opener .ch.vent,
 #rennen .medaille.m1 *,
 #rennen .rplay *,
 #btnGhost[aria-pressed="true"] *,
@@ -9402,12 +9312,14 @@ body:not(.compact) .top .mark .wort,
 .fclear.on:hover *,
 .fight .ptag *,
 .cmpbtn .cmpn *,
-.wbfahne[aria-pressed="true"] *,
 .cmpzeile.fuehrt .nm *,
 .cmpzeile.fuehrt .nm i *,
 .gleis .wbtn.on *,
 .wbtn.on *,
 .gl-anw[data-m="da"] .gl-plakette *,
+.a2chip[aria-pressed="true"] *,
+.a2marke[aria-pressed="true"] *,
+.a2opener .ch.vent *,
 .bwer > i *{-webkit-text-stroke-width:0;text-shadow:none}
 /* Aufbau B, Nachbesserung (02.11.2026): die Lesezeile steht im Kampf nur noch fuer Vorleser da (der Kopf sagt Zahlen, der Streifen soll flach
    sein); der Live-Punkt steht vor dem Schaden, nicht dahinter. */
@@ -9423,3 +9335,366 @@ body.compact.kn-hand .kn-wplatten{flex:1 1 auto;max-height:none}
 body.compact #kRest:not([hidden]),body.compact #kwkRest{position:absolute;right:8px;bottom:4px;left:auto;z-index:5;width:auto;height:16px;margin:0;opacity:0;pointer-events:none;
   background:var(--comb);box-shadow:inset 0 0 0 1px var(--hair-rule-strong);border-radius:8px}
 body.compact #kRest:focus-visible,body.compact #kwkRest:focus-visible{opacity:1;pointer-events:auto}
+
+/* ---------- Die neue Analyse (#414): Zeitleiste, Bereichsauswertung, Pruefstand je Faehigkeit ----------
+   Nur Tokens der Seite: Hitze (--h0..--h3), Glutkurve (--wbkurve), Spiegel des besten Pulls (--wbspiegel),
+   Gold nur auf Auswahl und Befund. Kein --pos, kein --neg, keine Kategoriefarben: Unterschiede ueber Form,
+   Lage und Beschriftung. 79-zeitleiste.ts, 70-pruefstand.ts. */
+.a2{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--hair-rule);min-width:0;container:a2/inline-size}
+.a2 > section,.a2mitte > section{background:var(--comb);padding:14px 20px 16px;min-width:0}
+.a2 h3{margin:0;font:400 var(--fs-lg)/1.2 var(--display);letter-spacing:-.005em;color:var(--text)}
+.a2 h4,.a2 h3.uz{margin:0;font:400 var(--fs-md,15px)/1.2 var(--display);color:var(--text)}
+.a2 .fein{font-size:var(--fs-xs);line-height:1.45;color:var(--dim)}
+.a2 .zahl{font:400 var(--fs-lg)/1.05 var(--display);color:var(--text);font-variant-numeric:tabular-nums}
+.a2 .zahl.gross{font-size:30px}
+.a2 .zahl.befund{color:var(--lite-ink)}
+.a2 button{font:inherit}
+.a2 :focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.a2 .vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.a2 ::selection{background:var(--deep);color:var(--text)}
+
+
+/* ---------- Mitte: Zeitleiste links, Bereichsauswertung rechts, wenn Platz ist ---------- */
+.a2mitte{display:grid;grid-template-columns:minmax(0,1fr);gap:1px;background:var(--hair-rule);min-width:0}
+@container a2 (min-width:1360px){.a2mitte{grid-template-columns:minmax(0,1fr) minmax(360px,30%)}}
+
+/* die Zeitleiste */
+.a2zeit .kopfzeile{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px;margin-bottom:10px}
+.a2zeit .kopfzeile .fein{flex:1 1 20ch}
+.a2steuer{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;font-size:var(--fs-xs);color:var(--dim)}
+.a2steuer input{width:5.2ch;height:24px;padding:0 4px;border:0;border-radius:var(--r-control,5px);background:var(--raise);color:var(--text);
+  font:400 var(--fs-sm)/1 var(--sans);font-variant-numeric:tabular-nums;text-align:center;box-shadow:var(--cast-ctl)}
+.a2steuer input[aria-invalid=true]{box-shadow:inset 0 0 0 1px var(--amber)}
+.a2chip{height:24px;padding:0 10px;border:0;border-radius:var(--r-control,5px);background:var(--raise);color:var(--ink-soft);cursor:pointer;box-shadow:var(--cast-ctl);
+  display:inline-flex;align-items:center;gap:5px;white-space:nowrap}
+.a2chip:hover{color:var(--text)}
+.a2chip[aria-pressed=true]{background:var(--gold);color:var(--ink-on-gold);text-shadow:none}
+.a2chip svg{width:11px;height:11px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+.a2graf{display:grid;grid-template-columns:var(--a2bahn,188px) minmax(0,1fr);gap:0 10px;align-items:stretch}
+.a2graf > .voll{grid-column:1/-1}
+.a2graf .bez{display:flex;align-items:center;font-size:var(--fs-xs);line-height:1.2;color:var(--dim);min-width:0}
+.a2graf .bez span{flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a2graf .bez.name{font:400 var(--fs-sm)/1.2 var(--serif);letter-spacing:.02em;color:var(--ink-soft)}
+.a2graf .bez.name b{font-weight:400;color:var(--text)}
+.a2graf .bez .ant{margin-left:auto;padding-left:6px;font:400 var(--fs-xs)/1 var(--display);color:var(--dim);flex:none}
+
+/* Ereignismarken: Knoepfe ueber der Kurve, in Zeitfolge (so laeuft Tab) */
+.a2marken{position:relative;height:26px}
+.a2marke{position:absolute;top:0;height:24px;display:inline-flex;align-items:center;gap:4px;padding:0 7px 0 6px;border:0;border-radius:0 var(--r-control,5px) var(--r-control,5px) 0;
+  background:var(--raise);color:var(--ink-soft);font:500 var(--fs-xs)/1 var(--sans);white-space:nowrap;cursor:pointer;box-shadow:inset 1px 0 0 var(--ink-faint),var(--cast-ctl)}
+.a2marke.spitze,.a2marke.einsatz{box-shadow:inset 1px 0 0 var(--gold),var(--cast-ctl)}
+.a2marke.unter,.a2marke.unlesbar,.a2marke.salven,.a2marke.stelle{box-shadow:inset 1px 0 0 var(--amber),var(--cast-ctl)}
+.a2marke.ziel{box-shadow:inset 1px 0 0 var(--ink-soft),var(--cast-ctl)}
+.a2marke:hover{color:var(--text);background:var(--surf-on)}
+.a2marke[aria-pressed=true]{background:var(--gold);color:var(--ink-on-gold);text-shadow:none;box-shadow:none}
+.a2marke svg{width:11px;height:11px;flex:none;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* die Glutkurve */
+.a2kurve{position:relative;height:clamp(150px,22vh,300px);background:linear-gradient(180deg,transparent,color-mix(in srgb,var(--pitch) 35%,transparent));
+  border-bottom:1px solid var(--hair-rule);overflow:visible;touch-action:none;cursor:crosshair}
+.a2kurve svg{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
+.a2kurve .gapz{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(45deg,var(--gap-hatch) 0 1px,transparent 1px 7px);box-shadow:inset 1px 0 0 var(--ink-faint),inset -1px 0 0 var(--ink-faint);pointer-events:none}
+.a2kurve .gapz .vgap{position:absolute;left:0;right:0;top:6px;transform:none;text-align:center;font-size:var(--fs-xs);color:var(--dim);white-space:nowrap;overflow:hidden}
+.a2kurve .med{position:absolute;left:0;right:0;border-top:1px dashed var(--ink-faint);opacity:.7;pointer-events:none}
+/* Strecken, in denen der Boss nichts nahm: Ziel unverwundbar und erkannte Mechanik (wie im alten Streifen, jetzt in der Zeitleiste) */
+.a2kurve .invz,.a2kurve .mechz{position:absolute;top:0;bottom:0;pointer-events:none;box-shadow:inset 1px 0 0 var(--invuln-edge),inset -1px 0 0 var(--invuln-edge)}
+.a2kurve .invz{background:var(--invuln-band)}
+.a2kurve .mechz{background:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 7px),var(--invuln-band)}
+.a2kurve .invz .vgap,.a2kurve .mechz .vgap{position:absolute;left:0;right:0;top:6px;transform:none;text-align:center;font-size:var(--fs-xs);color:var(--dim);white-space:nowrap;overflow:hidden}
+.a2kurve .spitze{position:absolute;top:0;bottom:0;background:linear-gradient(var(--gold),var(--gold)) top/100% 2px no-repeat;pointer-events:none}
+.a2kurve .spitze::before{content:"";position:absolute;inset:0;background:var(--gold);opacity:.08}
+.a2kurve .zielw{position:absolute;top:0;bottom:0;width:0;border-left:1px dotted var(--ink-soft);opacity:.6;pointer-events:none}
+/* die gewaehlte Strecke: goldener Rand, Lichtsaeule, Griffe */
+.a2brush{position:absolute;top:0;bottom:0;box-shadow:inset 1px 0 0 var(--gold),inset -1px 0 0 var(--gold);pointer-events:none}
+.a2brush::before{content:"";position:absolute;inset:0;background:var(--gold);opacity:.12}
+.a2brush[hidden]{display:none}
+.a2griff{position:absolute;top:0;bottom:0;width:12px;margin-left:-6px;cursor:ew-resize;pointer-events:auto;touch-action:none}
+.a2griff::after{content:"";position:absolute;top:calc(50% - 11px);left:4px;width:4px;height:22px;border-radius:2px;background:var(--gold)}
+.a2griff.l{left:0}.a2griff.r{left:100%}
+.a2brushfokus{position:absolute;inset:0;border:0;background:transparent;padding:0;cursor:crosshair}
+.a2brushfokus:focus-visible{outline-offset:-2px}
+.a2zeig{position:absolute;top:0;bottom:0;width:1px;background:var(--text);opacity:.55;pointer-events:none}
+.a2zeig[hidden]{display:none}
+/* Kerben der gewaehlten Faehigkeit am Fuss der Kurve, 2 x 9 in Gold wie in der Werkbank */
+.a2kerben{position:absolute;left:0;right:0;bottom:0;height:12px;pointer-events:none}
+.a2kerben i{position:absolute;bottom:0;width:2px;height:12px;margin-left:-1px;background:var(--gold)}
+.a2kerben i.vor{height:8px;background:var(--text);opacity:.45}
+.a2lese{margin:6px 0 0;min-height:1.4em;font-size:var(--fs-xs);line-height:1.4;color:var(--dim);font-variant-numeric:tabular-nums}
+.a2lese b{font-weight:600;color:var(--ink-soft)}
+.a2lese .wie{color:var(--dimmer)}
+
+/* die Zeitachse */
+.a2achse{position:relative;height:16px;font-size:var(--fs-xs);color:var(--dimmer);font-variant-numeric:tabular-nums}
+.a2achse span{position:absolute;top:1px;transform:translateX(-50%);white-space:nowrap}
+.a2achse span.a0{transform:none}.a2achse span.a1{transform:translateX(-100%)}
+
+/* die Schwimmbahnen der Faehigkeiten */
+.a2bahn{position:relative;height:var(--a2bh,24px);border-bottom:1px solid var(--hair-rule);cursor:default;transition:opacity .15s}
+.a2bahn[data-skill]{cursor:pointer}
+.a2bahn i{position:absolute;bottom:2px;width:2px;margin-left:-1px;border-radius:1px 1px 0 0;transition:opacity .15s}
+.a2bahn i.h0{background:var(--h0);opacity:var(--h0o)}
+.a2bahn i.h1{background:var(--h1)}
+.a2bahn i.h2{background:var(--h2)}
+.a2bahn i.h3{background:var(--h3);box-shadow:inset 0 2px 0 var(--hcap)}
+.a2bahn i.aus{opacity:.18 !important}
+.a2bahn i.teil{box-shadow:inset 0 -2px 0 var(--comb),inset 0 -3px 0 currentColor}
+/* Ventius: Perlen in der Bahn - je Nachbeben ein Punkt, hohl = gefehlt, Ring = unter der Decke, gestrichelt = unlesbar */
+.a2bahn.vent{height:calc(8px + var(--a2decke,3) * 6px)}
+.a2bahn .perle{position:absolute;bottom:3px;width:16px;margin-left:-8px;height:calc(var(--a2decke,3) * 6px);transition:opacity .15s}
+.a2bahn .perle.aus{opacity:.18}
+.a2bahn .perle svg{width:100%;height:100%;overflow:visible}
+.a2bahn .perle .voll{fill:var(--h2)}
+.a2bahn .perle .leer{fill:none;stroke:var(--gold-ink);stroke-width:1}
+.a2bahn .perle .ring{fill:none;stroke:var(--gold);stroke-width:1.1;opacity:.85}
+.a2bahn .perle .tot{fill:none;stroke:var(--dim);stroke-width:.9;stroke-dasharray:1.5 1.5}
+.a2bahn .perle.h0 .voll{fill:var(--h0);opacity:var(--h0o)}
+.a2bahn .perle.h1 .voll{fill:var(--h1)}
+.a2bahn .perle.h3 .voll{fill:var(--h3)}
+.a2bahnen .bez.hebt,.a2bahnen .a2bahn.hebt{background:color-mix(in srgb,var(--gold) 10%,transparent)}
+.a2bahnen .bez.zeigt,.a2bahnen .a2bahn.zeigt{background:color-mix(in srgb,var(--text) 6%,transparent)}
+/* gewaehlt: die anderen Bahnen treten zurueck, die gewaehlte bekommt eine goldene Kante */
+.a2graf.gewaehlt .a2bahn:not(.hebt):not(.zeigt){opacity:.4}
+.a2graf.gewaehlt .bez.name:not(.hebt):not(.zeigt) .nmt{color:var(--dim)}
+.a2graf.gewaehlt .bez.name:not(.hebt):not(.zeigt) .sic{opacity:.5}
+.a2bahnen .bez.hebt{box-shadow:inset 2px 0 0 var(--gold)}
+/* der Name der Bahn ist ein Knopf: Symbol, Name, Anteil */
+.a2graf .bezk{display:flex;align-items:center;gap:6px;width:100%;min-width:0;min-height:24px;padding:0 0 0 4px;border:0;background:transparent;color:inherit;font:inherit;letter-spacing:inherit;text-align:left;cursor:pointer;border-radius:3px}
+.a2graf .bezk .nmt{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.a2graf .bezk[aria-pressed=true] .nmt{color:var(--lite-ink)}
+.a2graf .bezk:hover .nmt{color:var(--text)}
+.a2 .sic{display:block;flex:none;object-fit:cover;border-radius:3px;box-shadow:0 0 0 1px var(--hair-rule)}
+.a2 .sic.bz{width:18px;height:18px}
+.a2bahnhinweis{grid-column:2;margin:6px 0 0;min-height:2.9em;font-size:var(--fs-xs);line-height:1.45;color:var(--dim);max-width:110ch}
+.a2bahnhinweis .kb{display:inline-block;width:2px;height:11px;margin-right:7px;vertical-align:-1px;background:var(--gold)}
+.a2bahnhinweis .kb.leer{background:transparent;box-shadow:inset 0 0 0 1px var(--gold)}
+.a2bahnen .bez.weitere,.a2bahnen .bez.tick{color:var(--dimmer)}
+.a2tasten{margin:8px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--dimmer);max-width:120ch}
+.a2tasten kbd{font:inherit;padding:0 4px;border-radius:3px;background:var(--raise);color:var(--ink-soft)}
+.a2legende{display:flex;flex-wrap:wrap;gap:3px 14px;font-size:var(--fs-xs);color:var(--dim);margin-top:8px}
+.a2legende i{display:inline-block;width:10px;height:10px;vertical-align:-1px;margin-right:4px;border-radius:2px}
+.a2legende .lk{background:var(--wbkurve)}
+.a2legende .lg{border:1px dashed var(--wbspiegel);background:transparent}
+.a2legende .lp{background:repeating-linear-gradient(45deg,var(--gap-hatch) 0 1px,transparent 1px 4px);box-shadow:inset 0 0 0 1px var(--ink-faint)}
+.a2legende .lmed{height:0;width:12px;border-top:1px dashed var(--ink-faint);border-radius:0;vertical-align:3px}
+.a2legende .lu{background:var(--invuln-band);box-shadow:inset 0 0 0 1px var(--invuln-edge)}
+.a2legende .lm{background:repeating-linear-gradient(135deg,var(--invuln-edge) 0 1px,transparent 1px 4px),var(--invuln-band);box-shadow:inset 0 0 0 1px var(--invuln-edge)}
+.a2legende .lw{box-shadow:inset 0 0 0 1px var(--gold);background:color-mix(in srgb,var(--gold) 15%,transparent)}
+.a2legende svg.lv{display:inline-block;width:8px;height:14px;vertical-align:-3px;margin-right:4px}
+.a2legende svg.lv .voll{fill:var(--h2)}.a2legende svg.lv .leer{fill:none;stroke:var(--gold-ink);stroke-width:1}
+.a2legende .lkb{width:2px;height:10px;background:var(--gold);border-radius:0;margin-right:6px}
+.a2legende .l0{background:var(--h0);opacity:var(--h0o)}.a2legende .l1{background:var(--h1)}.a2legende .l2{background:var(--h2)}.a2legende .l3{background:var(--h3);box-shadow:inset 0 2px 0 var(--hcap)}
+
+/* Tabelle hinter dem Bild */
+.a2tab{margin-top:10px;font-size:var(--fs-xs)}
+.a2tab summary{cursor:pointer;color:var(--dim);list-style:none;display:inline-flex;align-items:center;gap:6px;min-height:24px}
+.a2tab summary::-webkit-details-marker{display:none}
+.a2tab summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.a2tab[open] summary::before{transform:rotate(45deg)}
+.a2tab table{margin-top:8px;border-collapse:collapse;font-variant-numeric:tabular-nums;width:100%;max-width:70ch}
+.a2tab th,.a2tab td{text-align:left;padding:3px 10px 3px 0;border-bottom:1px solid var(--hair-rule);color:var(--ink-soft);font-weight:400;white-space:nowrap}
+.a2tab th{color:var(--dim)}
+.a2tab td.z,.a2tab th.z{text-align:right}
+.a2tab .rollt{max-height:260px;overflow:auto}
+
+/* ---------- die Bereichsauswertung ---------- */
+.a2bereich .satz{margin:0;font-size:15px;line-height:1.75;color:var(--text);max-width:80ch}
+.a2bereich .satz .z{font:400 var(--fs-xl)/1 var(--display);color:var(--lite-ink);font-variant-numeric:tabular-nums;vertical-align:-1px}
+.a2bereich .kopfzeile{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 14px;margin-bottom:8px}
+.a2bereich .kopfzeile .zeit{font:400 var(--fs-xs)/1.3 var(--mono);color:var(--dim)}
+.a2zwei{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,30ch),1fr));gap:10px 36px;margin-top:12px}
+.a2zwei h3.uz{margin-bottom:6px}
+.a2zwei ul{margin:0;padding:0;list-style:none;display:grid;gap:5px}
+.a2zwei li{position:relative;padding-left:14px;font-size:var(--fs-sm);line-height:1.45;color:var(--ink-soft);max-width:62ch}
+.a2zwei li::before{content:"";position:absolute;left:1px;top:.55em;width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.a2zwei .gut li::before{background:transparent;box-shadow:inset 0 0 0 1.5px var(--ink-faint)}
+.a2zwei li.leer{color:var(--dimmer)}.a2zwei li.leer::before{display:none}
+/* Was die Seite zur Analyse beisteuert (#414, B2): der Weg in die Rotation steht im Satz, Haelften, Start und unverwundbares Ziel als leise Saetze */
+#p-analysis :is(.a2haelften,.a2treffer,.a2unv,.a2start){margin:8px 0 0;font-size:var(--fs-sm);line-height:1.45;color:var(--dim);max-width:70ch}
+#p-analysis .a2zeit :is(#lueckeDef,#mechanikZeile){margin:6px 0 0;max-width:70ch}
+#p-analysis .a2zeit :is(#lueckeDef,#mechanikZeile)[hidden]{display:none}
+#aNoClock{margin:8px 0 0;max-width:75ch}
+#p-analysis .a2weg{margin:4px 0 0;font-size:var(--fs-xs)}
+#p-analysis :is(.a2zwei li,.a2start,.a2weg) :is(.inrot,.inzeit){display:inline-flex;align-items:center;min-height:24px;font-size:var(--fs-xs);padding:2px 0 2px 4px}
+.a2kacheln{display:grid;grid-template-columns:repeat(auto-fill,minmax(13ch,1fr));gap:12px 0;margin-top:14px}
+.a2kacheln > div{padding:0 14px;box-shadow:inset 1px 0 0 var(--hair-rule);min-width:0}
+.a2kacheln > div:first-child{padding-left:0;box-shadow:none}
+.a2kacheln dt{font-size:var(--fs-xs);line-height:1.3;color:var(--dim)}
+.a2kacheln dd{margin:6px 0 0}
+.a2kacheln .n{display:block;margin-top:2px;font-size:var(--fs-xs);line-height:1.35;color:var(--dim);max-width:22ch}
+.a2misch{display:flex;height:6px;margin-top:6px;border-radius:3px;overflow:hidden;background:var(--raise)}
+.a2misch i{display:block;height:100%;background:var(--ink-faint);opacity:.9}
+.a2misch i:first-child{background:var(--amber);opacity:1}
+.a2misch i + i{box-shadow:inset 1px 0 0 var(--comb)}
+@container a2 (min-width:1360px){
+  .a2bereich .a2kacheln{grid-template-columns:repeat(2,minmax(0,1fr));gap:12px 0}
+  .a2bereich .a2kacheln > div:nth-child(odd){padding-left:0;box-shadow:none}
+  .a2bereich .a2zwei{grid-template-columns:minmax(0,1fr)}
+}
+
+/* ---------- die Faehigkeiten: Checkliste, Opener, Karten ---------- */
+.a2oben{display:grid;grid-template-columns:minmax(0,1fr);gap:14px 40px;margin-bottom:14px}
+@container a2 (min-width:1100px){.a2oben{grid-template-columns:minmax(0,5fr) minmax(0,7fr)}}
+.a2oben > div{min-width:0}
+/* Checkliste: eine Tabelle, Frage - Prozent - Balken - Satz; der Balken ist Amber auf Erhebung, keine Note */
+.a2check{border-collapse:collapse;width:100%;table-layout:fixed;font-variant-numeric:tabular-nums}
+.a2check col.c1{width:30%}.a2check col.c2{width:9%}.a2check col.c3{width:16%}
+.a2check caption{text-align:left;font:400 var(--fs-md,15px)/1.2 var(--display);color:var(--text);padding:0 0 6px}
+.a2check th,.a2check td{text-align:left;padding:5px 10px 5px 0;border-bottom:1px solid var(--hair-rule);vertical-align:top;font-weight:400}
+.a2check th{font-size:var(--fs-sm);color:var(--ink-soft)}
+.a2check td.z{font:400 var(--fs-lg)/1 var(--display);color:var(--text);white-space:nowrap;padding-top:4px}
+.a2check td.b{padding-top:9px}
+.a2check td.s,.a2check th{white-space:normal;overflow-wrap:anywhere}
+.a2check .bal{display:block;height:5px;border-radius:3px;background:var(--raise);overflow:hidden}
+.a2check .bal i{display:block;height:100%;background:var(--amber);border-radius:3px}
+.a2check tr.neutral .bal i{background:var(--ink-faint)}
+.a2check td.s{font-size:var(--fs-xs);line-height:1.4;color:var(--dim)}
+.a2check td.s .vb{color:var(--dimmer)}
+/* Opener: zwei Spuren ueber 15 s, Chips an ihrer Zeit, darunter die Saetze */
+.a2opener h3.uz{margin-bottom:6px}
+.a2opener .spuren{display:grid;grid-template-columns:auto minmax(0,1fr);gap:4px 10px;align-items:center}
+.a2opener .l{font-size:var(--fs-xs);color:var(--dim);white-space:nowrap}
+.a2opener .l b{display:block;font-weight:600;color:var(--ink-soft)}
+.a2spur{position:relative;height:calc(var(--reihen,1) * 27px + 4px);border-bottom:1px solid var(--hair-rule)}
+/* ein Chip: Symbol der Faehigkeit (ohne Spielbilder Anfangsbuchstaben); Bernstein-Grund = Ventius; goldener Fuss unter dem Chip = kritisch */
+.a2opener .ch{position:relative;height:20px;min-width:22px;padding:0 4px;display:inline-flex;align-items:center;justify-content:center;border-radius:4px;
+  background:var(--raise);color:var(--ink-soft);font:600 var(--fs-xs)/1 var(--sans);letter-spacing:.02em;box-shadow:var(--cast-ctl)}
+.a2spur .ch{position:absolute;top:calc(var(--r,0) * 27px + 2px);transform:translateX(-50%)}
+.a2opener .ch.bild{padding:2px;min-width:0}
+.a2opener .ch .sic.ci{width:16px;height:16px;border-radius:2px;box-shadow:none}
+.a2opener .ch.vent{background:var(--amber);color:var(--ink-on-gold);text-shadow:none}
+.a2opener .ch.vent.bild{box-shadow:0 0 0 1px var(--amber),var(--cast-ctl)}
+.a2opener .ch.h2::after,.a2opener .ch.h3::after{content:"";position:absolute;left:2px;right:2px;bottom:-4px;height:2px;border-radius:1px;background:var(--gold)}
+.a2olegende{display:flex;flex-wrap:wrap;gap:4px 16px;margin:8px 0 0;font-size:var(--fs-xs);line-height:1.4;color:var(--dim)}
+.a2olegende > span{display:inline-flex;align-items:center;gap:6px}
+.a2spur .leerpull{position:absolute;inset:0;display:flex;align-items:center;font-size:var(--fs-xs);color:var(--dimmer)}
+.a2opener .achse{position:relative;height:14px;font-size:var(--fs-xs);color:var(--dimmer)}
+.a2opener .achse span{position:absolute;transform:translateX(-50%)}
+.a2opener .achse span.a0{transform:none}.a2opener .achse span.a1{transform:translateX(-100%)}
+.a2opener ol{margin:8px 0 0;padding:0 0 0 18px;font-size:var(--fs-xs);line-height:1.5;color:var(--ink-soft);max-width:70ch}
+.a2opener details{margin-top:6px;font-size:var(--fs-xs);color:var(--dim)}
+.a2opener details summary{cursor:pointer;min-height:24px;display:inline-flex;align-items:center}
+.a2opener details ol{columns:2 24ch;list-style:none;padding:0;margin:4px 0 0}
+.a2opener .ch[title]{cursor:help}
+
+.a2karten{display:grid;grid-template-columns:repeat(auto-fill,minmax(min(100%,290px),1fr));gap:1px;padding:0 1px 1px 0;border:solid var(--hair-rule);border-width:1px 0 0 1px;margin:-1px}
+/* #439: jede Linie wird genau einmal gezeichnet, und der Behaelter hat keinen Hintergrund mehr, eine leere Zelle am Ende
+   zeigt so die Seite statt der Linienfarbe. Die Karte legt rechts und unten 1 px Rand in die Luecke (negativer Aussenabstand,
+   Hintergrund nur bis zum Polster, damit der Rand auf der Seite liegt wie vorher der Behaelter); oben und links zeichnet der
+   Behaelter als Rand (mit negativem Aussenabstand, so schliessen die Ecken), rechts und unten sein Polster. */
+.a2karte{background:var(--comb);background-clip:padding-box;border:solid var(--hair-rule);border-width:0 1px 1px 0;margin:0 -1px -1px 0;padding:12px 14px 12px;min-width:0;display:block}
+.a2karte:hover,.a2karte.hebt,.a2karte.zeigt{background-color:color-mix(in srgb,var(--gold) 6%,var(--comb))}
+.a2karte .kname{display:flex;align-items:baseline;gap:8px;min-width:0}
+.a2karte .kname{align-items:center;flex-wrap:wrap;gap:2px 8px}
+.a2karte .kname .nm{font:400 17px/1.15 var(--serif);letter-spacing:.02em;color:var(--text);min-width:min-content;flex:1 1 14ch;display:flex;align-items:center;gap:9px;
+  border:0;background:transparent;padding:0;text-align:left;cursor:pointer;border-radius:3px;min-height:28px}
+.a2karte .nm .nmt{min-width:min-content;overflow-wrap:normal;white-space:normal}
+.a2karte .nm:hover .nmt{text-decoration:underline;text-decoration-color:var(--ink-faint);text-underline-offset:3px}
+.a2 .sic.kz{width:28px;height:28px;border-radius:4px}
+.a2karte .kwahl{margin:2px 0 0;font-size:var(--fs-xs);line-height:1.3;color:var(--dim);visibility:hidden}
+.a2karte:hover .kwahl,.a2karte:focus-within .kwahl,.a2karte.hebt .kwahl{visibility:visible}
+.a2karte.hebt{box-shadow:inset 2px 0 0 var(--gold)}
+.a2karte .nm[aria-pressed=true] .nmt{color:var(--lite-ink);box-shadow:inset 0 -2px 0 var(--gold)}
+.a2karte .kname .ant{font:400 var(--fs-xl)/1 var(--display);color:var(--text);flex:none}
+.a2karte .kname .ant small{font:400 var(--fs-xs)/1 var(--sans);color:var(--dim);margin-left:4px}
+.a2karte .streifen{position:relative;height:26px;margin:8px 0 6px;border-bottom:1px solid var(--hair-rule)}
+.a2karte .streifen i{position:absolute;bottom:1px;width:2px;margin-left:-1px;border-radius:1px 1px 0 0}
+.a2karte .streifen i.h0{background:var(--h0);opacity:var(--h0o)}.a2karte .streifen i.h1{background:var(--h1)}.a2karte .streifen i.h2{background:var(--h2)}.a2karte .streifen i.h3{background:var(--h3);box-shadow:inset 0 2px 0 var(--hcap)}
+.a2karte .streifen i.aus{opacity:.15}
+.a2karte .streifen .cd{position:absolute;bottom:0;height:3px;background:repeating-linear-gradient(90deg,var(--gap-hatch) 0 2px,transparent 2px 4px)}
+.a2karte .streifen .br{position:absolute;top:0;bottom:0;background:var(--gold);opacity:.08;pointer-events:none}
+.a2karte dl{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px 10px;margin:0}
+.a2karte dt{font-size:var(--fs-xs);line-height:1.25;color:var(--dim)}
+.a2karte dd{margin:5px 0 0;font:400 15px/1.1 var(--display);color:var(--text);font-variant-numeric:tabular-nums}
+.a2karte dd .n{display:block;font:400 var(--fs-xs)/1.3 var(--sans);color:var(--dim);margin-top:1px}
+.a2karte dd.befund{color:var(--lite-ink)}
+.a2karte .satz{margin:8px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--ink-soft);position:relative;padding-left:12px}
+.a2karte .satz::before{content:"";position:absolute;left:0;top:.5em;width:6px;height:6px;border-radius:50%;background:var(--gold)}
+.a2karte .satz.ruhig{padding-left:0;color:var(--dim)}.a2karte .satz.ruhig::before{display:none}
+/* #414: was die Werkbank an einer Faehigkeit sagte, steht an ihrer Karte: Saetze lesbar breit (#110: hoechstens 70 Zeichen),
+   Zeilen (Groesster Treffer, Fehlschlaege) volle Breite unter den Zahlen, die Tabelle gegen den besten Pull aufklappbar,
+   die Saetze der Ticks (Laufzeit) in einer Liste unter den Karten */
+.a2karte .satz,.a2karte .zsatz,.a2karte .wbfein,.a2karte .kvorbehalt{max-width:70ch}
+.a2karte .zsatz{margin-top:6px}
+.a2karte .wbfein{margin:6px 0 0}
+.a2karte .find{grid-column:1/-1;min-width:0}
+.a2karte .find dd.v{margin:5px 0 0}
+.a2karte .find dd.n{margin:1px 0 0;font:400 var(--fs-xs)/1.3 var(--sans);color:var(--dim);max-width:70ch}
+.a2karte .find.zaehlt dd.v{color:var(--lite-ink)}
+.a2passiv{margin:14px 0 0}
+.a2passiv > h4{margin:0 0 8px;font:400 var(--fs-md)/1.25 var(--display);color:var(--ink-soft)}
+.a2vgl{margin:8px 0 0}
+.a2vgl summary{font-size:var(--fs-xs);line-height:1.4;color:var(--dim);cursor:pointer;min-height:24px;display:flex;align-items:center}
+.a2vgl summary:focus-visible{outline:2px solid var(--focus);outline-offset:2px}
+.a2vgl .wbvgl{margin-top:6px}
+#p-analysis .a2karte .wbrk{margin:0;min-height:24px;padding:0 6px;display:inline-flex;align-items:center}
+.a2tsatz{margin:6px 0 0;padding:0;list-style:none;font-size:var(--fs-xs);line-height:1.5;color:var(--ink-soft);max-width:80ch}
+.a2tsatz li{margin:3px 0}
+.a2ticks{margin:10px 0 0;font-size:var(--fs-xs);line-height:1.5;color:var(--dim);max-width:80ch}
+.a2fuss{margin:8px 0 0;max-width:90ch}
+
+/* die Ventius-Karte: eine Karte wie die anderen, aufklappbar zu Raster und Stufen */
+@container a2 (min-width:640px){.a2karte.vent{grid-column:span 2}}
+.a2karte.vent{container:a2vent/inline-size}
+.a2vent{margin-top:10px;font-size:var(--fs-xs)}
+.a2vent summary{cursor:pointer;color:var(--ink-soft);list-style:none;display:inline-flex;align-items:center;gap:6px;font-size:var(--fs-sm);min-height:24px}
+.a2vent summary::-webkit-details-marker{display:none}
+.a2vent summary::before{content:"";width:6px;height:6px;border-right:1.5px solid currentColor;border-bottom:1.5px solid currentColor;transform:rotate(-45deg);transition:transform .15s}
+.a2vent[open] summary::before{transform:rotate(45deg)}
+.a2vent summary .stand{color:var(--dim)}
+.a2vinnen{display:grid;grid-template-columns:minmax(0,1fr);gap:10px 32px;margin-top:10px}
+@container a2vent (min-width:760px){.a2vinnen{grid-template-columns:minmax(0,3fr) minmax(0,2fr)}}
+.a2vzahlen{display:flex;flex-wrap:wrap;gap:8px 28px;margin:0 0 6px}
+.a2vzahlen dt{font-size:var(--fs-xs);color:var(--dim);line-height:1.3}
+.a2vzahlen dd{margin:5px 0 0}
+.a2vent .fein b{font-weight:600;color:var(--ink-soft)}
+.a2raster{display:flex;flex-wrap:wrap;gap:2px 1px;align-items:flex-end;margin:8px 0 2px}
+.a2salve{position:relative;flex:none;width:24px;height:calc(28px + var(--a2decke,3) * 10px);display:flex;flex-direction:column;align-items:center;border:0;border-radius:3px;background:transparent;padding:0;cursor:pointer}
+.a2salve:hover{background:color-mix(in srgb,var(--text) 8%,transparent)}
+.a2salve.aus{opacity:.3}
+.a2salve.im{background:color-mix(in srgb,var(--gold) 9%,transparent)}
+.a2salve svg{width:18px;height:calc(14px + var(--a2decke,3) * 10px);overflow:visible;display:block;flex:none}
+.a2salve .tz{display:block;font:400 11px/14px var(--display);color:var(--dim);font-variant-numeric:tabular-nums}
+.a2vlegende{display:flex;flex-wrap:wrap;gap:4px 14px;margin:8px 0 0;font-size:var(--fs-xs);line-height:1.4;color:var(--dim)}
+.a2vlegende > span{display:inline-flex;align-items:center;gap:4px}
+.a2vlegende svg{width:18px;height:14px;overflow:visible}
+.a2vlegende .voll{fill:var(--h2)}.a2vlegende .leer{fill:none;stroke:var(--gold-ink);stroke-width:1}.a2vlegende .ring{fill:none;stroke:var(--gold);stroke-width:1.2}
+.a2vlegende .tot{fill:none;stroke:var(--dim);stroke-width:1;stroke-dasharray:1.6 1.6}.a2vlegende .oeffner{fill:var(--ink-soft)}
+.a2vlegende .tzb{font:400 11px/1 var(--display);color:var(--dim);min-width:18px;text-align:center}
+.a2karte .vsatz{margin:8px 0 0;font-size:var(--fs-xs);line-height:1.45;color:var(--ink-soft);max-width:90ch}
+.a2salve .voll{fill:var(--h2)}.a2salve.h1 .voll{fill:var(--h1)}.a2salve.h3 .voll{fill:var(--h3)}.a2salve.h0 .voll{fill:var(--h0);opacity:var(--h0o)}
+.a2salve .leer{fill:none;stroke:var(--gold-ink);stroke-width:1}
+.a2salve .ring{fill:none;stroke:var(--gold);stroke-width:1.2;opacity:.85}
+.a2salve .tot{fill:none;stroke:var(--dim);stroke-width:1;stroke-dasharray:1.6 1.6}
+.a2salve .oeffner{fill:var(--ink-soft)}
+.a2stufen{border-collapse:collapse;font-size:var(--fs-sm);font-variant-numeric:tabular-nums;width:100%}
+.a2stufen th,.a2stufen td{text-align:left;padding:4px 10px 4px 0;border-bottom:1px solid var(--hair-rule);color:var(--ink-soft);font-weight:400}
+.a2stufen th{font-size:var(--fs-xs);color:var(--dim)}
+.a2stufen td.z,.a2stufen th.z{text-align:right}
+.a2stufen tr.decke td{color:var(--text)}
+
+/* ---------- schmal ---------- */
+@container a2 (max-width:640px){
+  .a2 > section,.a2mitte > section{padding:12px 14px 14px}
+  /* schmal: der Name einer Bahn steht ueber ihrem Streifen, nicht daneben; die Checkliste wird je Zeile ein Block */
+  .a2graf{grid-template-columns:minmax(0,1fr);gap:0}
+  .a2graf .bez:empty{display:none}
+  .a2graf .bezk{flex-wrap:wrap;row-gap:0}
+  .a2karte .kname .nm{flex-direction:column;align-items:flex-start;gap:4px;font-size:15px;letter-spacing:0}
+  .a2graf .bezk .nmt{white-space:normal;flex:1 1 auto;overflow:visible;text-overflow:clip}
+  .a2graf .bez.name{font-size:var(--fs-xs);letter-spacing:0}
+  .a2graf .bez{margin-top:6px}
+  .a2graf .bez.name,.a2graf .bez.weitere,.a2graf .bez.tick{margin-top:8px}
+  .a2bahnhinweis{grid-column:1}
+  .a2marke .l{display:none}
+  .a2marke{padding:0 5px;border-radius:var(--r-control,5px)}
+  .a2kurve{height:clamp(130px,26vh,200px)}
+  .a2karte dl{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .a2check,.a2check tbody{display:block}
+  .a2check colgroup,.a2check td.b{display:none}
+  .a2check caption{display:block}
+  .a2check tr{display:grid;grid-template-columns:minmax(0,1fr) auto;gap:2px 10px;padding:6px 0;border-bottom:1px solid var(--hair-rule)}
+  .a2check th,.a2check td{display:block;border:0;padding:0}
+  .a2check td.s{grid-column:1/-1}
+}
+@media (prefers-reduced-motion:reduce){.a2bahn,.a2bahn i,.a2bahn .perle,.a2marke svg,.a2vent summary::before{transition:none}}

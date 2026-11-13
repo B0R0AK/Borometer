@@ -42,9 +42,9 @@ try {
 } finally { rmSync(probe, { recursive: true, force: true }); }
 
 // ---- die Form
-const NAMEN = ["BOSS_ICON_BILD", "KERN_BILD", "SKILL_ICON_BILD", "WK_BOSS_BILD", "WK_GEGENSTAND_BILD"];
+const NAMEN = ["BOSS_ICON_BILD", "KERN_BILD", "SKILL_ICON_BILD", "WK_BOSS_BILD", "WK_GEGENSTAND_BILD", "WK_TURM_BILD"];
 const leerText = spielbilderText(root, "leer");
-ok(JSON.stringify(tabellenNamen(leerText)) === JSON.stringify(NAMEN), LEER + " hat genau die fuenf Tabellen", tabellenNamen(leerText));
+ok(JSON.stringify(tabellenNamen(leerText)) === JSON.stringify(NAMEN), LEER + " hat genau die sechs Tabellen", tabellenNamen(leerText));
 ok(NAMEN.every((n) => new RegExp("^export const " + n + ": Record<string, string> = \\{\\};$", "m").test(leerText)),
   LEER + ": jede Tabelle ist leer");
 
@@ -217,9 +217,13 @@ if (modus === "voll") {
   ok(!quer.length, "voll: jedes Boss-Bild ist quadratisch, 96 bis 192 Pixel", quer);
   const wk = [...T.WK_BOSS_BILD].filter(([, v]) => String(masse(v)) !== "192,192").map(([k]) => k);
   ok(!wk.length && T.WK_BOSS_BILD.size === 4, "voll: die vier Raid-Bilder sind 192 x 192", wk);
-  /* Obergrenze der ganzen Datei (#258: 4,5 MB); steigt nur auf Wort von B0R0AK. */
+  const tw = [...T.WK_TURM_BILD];
+  ok(tw.length === 6 && ["turm", "ebene1", "ebene2", "ebene3", "ebene4", "ebene5"].every(k => T.WK_TURM_BILD.has(k)), "voll: der Turm der Gier hat sein Bild und fuenf Ebenen", tw.map(([k]) => k));
+  ok(tw.filter(([k]) => k.startsWith("ebene")).every(([, v]) => String(masse(v)) === "160,160"), "voll: die fuenf Ebenen sind 160 x 160");
+  ok(String(masse(T.WK_TURM_BILD.get("turm"))) === "1716,1565", "voll: das Turmbild ist 1716 x 1565");
+  /* Obergrenze der ganzen Datei (#258: 4,5 MB; 7 MB seit 13.11.2026 auf Wort von B0R0AK, #428: alle Skillkerne von Questlog); steigt nur auf Wort von B0R0AK. */
   const GROESSE = Buffer.byteLength(text, "utf8");
-  ok(GROESSE <= 4.5 * 1024 * 1024, "voll: assets/spielbilder.ts ist hoechstens 4,5 MB gross (" + Math.round(GROESSE / 1024) + " kB)");
+  ok(GROESSE <= 7 * 1024 * 1024, "voll: assets/spielbilder.ts ist hoechstens 7 MB gross (" + Math.round(GROESSE / 1024) + " kB)");
   const SCHARF = ["vulcanus", "fellinex", "deus-chimaerus", "nerzatum", "kaiser-crimson", "norn-bercant", "limuny-bercant", "duke-magna",
     "king-chimaerus", "kaligras", "gaitan", "turka", "shakarux", "shaikal", "lequirus", "molgras", "murdock",
     "verence", "marta", "haylock", "gaudian"];
@@ -231,7 +235,7 @@ if (modus === "voll") {
   const s128 = gross(T.SKILL_ICON_BILD, 128, eigene);
   ok(!s128.length && [...T.SKILL_ICON_BILD.keys()].filter((k) => !eigene(k)).length === 275, "voll: die 275 questlog-Symbole der Faehigkeiten sind 128 x 128", s128.slice(0, 5));
   const k128 = gross(T.KERN_BILD, 128);
-  ok(!k128.length && T.KERN_BILD.size === 35, "voll: die 35 Kernsymbole sind 128 x 128", k128.slice(0, 5));
+  ok(!k128.length && T.KERN_BILD.size === 296, "voll: die 296 Kernsymbole sind 128 x 128", k128.slice(0, 5));
   const g128 = gross(T.WK_GEGENSTAND_BILD, 128);
   ok(!g128.length && T.WK_GEGENSTAND_BILD.size === 19, "voll: die 19 Gegenstaende der Weeklies sind 128 x 128", g128.slice(0, 5));
   const p192 = gross(T.BOSS_ICON_BILD, 192, (k) => !k.startsWith("PT_NPC_"));

@@ -81,6 +81,11 @@ eq(ok(mit((c) => { const s = "eigen" + "z".repeat(35); c.eigene[0].schluessel = 
   "ein eigener Schluessel mit 40 Zeichen");
 eq(ok(mit((c) => { c.eigene[0].menge = 999; c.zaehler.eigen1 = { stand: 999, seit: T }; })), true, "Menge und Stand 999");
 
+// Vorsaison (Turm der Gier, #423): ein Profil mit einem Turm-Zaehler der Saison davor
+const VOR = Date.parse("2026-11-11T06:00:00Z");
+const mitSaison = (f) => mit((c) => { c.vorsaison = { reset: VOR, zaehler: { turmS1E1: { stand: 1, seit: VOR + 3600000 } } }; f(c); });
+eq(ok(mitSaison(() => {})), true, "eine Vorsaison mit einem Turm-Zaehler wird angenommen");
+
 // --- Schema: was abgelehnt wird
 const falsch = [
   ["keine Version", { profile: [] }],
@@ -137,6 +142,12 @@ const falsch = [
   ["ein Zaehler mit seit zwei Tage voraus", mit((c) => { c.zaehler.zitadelleNormal.seit = Date.now() + 2 * 86400000; })],
   ["eine Vorwoche mit reset zwei Tage voraus", mit((c) => { c.vorwoche.reset = Date.now() + 2 * 86400000; })],
   ["ein Zaehler der Vorwoche mit seit zwei Tage voraus", mit((c) => { c.vorwoche.zaehler.illusionen.seit = Date.now() + 2 * 86400000; })],
+  // Vorsaison (Turm der Gier, #423): geprueft wie die Vorwoche
+  ["eine Vorsaison ohne reset", mitSaison((c) => { delete c.vorsaison.reset; })],
+  ["eine Vorsaison mit fremdem Feld", mitSaison((c) => { c.vorsaison.mehr = 1; })],
+  ["eine Vorsaison mit kaputtem Zaehler", mitSaison((c) => { c.vorsaison.zaehler.turmS1E1.stand = "eins"; })],
+  ["eine Vorsaison mit reset zwei Tage voraus", mitSaison((c) => { c.vorsaison.reset = Date.now() + 2 * 86400000; })],
+  ["eine Vorsaison mit ungueltigem Schluessel", mitSaison((c) => { c.vorsaison.zaehler["turm-S1"] = { stand: 1, seit: VOR }; })],
   // Nacharbeit K-7: eigene Punkte mit Vorsilbe eigen, nie ein Schluessel der Grundliste
   ["ein eigener Punkt mit dem Schluessel katalysator", mit((c) => { c.eigene[0].schluessel = "katalysator"; })],
   ["ein eigener Punkt mit dem Schluessel eigen allein", mit((c) => { c.eigene[0].schluessel = "eigen"; })],
@@ -184,6 +195,19 @@ eq(ok(stand(mit((c) => { c.vorwoche.zaehler.altarNormal = { stand: 1, seit: T - 
   "dieselbe Vorwoche mit einem Zaehler mehr");
 eq(ok(stand(mit((c) => { c.aus = []; c.namen = {}; }).profile[0], zwei), alt), true,
   "Grundliste wiederherstellen und Umbenennen zuruecknehmen sind erlaubt");
+
+// Vorsaison: nichts Gespeichertes darf fehlen, keine aeltere Saison ersetzt die gespeicherte
+{
+  const altS = w.checkWeeklies(mitSaison(() => {}), leer);
+  eq(altS !== null, true, "der gespeicherte Stand mit einer Vorsaison");
+  eq(ok(mitSaison(() => {}), altS), true, "dieselbe Vorsaison noch einmal");
+  eq(ok(mit(() => {}), altS), false, "eine gespeicherte Vorsaison darf nicht fehlen");
+  eq(ok(mitSaison((c) => { c.vorsaison.reset = VOR - 28 * 86400000; }), altS), false, "eine aeltere Saison ersetzt die gespeicherte nicht");
+  eq(ok(mitSaison((c) => { c.vorsaison.reset = VOR + 1000; c.vorsaison.zaehler = {}; }), altS), true, "eine neuere Saison ersetzt die gespeicherte");
+  eq(ok(mitSaison((c) => { delete c.vorsaison.zaehler.turmS1E1; c.vorsaison.zaehler.turmS1E2 = { stand: 1, seit: VOR + 3600000 }; }), altS), false,
+    "dieselbe Saison ohne einen Schluessel, den sie schon hatte: abgelehnt");
+  eq(ok(mitSaison((c) => { c.vorsaison.zaehler.turmS1E2 = { stand: 1, seit: VOR + 3600000 }; }), altS), true, "dieselbe Saison mit einem Schluessel mehr");
+}
 
 // --- nie blind uebernommen: nur die Felder des Schemas, neu gebaut
 const roh = stand(eins);

@@ -3,14 +3,14 @@ import { t } from "./08-translation";
 import { full } from "./03-helpers";
 import { esc } from "./18-interface-basics";
 import { ABRISS_FENSTER, SERVED } from "./41-server-mode";
-import { WK_MARKE, wkAnfang, wkBilderCss, wkHatBild } from "./60-weeklies-bilder";
+import { WK_MARKE, wkAnfang, wkBilderCss, wkHatBild, wkTurmCss, wkTurmHatBild } from "./60-weeklies-bilder";
 import { logPruefen, mainSetzen, mainZuerst } from "../charaktere-core";
-import { anzeigeStand, bereichZu, fortschrittVon, GRUNDLISTE, letzteWoche, letzterReset, naechsterReset, vorwocheSichern, type Erinnerung, type Takt, type WeeklyProfil } from "../weeklies-core";
+import { anzeigeStand, bereichZu, fortschrittTurm, fortschrittVon, GRUNDLISTE, letzteSaison, letzteWoche, letzterReset, naechsterReset, turmSaison, turmSchluessel, vorsaisonSichern, vorwocheSichern, TURM_EBENEN, TURM_SCHLUESSEL, TURM_STUFEN, type Erinnerung, type Takt, type WeeklyProfil } from "../weeklies-core";
 
 /* ---------- Weeklies (Spezifikation 2026-09-29-weeklies-design.md, Plan Aufgabe W3) ----------
    Eine Checkliste der Wochen- und Tagesaufgaben fuer bis zu sechs eigene
-   Charaktere. Oben die Reset-Anzeige (Wochen-Reset Do 10:00, taeglich
-   10:00, deutsche Zeit), darunter je Charakter ein Reiter mit kleinem
+   Charaktere. Oben die Reset-Anzeige (Wochen-Reset Mi 06:00 UTC, taeglich
+   06:00 UTC), darunter je Charakter ein Reiter mit kleinem
    Fortschrittsring und "erledigt/gesamt" (Tablist), "+ Charakter" (beim
    siebten ein Satz statt des Knopfs), rechts Umbenennen, Anpassen und
    Loesen mit Rueckgaengig.
@@ -18,7 +18,7 @@ import { anzeigeStand, bereichZu, fortschrittVon, GRUNDLISTE, letzteWoche, letzt
    Seit der Neugestaltung "Wochenband" (Spezifikation 9, 01.10.2026;
    Entwurf und Entscheidungen in .impeccable/surfaces/src-renderer-app-59-
    weeklies-ts.md): ein Raster aus Feldern mit Haarfugen. Zuerst das
-   Wochenband ueber die volle Breite - Do 10:00 bis Do 10:00, die taeglichen
+   Wochenband ueber die volle Breite - Mi 06:00 bis Mi 06:00 UTC, die taeglichen
    Resets als Striche mit Wochentag, "jetzt" als goldener Strich mit der
    Restzeit -, darunter die Gruppen als Kacheln mit Ring und
    erledigt/gesamt; eigene Punkte stehen in "Eigene". Seit Spezifikation 10
@@ -92,6 +92,9 @@ let meldung = "";
 let loeschFrage: {was: "charakter" | "eigen"; id: string} | null = null, loeschName = "", loeschSatz = "";
 /** Das Element (data-f), das nach dem naechsten Zeichnen den Fokus bekommt. */
 let fokus: string | null = null;
+/* Turm der Gier (Spezifikation 2026-11-11): der Unter-Tab (nur in der Sitzung gemerkt, Start "wochen") und die Plakette mit dem Tabstopp */
+let unter: "wochen" | "turm" = "wochen";
+let turmPos: string | null = null;
 /** Die Truhe (1 bis Menge), die den einen Tabstopp der Truhen traegt; null heisst die naechste zu fuellende. */
 let truhePos: number | null = null;
 /** Das Feld des Raid-Rasters, das den einen Tabstopp traegt (Schluessel), in der Sitzung. */
@@ -299,6 +302,37 @@ function setzeStand(k: string, wert: number){
   }
   if(jetztFertig) fertigGeworden = kachel;
 }
+/* Turm der Gier: Haken setzen. Erst die Vorwoche und die Vorsaison sichern, dann setzen; der Schluessel bleibt, auch auf 0. */
+function turmSetzen(schluessel: string[], wert: 0 | 1, stufe: number){
+  const p = profilJetzt();
+  if(!p) return;
+  const jetzt = Date.now();
+  const aendern = schluessel.filter(k => (anzeigeStand(p.zaehler[k], "turm", jetzt) >= 1 ? 1 : 0) !== wert);
+  if(!aendern.length) return;
+  const q = vorsaisonSichern(vorwocheSichern(p, jetzt), jetzt);
+  const zaehler = {...q.zaehler};
+  for(const k of aendern) zaehler[k] = {stand: wert, seit: jetzt};
+  const p2 = {...q, zaehler};
+  ersetze(p2);
+  merken();
+  const f = fortschrittTurm(p2, jetzt);
+  ansagen(t("weeklies.turm.angesagt", {stufe: t("weeklies.turm.stufe." + (stufe + 1)), k: f.stufen[stufe]!.n, m: TURM_EBENEN, n: f.n, g: f.g}));
+}
+function turmUmschalten(k: string){
+  const p = profilJetzt();
+  if(!p || !TURM_SCHLUESSEL.includes(k)) return;
+  const s = Number(k[5]) - 1;
+  turmSetzen([k], anzeigeStand(p.zaehler[k], "turm", Date.now()) >= 1 ? 0 : 1, s);
+  turmPos = k; fokus = "te:" + k;
+}
+function turmAlle(stufe: number){
+  const p = profilJetzt();
+  if(!p || !Number.isInteger(stufe) || stufe < 0 || stufe >= TURM_STUFEN.length) return;
+  const ks = Array.from({length: TURM_EBENEN}, (_, e) => turmSchluessel(stufe, e + 1));
+  const voll = ks.every(k => anzeigeStand(p.zaehler[k], "turm", Date.now()) >= 1);
+  turmSetzen(ks, voll ? 0 : 1, stufe);
+  fokus = "ta:" + stufe;
+}
 function anlegen(roh: string){
   const name = sauber(roh, 24);
   if(name == null){ meldung = "weeklies.nameBad"; fokus = "nn"; return; }
@@ -424,14 +458,14 @@ const istFertig = (p: WeeklyProfil, g: string, jetzt: number) => { const s = pun
 const bereichIstZu = (p: WeeklyProfil, g: string, jetzt: number) => bereichZu(p.zu?.[g], istFertig(p, g, jetzt));
 
 /* ---------- Reset-Anzeige ----------
-   Wochentag und Uhrzeit in Berlin, wie der Kern rechnet; die Dauer
+   Wochentag und Uhrzeit in UTC, wie der Kern rechnet; die Dauer
    aufgerundet auf Minuten ("in 2 T 5 Std", "in 3 Std 20 Min", "in 4 Min"). */
-let berlinFmt: Intl.DateTimeFormat | null = null;
+let utcFmt: Intl.DateTimeFormat | null = null;
 const TAGE = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
-function berlin(ms: number): {wt: number; zeit: string; d: string; m: string} {
-  berlinFmt ??= new Intl.DateTimeFormat("en-US", {timeZone: "Europe/Berlin", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
+function utc(ms: number): {wt: number; zeit: string; d: string; m: string} {
+  utcFmt ??= new Intl.DateTimeFormat("en-US", {timeZone: "UTC", weekday: "short", day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit", hourCycle: "h23"});
   const f: Record<string, string> = {};
-  for(const x of berlinFmt.formatToParts(ms)) f[x.type] = x.value;
+  for(const x of utcFmt.formatToParts(ms)) f[x.type] = x.value;
   return {wt: Math.max(0, TAGE.indexOf(f.weekday || "")), zeit: (f.hour || "00").padStart(2, "0").replace(/^24$/, "00") + ":" + (f.minute || "00"),
     d: f.day || "", m: f.month || ""};
 }
@@ -441,7 +475,7 @@ function dauer(ms: number): string {
 }
 const setzen = (el: Element | null, text: string) => { if(el && el.textContent !== text) el.textContent = text; };
 function kopfSetzen(jetzt: number){
-  const d = naechsterReset(jetzt, "tag"), bd = berlin(d);
+  const d = naechsterReset(jetzt, "tag"), bd = utc(d);
   setzen(document.querySelector("#wkTag"), t("weeklies.resetTagKopf", {zeit: bd.zeit, in: dauer(d - jetzt)}));
 }
 function statusSetzen(){
@@ -449,19 +483,19 @@ function statusSetzen(){
 }
 
 /* ---------- Das Wochenband ----------
-   Von Do 10:00 bis Do 10:00 (letzterReset/naechsterReset des Kerns). Die
+   Von Mi 06:00 bis Mi 06:00 UTC (letzterReset/naechsterReset des Kerns). Die
    Tagesabschnitte stehen an ihren echten Resets, nicht in sieben gleichen
-   Teilen: in der Woche der Zeitumstellung ist einer eine Stunde laenger
-   oder kuerzer, und der Strich steht trotzdem im richtigen Tag. Ein
-   Abschnitt traegt den Wochentag seines Beginns (10:00 bis 10:00), der
+   Teilen (jeder Abschnitt hat 24 Stunden, die Zeitumstellung verschiebt
+   nichts, der Strich steht im richtigen Tag). Ein
+   Abschnitt traegt den Wochentag seines Beginns (06:00 bis 06:00 UTC), der
    vergangene Teil ist leicht gefuellt, der heutige Tag fett, der naechste
    Tagesstrich etwas kraeftiger. Die Beschriftung "jetzt" wandert mit dem
    Strich und bleibt im Band: sie verschiebt sich um ihren eigenen Anteil.
    Gezeichnet in die feste Huelle #wkBand, im Minutentakt, ohne den Rest des
    Bereichs neu zu bauen. */
-const wtZeit = (ms: number) => { const b = berlin(ms); return t("weeklies.wt." + b.wt) + " " + b.zeit; };
+const wtZeit = (ms: number) => { const b = utc(ms); return t("weeklies.wt." + b.wt) + " " + b.zeit + "\u00a0UTC"; };
 /* Fuer den Namen des Bands mit Datum, damit die Region jede Woche anders heisst (Pruefung N4). */
-const wtDatumZeit = (ms: number) => { const b = berlin(ms); return t("weeklies.wt." + b.wt) + " " + t("weeklies.datum", {d: b.d, m: b.m}) + " " + b.zeit; };
+const wtDatumZeit = (ms: number) => { const b = utc(ms); return t("weeklies.wt." + b.wt) + " " + t("weeklies.datum", {d: b.d, m: b.m}) + " " + b.zeit + "\u00a0UTC"; };
 /* Die Zeile "Letzte Woche" unter dem Band, solange in der neuen Woche noch nichts gesetzt ist (Spezifikation 3.4). */
 function letzteHtml(jetzt: number): string {
   const lw = daten && lage === "da" ? letzteWoche(aktive(), jetzt) : null;
@@ -482,8 +516,8 @@ function bandSetzen(jetzt: number){
     const a = grenzen[i]!, b = grenzen[i + 1]!, l = anteil(a);
     const cls = jetzt >= b ? " vorbei" : jetzt >= a ? " heute" : "";
     const naechster = i > 0 && grenzen[i - 1]! <= jetzt && jetzt < a ? " naechster" : "";
-    // der erste Abschnitt sagt, ab wann: "Do ab 10:00" (125.4)
-    const bt = berlin(a), name = i === 0 ? t("weeklies.bandAb", {tag: t("weeklies.wt." + bt.wt), zeit: bt.zeit}) : t("weeklies.wt." + bt.wt);
+    // der erste Abschnitt sagt, ab wann: "Mi ab 06:00 UTC" (125.4)
+    const bt = utc(a), name = i === 0 ? t("weeklies.bandAb", {tag: t("weeklies.wt." + bt.wt), zeit: bt.zeit}) : t("weeklies.wt." + bt.wt);
     tage += '<span class="wkbtag' + cls + naechster + '" style="left:' + l.toFixed(3) + "%;width:" + (anteil(b) - l).toFixed(3) + '%">' +
       esc(name) + "</span>";
   }
@@ -491,7 +525,7 @@ function bandSetzen(jetzt: number){
       esc(wtZeit(jetzt)) + "</span></div>" +
     '<div class="wkbahn" aria-hidden="true"><span class="wkvorbei" style="width:' + pct + '%"></span>' + tage +
       '<span class="wkjetzt" style="left:' + pct + '%"></span></div>' +
-    '<div class="wkbandunten" aria-hidden="true"><span>' + esc(t("weeklies.bandWoche", {tag: t("weeklies.wt." + berlin(bis).wt), zeit: berlin(bis).zeit, in: dauer(bis - jetzt)})) + "</span></div>" + letzteHtml(jetzt);
+    '<div class="wkbandunten" aria-hidden="true"><span>' + esc(t("weeklies.bandWoche", {tag: t("weeklies.wt." + utc(bis).wt), zeit: utc(bis).zeit, in: dauer(bis - jetzt)})) + "</span></div>" + letzteHtml(jetzt);
   if(band.dataset.marke !== h){ band.innerHTML = h; band.dataset.marke = h; }
   const name = t("weeklies.bandName", {von: wtDatumZeit(von), bis: wtDatumZeit(bis)});
   if(band.getAttribute("aria-label") !== name) band.setAttribute("aria-label", name);
@@ -629,7 +663,7 @@ function karteHtml(x: WeeklyProfil, an: boolean, jetzt: number): string {
     : t(x.main ? "weeklies.karteVhMainOffen" : "weeklies.karteVhOffen", {name: x.name, n: offen, t: f.tag.n, tg: f.tag.g});
   const ini = [...x.name][0]?.toUpperCase() ?? "?";
   return '<button type="button" role="tab" class="wkkarte' + (f.fertig ? " fertig" : "") + (x.main ? " main" : "") + '" id="wkTab-' + x.id + '" data-wk-reiter="' + x.id + '" data-f="r:' + x.id +
-    '" aria-selected="' + an + '" aria-controls="wkPanel" tabindex="' + (an ? 0 : -1) + '" aria-label="' + esc(vh) + '" data-wk-woche="' + f.woche.n + "/" + f.woche.g + '" data-wk-heute="' + f.tag.n + "/" + f.tag.g + '"><span class="wkscheibe" aria-hidden="true">' +
+    '" aria-selected="' + an + '" aria-controls="' + (unter === "turm" ? "wkTurm" : "wkPanel") + '" tabindex="' + (an ? 0 : -1) + '" aria-label="' + esc(vh) + '" data-wk-woche="' + f.woche.n + "/" + f.woche.g + '" data-wk-heute="' + f.tag.n + "/" + f.tag.g + '"><span class="wkscheibe" aria-hidden="true">' +
     ring(44, 3.5, f.woche.anteil) + (f.fertig ? KHAKEN : "<b>" + esc(ini) + "</b>") + '</span>' + (x.main
       ? '<span class="wkkname wkmit"><span class="wkkn">' + esc(x.name) + '</span><span class="wkmain" aria-hidden="true">' + esc(t("ch.main")) + "</span></span>"
       : '<span class="wkkname">' + esc(x.name) + "</span>") +
@@ -808,6 +842,38 @@ function anpassenHtml(p: WeeklyProfil): string {
   return '<p class="wkanpsatz">' + esc(t("weeklies.anpSatz", {name: p.name})) + "</p>" + '<div class="wkgruppen">' + gruppen + "</div>" + eigen +
     '<p class="wkanpfuss">' + knopf("btn sm", 'data-wk-grundliste data-f="grund"', t("weeklies.grundliste")) + knopf("btn sm", 'data-wk-anpassen-fertig data-f="anpf"', t("weeklies.fertig")) + "</p>";
 }
+/* Turm der Gier (Entwurf D): das Turmbild als Hintergrund der ganzen Flaeche, der Kopf oben darauf, darunter vier Stufenkarten mit je fuenf Ebenen. */
+const turmTag = (ms: number) => new Intl.DateTimeFormat(state.lang === "de" ? "de-DE" : "en-GB", {timeZone: "UTC", day: "numeric", month: state.lang === "de" ? "numeric" : "short"}).format(ms);
+function turmEbeneHtml(p: WeeklyProfil, s: number, e: number, jetzt: number, tab: string): string {
+  const k = turmSchluessel(s, e), an = anzeigeStand(p.zaehler[k], "turm", jetzt) >= 1, st = t("weeklies.turm.stufe." + (s + 1));
+  const pl = wkTurmHatBild("ebene" + e) ? '<span class="wkt-pl wkt-b-ebene' + e + '" aria-hidden="true"></span>' : '<span class="wkt-pl wkt-ziffer" aria-hidden="true">' + e + "</span>";
+  return '<button type="button" class="wkt-ebene' + (an ? " an" : "") + '" data-wk-turm="' + k + '" data-f="te:' + k + '" aria-pressed="' + an + '" tabindex="' + (k === tab ? 0 : -1) +
+    '" aria-label="' + esc(t(an ? "weeklies.turm.ebeneAn" : "weeklies.turm.ebeneAus", {stufe: st, n: e})) + '">' + pl + (an ? KHAKEN : "") + "</button>";
+}
+function turmHtml(p: WeeklyProfil, jetzt: number): string {
+  const f = fortschrittTurm(p, jetzt), sa = turmSaison(jetzt), ls = letzteSaison(p, jetzt);
+  const offen = TURM_SCHLUESSEL.find(k => anzeigeStand(p.zaehler[k], "turm", jetzt) < 1);
+  const tab = turmPos && TURM_SCHLUESSEL.includes(turmPos) ? turmPos : offen || TURM_SCHLUESSEL[0]!;
+  const saison = t(sa.tage === 1 ? "weeklies.turm.saison1" : "weeklies.turm.saison", {von: turmTag(sa.start), bis: turmTag(sa.ende), tage: sa.tage});
+  const kopf = '<div class="wkt-kopf"><h3>' + esc(t("weeklies.turm.titel")) + '</h3><span class="wkt-zahl"><b>' + f.n + "</b>/" + f.g + '</span><span class="wkt-bar" aria-hidden="true"><i style="width:' +
+    Math.round(f.n / f.g * 10000) / 100 + '%"></i></span><span class="wkt-sub">' + esc(saison) + "</span>" +
+    (ls ? '<span class="wkt-sub wkt-letzte">' + esc(t("weeklies.turm.letzte", {n: ls.n, g: ls.g})) + "</span>" : "") + "</div>";
+  const stufen = TURM_STUFEN.map((_, s) => {
+    const n = f.stufen[s]!.n, voll = n === TURM_EBENEN, name = t("weeklies.turm.stufe." + (s + 1));
+    return '<section class="wkt-stufe' + (voll ? " fertig" : "") + '" data-stufe="' + s + '" aria-labelledby="wktS' + s + '"><h4 id="wktS' + s + '">' + esc(name) +
+      '</h4><button type="button" class="wkt-alle" data-wk-turm-alle="' + s + '" data-f="ta:' + s + '" aria-label="' + esc(t(voll ? "weeklies.turm.allezurueckName" : "weeklies.turm.alleName", {stufe: name})) + '">' +
+      esc(t(voll ? "weeklies.turm.allezurueck" : "weeklies.turm.alle")) + '</button><span class="wkt-zahl"><b>' + n + "</b>/" + TURM_EBENEN + '<span class="vh"> ' + esc(t("weeklies.turm.vonText", {n, m: TURM_EBENEN})) +
+      '</span></span><div class="wkt-reihe">' + Array.from({length: TURM_EBENEN}, (__, e) => turmEbeneHtml(p, s, e + 1, jetzt, tab)).join("") + "</div></section>";
+  }).join("");
+  return '<div class="wkt' + (wkTurmHatBild("turm") ? " wkt-b-turm" : " wkt-ohnebild") + '" id="wkTurm" role="tabpanel" aria-labelledby="wkUnter-turm">' + kopf + '<div class="wkt-stufen">' + stufen + "</div></div>";
+}
+function unterHtml(p: WeeklyProfil, jetzt: number): string {
+  const f = fortschrittTurm(p, jetzt);
+  const tab = (id: "wochen" | "turm", text: string) => '<button type="button" role="tab" class="wkt-unterknopf" id="wkUnter-' + id + '" data-wk-unter="' + id + '" data-f="un:' + id + '" aria-selected="' + (unter === id) + (unter === id ? '" aria-controls="' + (id === "turm" ? "wkTurm" : "wkPanel") : "") +
+    '" tabindex="' + (unter === id ? 0 : -1) + '">' + text + "</button>";
+  return '<div class="wkt-unter" role="tablist" aria-label="' + esc(t("weeklies.unter")) + '">' + tab("wochen", esc(t("weeklies.unter.wochen"))) +
+    tab("turm", esc(t("weeklies.unter.turm")) + ' <span class="wkt-zahl"><b>' + f.n + "</b>/" + f.g + "</span>") + "</div>";
+}
 function bodyHtml(jetzt: number): string {
   if(lage === "nurApp") return '<div class="wbox wkleer">' + SYMBOL + '<p class="wksatz">' + esc(t("weeklies.nurApp")) + "</p></div>";
   if(lage === "laden") return '<p class="wksatz wkladen">' + esc(t("weeklies.laden")) + "</p>";
@@ -818,9 +884,9 @@ function bodyHtml(jetzt: number): string {
   const nameForm = !nameOffen ? "" : '<form class="wkform" id="wkNameForm" novalidate><span class="field"><label for="wkNameNeu">' + esc(t("weeklies.nameNeu")) + "</label>" +
     '<input id="wkNameNeu" data-f="nu" maxlength="24" autocomplete="off" spellcheck="false" value="' + esc(p.name) + '"></span>' +
     '<button type="submit" class="btn sm">' + esc(t("weeklies.speichern")) + "</button>" + knopf("btn sm", 'data-wk-abbrechen="name"', t("weeklies.abbrechen")) + "</form>";
-  return reiterHtml(akt, p, jetzt) + undoHtml() +
+  return reiterHtml(akt, p, jetzt) + undoHtml() + unterHtml(p, jetzt) + (unter === "turm" ? turmHtml(p, jetzt) :
     '<div class="wkpanel" id="wkPanel" role="tabpanel" aria-labelledby="wkTab-' + p.id + '">' + nameForm +
-      (anpassen ? anpassenHtml(p) : wabenHtml(p, jetzt)) + "</div>";
+      (anpassen ? anpassenHtml(p) : wabenHtml(p, jetzt)) + "</div>");
 }
 
 /* Den Fokus setzen: das Element mit data-f; ist es gesperrt, sein Zaehler. */
@@ -1052,9 +1118,12 @@ function klick(e: MouseEvent){
     else if(d.wkAbbrechen === "name"){ nameOffen = false; fokus = "umb"; }
     else { fokus = punktEdit ? "u:" + punktEdit : null; punktEdit = null; }
   }
+  else if(d.wkUnter){ unter = d.wkUnter === "turm" ? "turm" : "wochen"; anpassen = false; fokus = "un:" + unter; }
+  else if(d.wkTurm){ turmUmschalten(d.wkTurm); }
+  else if(d.wkTurmAlle !== undefined){ turmAlle(Number(d.wkTurmAlle)); }
   else if(d.wkReiter){ gewaehlt = d.wkReiter; truhePos = null; anpassen = false; nameOffen = false; punktEdit = null; fokus = "r:" + d.wkReiter; }
   else if(d.wkUmbenennen !== undefined){ nameOffen = !nameOffen; fokus = nameOffen ? "nu" : "umb"; }
-  else if(d.wkAnpassen !== undefined){ anpassen = !anpassen; punktEdit = null; fokus = "anp"; }
+  else if(d.wkAnpassen !== undefined){ unter = "wochen"; anpassen = !anpassen; punktEdit = null; fokus = "anp"; }
   else if(d.wkAnpassenFertig !== undefined){ anpassen = false; punktEdit = null; fokus = "anp"; }
   else if(d.wkLoesen !== undefined) profilLoesen();
   else if(d.wkUndo !== undefined) undoAusfuehren();
@@ -1155,6 +1224,26 @@ function rasterTaste(e: KeyboardEvent, z: HTMLInputElement){
 }
 function taste(e: KeyboardEvent){
   const z = e.target as HTMLElement;
+  // Turm der Gier: die Leiste (Pfeile, Pos1, Ende) und das Raster der Ebenen (Pfeile, Pos1, Ende)
+  if(z.dataset.wkUnter){
+    if(e.altKey || e.ctrlKey || e.metaKey || e.shiftKey) return;
+    const ids = ["wochen", "turm"] as const, i = ids.indexOf(z.dataset.wkUnter as "wochen" | "turm");
+    const j = e.key === "ArrowRight" ? (i + 1) % 2 : e.key === "ArrowLeft" ? (i + 1) % 2 : e.key === "Home" ? 0 : e.key === "End" ? 1 : -1;
+    if(j < 0) return;
+    e.preventDefault(); unter = ids[j]!; anpassen = false; fokus = "un:" + unter;
+    return nachHandlung();
+  }
+  if(z.dataset.wkTurm && !e.altKey && !e.ctrlKey && !e.metaKey && !e.shiftKey){
+    const ks = TURM_SCHLUESSEL, i = ks.indexOf(z.dataset.wkTurm);
+    const j = e.key === "ArrowRight" ? Math.min(ks.length - 1, i + 1) : e.key === "ArrowLeft" ? Math.max(0, i - 1)
+      : e.key === "ArrowDown" ? Math.min(ks.length - 1, i + TURM_EBENEN) : e.key === "ArrowUp" ? Math.max(0, i - TURM_EBENEN)
+      : e.key === "Home" ? 0 : e.key === "End" ? ks.length - 1 : -1;
+    if(j < 0) return;
+    e.preventDefault();
+    if(j === i) return;
+    turmPos = ks[j]!; fokus = "te:" + turmPos;
+    return nachHandlung();
+  }
   if(z.getAttribute("role") === "tab"){
     const tabs = [...document.querySelectorAll<HTMLElement>('#wkReiter [role="tab"]')], i = tabs.indexOf(z);
     const j = e.key === "ArrowRight" ? (i + 1) % tabs.length : e.key === "ArrowLeft" ? (i - 1 + tabs.length) % tabs.length
@@ -1228,7 +1317,7 @@ export function setup(): void {
   if(!document.querySelector("#wkBilder")){
     const st = document.createElement("style");
     st.id = "wkBilder";
-    st.textContent = wkBilderCss();
+    st.textContent = wkBilderCss() + "\n" + wkTurmCss();
     document.head.append(st);
   }
   if(box && !document.querySelector("#wkAnsage")){

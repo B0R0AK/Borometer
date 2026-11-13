@@ -3,8 +3,8 @@
 // SPDX-License-Identifier: GPL-3.0-or-later
 //
 // Der Kern der Weeklies (src/renderer/weeklies-core.ts), ohne Seite:
-// Grundliste, Reset-Regel (Donnerstag 10:00 und taeglich 10:00 in
-// Europe/Berlin), Anzeige-Stand und Vorwoche (Spezifikation
+// Grundliste, Reset-Regel (alle Takte um 06:00 UTC, woechentlich Mittwoch,
+// ohne Sommer- und Winterzeit; Issue 420), Anzeige-Stand und Vorwoche (Spezifikation
 // docs/superpowers/specs/2026-09-29-weeklies-design.md, Abschnitte 3 und 5).
 //
 // Die Rechner-Zeitzone darf nichts aendern: der Test startet sich selbst
@@ -45,117 +45,119 @@ function naechst(jetzt, takt, erwartet, name) {
   ok(r === Z(erwartet), name, { jetzt, takt, bekommen: iso(r), erwartet });
 }
 
-// ---- Wochen-Reset im Sommer (CEST, UTC+2): Do 1.10.2026 10:00 = 08:00Z
+// ---- Wochen-Reset: jeden Mittwoch 06:00:00 UTC (Issue 420), im Sommer wie im Winter derselbe Zeitpunkt
 {
-  reset("2026-10-01T07:59:00Z", "woche", "2026-09-24T08:00:00Z", "Do 09:59: noch der Reset der Vorwoche");
-  reset("2026-10-01T08:00:00Z", "woche", "2026-10-01T08:00:00Z", "Do 10:00: genau der neue Reset");
-  reset("2026-10-01T08:01:00Z", "woche", "2026-10-01T08:00:00Z", "Do 10:01: der neue Reset");
-  reset("2026-09-30T12:00:00Z", "woche", "2026-09-24T08:00:00Z", "Mi: der Reset vom Donnerstag davor");
-  reset("2026-10-02T12:00:00Z", "woche", "2026-10-01T08:00:00Z", "Fr: der Reset vom Donnerstag");
-  reset("2026-10-04T21:59:59Z", "woche", "2026-10-01T08:00:00Z", "So spaet: noch der Donnerstag");
-  naechst("2026-10-01T07:59:00Z", "woche", "2026-10-01T08:00:00Z", "naechster Wochen-Reset Do 09:59: in einer Minute");
-  naechst("2026-10-01T08:00:00Z", "woche", "2026-10-08T08:00:00Z", "naechster Wochen-Reset Do 10:00: eine Woche spaeter");
-  naechst("2026-09-30T12:00:00Z", "woche", "2026-10-01T08:00:00Z", "naechster Wochen-Reset am Mi: morgen");
+  reset("2026-10-07T05:59:59Z", "woche", "2026-09-30T06:00:00Z", "Mi 05:59:59: noch der Reset der Vorwoche");
+  reset("2026-10-07T05:59:59.999Z", "woche", "2026-09-30T06:00:00Z", "Mi 05:59:59.999: eine ms davor, noch der alte");
+  reset("2026-10-07T06:00:00Z", "woche", "2026-10-07T06:00:00Z", "Mi 06:00:00: genau der neue Reset");
+  reset("2026-10-07T06:00:00.001Z", "woche", "2026-10-07T06:00:00Z", "Mi 06:00:00.001: eine ms danach, der neue");
+  reset("2026-10-06T12:00:00Z", "woche", "2026-09-30T06:00:00Z", "Di: der Reset vom Mittwoch davor");
+  reset("2026-10-08T12:00:00Z", "woche", "2026-10-07T06:00:00Z", "Do: der Reset vom Mittwoch (frueher Do 10:00 Berlin, jetzt schon seit Mi)");
+  reset("2026-10-08T08:00:00Z", "woche", "2026-10-07T06:00:00Z", "Do 10:00 Berlin (08:00Z): kein Reset mehr, der Mittwoch gilt");
+  reset("2026-10-11T23:59:59Z", "woche", "2026-10-07T06:00:00Z", "So spaet: noch der Mittwoch");
+  reset("2026-10-12T00:00:00Z", "woche", "2026-10-07T06:00:00Z", "Mo 00:00: noch der Mittwoch");
+  naechst("2026-10-07T05:59:59Z", "woche", "2026-10-07T06:00:00Z", "naechster Wochen-Reset Mi 05:59:59: in einer Sekunde");
+  naechst("2026-10-07T06:00:00Z", "woche", "2026-10-14T06:00:00Z", "naechster Wochen-Reset genau am Reset: eine Woche spaeter");
+  naechst("2026-10-06T12:00:00Z", "woche", "2026-10-07T06:00:00Z", "naechster Wochen-Reset am Di: morgen 06:00Z");
+  // Wochengrenze Mi -> Do: ein Zaehler vom Mi 05:00 gehoert zur alten, einer vom Mi 07:00 zur neuen Woche
+  const jetzt = Z("2026-10-08T12:00:00Z");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-07T05:00:00Z") }, "woche", jetzt) === 0, "Mi 05:00 gesetzt: gehoert zur alten Woche, 0");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-07T07:00:00Z") }, "woche", jetzt) === 1, "Mi 07:00 gesetzt: gehoert zur neuen Woche, 1");
 }
 
-// ---- Tages-Reset: jeden Tag 10:00
+// ---- Tages-Reset: jeden Tag 06:00:00 UTC
 {
-  reset("2026-09-29T07:59:00Z", "tag", "2026-09-28T08:00:00Z", "taeglich 09:59: der Reset von gestern");
-  reset("2026-09-29T08:00:00Z", "tag", "2026-09-29T08:00:00Z", "taeglich 10:00: der Reset von heute");
-  reset("2026-09-29T21:30:00Z", "tag", "2026-09-29T08:00:00Z", "taeglich 23:30: der Reset von heute");
-  reset("2026-09-29T22:30:00Z", "tag", "2026-09-29T08:00:00Z", "taeglich 00:30 (neuer Tag in Berlin): der Reset von gestern");
-  naechst("2026-09-29T07:59:00Z", "tag", "2026-09-29T08:00:00Z", "naechster Tages-Reset 09:59: heute 10:00");
-  naechst("2026-09-29T08:00:00Z", "tag", "2026-09-30T08:00:00Z", "naechster Tages-Reset 10:00: morgen 10:00");
-  // der Tages-Reset am Donnerstag ist derselbe Zeitpunkt wie der Wochen-Reset
-  ok(core.letzterReset(Z("2026-10-01T09:00:00Z"), "tag") === core.letzterReset(Z("2026-10-01T09:00:00Z"), "woche"),
-    "Do nach 10:00: Tages- und Wochen-Reset fallen zusammen");
+  reset("2026-09-29T05:59:59.999Z", "tag", "2026-09-28T06:00:00Z", "taeglich 05:59:59.999: der Reset von gestern");
+  reset("2026-09-29T06:00:00Z", "tag", "2026-09-29T06:00:00Z", "taeglich 06:00:00: der Reset von heute");
+  reset("2026-09-29T06:00:00.001Z", "tag", "2026-09-29T06:00:00Z", "taeglich 06:00:00.001: der Reset von heute");
+  reset("2026-09-29T23:59:59Z", "tag", "2026-09-29T06:00:00Z", "taeglich 23:59:59: der Reset von heute");
+  reset("2026-09-30T00:30:00Z", "tag", "2026-09-29T06:00:00Z", "taeglich 00:30 (neuer UTC-Tag): der Reset von gestern");
+  naechst("2026-09-29T05:59:59Z", "tag", "2026-09-29T06:00:00Z", "naechster Tages-Reset 05:59:59: heute 06:00");
+  naechst("2026-09-29T06:00:00Z", "tag", "2026-09-30T06:00:00Z", "naechster Tages-Reset 06:00: morgen 06:00");
+  // der Tages-Reset am Mittwoch ist derselbe Zeitpunkt wie der Wochen-Reset
+  ok(core.letzterReset(Z("2026-10-07T07:00:00Z"), "tag") === core.letzterReset(Z("2026-10-07T07:00:00Z"), "woche"),
+    "Mi nach 06:00: Tages- und Wochen-Reset fallen zusammen");
 }
 
-// ---- Winterzeit beginnt: So 25.10.2026 (letzter Sonntag im Oktober), danach CET (UTC+1)
+// ---- Zeitumstellung verschiebt nichts mehr: jeder Tag hat 24 Stunden, jeder Reset liegt auf 06:00 UTC
 {
-  reset("2026-10-24T12:00:00Z", "tag", "2026-10-24T08:00:00Z", "Sa vor dem Wechsel: 10:00 CEST = 08:00Z");
-  naechst("2026-10-24T12:00:00Z", "tag", "2026-10-25T09:00:00Z", "naechster Tages-Reset am Wechseltag: 10:00 CET = 09:00Z");
-  reset("2026-10-25T08:30:00Z", "tag", "2026-10-24T08:00:00Z", "So 09:30 CET: noch der Reset von Samstag");
-  reset("2026-10-25T09:00:00Z", "tag", "2026-10-25T09:00:00Z", "So 10:00 CET: der Reset von heute");
-  ok(core.naechsterReset(Z("2026-10-24T12:00:00Z"), "tag") - core.letzterReset(Z("2026-10-24T12:00:00Z"), "tag") === 25 * H,
-    "der Tag des Wechsels hat 25 Stunden");
-  reset("2026-10-26T12:00:00Z", "woche", "2026-10-22T08:00:00Z", "Mo nach dem Wechsel: Wochen-Reset noch in CEST");
-  naechst("2026-10-26T12:00:00Z", "woche", "2026-10-29T09:00:00Z", "naechster Wochen-Reset in CET: 09:00Z");
-  reset("2026-10-29T08:59:00Z", "woche", "2026-10-22T08:00:00Z", "Do 09:59 CET: noch der alte Reset");
-  reset("2026-10-29T09:00:00Z", "woche", "2026-10-29T09:00:00Z", "Do 10:00 CET: der neue Reset");
+  // Winterzeit beginnt So 25.10.2026, Sommerzeit So 29.3.2026
+  naechst("2026-10-24T12:00:00Z", "tag", "2026-10-25T06:00:00Z", "Tages-Reset am Tag der Winterzeit: 06:00Z");
+  ok(core.naechsterReset(Z("2026-10-24T12:00:00Z"), "tag") - core.letzterReset(Z("2026-10-24T12:00:00Z"), "tag") === 24 * H,
+    "der Tag der Umstellung (Herbst) hat 24 Stunden");
+  naechst("2026-03-28T12:00:00Z", "tag", "2026-03-29T06:00:00Z", "Tages-Reset am Tag der Sommerzeit: 06:00Z");
+  ok(core.naechsterReset(Z("2026-03-28T12:00:00Z"), "tag") - core.letzterReset(Z("2026-03-28T12:00:00Z"), "tag") === 24 * H,
+    "der Tag der Umstellung (Fruehling) hat 24 Stunden");
+  reset("2026-10-26T12:00:00Z", "woche", "2026-10-21T06:00:00Z", "Mo nach der Winterzeit: Mittwoch 06:00Z");
+  naechst("2026-10-26T12:00:00Z", "woche", "2026-10-28T06:00:00Z", "naechster Wochen-Reset nach der Winterzeit: 06:00Z");
+  reset("2026-03-30T12:00:00Z", "woche", "2026-03-25T06:00:00Z", "Mo nach der Sommerzeit: Mittwoch 06:00Z");
+  naechst("2026-03-30T12:00:00Z", "woche", "2026-04-01T06:00:00Z", "naechster Wochen-Reset nach der Sommerzeit: 06:00Z");
+  ok(core.naechsterReset(Z("2026-10-21T06:00:00Z"), "woche") - Z("2026-10-21T06:00:00Z") === 7 * TAG, "die Woche ueber die Winterzeit hat genau 7 mal 24 Stunden");
+  ok(core.naechsterReset(Z("2026-03-25T06:00:00Z"), "woche") - Z("2026-03-25T06:00:00Z") === 7 * TAG, "die Woche ueber die Sommerzeit hat genau 7 mal 24 Stunden");
 }
 
-// ---- Sommerzeit beginnt: So 29.3.2026 (letzter Sonntag im Maerz), danach CEST (UTC+2)
+// ---- Monats-Reset: der 1. des Monats um 06:00:00 UTC
 {
-  reset("2026-03-28T12:00:00Z", "tag", "2026-03-28T09:00:00Z", "Sa vor dem Wechsel: 10:00 CET = 09:00Z");
-  reset("2026-03-29T07:59:00Z", "tag", "2026-03-28T09:00:00Z", "So 09:59 CEST: noch der Reset von Samstag");
-  reset("2026-03-29T08:00:00Z", "tag", "2026-03-29T08:00:00Z", "So 10:00 CEST: der Reset von heute");
-  naechst("2026-03-28T12:00:00Z", "tag", "2026-03-29T08:00:00Z", "naechster Tages-Reset am Wechseltag: 08:00Z");
-  ok(core.naechsterReset(Z("2026-03-28T12:00:00Z"), "tag") - core.letzterReset(Z("2026-03-28T12:00:00Z"), "tag") === 23 * H,
-    "der Tag des Wechsels hat 23 Stunden");
-  reset("2026-03-30T12:00:00Z", "woche", "2026-03-26T09:00:00Z", "Mo nach dem Wechsel: Wochen-Reset noch in CET");
-  naechst("2026-03-30T12:00:00Z", "woche", "2026-04-02T08:00:00Z", "naechster Wochen-Reset in CEST: 08:00Z");
-}
-
-// ---- Monats-Reset (Spezifikation 10, Annahme): der 1. des Monats um 10:00 in Berlin
-{
-  reset("2026-10-01T07:59:00Z", "monat", "2026-09-01T08:00:00Z", "1.10. 09:59 CEST: noch der Reset vom 1.9.");
-  reset("2026-10-01T08:00:00Z", "monat", "2026-10-01T08:00:00Z", "1.10. 10:00 CEST: der neue Monats-Reset");
-  reset("2026-10-31T22:59:00Z", "monat", "2026-10-01T08:00:00Z", "31.10. 23:59 CET: noch der Oktober");
-  reset("2026-11-01T08:59:00Z", "monat", "2026-10-01T08:00:00Z", "1.11. 09:59 CET: noch der Oktober");
-  reset("2026-11-01T09:00:00Z", "monat", "2026-11-01T09:00:00Z", "1.11. 10:00 CET = 09:00Z");
-  reset("2027-01-15T12:00:00Z", "monat", "2027-01-01T09:00:00Z", "Mitte Januar: der 1.1. (ueber den Jahreswechsel)");
-  reset("2027-01-01T08:30:00Z", "monat", "2026-12-01T09:00:00Z", "1.1. 09:30: noch der Dezember");
-  reset("2026-03-01T09:00:00Z", "monat", "2026-03-01T09:00:00Z", "1.3. 10:00 CET (Februar davor kurz)");
-  reset("2026-04-01T08:00:00Z", "monat", "2026-04-01T08:00:00Z", "1.4. 10:00 CEST = 08:00Z (nach dem Wechsel)");
-  naechst("2026-10-15T12:00:00Z", "monat", "2026-11-01T09:00:00Z", "naechster Monats-Reset im Oktober: 1.11. 10:00 CET");
-  naechst("2026-12-20T12:00:00Z", "monat", "2027-01-01T09:00:00Z", "naechster Monats-Reset im Dezember: 1.1.");
-  naechst("2026-10-01T08:00:00Z", "monat", "2026-11-01T09:00:00Z", "naechster Monats-Reset genau am Reset: ein Monat spaeter");
+  reset("2026-10-01T05:59:59.999Z", "monat", "2026-09-01T06:00:00Z", "1.10. 05:59:59.999: noch der Reset vom 1.9.");
+  reset("2026-10-01T06:00:00Z", "monat", "2026-10-01T06:00:00Z", "1.10. 06:00:00: der neue Monats-Reset");
+  reset("2026-10-01T06:00:00.001Z", "monat", "2026-10-01T06:00:00Z", "1.10. 06:00:00.001: der neue Monats-Reset");
+  reset("2026-10-31T23:59:00Z", "monat", "2026-10-01T06:00:00Z", "31.10. 23:59: noch der Oktober");
+  reset("2026-11-01T05:59:00Z", "monat", "2026-10-01T06:00:00Z", "1.11. 05:59: noch der Oktober");
+  reset("2026-11-01T06:00:00Z", "monat", "2026-11-01T06:00:00Z", "1.11. 06:00");
+  reset("2027-01-15T12:00:00Z", "monat", "2027-01-01T06:00:00Z", "Mitte Januar: der 1.1. (ueber den Jahreswechsel)");
+  reset("2027-01-01T05:59:59Z", "monat", "2026-12-01T06:00:00Z", "1.1. 05:59:59: noch der Dezember (Jahreswechsel)");
+  reset("2027-01-01T06:00:00Z", "monat", "2027-01-01T06:00:00Z", "1.1. 06:00:00: der neue Januar");
+  reset("2026-03-01T06:00:00Z", "monat", "2026-03-01T06:00:00Z", "1.3. 06:00 (Februar davor kurz)");
+  reset("2026-04-01T06:00:00Z", "monat", "2026-04-01T06:00:00Z", "1.4. 06:00Z (Monat der Sommerzeit, kein Versatz)");
+  naechst("2026-10-15T12:00:00Z", "monat", "2026-11-01T06:00:00Z", "naechster Monats-Reset im Oktober: 1.11. 06:00Z");
+  naechst("2026-12-20T12:00:00Z", "monat", "2027-01-01T06:00:00Z", "naechster Monats-Reset im Dezember: 1.1.");
+  naechst("2026-10-01T06:00:00Z", "monat", "2026-11-01T06:00:00Z", "naechster Monats-Reset genau am Reset: ein Monat spaeter");
   const z = { stand: 2, seit: Z("2026-10-10T12:00:00Z") };
   ok(core.anzeigeStand(z, "monat", Z("2026-10-29T12:00:00Z")) === 2, "Monatspunkt: ueber den Wochen-Reset hinweg bleibt der Stand");
-  ok(core.anzeigeStand(z, "monat", Z("2026-11-01T09:00:00Z")) === 0, "Monatspunkt: am 1.11. 10:00 ist er 0");
+  ok(core.anzeigeStand(z, "monat", Z("2026-11-01T05:59:59Z")) === 2, "Monatspunkt: am 1.11. 05:59:59 noch 2");
+  ok(core.anzeigeStand(z, "monat", Z("2026-11-01T06:00:00Z")) === 0, "Monatspunkt: am 1.11. 06:00 ist er 0");
 }
 
-// ---- Montags-Reset (Spezifikation 10, Portal der Unendlichkeit Mo-Mo): Montag 10:00 in Berlin
+// ---- Montags-Reset (Portal der Unendlichkeit Mo-Mo): Montag 06:00:00 UTC (Issue 420, Nachtrag)
 {
-  reset("2026-10-05T07:59:00Z", "montag", "2026-09-28T08:00:00Z", "Mo 05.10. 09:59: noch der Montag davor");
-  reset("2026-10-05T08:00:00Z", "montag", "2026-10-05T08:00:00Z", "Mo 05.10. 10:00: der neue Reset");
-  reset("2026-10-01T12:00:00Z", "montag", "2026-09-28T08:00:00Z", "Do: der Montag dieser Woche");
-  reset("2026-10-04T21:00:00Z", "montag", "2026-09-28T08:00:00Z", "So 23:00: noch der Montag davor");
-  naechst("2026-10-01T12:00:00Z", "montag", "2026-10-05T08:00:00Z", "naechster Montags-Reset am Do: Mo 10:00");
-  naechst("2026-10-05T08:00:00Z", "montag", "2026-10-12T08:00:00Z", "naechster Montags-Reset genau am Reset: eine Woche spaeter");
-  naechst("2026-10-24T12:00:00Z", "montag", "2026-10-26T09:00:00Z", "ueber die Winterzeit: Mo 26.10. 10:00 CET = 09:00Z");
+  reset("2026-10-05T05:59:59.999Z", "montag", "2026-09-28T06:00:00Z", "Mo 05.10. 05:59:59.999: noch der Montag davor");
+  reset("2026-10-05T06:00:00Z", "montag", "2026-10-05T06:00:00Z", "Mo 05.10. 06:00: der neue Reset");
+  reset("2026-10-01T12:00:00Z", "montag", "2026-09-28T06:00:00Z", "Do: der Montag dieser Woche");
+  reset("2026-10-04T21:00:00Z", "montag", "2026-09-28T06:00:00Z", "So 23:00: noch der Montag davor");
+  naechst("2026-10-01T12:00:00Z", "montag", "2026-10-05T06:00:00Z", "naechster Montags-Reset am Do: Mo 06:00Z");
+  naechst("2026-10-05T06:00:00Z", "montag", "2026-10-12T06:00:00Z", "naechster Montags-Reset genau am Reset: eine Woche spaeter");
+  naechst("2026-10-24T12:00:00Z", "montag", "2026-10-26T06:00:00Z", "ueber die Winterzeit: Mo 26.10. 06:00Z, kein Versatz");
   const z = { stand: 1, seit: Z("2026-09-29T12:00:00Z") };   // Di
-  ok(core.anzeigeStand(z, "montag", Z("2026-10-01T09:00:00Z")) === 1, "Montagspunkt: ueber den Donnerstags-Reset hinweg bleibt der Stand");
-  ok(core.anzeigeStand(z, "montag", Z("2026-10-05T08:00:00Z")) === 0, "Montagspunkt: am Montag 10:00 ist er 0");
+  ok(core.anzeigeStand(z, "montag", Z("2026-10-01T09:00:00Z")) === 1, "Montagspunkt: ueber den Wochen-Reset hinweg bleibt der Stand");
+  ok(core.anzeigeStand(z, "montag", Z("2026-10-05T06:00:00Z")) === 0, "Montagspunkt: am Montag 06:00 ist er 0");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-05T06:00:00Z") }, "montag", Z("2026-10-08T12:00:00Z")) === 1, "Montagspunkt: genau zum Reset gesetzt zaehlt, auch nach dem Mittwoch");
 }
 
-// ---- ueber ein ganzes Jahr: jeder Wochen-Reset ist ein Donnerstag 10:00 in Berlin
+// ---- ueber 400 Tage: jeder Wochen-Reset ist ein Mittwoch 06:00:00 UTC, die anderen Takte 06:00:00 UTC, nie ein Versatz
 {
-  const berlin = new Intl.DateTimeFormat("en-US", { timeZone: "Europe/Berlin", weekday: "short", hour: "2-digit", minute: "2-digit", hourCycle: "h23" });
   let t = Z("2026-01-01T00:00:00Z"), schlecht = [];
+  const ist = (ms, wt) => { const d = new Date(ms); return d.getUTCHours() === 6 && d.getUTCMinutes() === 0 && d.getUTCSeconds() === 0 && d.getUTCMilliseconds() === 0 && (wt === undefined || d.getUTCDay() === wt); };
   for (let i = 0; i < 400; i++) {
-    const w = core.letzterReset(t, "woche"), d = core.letzterReset(t, "tag");
+    const w = core.letzterReset(t, "woche"), d = core.letzterReset(t, "tag"), mo = core.letzterReset(t, "monat"), mt = core.letzterReset(t, "montag");
     const n = core.naechsterReset(t, "woche"), m = core.naechsterReset(t, "tag");
-    const f = berlin.format(w), g = berlin.format(d);
-    if (!(w <= t && t < n && d <= t && t < m && t - w < 8 * TAG && n - t <= 7 * TAG + H && t - d < 25 * H && m - t <= 25 * H)) schlecht.push(["spanne", iso(t)]);
-    if (!/^Thu,? 10:00$/.test(f) || !/ 10:00$/.test(g)) schlecht.push([iso(t), f, g]);
+    if (!(w <= t && t < n && d <= t && t < m && t - w < 7 * TAG && n - t <= 7 * TAG && t - d < TAG && m - t <= TAG && n - w === 7 * TAG && m - d === TAG)) schlecht.push(["spanne", iso(t)]);
+    if (!ist(w, 3) || !ist(d) || !ist(mo) || new Date(mo).getUTCDate() !== 1 || !ist(mt, 1)) schlecht.push([iso(t), iso(w), iso(d), iso(mo), iso(mt)]);
     if (core.letzterReset(n, "woche") !== n || core.letzterReset(m, "tag") !== m) schlecht.push(["grenze", iso(t)]);
     t += 22 * H + 17 * 60000;
   }
-  ok(schlecht.length === 0, "ein Jahr lang: Reset immer Do 10:00 bzw. 10:00 Berlin, jetzt liegt dazwischen", schlecht.slice(0, 5));
+  ok(schlecht.length === 0, "400 Tage lang: Reset immer auf 06:00:00 UTC (Woche Mi, Montag Mo, Monat am 1.), Woche und Tag ohne Versatz", schlecht.slice(0, 5));
 }
 
 // ---- Anzeige-Stand: vor dem letzten Reset gesetzt heisst 0
 {
-  const jetzt = Z("2026-10-02T12:00:00Z"), r = Z("2026-10-01T08:00:00Z");
+  const jetzt = Z("2026-10-02T12:00:00Z"), r = Z("2026-09-30T06:00:00Z");
   ok(core.anzeigeStand(undefined, "woche", jetzt) === 0, "ohne Zaehler: 0");
   ok(core.anzeigeStand({ stand: 2, seit: r - 1 }, "woche", jetzt) === 0, "vor dem Wochen-Reset gesetzt: 0");
   ok(core.anzeigeStand({ stand: 2, seit: r }, "woche", jetzt) === 2, "genau zum Reset gesetzt: zaehlt");
   ok(core.anzeigeStand({ stand: 3, seit: r + H }, "woche", jetzt) === 3, "nach dem Reset gesetzt: zaehlt");
-  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T07:00:00Z") }, "tag", jetzt) === 0, "taeglich: vor 10:00 heute gesetzt: 0");
-  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T08:30:00Z") }, "tag", jetzt) === 1, "taeglich: nach 10:00 heute gesetzt: zaehlt");
-  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T07:00:00Z") }, "woche", jetzt) === 1, "derselbe Zeitpunkt zaehlt als Wochenpunkt weiter");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T05:59:59Z") }, "tag", jetzt) === 0, "taeglich: vor 06:00 heute gesetzt: 0");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T06:00:00Z") }, "tag", jetzt) === 1, "taeglich: genau 06:00 heute gesetzt: zaehlt");
+  ok(core.anzeigeStand({ stand: 1, seit: Z("2026-10-02T05:59:59Z") }, "woche", jetzt) === 1, "derselbe Zeitpunkt zaehlt als Wochenpunkt weiter");
   ok(core.anzeigeStand({ stand: -4, seit: r + H }, "woche", jetzt) === 0 &&
      core.anzeigeStand({ stand: 2.7, seit: r + H }, "woche", jetzt) === 2 &&
      core.anzeigeStand({ stand: "x", seit: r + H }, "woche", jetzt) === 0 &&
@@ -164,7 +166,7 @@ function naechst(jetzt, takt, erwartet, name) {
 
 // ---- Vorwoche: der alte Wochenstand bleibt eine Woche erhalten
 {
-  const r0 = Z("2026-09-24T08:00:00Z"), r1 = Z("2026-10-01T08:00:00Z");
+  const r0 = Z("2026-09-23T06:00:00Z"), r1 = Z("2026-09-30T06:00:00Z");
   const profil = {
     id: "p1", name: "A", aus: [], namen: {},
     eigene: [{ schluessel: "eigen1", name: "X", menge: 2, takt: "woche" }, { schluessel: "eigen2", name: "Y", menge: 1, takt: "tag" }],
@@ -198,7 +200,7 @@ function naechst(jetzt, takt, erwartet, name) {
   ok(p3.vorwoche.zaehler.illusionen.stand === 2 && p3.vorwoche.zaehler.zitadelleNormal.stand === 1,
     "nach dem Setzen: die Vorwoche behaelt den alten Stand", p3.vorwoche);
   // eine Woche spaeter: die neue Vorwoche ersetzt die alte (eine Woche, nicht mehr)
-  const r2 = Z("2026-10-08T08:00:00Z");
+  const r2 = Z("2026-10-07T06:00:00Z");
   const p4 = core.vorwocheSichern(p3, r2 + H);
   ok(p4.vorwoche.reset === r1 && Object.keys(p4.vorwoche.zaehler).sort().join() === "illusionen,umwandlungsstein",
     "eine Woche spaeter: die Vorwoche ist die Woche davor", p4.vorwoche);
@@ -207,7 +209,7 @@ function naechst(jetzt, takt, erwartet, name) {
   ok(core.vorwocheSichern(leer, r1 + H) === leer, "nur Tagespunkte: keine Vorwoche");
   ok(core.vorwocheSichern({ id: "p3", name: "C", aus: [], namen: {}, eigene: [], zaehler: {} }, r1 + H).vorwoche === undefined,
     "leeres Profil: keine Vorwoche");
-  // Pruefung W3, K4: die Uhr wurde ueber einen Donnerstag zurueckgestellt - eine gespeicherte Vorwoche, die
+  // Pruefung W3, K4: die Uhr wurde ueber einen Mittwoch zurueckgestellt - eine gespeicherte Vorwoche, die
   // neuer ist als die aus jetzt gerechnete, wird nie durch eine aeltere ersetzt (die Datei lehnte das ab)
   const zurueck = { ...p4, zaehler: { ...p4.zaehler, chaosprisma: { stand: 2, seit: r0 + 5 * H } } };
   ok(core.vorwocheSichern(zurueck, r1 + H) === zurueck && zurueck.vorwoche.reset === r1,
@@ -258,19 +260,19 @@ function naechst(jetzt, takt, erwartet, name) {
 {
   const profil = (zaehler, rest = {}) => ({ id: "w000000001", name: "Aurel", zaehler, aus: [], namen: {}, eigene: [], ...rest });
   const voll = (seit) => Object.fromEntries(core.GRUNDLISTE.map(g => [g.schluessel, { stand: g.menge, seit }]));
-  const Dienstag = Z("2026-10-06T12:00:00Z");
+  const Montag = Z("2026-10-12T12:00:00Z");   // Mo nach dem Montags-Reset, in der Woche ab Mi 07.10.
   const woche = core.GRUNDLISTE.filter(g => g.takt !== "tag");
   const tag = core.GRUNDLISTE.filter(g => g.takt === "tag");
 
-  let f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-06T18:00:00Z"));
+  let f = core.fortschrittVon(profil(voll(Montag)), Z("2026-10-12T18:00:00Z"));
   ok(f.fertig && f.woche.n === woche.length && f.woche.g === woche.length && f.tag.n === tag.length, "alles voll: Woche und Tag erledigt", f);
-  f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-07T09:00:00Z"));
+  f = core.fortschrittVon(profil(voll(Montag)), Z("2026-10-13T09:00:00Z"));
   ok(f.fertig && f.tag.n === 0 && f.tag.g === tag.length, "nach dem Tagesreset bleibt die Woche erledigt (121)", f);
-  f = core.fortschrittVon(profil(voll(Dienstag)), Z("2026-10-08T08:05:00Z"));
+  f = core.fortschrittVon(profil(voll(Montag)), Z("2026-10-14T06:05:00Z"));
   ok(!f.fertig && f.woche.n === core.GRUNDLISTE.filter(g => g.takt === "monat" || g.takt === "montag").length, "nach dem Wochen-Reset ist die Woche offen (Monats- und Montagspunkte gelten weiter)", f);
 
-  const teil = profil({ dimensionDungeons: { stand: 3, seit: Dienstag }, goldeneKiste: { stand: 2, seit: Dienstag } });
-  f = core.fortschrittVon(teil, Z("2026-10-06T18:00:00Z"));
+  const teil = profil({ dimensionDungeons: { stand: 3, seit: Montag }, goldeneKiste: { stand: 2, seit: Montag } });
+  f = core.fortschrittVon(teil, Z("2026-10-12T18:00:00Z"));
   const erwartet = (3 / 7 + 2 / 5) / woche.length;
   ok(Math.abs(f.woche.anteil - erwartet) < 1e-9 && f.woche.n === 0, "Teilfortschritt zaehlt nach Menge in den Ring (121)", { anteil: f.woche.anteil, erwartet });
 
@@ -279,24 +281,122 @@ function naechst(jetzt, takt, erwartet, name) {
     { schluessel: "eigenbbb", name: "Alt", menge: 1, takt: "woche", geloest: true }] });
   const sp = core.sichtbarePunkte(eig);
   ok(!sp.some(x => x.schluessel === "illusionen") && sp.some(x => x.schluessel === "eigenaaa") && !sp.some(x => x.schluessel === "eigenbbb"), "sichtbarePunkte: aus und geloest fehlen, eigener Punkt da", sp.map(x => x.schluessel));
-  ok(core.fortschrittVon(profil({}, { aus: core.GRUNDLISTE.map(g => g.schluessel) }), Dienstag).fertig === false, "ohne sichtbare Wochenpunkte ist nichts 'fertig'");
+  ok(core.fortschrittVon(profil({}, { aus: core.GRUNDLISTE.map(g => g.schluessel) }), Montag).fertig === false, "ohne sichtbare Wochenpunkte ist nichts 'fertig'");
 
   ok(core.bereichZu(undefined, true) === true && core.bereichZu(undefined, false) === false, "bereichZu: ohne Wahl gilt 'zu = fertig'");
   ok(core.bereichZu({ zu: false, bei: true }, true) === false, "bereichZu: aufgeklappt bleibt aufgeklappt, solange fertig");
   ok(core.bereichZu({ zu: false, bei: true }, false) === false && core.bereichZu({ zu: true, bei: true }, false) === false, "bereichZu: Wahl verfaellt, wenn der Fertig-Zustand wechselt");
   ok(core.bereichZu({ zu: true, bei: false }, false) === true, "bereichZu: zugeklappt im offenen Zustand bleibt, solange offen");
 
-  const mi = Z("2026-10-07T20:00:00Z");
+  const mi = Z("2026-10-06T20:00:00Z");   // Di, in der Woche vor dem Reset Mi 07.10.
   const alt = profil({ zitadelleNormal: { stand: 1, seit: mi }, illusionen: { stand: 2, seit: mi } });
-  const doDanach = Z("2026-10-08T08:05:00Z");
+  const doDanach = Z("2026-10-07T06:05:00Z");
   let lw = core.letzteWoche([alt], doDanach);
   ok(lw && lw.length === 1 && lw[0].n === 1 && lw[0].g === woche.filter(g => g.takt === "woche").length && lw[0].name === "Aurel", "Letzte Woche erscheint nach dem Reset", lw);
-  const neu = profil({ zitadelleNormal: { stand: 1, seit: mi }, illusionen: { stand: 2, seit: mi }, zitadelleSchwer: { stand: 1, seit: Z("2026-10-08T08:10:00Z") } });
-  ok(core.letzteWoche([neu], Z("2026-10-08T09:00:00Z")) === null, "Letzte Woche verschwindet beim ersten Stand der neuen Woche");
+  const neu = profil({ zitadelleNormal: { stand: 1, seit: mi }, illusionen: { stand: 2, seit: mi }, zitadelleSchwer: { stand: 1, seit: Z("2026-10-07T06:10:00Z") } });
+  ok(core.letzteWoche([neu], Z("2026-10-07T09:00:00Z")) === null, "Letzte Woche verschwindet beim ersten Stand der neuen Woche");
   ok(core.letzteWoche([profil({})], doDanach) === null, "Letzte Woche fehlt, wenn nie etwas gesetzt wurde");
-  const mitVor = profil({}, { vorwoche: { reset: Z("2026-10-01T08:00:00Z"), zaehler: { zitadelleNormal: { stand: 1, seit: mi } } } });
+  const mitVor = profil({}, { vorwoche: { reset: Z("2026-09-30T06:00:00Z"), zaehler: { zitadelleNormal: { stand: 1, seit: mi } } } });
   lw = core.letzteWoche([mitVor], doDanach);
   ok(lw && lw[0].n === 1, "Letzte Woche liest die gespeicherte vorwoche", lw);
+}
+
+// ---- Umstellung (Issue 420): alte Staende aus der Zeit mit Do 10:00 Berlin gehen nicht kaputt, nichts wird geloescht
+{
+  const profil = (zaehler, rest = {}) => ({ id: "w000000001", name: "Aurel", zaehler, aus: [], namen: {}, eigene: [], ...rest });
+  // So wurde bis zur Umstellung gespeichert: Wochen-Reset Do 10:00 Berlin (CEST, 08:00Z)
+  const altR = (tag) => Z("2026-10-" + tag + "T08:00:00Z");   // Do 01.10., Do 08.10. (alt)
+  // Neuer Stand: Mi 07.10. 06:00Z; jetzt ist Do 08.10. 12:00Z (zwischen Mi 06:00Z und Do 10:00 Berlin liegt der Uebergang)
+  const jetzt = Z("2026-10-08T12:00:00Z");
+  const r = core.letzterReset(jetzt, "woche"), r0 = core.letzterReset(r - 1, "woche");
+  ok(r === Z("2026-10-07T06:00:00Z") && r0 === Z("2026-09-30T06:00:00Z"), "Uebergang: die neue Woche beginnt Mi 07.10. 06:00Z", [iso(r), iso(r0)]);
+  // Ein alter Stand mit altem seit (Do 01.10. 11:00Z, Woche ab alt-Reset Do 01.10.) zaehlt in der Woche bis Mi 07.10. noch als Wochenstand
+  const alt = { stand: 2, seit: Z("2026-10-01T11:00:00Z") };
+  ok(core.anzeigeStand(alt, "woche", Z("2026-10-06T12:00:00Z")) === 2, "alter Stand (Do 01.10.) zaehlt bis zum neuen Reset weiter");
+  ok(core.anzeigeStand(alt, "woche", jetzt) === 0, "alter Stand (Do 01.10.) ist nach dem neuen Reset 0 (nicht verloren, nur eine neue Woche)");
+  // Wer zwischen Mi 06:00Z und Do 10:00 Berlin abhakt, zaehlt zur neuen Woche (einmalig)
+  const zwischen = { stand: 1, seit: Z("2026-10-07T20:00:00Z") };
+  ok(core.anzeigeStand(zwischen, "woche", jetzt) === 1, "abgehakt zwischen Mi 06:00Z und Do 10:00 Berlin: zaehlt zur neuen Woche");
+  // Eine vor der Umstellung gespeicherte Vorwoche (reset = Do 24.09. 08:00Z) wird in der Woche danach als Vorwoche erkannt, nicht verworfen
+  const mitVor = profil({
+    zitadelleNormal: { stand: 1, seit: Z("2026-10-02T09:00:00Z") },          // alte Woche, vor Mi 07.10.
+    illusionen: { stand: 2, seit: Z("2026-09-26T09:00:00Z") },
+  }, { vorwoche: { reset: altR("01"), zaehler: { chaosprisma: { stand: 3, seit: Z("2026-10-01T12:00:00Z") } } } });
+  const kopie = JSON.stringify(mitVor);
+  const lw = core.letzteWoche([mitVor], jetzt);
+  ok(lw && lw.length === 1 && lw[0].n === 2, "Vorwoche aus der alten Zeit (reset Do 01.10. 08:00Z) zaehlt mit: Zaehler und alte Vorwoche", lw);
+  const gesichert = core.vorwocheSichern(mitVor, jetzt);
+  ok(JSON.stringify(mitVor) === kopie, "die alte Datei wird nicht veraendert");
+  ok(gesichert.vorwoche && gesichert.vorwoche.reset === altR("01") && gesichert.vorwoche.zaehler.chaosprisma.stand === 3 && gesichert.vorwoche.zaehler.zitadelleNormal.stand === 1,
+    "vorwocheSichern ueber die Umstellung: alte Vorwoche und Zaehler der letzten Woche bleiben beide erhalten", gesichert.vorwoche);
+  ok(JSON.stringify(gesichert.zaehler) === JSON.stringify(mitVor.zaehler), "die Zaehler bleiben, nichts geht verloren");
+  ok(core.vorwocheSichern(gesichert, jetzt) === gesichert, "nach der Umstellung gesichert: ein zweiter Lauf aendert nichts (konsistent)");
+  // Zeit laeuft weiter: eine Woche spaeter ersetzt die neue Vorwoche die umgestellte, wie sonst auch
+  const spaeter = core.vorwocheSichern({ ...gesichert, zaehler: { ...gesichert.zaehler, altarNormal: { stand: 1, seit: Z("2026-10-09T12:00:00Z") } } }, Z("2026-10-14T07:00:00Z"));
+  ok(spaeter.vorwoche.reset === r && Object.keys(spaeter.vorwoche.zaehler).join() === "altarNormal", "eine Woche spaeter: die Vorwoche ist die neue Woche", spaeter.vorwoche);
+  // eine Vorwoche, die neuer ist als das Fenster (Uhr zurueckgestellt), bleibt wie bisher
+  const neuer = profil({}, { vorwoche: { reset: Z("2026-10-07T06:00:00Z"), zaehler: { chaosprisma: { stand: 1, seit: Z("2026-10-07T07:00:00Z") } } } });
+  ok(core.vorwocheSichern(neuer, Z("2026-10-06T12:00:00Z")) === neuer, "Uhr zurueck: die neuere Vorwoche bleibt");
+  // ein sehr alter Stand ohne passende Vorwoche: nichts kaputt
+  ok(core.letzteWoche([profil({ zitadelleNormal: { stand: 1, seit: Z("2026-08-01T10:00:00Z") } })], jetzt) === null, "sehr alter Stand: keine Letzte Woche, kein Fehler");
+}
+
+/* Turm der Gier (Spezifikation 2026-11-11-turm-der-gier-design.md, Abschnitt 2): 28-Tage-Saison ab Mi 11.11.2026 06:00 UTC */
+{
+  ok(core.TURM_START === Z("2026-11-11T06:00:00Z") && core.TURM_TAGE === 28, "Turm: Anker Mi 11.11.2026 06:00 UTC, 28 Tage");
+  reset("2026-11-11T06:00:00Z", "turm", "2026-11-11T06:00:00Z", "Turm: am Anker selbst beginnt die Saison");
+  reset("2026-11-11T05:59:59Z", "turm", "2026-10-14T06:00:00Z", "Turm: eine Sekunde vor dem Anker gilt die Saison davor (periodisch rueckwaerts)");
+  reset("2026-12-09T05:59:59Z", "turm", "2026-11-11T06:00:00Z", "Turm: 9.12. 05:59:59 noch Saison 1");
+  reset("2026-12-09T06:00:00Z", "turm", "2026-12-09T06:00:00Z", "Turm: 9.12. 06:00:00 beginnt Saison 2");
+  reset("2027-01-06T06:00:00Z", "turm", "2027-01-06T06:00:00Z", "Turm: 6.1.2027 beginnt Saison 3");
+  naechst("2026-11-20T12:00:00Z", "turm", "2026-12-09T06:00:00Z", "Turm: der naechste Reset in Saison 1 ist der 9.12. 06:00 UTC");
+  ok(core.naechsterReset(Z("2026-12-09T06:00:00Z"), "turm") - Z("2026-12-09T06:00:00Z") === 28 * TAG, "Turm: genau 28 mal 24 Stunden, auch ueber die Winterzeit");
+  ok(core.naechsterReset(Z("2027-03-10T12:00:00Z"), "turm") - core.letzterReset(Z("2027-03-10T12:00:00Z"), "turm") === 28 * TAG, "Turm: 28 mal 24 Stunden ueber die Sommerzeit");
+
+  ok(core.TURM_SCHLUESSEL.length === 20 && new Set(core.TURM_SCHLUESSEL).size === 20 && core.TURM_SCHLUESSEL[0] === "turmS1E1" && core.TURM_SCHLUESSEL[19] === "turmS4E5"
+    && core.TURM_SCHLUESSEL.every(k => /^[A-Za-z][A-Za-z0-9]{0,39}$/.test(k)), "Turm: 20 Schluessel turmS1E1 bis turmS4E5, passen in die Schluesselform des Speichers");
+  ok(core.turmSchluessel(2, 3) === "turmS3E3", "Turm: turmSchluessel(2, 3) ist turmS3E3");
+  ok(!core.GRUNDLISTE.some(g => core.TURM_SCHLUESSEL.includes(g.schluessel)), "Turm: die Schluessel stehen nicht in der Grundliste");
+
+  const profil = (zaehler, rest = {}) => ({ id: "w000000001", name: "Aurel", zaehler, aus: [], namen: {}, eigene: [], ...rest });
+  const jetzt = Z("2026-11-20T12:00:00Z");
+  const z1 = (k, seit) => ({ [k]: { stand: 1, seit } });
+  const p = profil({ ...z1("turmS1E1", Z("2026-11-12T08:00:00Z")), ...z1("turmS1E2", Z("2026-11-12T08:00:00Z")), ...z1("turmS2E5", Z("2026-11-13T08:00:00Z")), ...z1("turmS3E1", Z("2026-11-10T08:00:00Z")) });
+  const f = core.fortschrittTurm(p, jetzt);
+  ok(f.n === 3 && f.g === 20 && f.stufen.length === 4 && f.stufen.map(s => s.n).join() === "2,1,0,0" && f.stufen.every(s => s.g === 5),
+    "Turm: 3 von 20 (2 + 1), der Stand von vor dem Saisonbeginn zaehlt nicht", f);
+  ok(core.fortschrittVon(p, jetzt).woche.g === core.fortschrittVon(profil({}), jetzt).woche.g
+    && core.fortschrittVon(p, jetzt).woche.n === 0 && core.fortschrittVon(p, jetzt).fertig === false,
+    "Turm: Turm-Zaehler aendern Wochen-Fortschritt und Fertig nicht");
+  ok(core.letzteWoche([p], Z("2026-11-18T07:00:00Z")) === null, "Turm: Turm-Zaehler erscheinen nicht in der letzten Woche");
+  {
+    const mitWoche = profil({ zitadelleNormal: { stand: 1, seit: Z("2026-11-12T10:00:00Z") }, ...z1("turmS1E1", Z("2026-11-18T08:00:00Z")) });
+    const lwT = core.letzteWoche([mitWoche], Z("2026-11-19T12:00:00Z"));
+    ok(Array.isArray(lwT) && lwT.length === 1 && lwT[0].id === "w000000001", "Turm: ein Turm-Haken in der neuen Woche laesst die letzte Woche nicht verschwinden", lwT);
+  }
+
+  const s = core.turmSaison(Z("2026-11-11T06:00:00Z"));
+  ok(s.start === Z("2026-11-11T06:00:00Z") && s.ende === Z("2026-12-09T06:00:00Z") && s.tage === 28, "Turm: am ersten Tag 'noch 28 Tage'", s);
+  ok(core.turmSaison(Z("2026-12-09T05:00:00Z")).tage === 1, "Turm: eine Stunde vor dem Ende noch 1 Tag");
+
+  /* Vorsaison: die Saison davor bleibt erhalten, bevor ein neuer Stand sie ueberschreibt */
+  const alt = profil({ ...z1("turmS1E1", Z("2026-11-12T08:00:00Z")), ...z1("turmS1E2", Z("2026-11-13T08:00:00Z")), illusionen: { stand: 2, seit: Z("2026-11-12T08:00:00Z") } });
+  const neu = Z("2026-12-10T10:00:00Z");
+  const q = core.vorsaisonSichern(alt, neu);
+  ok(q.vorsaison && q.vorsaison.reset === Z("2026-11-11T06:00:00Z") && Object.keys(q.vorsaison.zaehler).sort().join() === "turmS1E1,turmS1E2",
+    "Vorsaison: die zwei Turm-Zaehler der Saison davor werden gesichert (kein Wochenzaehler)", q.vorsaison);
+  ok(q.zaehler === alt.zaehler || JSON.stringify(q.zaehler) === JSON.stringify(alt.zaehler), "Vorsaison: die Zaehler selbst bleiben");
+  ok(core.vorsaisonSichern(q, neu) === q, "Vorsaison: ohne Aenderung kommt dasselbe Objekt zurueck");
+  { const leer = profil({}); ok(core.vorsaisonSichern(leer, neu) === leer, "Vorsaison: ohne Turm-Zaehler nichts zu sichern, dasselbe Objekt"); }
+  const ueber = { ...q, zaehler: { ...q.zaehler, turmS1E1: { stand: 1, seit: neu } } };
+  ok(core.vorsaisonSichern(ueber, neu + 3600000).vorsaison.zaehler.turmS1E1.seit === Z("2026-11-12T08:00:00Z"), "Vorsaison: ein Ueberschreiben im neuen Stand loescht die gesicherte Saison nicht");
+  const neuere = profil({}, { vorsaison: { reset: Z("2026-12-09T06:00:00Z"), zaehler: { turmS1E1: { stand: 1, seit: Z("2026-12-10T00:00:00Z") } } } });
+  ok(core.vorsaisonSichern(neuere, Z("2026-12-10T10:00:00Z")) === neuere, "Vorsaison: eine neuere gespeicherte Vorsaison bleibt (Uhr zurueckgestellt)");
+
+  const ls = core.letzteSaison(q, neu);
+  ok(ls && ls.n === 2 && ls.g === 20, "Letzte Saison: 2 von 20", ls);
+  ok(core.letzteSaison(profil({}), neu) === null, "Letzte Saison: ohne Daten null");
+  ok(core.letzteSaison(q, Z("2026-11-20T12:00:00Z")) === null, "Letzte Saison: in der ersten Saison gibt es keine davor");
 }
 
 // ---- andere Rechner-Zeitzone: gleiche Ergebnisse
@@ -305,7 +405,8 @@ const probe = () => {
   let t = Z("2026-01-01T00:00:00Z");
   for (let i = 0; i < 200; i++) {
     aus.push(core.letzterReset(t, "woche"), core.letzterReset(t, "tag"), core.naechsterReset(t, "woche"), core.naechsterReset(t, "tag"),
-      core.letzterReset(t, "monat"), core.naechsterReset(t, "monat"), core.letzterReset(t, "montag"), core.naechsterReset(t, "montag"));
+      core.letzterReset(t, "monat"), core.naechsterReset(t, "monat"), core.letzterReset(t, "montag"), core.naechsterReset(t, "montag"),
+      core.letzterReset(t, "turm"), core.naechsterReset(t, "turm"));
     t += 43 * H + 11 * 60000;
   }
   return aus;

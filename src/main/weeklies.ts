@@ -62,7 +62,7 @@ const TAKTE = ["woche", "tag"];
 const FILE_KEYS = ["v", "profile", "erinnerungen", "ignoriert"];
 const LOESCHEN_KEYS = ["was", "id", "name", "profil"];
 const LOESCHEN_WAS = ["charakter", "eigen"];
-const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];
+const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "vorsaison", "zu"];
 const OWN_KEYS = ["schluessel", "name", "menge", "takt", "geloest"];
 const COUNTER_KEYS = ["stand", "seit"];
 const LAST_WEEK_KEYS = ["reset", "zaehler"];
@@ -96,6 +96,8 @@ export interface Profile {
   aus: string[]; namen: Record<string, string>;
   eigene: OwnPoint[];
   vorwoche?: { reset: number; zaehler: Record<string, Counter> };
+  /** the Tower of Greed counters of the season before (like vorwoche) */
+  vorsaison?: { reset: number; zaehler: Record<string, Counter> };
   zu?: Record<string, ZuWahl>;
 }
 export interface ZuWahl { zu: boolean; bei: boolean }
@@ -212,6 +214,13 @@ function profileOf(x: unknown): Profile | null {
     if (!z) return null;
     p.vorwoche = { reset: w.reset, zaehler: z };
   }
+  if (x.vorsaison !== undefined) {
+    const w = x.vorsaison;
+    if (!isRec(w) || !only(w, LAST_WEEK_KEYS) || !timeOk(w.reset)) return null;
+    const z = countersOf(w.zaehler);
+    if (!z) return null;
+    p.vorsaison = { reset: w.reset, zaehler: z };
+  }
   return p;
 }
 
@@ -257,6 +266,12 @@ export function checkWeeklies(next: unknown, stored: WeekliesFile): WeekliesFile
       const week = p.vorwoche;
       if (!week || week.reset < old.vorwoche.reset) return null;
       if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null;
+    }
+    // the season before: replaced only by a season as old or newer, and by the same one only with every key it had
+    if (old.vorsaison) {
+      const season = p.vorsaison;
+      if (!season || season.reset < old.vorsaison.reset) return null;
+      if (season.reset === old.vorsaison.reset && !Object.keys(old.vorsaison.zaehler).every((k) => Object.hasOwn(season.zaehler, k))) return null;
     }
   }
   return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }), ...(ignoriert === undefined ? {} : { ignoriert }) };

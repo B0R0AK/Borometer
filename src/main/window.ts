@@ -19,13 +19,13 @@ import { autostartSetzen } from "./autostart";
 import { loadConfig, updateConfig } from "./config";
 import { bump } from "./events";
 import {
-  fensterNeu, neuerMerker, platzAbriss, platzKompakt, platzVoll, teilAus, VOLL_H, VOLL_W, vollAnpassen, vollGroesse,
+  abrissGroesse, abrissMerken, fensterNeu, neuerMerker, platzAbriss, platzKompakt, platzVoll, teilAus, VOLL_H, VOLL_W, vollAnpassen, vollGroesse,
   type LageGross, type LageKompakt, type Monitor, type Teil,
 } from "./lage";
 import { meldeKampf } from "./notify";
 import { setLiveBadge } from "./taskbar";
 import { auftragErledigt } from "./start";
-import { abrissTeil, fensterOptionen, kompaktBericht, kompaktMinimum, menueArt, neuerKompaktPuffer, streifenLage, type AbrissTeil, type Ansicht, type Lift } from "./windows-core";
+import { abrissTeil, fensterOptionen, kompaktBericht, kompaktMinimum, menueArt, neuerKompaktPuffer, streifenLage, vorholen, type AbrissTeil, type Ansicht, type Lift } from "./windows-core";
 import { zeigeMenue } from "./menue";
 import type { Json } from "./http";
 
@@ -460,18 +460,19 @@ function openAbriss(teil: AbrissTeil): boolean {
   if (!currentWindow() || !seite.origin) return false;
   const offen = abrissWindow();
   if (offen && abriss.teil === teil) {
-    offen.show();
-    offen.focus();
+    // out of the taskbar if minimised (#353): show() alone leaves it there
+    vorholen(offen);
     return true;
   }
   offen?.close();
   const cfg = loadConfig();
   // its remembered place while it is still on a monitor (lage.ts)
   const p = platzAbriss(teilAus(loadConfig().fenster, "abriss"), monitore(), hauptmonitor());
+  const standard = abrissGroesse(hauptmonitor());
   const aw = new BrowserWindow({
     title: "Borometer",
-    width: p ? p.w : 900,
-    height: p ? p.h : 640,
+    width: p ? p.w : standard.w,
+    height: p ? p.h : standard.h,
     ...(p ? { x: p.x, y: p.y } : {}),
     minWidth: 320,
     minHeight: 240,
@@ -494,6 +495,9 @@ function openAbriss(teil: AbrissTeil): boolean {
   aw.webContents.once("did-fail-load", zeigen);
   aw.on("move", () => abrissMerker.ereignis());
   aw.on("resize", () => abrissMerker.ereignis());
+  aw.on("maximize", () => abrissMerker.ereignis());
+  aw.on("unmaximize", () => abrissMerker.ereignis());
+  aw.on("restore", () => abrissMerker.ereignis());
   aw.on("close", () => abrissMerker.jetzt());
   aw.on("closed", () => {
     if (abriss.win === aw) {
@@ -777,12 +781,17 @@ const kompaktMerker = neuerMerker(kompaktLageSchreiben, {
 });
 
 /* The torn-off window's place, remembered as "abriss" (not which area it
-   showed: every opening names that). Nothing while minimised. */
+   showed: every opening names that). Nothing while minimised; maximised, its
+   normal place with max set (lage.ts, abrissMerken). */
 function abrissLageSchreiben(): void {
   const aw = abrissWindow();
-  if (!aw || aw.isMinimized()) return;
+  if (!aw) return;
   const b = aw.getBounds();
-  merkeLage("abriss", { x: b.x, y: b.y, w: b.width, h: b.height, max: false });
+  const n = aw.getNormalBounds();
+  const lage = abrissMerken(
+    { x: b.x, y: b.y, w: b.width, h: b.height }, { x: n.x, y: n.y, w: n.width, h: n.height }, aw.isMaximized(), aw.isMinimized(),
+  );
+  if (lage) merkeLage("abriss", lage);
 }
 
 const abrissMerker = neuerMerker(abrissLageSchreiben, {

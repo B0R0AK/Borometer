@@ -379,7 +379,7 @@ fights stay undeletable, and it deletes nothing on its own.
 One tab per character, up to six: the raid as a grid of wings and difficulties,
 the secret dungeon, events, the dimension trial and the merchants, each with a
 counter. A band shows where the week stands and when the next weekly reset
-(Thursday, 10:00 German time) and the next daily reset come. **None of this is
+(Wednesday, 06:00 UTC) and the next daily reset come. **None of this is
 read from the game; you tick it off yourself.** Per character you can hide
 entries, rename them and add your own (*Customise*); *Show only what is open*
 hides what is done.

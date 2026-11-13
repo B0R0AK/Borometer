@@ -7,17 +7,16 @@
    die Seite zeigt. Rein gerechnet, ohne Seite und ohne Netz; der Test
    (scripts/test-weeklies-core.mjs) liest die Zahlen direkt.
 
-   Reset: woechentlich Donnerstag 10:00, taeglich 10:00, monatlich am 1.
-   um 10:00 (Spezifikation 10, Annahme bis zur Bestaetigung), "montag"
-   Montag 10:00 (Portal der Unendlichkeit Mo-Mo), alles deutsche
-   Zeit (Europe/Berlin, mit Sommer- und Winterzeit). Die Uhr des Rechners
-   zaehlt nicht: die Wandzeit in Berlin kommt allein aus
-   Intl.DateTimeFormat mit timeZone "Europe/Berlin", kein fester Versatz.
+   Reset: alle Takte um 06:00 UTC, ohne Sommer- und Winterzeit (Issue 420):
+   woechentlich Mittwoch, taeglich, monatlich am 1., "montag" (Portal der
+   Unendlichkeit Mo-Mo) Montag, "turm" (Turm der Gier): 28-Tage-Saison ab
+   Mi 11.11.2026 06:00 UTC. Gerechnet wird allein in UTC, die
+   Zeitzone des Rechners spielt keine Rolle.
 
    Die Texte der Punkte stehen nicht hier, sondern im Dictionary unter
    weeklies.punkt.<schluessel> und weeklies.gruppe.<gruppe>. */
 
-export type Takt = "woche" | "tag" | "monat" | "montag";
+export type Takt = "woche" | "tag" | "monat" | "montag" | "turm";
 export interface WeeklyPunkt { schluessel: string; gruppe: string; menge: number; takt: Takt }
 export interface Zaehler { stand: number; seit: number }
 export interface EigenerPunkt { schluessel: string; name: string; menge: number; takt: Takt; geloest?: boolean }
@@ -43,6 +42,8 @@ export interface WeeklyProfil {
   aus: string[]; namen: Record<string, string>;
   eigene: EigenerPunkt[];
   vorwoche?: Vorwoche;
+  /** die Turm-Zaehler der Saison davor (wie vorwoche) */
+  vorsaison?: Vorwoche;
 }
 
 /* Die Grundliste in der Reihenfolge der Spezifikation (3, seit 10 die
@@ -72,49 +73,39 @@ export const GRUNDLISTE: readonly WeeklyPunkt[] = Object.freeze([
   p("auswahltruheVerzauberung", "raidwaren", 1), p("raidChaosprisma", "raidwaren", 1),
 ]);
 
-export const RESET_STUNDE = 10;
-export const RESET_WOCHENTAG = 4;   // Donnerstag, 0 = Sonntag wie Date.getUTCDay
-/** Der Wochentag des Takts "montag" (Portal der Unendlichkeit Mo-Mo, 01.10.2026). */
+export const RESET_STUNDE = 6;      // 06:00 UTC, ohne Sommer- und Winterzeit
+export const RESET_WOCHENTAG = 3;   // Mittwoch, 0 = Sonntag wie Date.getUTCDay
+/** Der Wochentag des Takts "montag" (Portal der Unendlichkeit Mo-Mo, 01.10.2026), ebenfalls um 06:00 UTC. */
 export const RESET_MONTAG = 1;
 const TAG_MS = 86400000;
 
-/* Die Wandzeit in Berlin zu einem Zeitpunkt. Die Felder werden als
-   UTC-Felder gelesen: wand(ms) - ms ist der Versatz Berlins zu UTC. */
-const BERLIN = new Intl.DateTimeFormat("en-US", {
-  timeZone: "Europe/Berlin", hourCycle: "h23",
-  year: "numeric", month: "2-digit", day: "2-digit", hour: "2-digit", minute: "2-digit", second: "2-digit",
-});
-function wand(ms: number): number {
-  const f: Record<string, number> = {};
-  for(const t of BERLIN.formatToParts(ms)) if(t.type !== "literal") f[t.type] = Number(t.value);
-  const n = (k: string): number => f[k] ?? 0;
-  return Date.UTC(n("year"), n("month") - 1, n("day"), n("hour") % 24, n("minute"), n("second"));
-}
-const versatz = (ms: number): number => wand(Math.floor(ms / 1000) * 1000) - Math.floor(ms / 1000) * 1000;
+/** Der Turm der Gier (Spezifikation 2026-11-11-turm-der-gier-design.md): Saisonbeginn Mi 11.11.2026 06:00 UTC, alle 28 Tage. */
+export const TURM_START = Date.UTC(2026, 10, 11, RESET_STUNDE);
+export const TURM_TAGE = 28;
+export const TURM_STUFEN: readonly string[] = Object.freeze(["erwachen", "morgenroete", "zwielicht", "abgrund"]);
+export const TURM_EBENEN = 5;
+/** Der Schluessel eines Hakens: stufe 0 bis 3, ebene 1 bis 5. Nur Buchstaben und Ziffern, wie der Speicher es verlangt. */
+export const turmSchluessel = (stufe: number, ebene: number): string => "turmS" + (stufe + 1) + "E" + ebene;
+export const TURM_SCHLUESSEL: readonly string[] = Object.freeze(TURM_STUFEN.flatMap((_, s) => Array.from({length: TURM_EBENEN}, (__, e) => turmSchluessel(s, e + 1))));
 
-/* Ein Kalendertag (als UTC-Mitternacht seiner Felder) um RESET_STUNDE in
-   Berlin, als echter UTC-Zeitpunkt. 10:00 liegt nie in der Umstellung
-   (2:00 bis 3:00), der zweite Blick auf den Versatz genuegt also. */
-function resetAm(tagFelder: number): number {
-  const w = tagFelder + RESET_STUNDE * 3600000;
-  const erst = w - versatz(w);
-  return w - versatz(erst);
-}
+/* Ein Kalendertag (als UTC-Mitternacht) um RESET_STUNDE UTC. Keine Zeitzone,
+   keine Umstellung: jeder Reset liegt genau auf 06:00:00 UTC. */
+const resetAm = (tag: number): number => tag + RESET_STUNDE * 3600000;
 
-/* Der erste Tag des Monats (UTC-Mitternacht seiner Felder), um n Monate verschoben. */
-function monatsErster(tagFelder: number, n: number): number {
-  const d = new Date(tagFelder);
+/* Der erste Tag des Monats (UTC-Mitternacht), um n Monate verschoben. */
+function monatsErster(tag: number, n: number): number {
+  const d = new Date(tag);
   return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + n, 1);
 }
 
-/** Der letzte Reset (UTC-ms) zu jetztMs: Do 10:00, taeglich 10:00 bzw. am 1. um 10:00 in Berlin. */
+/** Der letzte Reset (UTC-ms) zu jetztMs: Mi 06:00 UTC, taeglich 06:00 UTC, am 1. um 06:00 UTC, "montag" Mo 06:00 UTC. */
 export function letzterReset(jetztMs: number, takt: Takt): number {
-  const w = wand(jetztMs);
+  if(takt === "turm") return TURM_START + Math.floor((jetztMs - TURM_START) / (TURM_TAGE * TAG_MS)) * TURM_TAGE * TAG_MS;
   if(takt === "monat"){
-    const r = resetAm(monatsErster(w, 0));
-    return r > jetztMs ? resetAm(monatsErster(w, -1)) : r;
+    const r = resetAm(monatsErster(jetztMs, 0));
+    return r > jetztMs ? resetAm(monatsErster(jetztMs, -1)) : r;
   }
-  let tag = Math.floor(w / TAG_MS) * TAG_MS;
+  let tag = Math.floor(jetztMs / TAG_MS) * TAG_MS;
   if(takt !== "tag") tag -= ((new Date(tag).getUTCDay() - (takt === "montag" ? RESET_MONTAG : RESET_WOCHENTAG) + 7) % 7) * TAG_MS;
   let r = resetAm(tag);
   if(r > jetztMs) r = resetAm(tag - (takt === "tag" ? 1 : 7) * TAG_MS);
@@ -124,7 +115,8 @@ export function letzterReset(jetztMs: number, takt: Takt): number {
 /** Der naechste Reset (UTC-ms) nach jetztMs, echt spaeter. */
 export function naechsterReset(jetztMs: number, takt: Takt): number {
   const l = letzterReset(jetztMs, takt);
-  const tag = Math.floor(wand(l) / TAG_MS) * TAG_MS;
+  if(takt === "turm") return l + TURM_TAGE * TAG_MS;
+  const tag = Math.floor(l / TAG_MS) * TAG_MS;
   if(takt === "monat") return resetAm(monatsErster(tag, 1));
   return resetAm(tag + (takt === "tag" ? 1 : 7) * TAG_MS);
 }
@@ -139,6 +131,7 @@ export function anzeigeStand(z: Zaehler | undefined, takt: Takt, jetztMs: number
 /* Der Takt eines Schluessels: Grundliste oder eigener Punkt; unbekannt
    heisst null (der Punkt zaehlt fuer die Vorwoche nicht). */
 function taktVon(profil: WeeklyProfil, schluessel: string): Takt | null {
+  if(TURM_SCHLUESSEL.includes(schluessel)) return "turm";
   const g = GRUNDLISTE.find(x => x.schluessel === schluessel);
   if(g) return g.takt;
   const e = (profil.eigene || []).find(x => x && x.schluessel === schluessel);
@@ -155,8 +148,9 @@ export function vorwocheSichern<P extends WeeklyProfil>(profil: P, jetztMs: numb
   const r = letzterReset(jetztMs, "woche");
   const r0 = letzterReset(r - 1, "woche");
   // eine gespeicherte Vorwoche, die neuer ist (Uhr zurueckgestellt), bleibt: die Datei nimmt keine aeltere an
-  if(profil.vorwoche && profil.vorwoche.reset > r0) return profil;
-  const alt = profil.vorwoche && profil.vorwoche.reset === r0 ? profil.vorwoche.zaehler : null;
+  if(profil.vorwoche && profil.vorwoche.reset >= r) return profil;
+  // die Vorwoche gilt, wenn ihr Reset in diesem Fenster liegt; so zaehlt auch ein vor der Umstellung (Do 10:00 Berlin) gespeicherter Stand mit
+  const alt = profil.vorwoche && profil.vorwoche.reset >= r0 ? profil.vorwoche.zaehler : null;
   const neu: Record<string, Zaehler> = {};
   let dazu = 0;
   for(const [k, z] of Object.entries(profil.zaehler || {})) {
@@ -167,7 +161,9 @@ export function vorwocheSichern<P extends WeeklyProfil>(profil: P, jetztMs: numb
     dazu++;
   }
   if(!dazu) return profil;
-  return {...profil, vorwoche: {reset: r0, zaehler: {...(alt || {}), ...neu}}};
+  // der gespeicherte Reset bleibt (auch ein alter aus Do 10:00 Berlin): die Datei nimmt keinen kleineren an
+  const reset = alt && profil.vorwoche ? profil.vorwoche.reset : r0;
+  return {...profil, vorwoche: {reset, zaehler: {...(alt || {}), ...neu}}};
 }
 
 /* Die Punkte eines Charakters, die gezeigt und gezaehlt werden: die Grundliste ohne die
@@ -195,19 +191,71 @@ export function bereichZu(wahl: ZuWahl | undefined, fertig: boolean): boolean {
   return wahl && wahl.bei === fertig ? wahl.zu : fertig;
 }
 
-/** Die Wochenzaehler der Woche davor, je Charakter "n von g"; null, wenn in der laufenden Woche schon etwas gesetzt ist oder nichts zu zeigen ist (4.5). */
+/** Die Wochenzaehler der Woche davor, je Charakter "n von g"; null, wenn in der laufenden Woche schon etwas gesetzt ist (Turm-Haken zaehlen nicht) oder nichts zu zeigen ist (4.5). */
 export function letzteWoche(profile: WeeklyProfil[], jetztMs: number): LetzteWoche[] | null {
   const r = letzterReset(jetztMs, "woche"), r0 = letzterReset(r - 1, "woche");
   const gesetzt = (z: Zaehler | undefined): z is Zaehler => !!z && typeof z.seit === "number" && typeof z.stand === "number";
-  if(profile.some(q => Object.values(q.zaehler || {}).some(z => gesetzt(z) && z.seit >= r))) return null;
+  if(profile.some(q => Object.entries(q.zaehler || {}).some(([k, z]) => !TURM_SCHLUESSEL.includes(k) && gesetzt(z) && z.seit >= r))) return null;
   const out: LetzteWoche[] = [];
   for(const q of profile){
     const stand: Record<string, number> = {};
     for(const [k, z] of Object.entries(q.zaehler || {})) if(gesetzt(z) && z.seit >= r0 && z.seit < r && taktVon(q, k) === "woche") stand[k] = z.stand;
-    if(q.vorwoche && q.vorwoche.reset === r0) for(const [k, z] of Object.entries(q.vorwoche.zaehler || {})) if(gesetzt(z)) stand[k] = z.stand;
+    if(q.vorwoche && q.vorwoche.reset >= r0 && q.vorwoche.reset < r) for(const [k, z] of Object.entries(q.vorwoche.zaehler || {})) if(gesetzt(z)) stand[k] = z.stand;
     if(!Object.keys(stand).length) continue;
     const punkte = sichtbarePunkte(q).filter(x => x.takt === "woche");
     out.push({id: q.id, name: q.name, n: punkte.filter(x => Math.min(x.menge, stand[x.schluessel] ?? 0) >= x.menge).length, g: punkte.length});
   }
   return out.length ? out : null;
+}
+
+export interface TurmStand { n: number; g: number; stufen: {n: number; g: number}[] }
+const turmGesetzt = (z: Zaehler | undefined, jetztMs: number) => anzeigeStand(z, "turm", jetztMs) >= 1;
+/** Die Haken des Turms: gesamt und je Stufe, gezaehlt wird nur die laufende Saison. Der Wochen-Fortschritt kennt sie nicht. */
+export function fortschrittTurm(profil: WeeklyProfil, jetztMs: number): TurmStand {
+  const stufen = TURM_STUFEN.map((_, s) => {
+    let n = 0;
+    for(let e = 1; e <= TURM_EBENEN; e++) if(turmGesetzt(profil.zaehler ? profil.zaehler[turmSchluessel(s, e)] : undefined, jetztMs)) n++;
+    return {n, g: TURM_EBENEN};
+  });
+  return {n: stufen.reduce((a, s) => a + s.n, 0), g: TURM_STUFEN.length * TURM_EBENEN, stufen};
+}
+
+/** Die laufende Saison: Beginn, naechster Reset und die Resttage (aufgerundet, mindestens 1). */
+export function turmSaison(jetztMs: number): {start: number; ende: number; tage: number} {
+  const start = letzterReset(jetztMs, "turm"), ende = naechsterReset(jetztMs, "turm");
+  return {start, ende, tage: Math.max(1, Math.ceil((ende - jetztMs) / TAG_MS))};
+}
+
+/* Vorsaison (wie vorwocheSichern): liegt ein Saison-Reset nach dem letzten Setzen, werden die Turm-Zaehler der Saison
+   davor als vorsaison aufbewahrt, bevor ein neuer Stand sie ueberschreibt. Eine Saison, nicht mehr; eine neuere
+   ersetzt die aeltere, nie umgekehrt. Ohne Aenderung kommt dasselbe Objekt zurueck. */
+export function vorsaisonSichern<P extends WeeklyProfil>(profil: P, jetztMs: number): P {
+  const r = letzterReset(jetztMs, "turm");
+  const r0 = letzterReset(r - 1, "turm");
+  if(profil.vorsaison && profil.vorsaison.reset >= r) return profil;
+  const alt = profil.vorsaison && profil.vorsaison.reset >= r0 ? profil.vorsaison.zaehler : null;
+  const neu: Record<string, Zaehler> = {};
+  let dazu = 0;
+  for(const [k, z] of Object.entries(profil.zaehler || {})) {
+    if(!z || typeof z.seit !== "number" || z.seit < r0 || z.seit >= r) continue;
+    if(!TURM_SCHLUESSEL.includes(k)) continue;
+    if(alt && k in alt) continue;
+    neu[k] = {stand: z.stand, seit: z.seit};
+    dazu++;
+  }
+  if(!dazu) return profil;
+  const reset = alt && profil.vorsaison ? profil.vorsaison.reset : r0;
+  return {...profil, vorsaison: {reset, zaehler: {...(alt || {}), ...neu}}};
+}
+
+/** Die Haken der Saison davor, "n von 20"; null, wenn es keine gibt (erste Saison, nichts gesetzt). */
+export function letzteSaison(profil: WeeklyProfil, jetztMs: number): {n: number; g: number} | null {
+  const r = letzterReset(jetztMs, "turm"), r0 = letzterReset(r - 1, "turm");
+  const gesetzt = (z: Zaehler | undefined): z is Zaehler => !!z && typeof z.seit === "number" && typeof z.stand === "number";
+  const stand: Record<string, number> = {};
+  for(const [k, z] of Object.entries(profil.zaehler || {})) if(gesetzt(z) && z.seit >= r0 && z.seit < r && TURM_SCHLUESSEL.includes(k)) stand[k] = z.stand;
+  if(profil.vorsaison && profil.vorsaison.reset >= r0 && profil.vorsaison.reset < r)
+    for(const [k, z] of Object.entries(profil.vorsaison.zaehler || {})) if(gesetzt(z) && TURM_SCHLUESSEL.includes(k)) stand[k] = z.stand;
+  if(!Object.keys(stand).length) return null;
+  return {n: TURM_SCHLUESSEL.filter(k => (stand[k] ?? 0) >= 1).length, g: TURM_SCHLUESSEL.length};
 }

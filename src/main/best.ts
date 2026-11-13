@@ -8,6 +8,9 @@
  * apart from it. The config is read and rewritten whole on every setting, and
  * while logging live the history index rewrites it every couple of seconds;
  * two pulls per boss with their casts would ride along with each of those.
+ * A pull may also carry the Eye of Ventius volleys as an optional `run.ventius`
+ * list of numbers (#414); an entry without it stays exactly as it was, and the
+ * size limit below is unchanged (a few hundred numbers at most).
  *
  * The page sends one boss at a time. The key names a boss or a dummy length,
  * never a path; the file name is fixed here. Nothing in this file reads the

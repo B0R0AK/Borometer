@@ -285,8 +285,9 @@ try {
       if (zoom === 100) {
         const soll = Math.min(400, Math.max(340, 233 + breite * 0.0834));
         assert(Math.abs(m.liste.width - soll) <= 1.5, `${wo}: die Liste ist 340 bis 400 Punkt breit (hier ${Math.round(soll)})`, { soll, ist: m.liste.width });
+        /* #414: der Beispielkampf hat seit dem Kopf-Befund ein echtes Urteil (Ventius: fehlende Treffer ueber alle Salven, Schlagzeile in zwei Zeilen, Erklaerung auf zwei begrenzt) statt des Ein-Zeilen-Ruhesatzes: das Band ist so hoch wie das Urteil, hoechstens 190 statt 130 */
         /* folgt Spezifikation Feinschliff 6: ab 1200 Punkt Hoehe waechst die Kurve um 72 */
-        assert(m.band.height >= (hoehe >= 1200 ? 170 : 100) && m.band.height <= (hoehe >= 1200 ? 210 : 130), `${wo}: das Band ist etwa ${hoehe >= 1200 ? 190 : 110} Punkt hoch`, m.band);
+        assert(m.band.height >= (hoehe >= 1200 ? 170 : 160) && m.band.height <= (hoehe >= 1200 ? 210 : 190), `${wo}: das Band ist etwa ${hoehe >= 1200 ? 190 : 180} Punkt hoch`, m.band);
       }
     } else {
       assert(m.ring.bottom <= m.liste.top + 1 && m.liste.bottom <= m.band.top + 1, `${wo}: gestapelt Ringfeld, Liste mit Urteil, Band`, m);
@@ -1014,7 +1015,8 @@ try {
   }
   // --- 8. Der Ring (Spezifikation Glutring 3): ein Bogen je Zeile ab 12 Uhr, rund, in der Groesse des Felds, aussen die
   // Trefferarten, die grosse Zahl in der Mitte, ein Bild mit Beschreibung
-  for (const [breite, hoehe, min, max, schrift] of [[1280, 860, 480, 560, "1"], [2000, 1480, 760, 760, "1"], [560, 800, 280, 460, "0"]]) {
+  // (1280 x 860: der Ring ab 440 statt 480, aus demselben Grund: das Urteil des Beispielkampfs ist seit #414 zwei plus zwei Zeilen hoch)
+  for (const [breite, hoehe, min, max, schrift] of [[1280, 860, 440, 560, "1"], [2000, 1480, 760, 760, "1"], [560, 800, 280, 460, "0"]]) {
     const s = await oeffne({ app: true, breite, hoehe }); const p = s.page;
     await p.emulateMedia({ reducedMotion: "reduce" });
     await beispiel(p);

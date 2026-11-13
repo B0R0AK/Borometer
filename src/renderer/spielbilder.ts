@@ -11,3 +11,4 @@ export const KERN_BILD: Record<string, string> = {};
 export const BOSS_ICON_BILD: Record<string, string> = {};
 export const WK_BOSS_BILD: Record<string, string> = {};
 export const WK_GEGENSTAND_BILD: Record<string, string> = {};
+export const WK_TURM_BILD: Record<string, string> = {};

@@ -42,11 +42,21 @@ function normWeapon(s: unknown){
    Gespeichertes - ausser randlosGesehen, damit "Verstanden" haelt. Das
    abgerissene Fenster (Windows Teil 2) schreibt gar nichts. */
 const KOMPAKT_DARF_MERKEN = ["randlosGesehen"];
+/* Das Paar, das nach aussen geht (Gruppe, config.json): das letzte, das ein
+   Kampf oder die Hand gesagt hat. Die Anzeige darf leer sein, wenn ein Kampf
+   keine Waffe zeigt (#406); gemeldet und gespeichert wird dann nicht "leer",
+   denn das Paar gehoert dem Spieler und nicht dem Kampf. */
+let letztesPaar = {main: "", off: ""};
+export function merkePaar(main: string, off: string){ letztesPaar = {main, off}; }
+export function paarNachAussen(): {main: string; off: string} {
+  return state.mainWeapon ? {main: state.mainWeapon, off: state.offWeapon || ""} : letztesPaar;
+}
 export function persistConfig(){
   if(!SERVED || KOMPAKT_FENSTER || ABRISS_FENSTER) return;
+  const paar = paarNachAussen();
   fetch("/api/config", {method:"POST", headers:{"Content-Type":"application/json"},
     body: JSON.stringify({weaponOf:state.weaponOf, weaponById:state.weaponById,
-                          mainWeapon:state.mainWeapon||"", offWeapon:state.offWeapon||"",
+                          mainWeapon:paar.main, offWeapon:paar.off,
                           weaponPick:state.weaponPick,
                           runs:state.runs})}).catch(() => {});
 }

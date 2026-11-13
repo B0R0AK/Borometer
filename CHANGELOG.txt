@@ -1,6 +1,25 @@
 BOROMETER — CHANGELOG
 =====================
 
+v2.2
+----
+Added
+  - Analysis: timeline with damage per second, the best pull's curve and markers for gaps, the strongest 5s and target switches; drag a range and read what happened there (#414)
+  - Analysis: checklist, the opener of the first 15s against the best pull, and a card per skill; the best pull now keeps its Eye of Ventius volleys for comparison (#414)
+  - Weeklies: Tower of Greed tab with a 28-day season, four tiers of five floors each and “Tick all” per tier (#423)
+Changed
+  - Analysis: the workbench and the fight strip are gone; what they showed is on the skill cards and in the timeline now (#414)
+  - Analysis: the findings list is gone; its sentences sit under “Good here” and “Room to gain” and on the timeline markers (#414)
+  - Analysis: the “The fight” panel is gone; the rate of direct hits sits under “Good here”, and the bar of the four hit types is gone (#414)
+  - Analysis: the verdict at the top names what cost the most damage, such as idle time or missing hits (#414)
+  - Weeklies: every reset is at 06:00 UTC; the weekly one is now on Wednesday 06:00 UTC (07:00 Berlin time in winter); it was Thursday 10:00 Berlin time (#420)
+  - Info: the Network entry under security also names guild online (#356)
+Fixed
+  - Weapon pair: a fight without weapon damage no longer shows the pair from the fight before (#405)
+  - Glow ring: the note on other targets sits top left and no longer spills out of a small ring (#401)
+  - Own window: “Open in its own window” brings a minimised window back, and it never opens larger than the work area (#353)
+  - Mortal Wrath and Cleaving Moonlight get their names in both log languages (#400)
+
 v2.1
 ------
 Added

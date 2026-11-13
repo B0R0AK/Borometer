@@ -125,6 +125,13 @@ const f = (min) => ({ isMinimized: () => min, restore: () => spur.push("restore"
 k.vorholen(f(true)); eq(spur.splice(0), ["restore", "show", "focus"], "minimiert: wiederherstellen, zeigen, Fokus");
 k.vorholen(f(false)); eq(spur.splice(0), ["show", "focus"], "sonst: zeigen, Fokus");
 k.vorholen(null); eq(spur.length, 0, "kein Fenster: nichts");
+// #353: ein zweiter Klick auf "Abreissen" holt ein minimiertes Fenster zurueck (show() allein liess es in der Taskleiste)
+{
+  const von = win.indexOf("function openAbriss(");
+  const kopf = von < 0 ? "" : win.slice(von, win.indexOf("offen?.close();", von));
+  eq(/abriss\.teil === teil\) \{\s*(\/\/[^\n]*\n\s*)?vorholen\(offen\);/.test(kopf), true, "window.ts: openAbriss holt dasselbe Fenster mit vorholen (auch minimiert)");
+  eq(/offen\.show\(\)/.test(kopf), false, "window.ts: openAbriss ruft show() nicht mehr allein");
+}
 
 // --- streifenLage (#298): der Streifen waechst am unteren Rand nicht aus dem Bild
 const WA = { x: 0, y: 0, width: 1920, height: 1040 };
@@ -252,6 +259,17 @@ eq(/max: win\.isMaximized\(\)/.test(win), false, "window.ts: gemerkt wird nie ei
   eq(k.kompaktAnfrage({ do: "chrome", win: "kompakt" }), null, "Anfrage: was das Kompaktfenster nicht nimmt, nichts");
   // nur Art und Zeit: nichts, was ein Spieler oder eine Datei heissen koennte
   eq(puffer.liste().every((e) => /^[a-z:\-]+$/.test(e.art)), true, "Puffer: die Arten sind feste Woerter");
+}
+
+// --- die Hoehe der Systemknoepfe (#389): 36 pt Kopfleiste (CHROME_HEIGHT) bei 50 % Groesse sind 18
+{
+  const c = await lade("src/main/chrome.ts");
+  eq(c.CHROME_HEIGHT, 36, "Kopfleiste: 36 pt");
+  eq(c.overlayFor("dark", Math.round(c.CHROME_HEIGHT * 50 / 100)).height, 18, "Systemknoepfe bei 50 %: 18 hoch, nicht auf 20 gehoben");
+  eq(c.overlayFor("dark", Math.round(c.CHROME_HEIGHT * 150 / 100)).height, 54, "Systemknoepfe bei 150 %: 54 hoch");
+  eq(c.overlayFor("dark", 1).height, 18, "Untergrenze 18");
+  eq(c.overlayFor("dark", 9999).height, 96, "Obergrenze 96");
+  eq(c.overlayFor("dark").height, 36, "ohne Angabe: die Kopfleiste");
 }
 
 if (failed) { console.log(`\n${failed} FAILED`); process.exit(1); }

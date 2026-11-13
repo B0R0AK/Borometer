@@ -9,7 +9,7 @@ import { skillLabel } from "./14-questlog-weapons";
 import { LIEST_AB_TREFFER, markiereRest, numN, paintMech, pctMin, perSecond } from "./16-fight-analysis";
 import { $, clock, esc } from "./18-interface-basics";
 import { glaetten, rundeSchritte } from "./22-timeline-smoothing";
-import { urteilHtml } from "./26-analysis-tab";
+import { bestCasts, urteilHtml } from "./26-analysis-tab";
 import { uiZoomFactor } from "./37-window-size-and-overlay";
 import { logOrdnerKennt, oeffneDateien, waehleKampf } from "./23-kampfwahl";
 import { cmpKey, cmpLauf } from "./28-compare";
@@ -255,7 +255,8 @@ export function renderTafelUrteil(){
   const cur = mitBezug && !duenn ? cmpLauf(info.curId!) : null, ref = mitBezug && !duenn ? cmpLauf(info.refId!) : null;
   let html: string;
   if(!cur || !ref){
-    const u = urteilHtml(seg);
+    // derselbe Weg wie in der Analyse, mit dem besten Pull (ein Weg, eine Zahl; Entscheidung 11.11.2026)
+    const u = urteilHtml(seg, false, bestCasts(seg));
     html = '<div class="' + esc(u.klasse) + '">' + u.html + "</div>" + ohneLaufHtml(info);
   } else {
     const z = urteilZahlen(ref, cur, cmpKey);

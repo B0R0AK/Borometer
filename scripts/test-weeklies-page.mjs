@@ -101,9 +101,11 @@ const { I18N } = await import("data:text/javascript;base64," + Buffer.from(dictM
 
 const browser = await chromium.launch(process.env.PARITY_CHROMIUM ? { executablePath: process.env.PARITY_CHROMIUM } : {});
 
-/* Uhrzeiten in Berlin (Sommerzeit, UTC+2): Mi 23.09.2026 09:55 ist der Alltag. */
-const berlin = (tag, h, m = 0) => Date.UTC(2026, 8, tag, h - 2, m);
-const MI_0955 = berlin(23, 9, 55);
+/* Zeitpunkte im alten Gefuege der Tests (Tag und Stunde so gezaehlt, wie der Reset einst lag: Do 10:00 Berlin, Sommerzeit UTC+2),
+   um 26 Stunden verschoben auf den neuen Reset Mi 06:00 UTC (Issue 420). So behalten alle Abstaende zu den Resets ihren Sinn:
+   zeit(23, 9, 55) ist Di 22.09.2026 05:55 UTC, fuenf Minuten vor dem Tages-Reset und einen Tag vor dem Wochen-Reset. */
+const zeit = (tag, h, m = 0) => Date.UTC(2026, 8, tag - 1, h - 4, m);
+const MI_0955 = zeit(23, 9, 55);
 const LEER = { v: 1, profile: [] };
 const profil = (id, name, mehr = {}) => ({ id, name, zaehler: {}, aus: [], namen: {}, eigene: [], ...mehr });
 
@@ -279,7 +281,7 @@ try {
     const b = await blick(s.page);
     assert(b.lage === "nurApp" && /nur in der App/.test(b.satz) && !b.reiter.length && !b.neu,
       "Datei-Modus: der Satz, dass Weeklies nur in der App gespeichert werden; kein Reiter, kein \u201e+ Charakter\u201c", b);
-    assert(/^T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 5\u00a0Min$/.test(b.tag) && !(await s.page.evaluate(() => !!document.querySelector("#wkWoche"))), "Datei-Modus: der t\u00e4gliche Reset steht trotzdem im Kopf, der Wochen-Reset nicht (125.1)", b.tag);
+    assert(/^T\u00e4glicher Reset 06:00\u00a0UTC \u00b7 in 5\u00a0Min$/.test(b.tag) && !(await s.page.evaluate(() => !!document.querySelector("#wkWoche"))), "Datei-Modus: der t\u00e4gliche Reset steht trotzdem im Kopf, der Wochen-Reset nicht (125.1)", b.tag);
     assert(!s.fehler.length, "Datei-Modus: keine Fehler", s.fehler);
     await s.page.close();
   }
@@ -287,8 +289,8 @@ try {
      ein Satz, keine Liste, kein Schreiben; spaeter wird noch einmal gelesen, und der gespeicherte Stand
      uebersteht den ersten Haken danach (K7) */
   for (const [wie, status] of [["503", 503], ["Netzfehler", "abbruch"], ["ohne data", "ohneDaten"]]) {
-    const vorher = { v: 1, profile: [profil("wlesen0001", "Gelesen", { zaehler: { illusionen: { stand: 2, seit: berlin(22, 20) },
-      zitadelleNormal: { stand: 1, seit: berlin(22, 20) } }, eigene: [{ schluessel: "eigenalt01", name: "Alt", menge: 3, takt: "woche" }] })] };
+    const vorher = { v: 1, profile: [profil("wlesen0001", "Gelesen", { zaehler: { illusionen: { stand: 2, seit: zeit(22, 20) },
+      zitadelleNormal: { stand: 1, seit: zeit(22, 20) } }, eigene: [{ schluessel: "eigenalt01", name: "Alt", menge: 3, takt: "woche" }] })] };
     const gl = neuesLager(vorher); gl.getStatus = status;
     const s = await oeffne({ lager: gl });
     await s.page.waitForFunction(() => ["gesperrt", "nurApp", "da"].includes(document.querySelector("#wkBody")?.dataset.lage));
@@ -693,7 +695,7 @@ try {
      Pfeiltasten im Raster, der Fuellring n/Menge, die Ringe an den Reitern und das Wochenband mit dem Jetzt-Strich
      (gestellte Uhr Mi 23.09. 09:55, dann im Minutentakt ueber den Tages-Reset) */
   {
-    const seit = berlin(22, 20);
+    const seit = zeit(22, 20);
     const wl = neuesLager({ v: 1, profile: [
       profil("wband00001", "Band", { zaehler: { zitadelleNormal: { stand: 1, seit }, umwandlungsstein: { stand: 60, seit }, illusionen: { stand: 3, seit },
         unendlichkeit: { stand: 1, seit }, freischaltFragment: { stand: 40, seit }, regionszertifikat: { stand: 1, seit } },
@@ -713,18 +715,18 @@ try {
     });
     let bd = await band();
     const W = 7 * 1440;
-    assert(Math.abs(bd.x - bd.w * (6 * 1440 - 5) / W) <= 1, "Wochenband Mi 09:55: der Jetzt-Strich steht bei 6 Tagen weniger 5 Minuten von 7 Tagen", { x: bd.x, soll: bd.w * (6 * 1440 - 5) / W });
-    assert(bd.tage.map((t) => t.t).join() === "Do ab 10:00,Fr,Sa,So,Mo,Di,Mi" && bd.tage.findIndex((t) => t.heute) === 5 && bd.tage.filter((t) => t.vorbei).length === 5
+    assert(Math.abs(bd.x - bd.w * (6 * 1440 - 5) / W) <= 1, "Wochenband Di 05:55 UTC: der Jetzt-Strich steht bei 6 Tagen weniger 5 Minuten von 7 Tagen", { x: bd.x, soll: bd.w * (6 * 1440 - 5) / W });
+    assert(bd.tage.map((t) => t.t).join() === "Mi ab 06:00\u00a0UTC,Do,Fr,Sa,So,Mo,Di" && bd.tage.findIndex((t) => t.heute) === 5 && bd.tage.filter((t) => t.vorbei).length === 5
       && bd.tage.every((t, i) => Math.abs(t.l - bd.w * i / 7) <= 1) && bd.x >= bd.tage[5].l && bd.x <= bd.tage[5].r,
-      "Wochenband: sieben Tage Do bis Mi, der erste \u201eDo ab 10:00\u201c (125.4), heute ist noch der Dienstag-Abschnitt (vor dem Tages-Reset), der Strich steht darin", bd.tage);
-    assert(bd.text === "jetzt Mi 09:55" && bd.name === "Die Woche vom Do 17.09. 10:00 bis Do 24.09. 10:00",
-      "Wochenband: „jetzt Mi 09:55“ (der Reset steht unter dem Band), fuer den Vorleser die Woche mit Datum (Pruefung N4)", { t: bd.text, n: bd.name });
+      "Wochenband: sieben Tage Mi bis Di, der erste \u201eMi ab 06:00\u00a0UTC\u201c (125.4), heute ist noch der Montag-Abschnitt (vor dem Tages-Reset), der Strich steht darin", bd.tage);
+    assert(bd.text === "jetzt Di 05:55\u00a0UTC" && bd.name === "Die Woche vom Mi 16.09. 06:00\u00a0UTC bis Mi 23.09. 06:00\u00a0UTC",
+      "Wochenband: „jetzt Di 05:55 UTC“ (der Reset steht unter dem Band), fuer den Vorleser die Woche mit Datum (Pruefung N4)", { t: bd.text, n: bd.name });
     assert(Math.abs(bd.breit - bd.waben) <= 1 && bd.gold === bd.zahl, "Wochenband ueber die volle Breite, der Strich in Gold wie die Fortschrittszahl", bd);
     await vorspulen(s, 6 * 60000);
-    await bis(async () => (await band()).text.includes("10:01"));
+    await bis(async () => (await band()).text.includes("06:01"));
     bd = await band();
-    assert(Math.abs(bd.x - bd.w * (6 * 1440 + 1) / W) <= 1 && bd.tage.findIndex((t) => t.heute) === 6 && bd.text === "jetzt Mi 10:01",
-      "im Minutentakt ueber den Tages-Reset: der Strich wandert, heute ist der Mittwoch-Abschnitt", { x: bd.x, soll: bd.w * (6 * 1440 + 1) / W, t: bd.text, h: bd.tage.map((t) => t.heute) });
+    assert(Math.abs(bd.x - bd.w * (6 * 1440 + 1) / W) <= 1 && bd.tage.findIndex((t) => t.heute) === 6 && bd.text === "jetzt Di 06:01\u00a0UTC",
+      "im Minutentakt ueber den Tages-Reset: der Strich wandert, heute ist der Dienstag-Abschnitt", { x: bd.x, soll: bd.w * (6 * 1440 + 1) / W, t: bd.text, h: bd.tage.map((t) => t.heute) });
     // --- das Raster
     const raster = () => p.evaluate((bilder) => {
       const t = document.querySelector('#wkPanel [data-wk-g="raid"] table.wkraster');
@@ -852,43 +854,43 @@ try {
     await p.click('#wkReiter [data-wk-reiter="wband00001"]');
     assert(!wl.abgelehnt.length && !s.fehler.length, "Wochenband und Raster: jeder gesendete Stand gilt, keine Fehler", { a: wl.abgelehnt, f: s.fehler });
     await p.close();
-    // die Woche der Zeitumstellung (So 25.10.2026, 3:00 -> 2:00): 169 Stunden, der Sonntag-Abschnitt beginnt bei 73 Stunden
-    const t = await oeffne({ lager: neuesLager({ v: 1, profile: [profil("wband00003", "Umstellung")] }), uhr: Date.UTC(2026, 9, 25, 11, 0, 30) }); // 12:00:30, nicht 12:00:00: springt die Wanduhr der Runner um Sekunden zurueck, bliebe der Satz bei "12:00"
+    // die Woche der Zeitumstellung (So 25.10.2026, 3:00 -> 2:00 in Berlin): seit Issue 420 verschiebt sie nichts, die Woche hat 168 Stunden, der Sonntag-Abschnitt beginnt bei 96 Stunden
+    const t = await oeffne({ lager: neuesLager({ v: 1, profile: [profil("wband00003", "Umstellung")] }), uhr: Date.UTC(2026, 9, 25, 12, 0, 30) }); // 12:00:30, nicht 12:00:00: springt die Wanduhr der Runner um Sekunden zurueck, bliebe der Satz bei "12:00"
     const tq = t.page;
     const z = await tq.evaluate(() => { const b = document.querySelector("#wkBand"), bahn = b.querySelector(".wkbahn").getBoundingClientRect(), j = b.querySelector(".wkjetzt").getBoundingClientRect();
       const so = [...b.querySelectorAll(".wkbtag")].find((x) => x.classList.contains("heute"));
       return { w: bahn.width, x: j.left + j.width / 2 - bahn.left, heute: so?.textContent, l: so.getBoundingClientRect().left - bahn.left, r: so.getBoundingClientRect().right - bahn.left,
         text: b.querySelector(".wkbandjetzt").textContent }; });
-    assert(Math.abs(z.x - z.w * 75 / 169) <= 1 && z.heute === "So" && Math.abs(z.l - z.w * 73 / 169) <= 1 && Math.abs(z.r - z.w * 97 / 169) <= 1 && z.text.startsWith("jetzt So 12:00"),
-      "Zeitumstellung: der Strich bei 75 von 169 Stunden, der Sonntag-Abschnitt an seinen echten Resets (73 bis 97 Stunden)", { ...z, soll: z.w * 75 / 169 });
+    assert(Math.abs(z.x - z.w * 102 / 168) <= 1 && z.heute === "So" && Math.abs(z.l - z.w * 96 / 168) <= 1 && Math.abs(z.r - z.w * 120 / 168) <= 1 && z.text.startsWith("jetzt So 12:00"),
+      "Zeitumstellung: der Strich bei 102 von 168 Stunden, der Sonntag-Abschnitt an seinen Resets (96 bis 120 Stunden), kein Versatz", { ...z, soll: z.w * 102 / 168 });
     assert(!t.fehler.length, "Zeitumstellung: keine Fehler", t.fehler);
     await tq.close();
   }
 
-  // ===== Reset ueber die gestellte Uhr: Do 10:00 leert die Wochenpunkte, die Vorwoche bleibt im Stand
+  // ===== Reset ueber die gestellte Uhr: Mi 06:00 UTC leert die Wochenpunkte, die Vorwoche bleibt im Stand
   {
-    const seitWoche = berlin(20, 12);            // So 20.09. 12:00, in der Woche ab Do 17.09. 10:00
-    const seitTag = berlin(24, 8);               // Do 24.09. 08:00, nach dem Tages-Reset vom Mi
+    const seitWoche = zeit(20, 12);            // Sa 19.09. 08:00 UTC, in der Woche ab Mi 16.09. 06:00 UTC
+    const seitTag = zeit(24, 8);               // Mi 23.09. 04:00 UTC, nach dem Tages-Reset vom Di
     const rl = neuesLager({ v: 1, profile: [profil("wreset0001", "Uhr", { zaehler: {
       zitadelleNormal: { stand: 1, seit: seitWoche }, illusionen: { stand: 2, seit: seitWoche }, phantomstein: { stand: 1, seit: seitTag } } })] });
-    const s = await oeffne({ lager: rl, uhr: berlin(24, 9, 59) });
+    const s = await oeffne({ lager: rl, uhr: zeit(24, 9, 59) });
     const p = s.page;
     let b = await blick(p);
     assert(punkt(b, "zitadelleNormal").haken && punkt(b, "illusionen").stand === 2 && punkt(b, "phantomstein").haken,
-      "Do 09:59: der Stand der Woche steht", b.punkte.filter((x) => x.haken || x.stand));
+      "Mi 05:59 UTC: der Stand der Woche steht", b.punkte.filter((x) => x.haken || x.stand));
     await vorspulen(s, 120000);
     await bis(async () => !punkt(await blick(p), "zitadelleNormal").haken);
     b = await blick(p);
     assert(!punkt(b, "zitadelleNormal").haken && punkt(b, "illusionen").stand === 0 && !punkt(b, "phantomstein").haken && b.reiter[0].fort === `0/${NW}`,
-      "Do 10:01 (ohne Neuladen, im Minutentakt): alle Wochen- und Tagespunkte 0", b.punkte.filter((x) => x.haken || x.stand));
+      "Mi 06:01 UTC (ohne Neuladen, im Minutentakt): alle Wochen- und Tagespunkte 0", b.punkte.filter((x) => x.haken || x.stand));
     assert(!rl.posts.length, "der Reset allein schreibt nichts");
     const n = nPosts(s);
     await p.click('input[data-wk-haken="korridorNormal"]');
     await nachPost(s, n);
     const sent = rl.posts.at(-1).profile[0];
-    const r0 = kern.letzterReset(berlin(24, 9, 59), "woche");
+    const r0 = kern.letzterReset(zeit(24, 9, 59), "woche");
     assert(sent.vorwoche && sent.vorwoche.reset === r0 && sent.vorwoche.zaehler.zitadelleNormal?.stand === 1 && sent.vorwoche.zaehler.illusionen?.stand === 2
-      && !("phantomstein" in sent.vorwoche.zaehler), "Vorwoche im gesendeten Stand: Zitadelle 1 und Illusionen 2 der Woche ab Do 17.09., ohne Tagespunkt",
+      && !("phantomstein" in sent.vorwoche.zaehler), "Vorwoche im gesendeten Stand: Zitadelle 1 und Illusionen 2 der Woche ab Mi 16.09., ohne Tagespunkt",
       /* #224: ohne Vorwoche stand hier nur "undefined"; jetzt die beiden Uhren und die Posts dazu */
       { vorwoche: sent.vorwoche, posts: rl.posts.length, seite: await p.evaluate(() => Date.now()), knoten: Math.round(seitenUhr(s)), reset: r0,
         seit: Object.fromEntries(Object.entries(sent.zaehler).map(([k, z]) => [k, z.seit])) });
@@ -896,17 +898,17 @@ try {
       "die alten Zaehler bleiben im Stand, der neue kommt dazu", sent.zaehler);
     assert(!rl.abgelehnt.length && !s.fehler.length, "Reset: der gesendete Stand gilt, keine Fehler", { a: rl.abgelehnt, f: s.fehler });
     await p.close();
-    // Tages-Reset: Fr 10:00 leert nur die Tagespunkte
+    // Tages-Reset: Do 06:00 UTC leert nur die Tagespunkte
     const tl = neuesLager({ v: 1, profile: [profil("wreset0002", "Tag", { zaehler: {
-      zitadelleNormal: { stand: 1, seit: berlin(24, 12) }, phantomstein: { stand: 1, seit: berlin(24, 12) }, vertragNyx: { stand: 1, seit: berlin(24, 12) } } })] });
-    const t = await oeffne({ lager: tl, uhr: berlin(25, 9, 59) });
+      zitadelleNormal: { stand: 1, seit: zeit(24, 12) }, phantomstein: { stand: 1, seit: zeit(24, 12) }, vertragNyx: { stand: 1, seit: zeit(24, 12) } } })] });
+    const t = await oeffne({ lager: tl, uhr: zeit(25, 9, 59) });
     b = await blick(t.page);
-    assert(punkt(b, "phantomstein").haken && punkt(b, "vertragNyx").haken && punkt(b, "zitadelleNormal").haken, "Fr 09:59: Tages- und Wochenpunkt gesetzt");
+    assert(punkt(b, "phantomstein").haken && punkt(b, "vertragNyx").haken && punkt(b, "zitadelleNormal").haken, "Do 05:59 UTC: Tages- und Wochenpunkt gesetzt");
     await vorspulen(t, 120000);
     await bis(async () => !punkt(await blick(t.page), "phantomstein").haken);
     b = await blick(t.page);
     assert(!punkt(b, "phantomstein").haken && !punkt(b, "vertragNyx").haken && punkt(b, "zitadelleNormal").haken && b.reiter[0].fort === `1/${NW}`,
-      "Fr 10:01: die Tagespunkte 0, der Wochenpunkt bleibt", b.punkte.filter((x) => x.haken));
+      "Do 06:01 UTC: die Tagespunkte 0, der Wochenpunkt bleibt", b.punkte.filter((x) => x.haken));
     await t.page.close();
   }
 
@@ -915,8 +917,8 @@ try {
      fuenf goldenen Truhen (Klick, Tastatur, Ansage), der Monats- und der Montags-Reset ueber die gestellte Uhr, die
      Spalten der Haendler bei 2000, 1280 und 560 und die Symbole der Haendler-Punkte */
   {
-    const seit = berlin(22, 20);
-    const HZ = { truhePvp: { stand: 3, seit }, phantomstein: { stand: 1, seit: berlin(23, 9) }, umwandlungsstein: { stand: 100, seit }, chaosprisma: { stand: 1, seit },
+    const seit = zeit(22, 20);
+    const HZ = { truhePvp: { stand: 3, seit }, phantomstein: { stand: 1, seit: zeit(23, 9) }, umwandlungsstein: { stand: 100, seit }, chaosprisma: { stand: 1, seit },
       vererbungsstein: { stand: 1, seit }, dimensionDungeons: { stand: 3, seit }, wachstumsbuch: { stand: 5, seit } };
     /* die Dungeons: Menge aus dem Kern, die Punkte so, dass alle zusammen 42.000 ergeben (Spezifikation 10) */
     const DM = kern.GRUNDLISTE.find((g) => g.schluessel === "dimensionDungeons").menge, DP = 42000 / DM;
@@ -1064,21 +1066,21 @@ try {
     assert(!hl.abgelehnt.length && !s.fehler.length, "Spezifikation 10: jeder gesendete Stand gilt, keine Fehler", { a: hl.abgelehnt, f: s.fehler });
     await p.close();
 
-    // --- Monats- und Montags-Reset ueber die gestellte Uhr: Do 24.09. (Wochen-Reset), Mo 28.09. (Montag), Do 01.10. (Monat)
-    const ml = neuesLager({ v: 1, profile: [profil("wmonat0001", "Monat", { zaehler: { vererbungsstein: { stand: 2, seit: berlin(5, 12) },
-      unendlichkeit: { stand: 1, seit: berlin(21, 12) }, unendlichkeitMontag: { stand: 1, seit: berlin(21, 12) }, truhePvp: { stand: 2, seit: berlin(21, 12) } } })] });
-    const u = await oeffne({ lager: ml, uhr: berlin(24, 9, 59) });
+    // --- Monats- und Montags-Reset ueber die gestellte Uhr (alle 06:00 UTC): Mi 23.09. (Wochen-Reset), Mo 28.09. (Montag), Do 01.10. (Monat)
+    const ml = neuesLager({ v: 1, profile: [profil("wmonat0001", "Monat", { zaehler: { vererbungsstein: { stand: 2, seit: zeit(5, 12) },
+      unendlichkeit: { stand: 1, seit: zeit(21, 12) }, unendlichkeitMontag: { stand: 1, seit: Date.UTC(2026, 8, 21, 12) }, truhePvp: { stand: 2, seit: zeit(21, 12) } } })] });
+    const u = await oeffne({ lager: ml, uhr: zeit(24, 9, 59) });
     const q = u.page;
     const st = async () => { const b = await blick(q); return { verb: punkt(b, "vererbungsstein").stand, unend: punkt(b, "unendlichkeit").haken, mo: punkt(b, "unendlichkeitMontag").haken,
       pvp: punkt(b, "truhePvp").stand, monName: punkt(b, "unendlichkeitMontag").name, doName: punkt(b, "unendlichkeit").name }; };
     const bisZu = async (ziel) => { const jetzt = await q.evaluate(() => Date.now()); await vorspulen(u, ziel - jetzt); };
     let x = await st();
-    assert(x.verb === 2 && x.unend && x.mo && x.pvp === 2 && x.monName === "Portal der Unendlichkeit (Mo–Mo)" && x.doName === "Portal der Unendlichkeit (Do–Do)",
-      "Do 24.09. 09:59: Vererbungsstein 2/2, beide Portale (Do–Do und Mo–Mo) und die PvP-Truhe 2 stehen", x);
+    assert(x.verb === 2 && x.unend && x.mo && x.pvp === 2 && x.monName === "Portal der Unendlichkeit (Mo–Mo)" && x.doName === "Portal der Unendlichkeit (Mi–Mi)",
+      "Mi 23.09. 05:59 UTC: Vererbungsstein 2/2, beide Portale (Mi–Mi und Mo–Mo) und die PvP-Truhe 2 stehen", x);
     await vorspulen(u, 120000);
     await bis(async () => !(await st()).unend);
     x = await st();
-    assert(x.verb === 2 && !x.unend && x.mo && x.pvp === 0, "Do 10:01 (Wochen-Reset): Wochenpunkte 0, der Vererbungsstein (monatlich) und das Portal Mo–Mo bleiben", x);
+    assert(x.verb === 2 && !x.unend && x.mo && x.pvp === 0, "Mi 06:01 UTC (Wochen-Reset): Wochenpunkte 0, der Vererbungsstein (monatlich) und das Portal Mo–Mo bleiben", x);
     assert(!ml.posts.length, "Wochen-Reset mit Monats- und Montagspunkt: der Reset allein schreibt nichts", ml.posts.length);
     n = nPosts(u);
     await q.click('input[data-wk-haken="korridorNormal"]');
@@ -1087,24 +1089,24 @@ try {
     assert(sent.vorwoche && sent.vorwoche.zaehler.unendlichkeit?.stand === 1 && sent.vorwoche.zaehler.truhePvp?.stand === 2 && !("vererbungsstein" in sent.vorwoche.zaehler)
       && !("unendlichkeitMontag" in sent.vorwoche.zaehler) && sent.zaehler.vererbungsstein?.stand === 2 && sent.zaehler.unendlichkeitMontag?.stand === 1,
       "Vorwoche: nur die Wochenpunkte, kein Monats- und kein Montagspunkt; beide bleiben im Stand", sent);
-    await bisZu(Date.UTC(2026, 8, 28, 7, 59));
+    await bisZu(Date.UTC(2026, 8, 28, 5, 59));
     await bis(async () => (await blick(q)).tag.includes("1 Min"));
     x = await st();
-    assert(x.verb === 2 && x.mo, "Mo 28.09. 09:59: das Portal Mo–Mo und der Vererbungsstein stehen noch", x);
+    assert(x.verb === 2 && x.mo, "Mo 28.09. 05:59 UTC: das Portal Mo–Mo und der Vererbungsstein stehen noch", x);
     await vorspulen(u, 120000);
     await bis(async () => !(await st()).mo);
     x = await st();
-    assert(!x.mo && x.verb === 2, "Mo 10:01 (Montags-Reset): das Portal Mo–Mo ist 0, der Vererbungsstein bleibt",
+    assert(!x.mo && x.verb === 2, "Mo 06:01 UTC (Montags-Reset): das Portal Mo–Mo ist 0, der Vererbungsstein bleibt",
       /* #224: die Uhr der Seite und die des Tests, dazu was die Seite als Rest anzeigt */
       { x, seite: await q.evaluate(() => Date.now()), knoten: Math.round(seitenUhr(u)), tag: (await blick(q)).tag });
-    await bisZu(Date.UTC(2026, 9, 1, 7, 59));
+    await bisZu(Date.UTC(2026, 9, 1, 5, 59));
     await bis(async () => (await blick(q)).tag.includes("1 Min"));
     x = await st();
-    assert(x.verb === 2, "Do 01.10. 09:59: der Vererbungsstein steht ueber zwei Wochen-Resets", x);
+    assert(x.verb === 2, "Do 01.10. 05:59 UTC: der Vererbungsstein steht ueber zwei Wochen-Resets", x);
     await vorspulen(u, 120000);
     await bis(async () => (await st()).verb === 0);
     x = await st();
-    assert(x.verb === 0, "Do 01.10. 10:01 (1. des Monats, 10:00 Berlin): der Vererbungsstein ist 0", x);
+    assert(x.verb === 0, "Do 01.10. 06:01 UTC (1. des Monats, 06:00 UTC): der Vererbungsstein ist 0", x);
     assert(!ml.abgelehnt.length && !u.fehler.length, "Monats- und Montags-Reset: jeder gesendete Stand gilt, keine Fehler", { a: ml.abgelehnt, f: u.fehler });
     await q.close();
 
@@ -1161,17 +1163,17 @@ try {
     const s = await oeffne({ lager, fest: true });
     let b = await blick(s.page);
     // folgt Weeklies neu (125.1): der Wochen-Reset steht nur im Band, der Kopf nennt den taeglichen
-    assert(b.woche === "Wochen-Reset Do ab 10:00 (deutsche Zeit) \u00b7 in 1\u00a0T 0\u00a0Std" && b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 5\u00a0Min",
-      "Reset-Anzeige Mi 09:55: Wochen-Reset im Band (Do ab 10:00) in 1 T 0 Std, der Kopf nennt den taeglichen in 5 Min", { w: b.woche, t: b.tag });
+    assert(b.woche === "Wochen-Reset Mi ab 06:00\u00a0UTC \u00b7 in 1\u00a0T 0\u00a0Std" && b.tag === "T\u00e4glicher Reset 06:00\u00a0UTC \u00b7 in 5\u00a0Min",
+      "Reset-Anzeige Di 05:55 UTC: Wochen-Reset im Band (Mi ab 06:00) in 1 T 0 Std, der Kopf nennt den taeglichen in 5 Min", { w: b.woche, t: b.tag });
     await vorspulen(s, 60000);
     await bis(async () => (await blick(s.page)).tag.endsWith("4\u00a0Min"));
     b = await blick(s.page);
-    assert(b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 4\u00a0Min", "eine Minute spaeter: in 4 Min (Minutentakt)", b.tag);
-    // auf 10:01:30: der Tages-Reset liegt hinter uns, beide kommen Do 10:00 (aufgerundet 23 Std 59 Min)
+    assert(b.tag === "T\u00e4glicher Reset 06:00\u00a0UTC \u00b7 in 4\u00a0Min", "eine Minute spaeter: in 4 Min (Minutentakt)", b.tag);
+    // auf 06:01:30: der Tages-Reset liegt hinter uns, beide kommen Mi 06:00 (aufgerundet 23 Std 59 Min)
     await vorspulen(s, 5 * 60000 + 30000);
     await bis(async () => (await blick(s.page)).tag.includes("Std"));
     b = await blick(s.page);
-    assert(b.woche === "Wochen-Reset Do ab 10:00 (deutsche Zeit) \u00b7 in 23\u00a0Std 59\u00a0Min" && b.tag === "T\u00e4glicher Reset 10:00 deutsche Zeit \u00b7 in 23\u00a0Std 59\u00a0Min",
+    assert(b.woche === "Wochen-Reset Mi ab 06:00\u00a0UTC \u00b7 in 23\u00a0Std 59\u00a0Min" && b.tag === "T\u00e4glicher Reset 06:00\u00a0UTC \u00b7 in 23\u00a0Std 59\u00a0Min",
       "nach dem Tages-Reset: beide in Stunden und Minuten", { w: b.woche, t: b.tag });
     // der Takt laeuft nur, solange der Bereich offen ist
     const vorher = await s.page.evaluate(() => document.querySelector("#wkTag").textContent);
@@ -1187,8 +1189,8 @@ try {
     b = await blick(e.page);
     const en =await e.page.evaluate(() => ({ neu: document.querySelector("#wkNeu")?.textContent || document.querySelector("#wkVoll")?.textContent,
       werk: [...document.querySelectorAll(".wkwerk button:not([data-wk-allezu])")].map((x) => x.textContent), titel: document.querySelector("#weekliesTitel")?.textContent }));
-    assert(b.woche === "Weekly reset Thu from 10:00 (German time) \u00b7 in 1\u00a0d 0\u00a0h" && b.tag === "Daily reset 10:00 German time \u00b7 in 5\u00a0min",
-      "English: weekly reset Thu from 10:00 in the band, daily reset in the header", { w: b.woche, t: b.tag });
+    assert(b.woche === "Weekly reset Wed from 06:00\u00a0UTC \u00b7 in 1\u00a0d 0\u00a0h" && b.tag === "Daily reset 06:00\u00a0UTC \u00b7 in 5\u00a0min",
+      "English: weekly reset Wed from 06:00 UTC in the band, daily reset in the header", { w: b.woche, t: b.tag });
     assert(b.gruppen[0].name === "Raid \u2013 Altar of Calanthia" && punkt(b, "zitadelleNormal").name === "The Forgotten Citadel \u2013 Normal"
       && punkt(b, "phantomstein").tag === "daily" && punkt(b, "vertragNyx").name === "Allied Resistance Forces Contract Scroll: Nix",
       "English: groups, points and \u201edaily\u201c", { g: b.gruppen[0].name, p: punkt(b, "zitadelleNormal").name });
@@ -1235,11 +1237,11 @@ try {
     await p.close();
   }
   {
-    const al = neuesLager({ v: 1, profile: [profil("wfenster01", "Fenster A", { zaehler: { illusionen: { stand: 1, seit: berlin(22, 20) } } })] });
+    const al = neuesLager({ v: 1, profile: [profil("wfenster01", "Fenster A", { zaehler: { illusionen: { stand: 1, seit: zeit(22, 20) } } })] });
     const s = await oeffne({ lager: al });
     const p = s.page;
     // ein anderes Fenster legt einen Charakter an und zaehlt weiter
-    al.data = { v: 1, profile: [{ ...al.data.profile[0], zaehler: { illusionen: { stand: 2, seit: berlin(23, 9) } } }, profil("wfenster02", "Fenster B")] };
+    al.data = { v: 1, profile: [{ ...al.data.profile[0], zaehler: { illusionen: { stand: 2, seit: zeit(23, 9) } } }, profil("wfenster02", "Fenster B")] };
     const n = nPosts(s);
     await p.click('input[data-wk-haken="zitadelleNormal"]');
     await nachPost(s, n);
@@ -1418,9 +1420,9 @@ try {
     const WOCHE_KEYS = kern.GRUNDLISTE.filter((g) => g.takt !== "tag");
     const wocheVoll = (seitMs) => Object.fromEntries(WOCHE_KEYS.map((g) => [g.schluessel, { stand: g.menge, seit: seitMs }]));
     const tagVoll = (seitMs) => Object.fromEntries(kern.GRUNDLISTE.filter((g) => g.takt === "tag").map((g) => [g.schluessel, { stand: g.menge, seit: seitMs }]));
-    // Mo 21.09. 12:00: die Woche ab Do 17.09. ist voll, die Tagespunkte sind am Mi 23.09. 09:55 schon zurueckgesetzt
-    const fertigP = profil("wneufert01", "Fertig", { zaehler: { ...wocheVoll(berlin(21, 12)), ...tagVoll(berlin(21, 12)) } });
-    const teilP = profil("wneuteil01", "Teil", { zaehler: { dimensionDungeons: { stand: 3, seit: berlin(22, 20) }, goldeneKiste: { stand: 2, seit: berlin(22, 20) } } });
+    // Mo 21.09. 06:00 UTC (der Montags-Reset): die Woche ab Mi 16.09. ist voll, die Tagespunkte vom So sind am Di 22.09. 05:55 UTC schon zurueckgesetzt
+    const fertigP = profil("wneufert01", "Fertig", { zaehler: { ...wocheVoll(Date.UTC(2026, 8, 21, 6)), ...tagVoll(Date.UTC(2026, 8, 20, 12)) } });
+    const teilP = profil("wneuteil01", "Teil", { zaehler: { dimensionDungeons: { stand: 3, seit: zeit(22, 20) }, goldeneKiste: { stand: 2, seit: zeit(22, 20) } } });
     const nl = neuesLager({ v: 1, profile: [fertigP, teilP] });
     const s = await oeffne({ lager: nl });
     const p = s.page;
@@ -1476,12 +1478,12 @@ try {
       await t.page.close();
     }
   }
-  // Letzte Woche (123): Mi 22:00 Haken, Do 10:05 - die Zeile steht da, nach dem ersten Haken ist sie weg
+  // Letzte Woche (123): Di 22:00 Haken, Mi 06:05 UTC - die Zeile steht da, nach dem ersten Haken ist sie weg
   {
-    const lw = neuesLager({ v: 1, profile: [profil("wletzt0001", "Alt", { zaehler: { zitadelleNormal: { stand: 1, seit: berlin(23, 12) }, illusionen: { stand: 2, seit: berlin(23, 12) } } }),
+    const lw = neuesLager({ v: 1, profile: [profil("wletzt0001", "Alt", { zaehler: { zitadelleNormal: { stand: 1, seit: zeit(23, 12) }, illusionen: { stand: 2, seit: zeit(23, 12) } } }),
       profil("wletzt0002", "Neu", {})] });
     const lwOrig = structuredClone(lw.data);
-    const s = await oeffne({ lager: lw, uhr: berlin(24, 10, 5) });
+    const s = await oeffne({ lager: lw, uhr: zeit(24, 10, 5) });
     const p = s.page;
     const zeile = () => p.evaluate(() => document.querySelector("#wkLetzte")?.textContent || "");
     const z0 = await zeile();
@@ -1491,7 +1493,7 @@ try {
     await nachPost(s, n);
     assert((await zeile()) === "", "Letzte Woche: nach dem ersten Haken der neuen Woche ist die Zeile weg");
     await p.close();
-    const e = await oeffne({ lager: neuesLager(lwOrig), uhr: berlin(24, 10, 5), lang: "en" });
+    const e = await oeffne({ lager: neuesLager(lwOrig), uhr: zeit(24, 10, 5), lang: "en" });
     assert(/^Last week: Alt 1\/\d+$/.test(await e.page.evaluate(() => document.querySelector("#wkLetzte")?.textContent || "")), "English: Last week: Alt 1/…");
     await e.page.close();
   }
@@ -1534,7 +1536,7 @@ try {
   // 560 px: keine waagerechte Rolleiste, Karten in zwei Spalten; die Karte hat in allen Themen mindestens 4,5:1 (124.3)
   {
     const voll6 = { v: 1, profile: ["Eins", "Zwei", "Drei", "Vier", "Fuenf", "Sechs"].map((nm, i) => profil("wbreit000" + i, nm,
-      { zaehler: { dimensionDungeons: { stand: 3, seit: berlin(22, 20) }, umwandlungsstein: { stand: 40, seit: berlin(22, 20) }, zitadelleNormal: { stand: 1, seit: berlin(22, 20) } } })) };
+      { zaehler: { dimensionDungeons: { stand: 3, seit: zeit(22, 20) }, umwandlungsstein: { stand: 40, seit: zeit(22, 20) }, zitadelleNormal: { stand: 1, seit: zeit(22, 20) } } })) };
     for (const thema of ["dark", "light", "tnl", "glas"]) {
       for (const lang of ["de", "en"]) {
         const s = await oeffne({ lager: neuesLager(voll6), breite: 560, hoehe: 900, thema, lang });
@@ -1569,9 +1571,9 @@ try {
     const sich = () => (existsSync(SDIR) ? readdirSync(SDIR).sort() : []);
     rmSync(SDIR, { recursive: true, force: true });
     const daten = () => ({ v: 1, profile: [
-      profil("wloesch001", "Test Eins", { zaehler: { eigen1: { stand: 1, seit: berlin(22, 20) } }, namen: {},
+      profil("wloesch001", "Test Eins", { zaehler: { eigen1: { stand: 1, seit: zeit(22, 20) } }, namen: {},
         eigene: [{ schluessel: "eigen1", name: "Gildenkiste", menge: 2, takt: "tag", geloest: true }, { schluessel: "eigen2", name: "Andere", menge: 1, takt: "woche" }] }),
-      profil("wloesch002", "Test Zwei", { geloest: true, zaehler: { zitadelleNormal: { stand: 1, seit: berlin(22, 20) } } })] });
+      profil("wloesch002", "Test Zwei", { geloest: true, zaehler: { zitadelleNormal: { stand: 1, seit: zeit(22, 20) } } })] });
     const gl = neuesLager(daten());
     const s = await oeffne({ lager: gl });
     const p = s.page;

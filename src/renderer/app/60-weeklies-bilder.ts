@@ -1,4 +1,4 @@
-import { WK_BOSS_BILD as BOSS, WK_GEGENSTAND_BILD as GEGENSTAND } from "../spielbilder";
+import { WK_BOSS_BILD as BOSS, WK_GEGENSTAND_BILD as GEGENSTAND, WK_TURM_BILD as TURM } from "../spielbilder";
 /* ---------- Weeklies: die Bilder (Neugestaltung "Wochenband", Spezifikation Weeklies 9, 01.10.2026) ----------
    Eingebettet, die Seite laedt nichts nach. Kein Teil hier fragt etwas ab;
    59-weeklies.ts legt die Bilder einmal als Stilblatt an (wkBilderCss) und
@@ -49,7 +49,7 @@ const GLEICH: Record<string, string> = {
   widerstandHeroischFreischalt: "heroischFreischalt", widerstandFreischaltFragment: "freischaltFragment", raidChaosprisma: "chaosprisma",
 };
 
-// das Portal der Unendlichkeit hat zwei Rotationen (Do-Do und Mo-Mo, Spezifikation 10), eine Marke
+// das Portal der Unendlichkeit hat zwei Rotationen (Mi-Mi und Mo-Mo, Spezifikation 10), eine Marke
 WK_MARKE.unendlichkeitMontag = WK_MARKE.unendlichkeit!;
 
 /** Traegt der Schluessel (Fluegel oder Punkt) ein Bild? Ein Alias nur, wenn sein Ziel eines traegt. */
@@ -60,4 +60,10 @@ export const wkHatBild = (k: string): boolean => Object.hasOwn(BOSS, k) || Objec
 export function wkBilderCss(): string {
   return Object.entries({...BOSS, ...GEGENSTAND}).map(([k, d]) => [k, ...Object.keys(GLEICH).filter(g => GLEICH[g] === k)].map(x => ".wkb-" + x).join(",") +
     "{background-image:url(data:image/webp;base64," + d + ")}").join("\n");
+}
+/** Ob das Turmbild und die Ebenen-Plaketten da sind (privat im Release-Build; im oeffentlichen Quelltext leer, dann zeichnet die Seite Verlauf und Ziffern). */
+export const wkTurmHatBild = (k: string): boolean => Object.hasOwn(TURM, k);
+/** Das Stilblatt der Turm-Bilder (.wkt-b-turm, .wkt-b-ebene1 .. 5), einmal angelegt von 59-weeklies.ts. */
+export function wkTurmCss(): string {
+  return Object.entries(TURM).map(([k, d]) => ".wkt-b-" + k + "{background-image:url(data:image/webp;base64," + d + ")}").join("\n");
 }

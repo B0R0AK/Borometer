@@ -329,11 +329,16 @@ try {
       });
       assert(!m.quer && m.drin && m.hoch >= 30 && m.wurzel === m.hoch + "px", `${breite} × ${hoehe}, ${b}: kein Querrollen, im Fenster, --hw-h = ${m.hoch} Punkt`, m);
       // der Streifen schiebt den Bereich nur um seine Hoehe: nicht mehr als diese Hoehe Zuwachs im Rollmass
-      const mit = await p.evaluate(() => document.scrollingElement.scrollHeight);
+      /* a2, marken und fonts: nur zur Auskunft im Fehlerfall (#414), nichts davon wird geprueft */
+      const teile = () => p.evaluate(() => ({ h: document.scrollingElement.scrollHeight, a2: Math.round(document.querySelector("#a2")?.getBoundingClientRect().height || 0),
+        marken: document.querySelector("#a2marken")?.style.height || "", fonts: document.fonts?.status || "",
+        teile: ["#analysisCall", "#findings", "#a2", "#afuss", "#app", "#p-analysis"].map((x) => x + "=" + Math.round(document.querySelector(x)?.getBoundingClientRect().height || 0)).join(" "),
+        winh: getComputedStyle(document.documentElement).getPropertyValue("--winh").trim(), h1200: document.documentElement.classList.contains("h-min-1200") }));
+      const t1 = await teile(), mit = t1.h;
       await p.click("#bhOk");
       await weg(p);
-      const ohne = await p.evaluate(() => document.scrollingElement.scrollHeight);
-      assert(mit - ohne <= m.hoch + 1, `${breite} × ${hoehe}, ${b}: mit dem Streifen waechst das Rollmass hoechstens um seine Hoehe`, { mit, ohne, hoch: m.hoch });
+      const t2 = await teile(), ohne = t2.h;
+      assert(mit - ohne <= m.hoch + 1, `${breite} × ${hoehe}, ${b}: mit dem Streifen waechst das Rollmass hoechstens um seine Hoehe`, { mit, ohne, hoch: m.hoch, t1, t2 });
     }
     await p.close();
   }

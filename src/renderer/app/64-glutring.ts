@@ -346,7 +346,9 @@ function binden(box: HTMLElement){
    ein anderer Bereich) steht jeder wieder an seinem alten Platz. */
 const UMHAENGEN: readonly [string, string][] = [
   [".headtop > .big", "#ringMitte"], ["#hName", "#ringMeta"], ["#snapBadge", "#ringMeta"], ["#hMeta", "#ringMeta"],
-  [".headtop > .headact", "#ringRechts"], ["#hRead", "#ringSatz"], ["#hHist", "#ringSatz"]];
+  [".headtop > .headact", "#ringRechts"], ["#hRead", "#ringSatz"], ["#hHist", "#ringSatz"],
+  /* der Nebenziel-Hinweis (#401): ein langer Satz mit Namen und Zeit passt nicht ins Loch, er steht unter der Einordnung */
+  ["#hSide", "#ringSatz"]];
 const herkunft: [Element, Node, Node | null][] = [];
 let umgehaengt = false;
 let fokusMerk: HTMLElement | null = null;

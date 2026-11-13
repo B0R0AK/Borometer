@@ -896,6 +896,19 @@ try {
         "ohne Lauf, mit Server: die Zeile nennt Bezug und DPS aus dem Verlauf", mit);
       assert(mit.tab >= 0 && !mit.aus && (mit.name === null || mit.name.toLowerCase().includes(mit.text.toLowerCase())),
         "ohne Lauf: der Knopf ist per Tastatur erreichbar, sein Name enthaelt den sichtbaren Text", mit);
+      /* Ein Weg, eine Zahl (#414, B1; Entscheidung 11.11.2026): der beste Pull liegt nur im Verlauf (ohne Lauf), also zeigt die Tafel keinen Vergleich,
+         sondern ihren Urteilssatz - mit dem besten Pull wie die Analyse (urteilHtml(seg, false, bestCasts(seg)), 56). Ein anderer Pull desselben
+         Builds im Log hat einen Lauf und ist der Bezug der Analyse. Beide zeigen denselben Satz, und es gibt ihn wirklich (.uv in der Tafel). */
+      const ohneKnopf = (sel) => s3.evaluate((x) => { const e = document.querySelector(x)?.cloneNode(true); e?.querySelectorAll("button").forEach((k) => k.remove()); return (e?.textContent || "").trim(); }, sel);
+      const tafelU = { uv: await ohneKnopf("#urteilInhalt .uv"), un: await ohneKnopf("#urteilInhalt .un") };
+      await s3.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
+      await s3.waitForFunction(() => !!document.querySelector("#analysisCall .uv"), null, { timeout: 5000 }).catch(() => {});
+      const analyseU = { uv: await ohneKnopf("#analysisCall .uv"), un: await ohneKnopf("#analysisCall .un") };
+      const geistDa = await s3.evaluate(() => !!document.querySelector("#a2kurve path.a2geist"));
+      assert(!!tafelU.uv && tafelU.uv === analyseU.uv && tafelU.un === analyseU.un && geistDa,
+        "ohne Lauf, mit Pull desselben Builds: die Tafel zeigt einen Urteilssatz und er ist der der Analyse, die einen Geist hat", { tafelU, analyseU, geistDa });
+      await s3.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await s3.waitForTimeout(150);
       await s3.setViewportSize({ width: 560, height: 860 });
       await s3.waitForTimeout(250);
       const breit = await s3.evaluate(() => ({ scroll: document.documentElement.scrollWidth, client: document.documentElement.clientWidth,
@@ -1065,6 +1078,83 @@ try {
       "Eintrag im Verzeichnis ohne Paar: das Paar kommt aus dem Lauf des gespeicherten Pulls", await h2.evaluate(() => document.querySelector("#cmpBest")?.textContent || ""));
     assert(!h2.errors.length, "Paar aus dem Lauf: keine Fehler in der Seite", h2.errors);
     await h2.close();
+  }
+
+  /* #405/#406: das Waffenpaar gehoert zum gewaehlten Kampf. Zwei erfundene Kaempfe in einem Log (nur IDs und
+     Zahlen): A traegt Speer und Dagger (dazu ein Grossschwert mit 5 % und Passiv), B Langbogen und Armbrust,
+     C hat nur Schaden von Passiven. Gewartet wird auf den Zustand (die gewaehlte Zeile, das Feld), nie auf Zeit. */
+  {
+    const gap = (min) => Date.UTC(2026, 9, 3, 20, min, 0);
+    const kampfZeilen = (start, ziel, muster) => {
+      const out = [];
+      for (let k = 0; k < 80; k++) {
+        const [name, sid] = muster[k % muster.length];
+        out.push(`${stamp(start + k * 500)},DamageDone,${name},${sid},1000,0,0,kNormalHit,Tester,${ziel}`);
+      }
+      return out;
+    };
+    const rep = (n, e) => Array.from({ length: n }, () => e);
+    // 20er-Muster: A = Speer 50 %, Dagger 30 %, Grossschwert 5 %, Passiv 15 %; B = Langbogen 60 %, Armbrust 40 %
+    const SP = ["Probe Speer", 948156706], DA = ["Probe Dagger", 939780553], GS = ["Probe Grossschwert", 940579344],
+          PA = ["Probe Passiv", 940584840], LB = ["Probe Langbogen", 944299709], AR = ["Probe Armbrust", 945408027];
+    const MA = [...rep(10, SP), ...rep(6, DA), GS, ...rep(3, PA)];
+    const MB = [...rep(12, LB), ...rep(8, AR)];
+    const zeilen = ["CombatLogVersion,4",
+      ...kampfZeilen(gap(0), "Probe Boss A", MA),
+      ...kampfZeilen(gap(10), "Probe Boss B", MB),
+      ...kampfZeilen(gap(20), "Probe Boss C", rep(20, PA))];
+    const wf = join(work, "paar-je-kampf.txt");
+    writeFileSync(wf, zeilen.join("\n") + "\n");
+
+    const w = await browser.newPage({ viewport: { width: 1280, height: 860 } });
+    const werrors = [];
+    w.on("pageerror", (e) => werrors.push(String(e)));
+    await w.addInitScript(() => {
+      try { localStorage.clear(); localStorage.setItem("boroLang", "en"); } catch { /* storage blocked */ }
+    });
+    await w.goto("file://" + join(root, "dist", "renderer", "index.html"));
+    await w.setInputFiles("#fileInput", wf);
+    await w.waitForFunction(() => document.querySelectorAll("#fightList .fight").length === 3);
+    // der Bereich Waffen zeichnet erst, wenn er offen ist; Klick im DOM wie tab() oben
+    await w.evaluate(() => document.querySelector('[data-tab="weapons"]').click());
+    await w.waitForFunction(() => document.querySelector("#p-weapons")?.classList.contains("on"));
+    // waehlt den Kampf mit diesem Bossnamen und wartet, bis der Kampfkopf ihn nennt
+    const waehle = async (boss) => {
+      await w.evaluate((b) => {
+        const z = [...document.querySelectorAll("#fightList .fight")].find((r) => (r.textContent || "").includes(b));
+        z.click();
+      }, boss);
+      await w.waitForFunction((b) => (document.querySelector("#hName")?.textContent || "").includes(b), boss);
+    };
+    const paar = () => w.evaluate(() => {
+      const sel = (id) => { const s = document.querySelector(id); return s.value; };
+      return {
+        main: sel("#wMain"), off: sel("#wOff"),
+        zeilen: [...document.querySelectorAll("#wpnTable tbody tr")].map((r) => (r.cells[0].textContent || "").trim()),
+        offen: (document.querySelector("#wUnassigned")?.textContent || ""),
+      };
+    });
+    const pruefe = async (boss, main, off, zeilenSoll, name) => {
+      await waehle(boss);
+      // das Feld folgt dem Kampf erst nach dem Zeichnen: auf den Wert warten, nicht auf eine Zeit
+      await w.waitForFunction(([m, o]) => document.querySelector("#wMain").value === m && document.querySelector("#wOff").value === o,
+        [main, off], { timeout: 4000 }).catch(() => {});
+      const ist = await paar();
+      assert(ist.main === main && ist.off === off, name + ": Haupt- und Zweitwaffe", ist);
+      if (zeilenSoll) assert(JSON.stringify(ist.zeilen) === JSON.stringify(zeilenSoll) && !ist.zeilen.includes("Unassigned"),
+        name + ": Waffentabelle", ist.zeilen);
+    };
+    const ZA = ["Spear", "Dagger", "Passive", "Greatsword"], ZB = ["Longbow", "Crossbow"];
+    await pruefe("Probe Boss A", "Spear", "Dagger", ZA, "#405 Kampf A (A zuerst)");
+    await pruefe("Probe Boss B", "Longbow", "Crossbow", ZB, "#405 Kampf B nach A");
+    await pruefe("Probe Boss A", "Spear", "Dagger", ZA, "#405 Kampf A nach B");
+    await pruefe("Probe Boss B", "Longbow", "Crossbow", ZB, "#405 Kampf B zuletzt");
+    // #406: ein Kampf ohne Waffenschaden zeigt nicht das Paar des Vorkampfs
+    await pruefe("Probe Boss A", "Spear", "Dagger", null, "#406 Vorkampf A");
+    await pruefe("Probe Boss C", "", "", ["Passive"], "#406 Kampf nur mit Passiv-Schaden");
+    await pruefe("Probe Boss B", "Longbow", "Crossbow", ZB, "#406 danach wieder B");
+    assert(!werrors.length, "Paar je Kampf: keine Fehler in der Seite", werrors);
+    await w.close();
   }
 } finally {
   await browser.close();

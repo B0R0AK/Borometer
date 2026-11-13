@@ -187,9 +187,55 @@ export function vollAnpassen(
   return { ...rueckfall(vollGroesse(haupt, zoom), haupt), max: false };
 }
 
-/** Where the torn-off window opens: a place like full view's, kept apart under "abriss". */
+/** The torn-off window's size when nothing is remembered, no bigger than the main monitor's work area. */
+export const ABRISS_W = 900;
+export const ABRISS_H = 640;
+export function abrissGroesse(haupt: Monitor | null): { w: number; h: number } {
+  return haupt ? { w: Math.min(ABRISS_W, haupt.width), h: Math.min(ABRISS_H, haupt.height) } : { w: ABRISS_W, h: ABRISS_H };
+}
+
+/*
+ * Where the torn-off window opens (#353). Unlike full view it can be dragged
+ * and maximised, so its remembered place keeps its size (and still carries the
+ * "maximised" flag, which the caller does not apply: it always opens normal,
+ * #353): while the title bar is still on a monitor, the size is cut to that
+ * monitor's work area and the window moved in so that all of it lies there;
+ * else the middle of the main monitor. For a maximised window the place is the
+ * normal one it goes back to (see abrissMerken). Null: nothing usable is
+ * remembered, the caller takes abrissGroesse and Electron's centre.
+ */
 export function platzAbriss(roh: unknown, monitore: readonly Monitor[], haupt: Monitor | null): LageGross | null {
-  return platzGross(roh, monitore, haupt);
+  const lage = pruefen(roh, "gross");
+  if (!lage) return null;
+  if (sichtbar(lage, monitore)) {
+    const m = meisterMonitor(lage, monitore);
+    if (m) {
+      const w = Math.min(lage.w, m.width);
+      const h = Math.min(lage.h, m.height);
+      return {
+        x: Math.max(m.x, Math.min(lage.x, m.x + m.width - w)),
+        y: Math.max(m.y, Math.min(lage.y, m.y + m.height - h)),
+        w, h, max: lage.max,
+      };
+    }
+  }
+  if (!haupt) return null;
+  return { ...rueckfall(lage, haupt), max: lage.max };
+}
+
+/*
+ * What of the torn-off window is remembered (#353): nothing while it is
+ * minimised (Windows parks it far off screen); while it is maximised its
+ * normal place with max set, so it goes back to a window of its size, not one
+ * the size of the monitor; else where it stands. Null: nothing to write.
+ */
+export function abrissMerken(
+  jetzt: { x: number; y: number; w: number; h: number }, normal: { x: number; y: number; w: number; h: number },
+  maximiert: boolean, minimiert: boolean,
+): LageGross | null {
+  if (minimiert) return null;
+  const r = maximiert ? normal : jetzt;
+  return { x: r.x, y: r.y, w: r.w, h: r.h, max: maximiert };
 }
 
 /** Where compact goes: its remembered corner, the fallback, or null to stay where it is. */

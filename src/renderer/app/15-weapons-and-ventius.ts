@@ -112,6 +112,34 @@ function ventiusWaves(cast: VentiusCast){
   return w.length - 1;
 }
 
+/* Die Salven des Ziels, das ventiusMix beantwortet (das mit den meisten
+   Salven unter denen mit einer lesbaren), mit den Groessen ihrer Wellen: die
+   Eingabe der neuen Analyse (80-analyse-daten, #414). Rechnet nichts um, was
+   ventiusMix rechnet; die Form (1 + 3N) liest ventius-core.ts aus den
+   Wellengroessen. Zeiten in ms auf der Uhr des Logs. */
+export function ventiusSalven(seg: Encounter){
+  const per = new Map<string, VentiusCast[]>();
+  for(const c of ventiusCasts(seg)){
+    let l = per.get(c.target);
+    if(!l){ l = []; per.set(c.target, l); }
+    l.push(c);
+  }
+  const alle = [...per.values()].sort((a, b) => b.length - a.length);
+  const best = alle.find(l => l.some(c => ventiusWaves(c) > 0)) || alle[0];
+  if(!best) return [];
+  return best.map(c => ({
+    t: c.t, wellen: ventiusShape(c).map(w => w.length), hits: c.hits, dmg: c.dmg,
+    crit: c.ev.filter(e => e.crit).length, heavy: c.ev.filter(e => e.heavy).length,
+  }));
+}
+
+/* Die gelernte Decke eines Gegners (Nachbeben), 0 wo sie nicht belegt ist:
+   wie ventiusMix sie nennt, erst ab VENTIUS_TRUST Salven dort. */
+export function ventiusDecke(ziel: string){
+  const rec = state.ventiusTop[ventiusTargetKey(ziel)];
+  return rec && rec.atTop >= VENTIUS_TRUST ? (rec.waves || 0) : 0;
+}
+
 /* The shape of a fight's Ventius casts: what the best cast reached, and how
    often the rest got there. The ceiling is read off this fight rather than
    fixed at seven, because it is the target that sets it - measured, Vulcanus

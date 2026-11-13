@@ -243,18 +243,16 @@ try {
   const fenster = () => page.evaluate(() => {
     /* Neugestaltung 28.09., Aufgabe 5 (folgt Entwurf, Luecken 4): die Fragen sind die
        Ueberschriften der Felder unter der Form (h3), in der Reihenfolge der Seite */
-    /* #218 (Werkbank, Spezifikation 2026-10-07, 4 und 8.2): das Fenster steht im Hauptfach unter seinem
-       Satz, die Frage ist dort ein h4; die Faecher sind h3 mit dem Namen der Faehigkeit. Gelesen werden
-       darum h3 und h4 in der Reihenfolge der Seite, ohne die Zusatzzeile (small) der Faecher. */
+    /* #414 (Inventur D19): die Werkbank ist abgeloest, die Frage nach dem Fenster steht als h3 fuer sich in #findings
+       unter dem Pruefstand, in keiner Karte. Gelesen werden h3 und h4 in der Reihenfolge der Seite. */
     const secs = [...document.querySelectorAll("#findings .fsec")];
     const w = secs.find((s) => s.querySelector(".fwin"));
     const q = (sel) => w?.querySelector(sel);
     const nurName = (h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); };
     return {
       fragen: [...document.querySelectorAll("#findings :is(h3,h4)")].map(nurName),
-      // das Fenster im ersten Fach (dem Hauptfach), die Frage dort als h4#fensterH
-      imHaupt: !!w && !!w.closest(".wbfach") && w.closest(".wbfach") === document.querySelector("#findings .wbfach") &&
-        w.querySelector("h4")?.id === "fensterH",
+      // das Fenster steht unter dem Pruefstand, nicht in einer Karte; die Frage ist h3#fensterH
+      unterKarten: !!w && !w.closest(".a2karte, #a2") && w.querySelector("h3")?.id === "fensterH",
       da: !!w,
       gef: q(".fgef")?.textContent || "",
       v: q(".fant .v")?.textContent || "",
@@ -312,15 +310,10 @@ try {
     await load(logFile("fenster-30.txt", tr30), "Fellinex");
     await tab("analysis");
     const f = await fenster();
-    /* folgt Entwurf (DECISION 4.13): die Frage ist ein Feld unter den drei Feldern -
-       vorher zwischen "Rhythmus" und "Treffer"; geprueft wird wie vorher die genaue Stelle.
-       #218 (Werkbank, Spezifikation 2026-10-07, 8.2): die drei Felder sind entfallen; die Frage steht als
-       h4 im Hauptfach (Schnellfeuer), direkt unter seiner h3, danach die mittleren Faecher (Beschuss,
-       Detonierendes Mal) - die Namen aus dem gezeigten Pull gerechnet, die Folge genau. */
-    const fa30 = faecherVon(letzterPull(tr30));
-    const soll30 = [fa30.haupt, "Hast du im Fenster getroffen?", ...fa30.mittel];
-    assert(f.imHaupt && fa30.weitere.length === 0 && JSON.stringify(f.fragen) === JSON.stringify(soll30),
-      "die Frage steht direkt unter den drei Feldern (Ventius gibt es hier nicht)", { fragen: f.fragen, soll: soll30, imHaupt: f.imHaupt });
+    /* #414 (Inventur D19, O13): die Werkbank ist abgeloest; die Frage steht als h3 fuer sich in #findings, unter dem
+       Pruefstand, in keinem Fach und in keiner Gruppe. */
+    assert(f.unterKarten && f.fragen[0] === "Hast du im Fenster getroffen?" && !f.fragen.some((h) => /Laufzeit|Weitere F\u00e4higkeiten|Passiv|Mehr zu/.test(h)),
+      "die Frage steht fuer sich unter dem Pruefstand, in keinem Fach (Ventius gibt es hier nicht)", { fragen: f.fragen, unterKarten: f.unterKarten });
     // Builds-Reiter 6: ohne gespeicherten Build gilt das Waffenpaar (diese Kaempfe haben keinen); vorher erkannter Build, der Satz endete auf "mit diesem Build."
     assert(/^Borometer hat das Fenster selbst gefunden: in den 6\u00a0s nach Detonierendes Mal trifft Schnellfeuer im Schnitt \d+\u00a0% st\u00e4rker \(\d+\.\dk statt \d+\.\dk\) \u2013 gemessen \u00fcber 6 Pulls mit diesen Waffen\.$/.test(f.gef),
       "Satz: gefunden, 6 s nach Detonierendes Mal, ueber 6 Pulls", f.gef);
@@ -429,24 +422,25 @@ try {
 
   // --- 3 \u00b7 Der Start (Spezifikation 3.5, 4.5)
   const startZeile = () => page.evaluate(() => {
-    // folgt Entwurf (DECISION 4.14): der Start steht unter "Weitere Befunde", nicht mehr im Rhythmus
-    const f = [...document.querySelectorAll("#p-analysis .find")].find((x) => x.querySelector(".k")?.textContent === "Die ersten 10\u00a0s" ||
-      x.querySelector(".k")?.textContent === "The first 10\u00a0s");
-    /* #218 (Spezifikation 2026-10-07, 8.2): "Weitere Befunde" ist entfallen; die Liste #weitereListe
-       steht im Kampfstreifen #verdict unter der h3 "Der Kampf" - gelesen wird die h3 des Streifens */
-    const sec = f?.closest("#weitereListe") ? f.closest("#verdict")?.querySelector("h3")?.textContent || "" : "";
-    return f ? { sec, v: f.querySelector(".v")?.textContent || "", n: f.querySelector(".n")?.textContent || "" } : null;
+    /* #414 (B2, Inventur O7): der Start steht als Satz unter dem Opener (#a2start, im Abschnitt der Faehigkeiten), nicht mehr in der
+       Befundliste: "Die ersten 10 s: <Wert> \u00b7 <Bezug> \u00b7 <Satz>", gelesen wird die h3 des Abschnitts */
+    const e = document.querySelector("#a2start");
+    if (!e || e.hidden) return null;
+    const c = e.cloneNode(true); c.querySelectorAll("button").forEach((b) => b.remove());
+    const m = /^(?:Die ersten|The first) 10\u00a0s: (\S+) \u00b7 (.*)$/.exec(c.textContent.trim());
+    return m ? { sec: e.closest("section")?.querySelector("h3")?.textContent || "", v: m[1], n: m[2] } : null;
   });
-  const formSatz = () => page.evaluate(() => document.querySelector("#verdictText")?.textContent || "");
+  // #414 (B2): "unter der Form" steht kein Start-Satz - die Saetze der Form sind der Satz des Bereichs, der Haelftensatz, Gut hier, Besser moeglich und die Zeile unter der Legende
+  const formSatz = () => page.evaluate(() => ["#a2satz", "#a2haelften", "#a2gut", "#a2besser", "#a2unv"].map((x) => document.querySelector(x)?.textContent || "").join(" "));
   {
     await frisch();
     // fuenf gewoehnliche Pulls, im letzten die ersten 10 s nur der Fueller
     await load(logFile("start-schwach.txt", serie(26, "Fellinex", 5, {}, { leise: 10000 })), "Fellinex");
     await tab("analysis");
     const z = await startZeile();
-    assert(z && z.sec === "Der Kampf" && /^\d+\.\dk$/.test(z.v) &&
+    assert(z && z.sec === "Deine Fähigkeiten" && /^\d+\.\dk$/.test(z.v) &&
       /^bester Pull \d+\.\dk \u00b7 Dein Start war deutlich schw\u00e4cher: \d+\u00a0% deines besten Pulls\.$/.test(z.n),
-      "schwacher Start: Eintrag unter Weitere Befunde mit Wert, bestem Pull und Satz", z);
+      "schwacher Start: Satz unter dem Opener mit Wert, bestem Pull und Satz (#414)", z);
     /* Issue #106: der Start steht genau einmal - unter "Weitere Befunde" (oben), nicht noch als
        Nebensatz unter der Form (vorher mit dem Verweis auf die Zeitleiste der Rotation) */
     assert(!/Start/.test(await formSatz()), "schwacher Start: kein zweiter Satz unter der Form (#106)", await formSatz());
@@ -538,26 +532,22 @@ try {
     /* #218 (Spezifikation 2026-10-07, 8.2): das Ventius-Fach ist das Hauptfach (Meister Schaden), seine h3
        "Auge von Ventius" zuerst, darin die Frage zum Fenster als h4, danach die mittleren Faecher */
     const faV = faecherVon(letzterPull(tr), { ventius: true });
-    const sollV = [faV.haupt, "Hast du im Fenster getroffen?", ...faV.mittel];
-    const vHaupt = await page.evaluate(() => document.querySelector("#findings .wbfach")?.classList.contains("vfeld") || false);
-    assert(faV.haupt === "Auge von Ventius" && vHaupt && f.imHaupt && JSON.stringify(f.fragen) === JSON.stringify(sollV),
-      "Reihenfolge: drei Felder, Fenster, Ventius", { fragen: f.fragen, soll: sollV, vHaupt, imHaupt: f.imHaupt });
+    const vKarte = await page.evaluate(() => document.querySelectorAll("#a2 .a2karte.vent").length);
+    assert(faV.haupt === "Auge von Ventius" && vKarte === 1 && f.unterKarten && f.fragen[0] === "Hast du im Fenster getroffen?",
+      "Ventius hat seine Karte im Pruefstand, die Frage nach dem Fenster steht darunter in #findings (#414)", { fragen: f.fragen, vKarte, unterKarten: f.unterKarten });
     /* #218 neu (Spezifikation 3.3, 8.3): je Salve eine Saeule, gefuellte Perlen bis zur erreichten Zahl
        der Nachbeben, leere bis zum Bestwert des Kampfes (ventiusMix().top). Hier fliegt jede Salve mit
        zwei Wellen zu drei (Eroeffnung, +1000 ms, +1100 ms): 32 Salven je Pull, je zwei gefuellte Perlen,
        keine leere. Die Saeulen trennt der Test an ihrer Lage (Mitte der Perle auf der x-Achse). */
-    const perlen = await page.evaluate(() => {
-      const spalten = new Map();
-      for (const e of document.querySelectorAll('#findings .vfeld svg [data-welle]')) {
-        const r = e.getBoundingClientRect(), x = Math.round((r.left + r.width / 2) * 2) / 2;
-        const s = spalten.get(x) || { voll: 0, leer: 0 }; spalten.set(x, s);
-        if (e.getAttribute("data-welle") === "1") s.voll++; else s.leer++;
-      }
-      return [...spalten.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => s);
-    });
+    /* #414: die Perlen sind das Raster der Ventius-Karte (ein Punkt = ein Nachbeben); es ist erst gebaut, wenn die Karte
+       aufgeklappt ist. Je Salve ein Streifen mit so vielen vollen Punkten wie Nachbeben, keinem hohlen beim Bestwert. */
+    await page.evaluate(() => { document.querySelector("#a2vent").open = true; });
+    await page.waitForFunction(() => document.querySelectorAll("#a2vinnen .a2salve").length > 0);
+    const perlen = await page.evaluate(() => [...document.querySelectorAll("#a2vinnen .a2salve")]
+      .map((e) => ({ voll: e.querySelectorAll(".voll").length, leer: e.querySelectorAll(".leer").length })));
     const salvenJePull = Math.ceil((96000 - 300) / 3000);
     assert(perlen.length === salvenJePull && perlen.every((s) => s.voll === 2 && s.leer === 0),
-      "Ventius: je Saeule so viele gefuellte Perlen wie Nachbeben (ventiusMix), keine leere beim Bestwert", { salvenJePull, perlen });
+      "Ventius: je Salve so viele volle Punkte wie Nachbeben (ventiusMix), keinen hohlen beim Bestwert", { salvenJePull, n: perlen.length, erste: perlen.slice(0, 3) });
   }
   {
     await frisch();
@@ -851,7 +841,8 @@ try {
     const analyse = () => tp.evaluate(() => ({
       call: document.querySelector("#analysisCall").textContent,
       ruhig: document.querySelector("#analysisCall").classList.contains("ruhig"),
-      verdict: document.querySelector("#verdictText").textContent,
+      // #414 (B2): der Haelftensatz steht unter dem Satz des Bereichs (#a2haelften), nicht mehr unter dem Kampfstreifen
+      verdict: document.querySelector("#a2haelften")?.hidden !== false ? "" : document.querySelector("#a2haelften").textContent,
       alles: document.querySelector("#p-analysis").innerText,
     }));
     await load(wolfLog("wolf-duenn.txt", 11, (k) => k % 2 === 0), "Frost Wolf");
@@ -892,9 +883,23 @@ try {
     };
     /* Neugestaltung 28.09., Aufgabe 5 (folgt Entwurf): die Befunde stehen unter "Weitere Befunde";
        die Leerzeit heisst dort "Luecken ab 2 s" (Anzahl, die Summe darunter) und zaehlt nach dem Median */
-    const befunde = () => tp.evaluate(() => [...document.querySelectorAll("#p-analysis .find")]
-      .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
-        (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
+    // #414 (B2): was keine .find mehr ist, steht als Satz in der Analyse (unter Gut hier, Besser moeglich, am Opener, unter der Legende, unter dem Satz des Bereichs);
+    // befunde() liest beides, damit die Proben unten nicht an einer leeren Quelle immer wahr sind
+    const befunde = () => tp.evaluate(() => {
+      const ohne = (e) => { const c = e.cloneNode(true); c.querySelectorAll("button").forEach((b) => b.remove()); return c.textContent.trim(); };
+      const alt = [...document.querySelectorAll("#p-analysis .find")]
+        .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
+          (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : ""));
+      const neu = [...document.querySelectorAll("#a2gut li[data-k], #a2besser li[data-k]")].map((li) => {
+        const t = ohne(li), m = /^(Schwächste drei Sekunden) (.*)$/.exec(t);
+        return m ? m[1] + " | " + m[2] : li.dataset.k + " | " + t;
+      });
+      for (const [sel, k] of [["#a2unv", "Ziel unverwundbar"], ["#a2start", "Start"], ["#a2haelften", "Hälften"]]) {
+        const e = document.querySelector(sel);
+        if (e && !e.hidden) neu.push(k + " | " + ohne(e));
+      }
+      return alt.concat(neu);
+    });
     await load(deusLog("deus-ohne.txt", false), "Deus Chimaerus");
     await tab("analysis");
     an = await analyse();
@@ -906,12 +911,12 @@ try {
     const ohneBand = an.alles.replace("Ziel unverwundbar \u00b7 38,0\u00a0s", "");
     /* Fixrunde 1 zu Aufgabe 5 (folgt Entwurf, Pruefung Befund 8): "was war los" stammte aus dem entfallenen
        Leerzeit-Befund - jetzt: in der Phase 57-95 s liegt kein Band einer Luecke, die Saeulen nennen keine */
-    const phaseForm = await tp.evaluate(() => ({ zonen: [...document.querySelectorAll("#saeulen .gapz")].map((z) => z.dataset.zeit),
-      label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "" }));
+    const phaseForm = await tp.evaluate(() => ({ zonen: [...document.querySelectorAll("#a2kurve .gapz")].map((z) => z.dataset.zeit),
+      label: document.querySelector("#a2beschr")?.textContent || "" }));
     assert(!/39,1|38,\d/.test(ohneBand) && phaseForm.zonen.length === 0 && phaseForm.label.includes("keine Lücken"),
-      "Unverwundbar: keine Luecke aus der Phase, die Saeulen sagen „keine Lücken“", { phaseForm, alles: an.alles.slice(0, 300) });
+      "Unverwundbar: keine Luecke aus der Phase, die Zeitleiste sagt „keine Lücken“", { phaseForm, alles: an.alles.slice(0, 300) });
     // #109: die Beschreibung nennt die Strecke, die im Bild steht
-    assert(phaseForm.label.endsWith("; Ziel unverwundbar 0:57\u20131:35"), "#109: die Saeulen-Beschreibung nennt die unverwundbare Strecke mit Zeit", phaseForm.label);
+    assert(phaseForm.label.endsWith("; Ziel unverwundbar 0:57\u20131:35"), "#109: die Beschreibung der Zeitleiste nennt die unverwundbare Strecke mit Zeit", phaseForm.label);
     assert(bf.some((b) => b === "Lücken ab 2\u00a0s | keine"), "Unverwundbar: keine Luecke", bf);
     // folgt Entwurf (Pruefung Befund 8): der Satz unter der Form nennt keine Luecke und keine Pause
     // seit #106 darf der Satz fehlen (kein Krit, kein Haelftensatz beim 1,0-fachen) - steht er, nennt er keine Luecke
@@ -927,8 +932,8 @@ try {
     assert(!schwach || schwachAb + 3 <= 57 || schwachAb >= 95, "Unverwundbar: die schwaechste Stelle liegt nicht in der Phase", bf);
     assert(!bf.some((b) => /unverwundbare Ziel/.test(b)), "ohne Einsatz in der Phase: kein Befund, nur das Band", bf);
     const form = await tp.evaluate(() => ({
-      gap: !document.querySelector("#vlegGap").hidden, inv: !document.querySelector("#vlegInvuln")?.hidden,
-      text: document.querySelector("#vlegInvuln")?.textContent || "",
+      gap: !!document.querySelector("#a2legende .lp"), inv: !!document.querySelector("#a2legende .lu"),
+      text: document.querySelector("#a2legende .lu")?.parentElement.textContent || "",
     }));
     assert(form.inv && !form.gap && form.text === "Ziel unverwundbar", "Form: Legende \"Ziel unverwundbar\", keine Pause", form);
     await tab("timeline");
@@ -956,9 +961,9 @@ try {
        "Ziel unverwundbar" stand am Zeilenende, "schwaechste 3 s" darunter,
        getrennt von seinem Kaestchen. Im Zeitverlauf und in der Form, bei 1280
        und bei 560 px. Die Rotation hat keine Bandlegende. */
-    const legende = () => tp.evaluate(() => [...document.querySelectorAll("#stackGut .bandkey .bke, #verdict .vleg")]
+    const legende = () => tp.evaluate(() => [...document.querySelectorAll("#stackGut .bandkey .bke, #a2legende > span")]
       .filter((e) => e.offsetParent && !e.hidden).map((e) => {
-        const kasten = e.querySelector("i").getBoundingClientRect();
+        const kasten = e.querySelector("i, svg").getBoundingClientRect();
         const zeilen = [], lauf = document.createTreeWalker(e, NodeFilter.SHOW_TEXT);
         for (let n = lauf.nextNode(); n; n = lauf.nextNode()) {
           if (!n.textContent.trim()) continue;
@@ -977,8 +982,8 @@ try {
         `Zeitverlauf ${breite}: jeder Legendeneintrag hat Kaestchen und Text auf einer Zeile`, zv);
       await tab("analysis");
       const fo = await legende();
-      assert(fo.length === 2 && fo.every((l) => l.zusammen),
-        `Form ${breite}: jeder Legendeneintrag hat Kaestchen und Text auf einer Zeile`, fo);
+      assert(fo.some((l) => l.text.includes("Ziel unverwundbar")) && fo.every((l) => l.zusammen),
+        `Zeitleiste ${breite}: jeder Legendeneintrag hat Kaestchen und Text auf einer Zeile`, fo);
       assert(await tp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth),
         `Form ${breite}: kein waagerechtes Rollen`);
       await tab("timeline");
@@ -989,11 +994,12 @@ try {
     await load(deusLog("deus-mit.txt", true), "Deus Chimaerus");
     await tab("analysis");
     bf = await befunde();
-    const leise = bf.filter((b) => /unverwundbare Ziel/.test(b));
+    // #414 (B2): der Einsatz ins unverwundbare Ziel steht als leiser Satz unter der Legende der Zeitleiste (#a2unv), genau einmal
+    const leise = await tp.evaluate(() => [...document.querySelectorAll("#p-analysis *")].filter((e) => !e.children.length && /unverwundbare Ziel/.test(e.textContent)).map((e) => e.id + ": " + e.textContent.trim()));
     // Fixrunde 1 zu Aufgabe 5 (Pruefung Befund 2, Befund 4): mit dem sichtbaren Satz, der sagt, dass die Strecke weder Pause noch Luecke ist
-    assert(leise.length === 1 && leise[0] === "Ziel unverwundbar | 1 Einsatz von Detonierendes Mal ging ins unverwundbare Ziel (0:57\u20131:35). | " +
-      "Die Strecke selbst steht im Zeitverlauf als Band und zählt weder als Pause noch als Lücke.",
-      "ein Detonationsmal in der Phase: genau ein leiser Befund", bf);
+    await themen(["#a2unv"], "Satz zum unverwundbaren Ziel", tp);
+    assert(leise.length === 1 && /^a2unv: 1 Einsatz von Detonierendes Mal ging ins unverwundbare Ziel \(0:57\u20131:35\)\. Die Strecke selbst steht im Zeitverlauf als Band und zählt weder als Pause noch als Lücke\.$/.test(leise[0]),
+      "ein Detonationsmal in der Phase: genau ein leiser Satz", leise);
     assert(!/unverwundbar/i.test((await analyse()).call), "mit Einsatz: trotzdem nicht das Urteil oben", (await analyse()).call);
 
     /* Freie Zeilen: je Eintrag [ms, Faehigkeit, Ziel, unverwundbar?]; Schnellfeuer
@@ -1017,7 +1023,7 @@ try {
     const DEUS = "Deus Chimaerus", ADD = "Flame Add";
     const phase = (t) => t >= 57000 && t <= 95000;
     const legenden = async () => {
-      const form = await tp.evaluate(() => !document.querySelector("#vlegInvuln").hidden);
+      const form = await tp.evaluate(() => !!document.querySelector("#a2legende .lu"));
       await tab("timeline");
       await zeitAuf();
       const key = await text("#stackGut .bandkey");
@@ -1057,7 +1063,7 @@ try {
     /* folgt Entwurf (Luecken 4.3/4.5): die Luecken nach dem Median in ganzen Sekunden - 51-54 s ohne
        Treffer (vorher gemessen ab dem letzten Treffer bei 50 s, 4 s) und 90-95 s; die Pausenliste ist
        entfallen, die Zeiten stehen an den Baendern der Form */
-    const pausenText = await tp.evaluate(() => [...document.querySelectorAll("#saeulen .gapz")].map((p) => p.dataset.zeit));
+    const pausenText = await tp.evaluate(() => [...document.querySelectorAll("#a2kurve .gapz")].map((p) => p.dataset.zeit));
     assert(bf.some((b) => b === "Lücken ab 2\u00a0s | 2 | zusammen 8\u00a0s"), "zwei Strecken: Luecken sind nur die zwei echten Pausen (3 + 5 s)", bf);
     assert(JSON.stringify(pausenText) === JSON.stringify(["0:51\u20130:54", "1:30\u20131:35"]),
       "zwei Strecken: die Bänder der Form nennen die Luecke vor dem Streckenbeginn und die nach dem Ende", pausenText);
@@ -1068,8 +1074,8 @@ try {
        Band gilt nur, wo kInvincible-Treffer liegen, und traegt seine Dauer. */
     const baender = async () => {
       const form = await tp.evaluate(() => ({
-        gap: !document.querySelector("#vlegGap").hidden, inv: !document.querySelector("#vlegInvuln").hidden,
-        marken: [...document.querySelectorAll("#verdictForm .vgap")].map((m) => m.textContent) }));
+        gap: !!document.querySelector("#a2legende .lp"), inv: !!document.querySelector("#a2legende .lu"),
+        marken: [...document.querySelectorAll("#a2kurve .vgap")].map((m) => m.textContent) }));
       await tab("timeline");
       await zeitAuf();
       const zv = await tp.evaluate(() => {
@@ -1181,35 +1187,53 @@ try {
     const qTab = async (name) => { await q.evaluate((n) => document.querySelector(`[data-tab="${n}"]`).click(), name); await q.waitForTimeout(120); };
     // die Start-Zeile im Rhythmus: Wert, Bezug (bester/zweitbester Pull) und dessen Wert
     const qStart = () => q.evaluate(() => {
-      // folgt Entwurf (DECISION 4.14): die Start-Zeile steht unter "Weitere Befunde"
-      const f = [...document.querySelectorAll("#p-analysis .find")].find((x) => /^(Die ersten|The first) 10\u00a0s$/.test(x.querySelector(".k")?.textContent || ""));
-      if (!f) return null;
-      const n = f.querySelector(".n")?.textContent || "";
-      const m = /^(bester Pull|zweitbester Pull|best pull|second best pull) (\S+) \u00b7 /.exec(n);
-      return { v: f.querySelector(".v")?.textContent || "", bp: m ? m[1] : "", x: m ? m[2] : "", n };
+      // #414 (B2): der Start steht als Satz unter dem Opener (#a2start)
+      const f = document.querySelector("#a2start");
+      if (!f || f.hidden) return null;
+      const c = f.cloneNode(true); c.querySelectorAll("button").forEach((b) => b.remove());
+      const tx = c.textContent.trim();
+      const m = /^(?:Die ersten|The first) 10\u00a0s: (\S+) \u00b7 (bester Pull|zweitbester Pull|best pull|second best pull) (\S+) \u00b7 /.exec(tx);
+      return { v: m ? m[1] : "", bp: m ? m[2] : "", x: m ? m[3] : "", n: tx };
     });
     const alles = () => q.evaluate(() => document.querySelector("#p-analysis").innerText);
     // Kampf waehlen: der Reihe nach in der Liste (0 der neueste)
     const waehle = async (i) => { await q.evaluate((k) => document.querySelectorAll("#fightList .fight")[k].click(), i); await q.waitForTimeout(150); };
 
     // der Geist des besten Pulls (#218, Task 10): Kennzeile, gestrichelte Kurve, Spiegel und Tabelle
+    /* Ein Weg, eine Zahl (Entscheidung 11.11.2026): die Tafel ruft das Urteil wie die Analyse mit dem besten Pull auf (56). Zeigt die Tafel einen
+       Urteilssatz (ohne Bezug mit Lauf; mit einem zeigt sie ihren Vergleich), ist es derselbe wie in der Analyse. Gesammelt an jedem Kampf
+       dieses Blocks, am Ende geprueft. Diese Kaempfe haben alle einen Bezug mit Lauf und zeigen darum den Vergleich; den Fall mit Geist UND
+       Urteilssatz (der beste Pull liegt nur im Verlauf, ein Pull desselben Builds hat einen Lauf) prueft test-best-page ("ohne Lauf, mit Pull
+       desselben Builds"), samt Gegenprobe ohne den Aufruf mit Geist. */
+    const uSaetze = [];
+    const uSatz = async (wo) => {
+      const lies = (sel) => q.evaluate((x) => { const e = document.querySelector(x)?.cloneNode(true); e?.querySelectorAll("button").forEach((k) => k.remove()); return (e?.textContent || "").trim(); }, sel);
+      const analyse = { uv: await lies("#analysisCall .uv"), un: await lies("#analysisCall .un") };
+      const geist = await q.evaluate(() => !!document.querySelector("#a2kurve path.a2geist"));
+      // die Tafel zeichnet ihr Urteil nur im Bereich Kampf (tafelGilt, 56): dorthin, lesen, zurueck
+      await q.evaluate(() => document.querySelector('[data-tab="timeline"]').click());
+      await q.waitForFunction(() => !!document.querySelector("#urteilInhalt .uv, #urteilInhalt .usatz"), null, { timeout: 5000 }).catch(() => {});
+      const tafel = { uv: await lies("#urteilInhalt .uv"), un: await lies("#urteilInhalt .un"), vergleich: await q.evaluate(() => !!document.querySelector("#urteilInhalt .ubezug")) };
+      await q.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
+      await q.waitForFunction(() => !!document.querySelector("#analysisCall .uv"), null, { timeout: 5000 }).catch(() => {});
+      uSaetze.push({ wo, geist, analyse, tafel });
+    };
     const geist = () => q.evaluate(() => {
       const g = document.querySelector('#wbKenn .find[data-k="gegenBest"]');
       return { v: g?.querySelector(".v")?.textContent || "", n: g?.querySelector(".n")?.textContent || "",
-        pfad: !!document.querySelector("#saeulen path.wbgeist"), label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "" };
+        pfad: !!document.querySelector("#a2kurve path.a2geist"), label: document.querySelector("#a2beschr")?.textContent || "" };
     });
-    // das Hauptfach aufklappen und seine Tabelle lesen: Spaltenkoepfe, je Zeile die Zellen, der Spiegel im grossen Bild
+    /* #414 (Inventur O9): die Tabelle dieser Pull gegen den besten Pull steht aufklappbar an der ersten Karte (der staerksten
+       Faehigkeit); aufklappen und lesen: Spaltenkoepfe, je Zeile die Zellen. Die gespiegelten Striche der Werkbank entfallen. */
     const tabelle = async () => {
-      await q.evaluate(() => { const b = document.querySelector('#findings .wbfach.haupt .wbauf[aria-expanded="false"]'); if (b) b.click(); });
+      await q.evaluate(() => { const d = document.querySelector(".a2karte .a2vgl"); if (d) d.open = true; });
       await q.waitForTimeout(150);
       return q.evaluate(() => {
-        const t = document.querySelector("#findings .wbfach.haupt .wbvgl");
+        const t = document.querySelector(".a2karte .a2vgl .wbvgl");
         if (!t) return null;
         return { kopf: [...t.querySelectorAll("thead th")].map((x) => x.textContent.trim()),
           zeilen: [...t.querySelectorAll("tbody tr")].map((r) => [...r.children].map((x) => x.textContent.trim())),
-          fein: [...document.querySelectorAll("#findings .wbfach.haupt .wbmehr .wbfein")].map((x) => x.textContent).join(" "),
-          spiegel: [...document.querySelectorAll('#findings .wbfach.haupt .wbbild2[data-bild="gross"] rect')]
-            .filter((r) => (r.getAttribute("fill") || "").includes("--wbspiegel")).length };
+          fein: [...document.querySelectorAll(".a2karte .a2vgl .wbfein")].map((x) => x.textContent).join(" ") };
       });
     };
     // der beste Pull: Langbogen + Armbrust
@@ -1262,33 +1286,39 @@ try {
     await waehle(0);
     await qTab("analysis");
     const gSpaet = await geist();
+    await uSatz("Spaet");
     assert(/^[−+]\d+,\d %$/.test(gSpaet.v) && gSpaet.v.startsWith("−") && /^\S+ am 22\.09\.$/.test(gSpaet.n),
       "Geist: zweiter Pull desselben Builds, gegen den besten mit Vorzeichen und %, Wert am Tag", gSpaet);
     assert(gSpaet.pfad && /gestrichelt dein bester Pull vom 22\.09\./.test(gSpaet.label),
       "Geist: gestrichelte Kurve path.wbgeist, im Namen des Bildes beschrieben", gSpaet);
     const abst = await q.evaluate(() => {
-      const e = document.querySelector('#weitereListe .find[data-k="abstand"]');
-      const f = document.querySelector('#wbFahnen .wbfahne[data-k="abstand"]');
-      if (f) f.click();
-      return { e: !!e, von: Number(e?.dataset.von), bis: Number(e?.dataset.bis), n: e?.querySelector(".n")?.textContent || "",
-        weg: !!e?.querySelector("button.inrot"), fahne: !!f, lese: document.querySelector("#wbLese")?.textContent || "" };
+      // #414 (B2, Inventur O5): der Satz steht unter "Besser möglich", mit dem Weg in die Rotation und dem in die Zeitleiste
+      const e = document.querySelector('#a2besser li[data-k="abstand"]');
+      const k = e?.querySelector("button.inzeit");
+      const von = Number(k?.dataset.von), bis = Number(k?.dataset.bis);
+      const n = (e?.textContent || "");
+      if (k) k.click();
+      const uhr = (s) => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+      return { e: !!e, von, bis, n, weg: !!e?.querySelector("button.inrot"), zeit: !!k, zeitLabel: k?.getAttribute("aria-label") || "", bereich: document.querySelector("#a2bereichZeit")?.textContent || "", erwartet: e ? uhr(von) + "–" + uhr(bis) : "" };
     });
-    assert(abst.e && abst.fahne && abst.bis - abst.von === 15 && /Rückstand zum besten Pull/.test(abst.n) && abst.weg && /Abstand wächst/.test(abst.lese),
-      "Geist: Fahne „Abstand wächst“ mit 15 s, Satz, Weg in die Rotation und Lesezeile", abst);
-    await q.evaluate(() => document.querySelector("#wbLese [data-aufheben]")?.click());
+    assert(abst.e && abst.zeit && abst.bis - abst.von === 15 && /Rückstand zum besten Pull/.test(abst.n) && abst.weg && /^Die Strecke \d+:\d\d–\d+:\d\d in der Zeitleiste zeigen$/.test(abst.zeitLabel) && abst.bereich.startsWith(abst.erwartet + " ·"),
+      "Geist: der Satz „Rückstand wuchs“ mit 15 s unter Besser möglich, Weg in die Rotation und Weg in die Zeitleiste (die 15 s werden der Bereich)", abst);
+    await q.evaluate(() => document.querySelector("#a2ganz")?.click());
     const tSpaet = await tabelle();
-    assert(!!tSpaet && tSpaet.kopf.some((x) => /^bester Pull$/i.test(x)) && tSpaet.kopf.some((x) => /^dieser Pull$/i.test(x)) && tSpaet.spiegel > 0,
-      "Geist: aufgeklapptes Fach mit Spalte „bester Pull“ und Spiegel unter der Grundlinie", tSpaet);
+    assert(!!tSpaet && tSpaet.kopf.some((x) => /^bester Pull$/i.test(x)) && tSpaet.kopf.some((x) => /^dieser Pull$/i.test(x)),
+      "Geist: die Karte mit der Tabelle „dieser Pull“ gegen „bester Pull“ (#414)", tSpaet);
     // der beste Dolch-Kampf: der Geist ist der zweitbeste
     await waehle(1);
     await qTab("analysis");
     const gFrueh = await geist();
+    await uSatz("Frueh");
     assert(gFrueh.v.startsWith("+") && /^zweitbester /.test(gFrueh.n) && gFrueh.pfad && /gestrichelt dein zweitbester Pull/.test(gFrueh.label),
       "Geist: im besten Pull selbst gegen den zweitbesten, mit +", gFrueh);
     // gespeicherter Bezug: der erste Dolch-Kampf allein; der gespeicherte zweitbeste Pull ist der Dolch-Kampf vom 22.09. 21:00
     await qLoad(BAU_DA1);
     await qTab("analysis");
     const gGesp = await geist();
+    await uSatz("Gesp");
     assert(gGesp.v.startsWith("−") && gGesp.pfad && /am 22\.09\.$/.test(gGesp.n),
       "Geist: gegen den gespeicherten Pull desselben Builds", gGesp);
     const tGesp = await tabelle();
@@ -1299,23 +1329,106 @@ try {
     await qLoad(BAU_DA3);
     await qTab("analysis");
     const gDa3 = await geist();
+    await uSatz("Da3");
     const tDa3 = await tabelle();
-    const haupt3 = await q.evaluate(() => document.querySelector("#findings .wbfach.haupt")?.dataset.n || "");
+    const haupt3 = await q.evaluate(() => document.querySelector("#a2 .a2karte")?.dataset.skill || "");
     assert(gDa3.pfad && haupt3 === "Strafing" && !!tDa3 && tDa3.kopf.some((x) => /^bester Pull$/i.test(x)) &&
       tDa3.zeilen.every((z) => z[2] === "nicht gespeichert"),
       "Geist: Faehigkeit ausserhalb des gespeicherten Pulls zeigt „nicht gespeichert“, keine Null", { gDa3, haupt3, tDa3 });
+    /* #439: bei ungerader Kartenzahl bleibt am Ende eine leere Zelle; die Flaeche dahinter hat nicht die Farbe der
+       Trennlinie (--hair-rule), sondern ist durchsichtig wie die Seite. Jede Linie wird genau einmal gezeichnet: Rahmen
+       oben, Rahmen links, senkrechte und waagerechte Linie zwischen den Karten und ihre Kreuzung haben dieselbe Farbe
+       (kein zweiter Auftrag, der sie dunkler macht). Der Test macht die Zahl ungerade (drei Karten in zwei Spalten) und
+       liest Bildpunkte aus einem Bildschirmfoto. Glas bleibt wie vorher: nur der Aussenrahmen, keine inneren Linien. */
+    const themaDavor = await q.evaluate(() => ({ t: document.documentElement.dataset.theme, m: document.documentElement.classList.contains("mica") }));
+    const punkte = async (t) => {
+      await q.setViewportSize({ width: 1280, height: 1100 }); /* die ganze Karte samt Rahmen unter dem festen Kopf im Bild */
+      const g = await q.evaluate((t) => {
+        document.documentElement.dataset.theme = t;
+        document.documentElement.classList.toggle("mica", t === "glas");
+        const kk = document.querySelector("#a2 .a2karten");
+        if (!kk) return null;
+        const karten = [...kk.querySelectorAll(".a2karte")];
+        karten.forEach((k, i) => { k.style.display = i < 3 ? "" : "none"; });
+        kk.style.gridTemplateColumns = "repeat(2,minmax(0,1fr))";
+        kk.style.scrollMarginTop = "40px"; kk.scrollIntoView({ block: "start" });
+        const a = karten[0].getBoundingClientRect(), c = karten[2].getBoundingClientRect(), k0 = kk.getBoundingClientRect();
+        return { n: karten.length, bg: getComputedStyle(kk).backgroundColor, ax: a.left, ay: a.top, ar: a.right, ab: a.bottom, cr: c.right, ct: c.top, ch: c.height, kr: k0.right, k1r: karten[1].getBoundingClientRect().right,
+          mass: (() => { const st = getComputedStyle(kk), pa = kk.parentElement, ps = getComputedStyle(pa), pr = pa.getBoundingClientRect();
+            return { hoehe: Math.round((k0.height + parseFloat(st.marginTop) + parseFloat(st.marginBottom)) - (c.bottom - a.top - 1)),
+              rechts: Math.round(k0.right + parseFloat(st.marginRight) - (pr.right - parseFloat(ps.paddingRight) - parseFloat(ps.borderRightWidth))),
+              links: Math.round(k0.left - parseFloat(st.marginLeft) - (pr.left + parseFloat(ps.paddingLeft) + parseFloat(ps.borderLeftWidth))) }; })() };
+      }, t);
+      if (!g) return null;
+      const bild = (await q.screenshot()).toString("base64");
+      const px = await q.evaluate(async ({ bild, p }) => {
+        const bm = await createImageBitmap(await (await fetch("data:image/png;base64," + bild)).blob());
+        const cv = document.createElement("canvas"); cv.width = bm.width; cv.height = bm.height;
+        const cx = cv.getContext("2d"); cx.drawImage(bm, 0, 0);
+        const f = Object.fromEntries(Object.entries(p).map(([k, [x, y]]) => [k, [...cx.getImageData(Math.round(x), Math.round(y), 1, 1).data].join(",")]));
+        return f;
+      }, { bild, p: {
+        oben: [g.ax + 20, g.ay - 1], links: [g.ax - 1, g.ay + 20],
+        senkrecht: [g.ar - 1, g.ay + 20], waagerecht: [g.ax + 20, g.ab - 1], kreuz: [g.ar - 1, g.ab - 1], eckeOR: [g.k1r - 1, g.ay - 1], eckeUL: [g.ax - 1, g.ab + g.ch - 1],
+        leer: [g.cr + (g.kr - g.cr) / 2, g.ct + g.ch / 2] } });
+      await q.evaluate(() => { document.querySelectorAll("#a2 .a2karte").forEach((k) => { k.style.display = ""; }); document.querySelector("#a2 .a2karten").style.gridTemplateColumns = ""; });
+      await q.setViewportSize({ width: 1280, height: 860 });
+      return { ...g, px };
+    };
+    /* der Rahmen oben liegt bei Bruchteilen eines Pixels nicht pixelgenau (Schatten werden nicht gerundet): 3 von 255 Toleranz;
+       eine zweite Schicht laege bei etwa 18 */
+    const gleich = (x, y) => x.split(",").every((v, i) => Math.abs(Number(v) - Number(y.split(",")[i])) <= 3);
+    for (const thema of ["dunkel", "hell", "tnl"]) {
+      const g = await punkte(thema);
+      const p = g?.px;
+      assert(!!p && g.n >= 3 && /rgba\(0, 0, 0, 0\)|transparent/.test(g.bg) && gleich(p.oben, p.senkrecht) && gleich(p.links, p.senkrecht) && gleich(p.waagerecht, p.senkrecht) && gleich(p.kreuz, p.senkrecht) && g.mass.hoehe === 0 && g.mass.rechts === 0 && g.mass.links === 0 && gleich(p.eckeOR, p.senkrecht) && gleich(p.eckeUL, p.senkrecht) && !gleich(p.leer, p.senkrecht),
+        "#439: leere Zelle zeigt die Seite; Rahmen, Linien zwischen den Karten und Kreuzung haben dieselbe Farbe, einmal gezeichnet (" + thema + ")", g);
+    }
+    const gg = await punkte("glas");
+    const nah = (x, y) => x.split(",").every((v, i) => Math.abs(Number(v) - Number(y.split(",")[i])) <= 2);
+    assert(!!gg && nah(gg.px.senkrecht, gg.px.leer) && nah(gg.px.waagerecht, gg.px.leer) && !nah(gg.px.oben, gg.px.leer),
+      "#439: Glas bleibt wie vorher: nur der Aussenrahmen, keine inneren Linien zwischen den Karten", gg);
+    /* #439: die Karten rollen bei keiner Breite waagerecht, und die Zeilen sind nicht gestreckt: die hoechste Karte
+       einer Zeile ist genau so hoch wie ihr Inhalt (Rand und Polster eingerechnet), nirgends mehr */
+    for (const [b, h] of [[560, 900], [1280, 860], [2000, 1480]]) {
+      await q.setViewportSize({ width: b, height: h });
+      await q.waitForFunction(() => document.querySelector("#a2 .a2karte"));
+      const m = await q.evaluate(() => {
+        const kk = document.querySelector("#a2 .a2karten");
+        const karten = [...kk.querySelectorAll(".a2karte")];
+        const zeilen = new Map();
+        karten.forEach((k) => { const t = Math.round(k.getBoundingClientRect().top + scrollY); const r = zeilen.get(t) || []; r.push(k); zeilen.set(t, r); });
+        const ueber = [...zeilen.values()].map((r) => {
+          const hoch = Math.max(...r.map((k) => k.getBoundingClientRect().height));
+          const inhalt = Math.max(...r.map((k) => { const kr = k.getBoundingClientRect(); const stil = getComputedStyle(k);
+            return Math.max(...[...k.children].map((c) => c.getBoundingClientRect().bottom)) - kr.top + parseFloat(stil.paddingBottom) + parseFloat(stil.borderBottomWidth); }));
+          return Math.round(hoch - inhalt);
+        });
+        return { rollt: document.documentElement.scrollWidth > document.documentElement.clientWidth, karten: karten.length, ueber };
+      });
+      assert(!m.rollt && m.ueber.every((u) => u <= 4), "#439: Karten bei " + b + " px: kein waagerechtes Rollen, Zeilen nicht gestreckt", m);
+    }
+    await q.setViewportSize({ width: 1280, height: 860 });
+    await q.evaluate(({ t, m }) => { document.documentElement.dataset.theme = t; document.documentElement.classList.toggle("mica", m); }, themaDavor);
     // ein Pull eines anderen Builds (Langbogen): kein Geist
     await qLoad(BAU_LB);
     await qTab("analysis");
     const gLb2 = await geist();
+    await uSatz("Lb2");
     assert(!gLb2.pfad && gLb2.v === "–", "Geist: Langbogen-Pull zeigt keinen Geist", gLb2);
+    assert(uSaetze.every((x) => !!x.analyse.uv && (!x.tafel.uv || (x.tafel.uv === x.analyse.uv && x.tafel.un === x.analyse.un))),
+      "Urteil: wo die Tafel einen Urteilssatz zeigt, ist es derselbe wie in der Analyse (auch mit besten Pull)", uSaetze);
+    // diese Kaempfe haben alle einen Bezug mit Lauf: wo die Analyse den Geist zeichnet, zeigt die Tafel ihren Vergleich (.ubezug), keinen Urteilssatz
+    assert(uSaetze.some((x) => x.geist) && uSaetze.filter((x) => x.geist).every((x) => x.tafel.vergleich && !x.tafel.uv),
+      "Urteil: Kampf mit Geist und Bezug mit Lauf: die Tafel zeigt ihren Vergleich (.ubezug) statt des Urteilssatzes", uSaetze.map((x) => [x.wo, x.geist, x.tafel.vergleich, !!x.tafel.uv]));
+
     // der beste Pull selbst gegen den zweitbesten, der ueber die gemeinsame Strecke vorn liegt
     await qLoad(BAU_DA4);
     await qTab("analysis");
     await waehle(1);
     await qTab("analysis");
     const zweitAbst = () => q.evaluate(() => {
-      const e = document.querySelector('#weitereListe .find[data-k="abstand"]');
+      const e = document.querySelector('#a2besser li[data-k="abstand"]');
       return { e: !!e, text: e?.textContent || "", aria: e?.querySelector("button.inrot")?.getAttribute("aria-label") || "",
         n: document.querySelector('#wbKenn .find[data-k="gegenBest"] .n')?.textContent || "" };
     });
@@ -1332,19 +1445,10 @@ try {
       "Geist: Englisch - Abstand und Kennzeile gegen den second best pull", zEn);
     await q.evaluate(() => document.querySelector("#btnLang").click());
     await q.waitForTimeout(150);
-    /* Abschlusspruefung I2: der 50-s-Pull (21:10) gegen den 90-s-Besten - die Einsaetze des besten Pulls nach
-       dem Ende dieses Kampfs stehen nicht als Block am rechten Rand (wie die Kurve auf die Laenge geschnitten).
-       Je Bild hoechstens ein Spiegel-Strich in den letzten 2 Punkt (der letzte Einsatz vor dem Ende). */
+    /* Abschlusspruefung I2 (Spiegel am rechten Rand): entfallen mit den gespiegelten Strichen der Werkbank (#414, Inventur D05/D16);
+       die Geisterkurve der Zeitleiste ist auf die Laenge dieses Kampfs geschnitten (geistBauen, 26) und hat keinen Rand. */
     await waehle(0);
     await qTab("analysis");
-    await tabelle();
-    const rand = await q.evaluate(() => [...document.querySelectorAll("#findings svg.wbglut")].map((svg) => {
-      const W = +(svg.getAttribute("viewBox") || "0 0 0 0").split(" ")[2];
-      const sp = [...svg.querySelectorAll("rect")].filter((r) => (r.getAttribute("fill") || "").includes("--wbspiegel"));
-      return { W, n: sp.length, rand: sp.filter((r) => +r.getAttribute("x") >= W - 2).length };
-    }).filter((x) => x.n > 0));
-    assert(rand.length > 0 && rand.every((x) => x.rand <= 1),
-      "Geist: kuerzerer Pull gegen laengeren Besten - kein Stapel gespiegelter Einsaetze am rechten Rand", rand);
     /* Abschlusspruefung I1: ein duenner Dolch-Kampf (15 Treffer) - der beste Pull desselben Builds ist
        gespeichert, nur der Geist wird unter der Schwelle nicht gezeichnet: kein Eintrag, kein "noch kein Pull" */
     const BAU_DUENN = bauLog("bau-duenn.txt", [{ bau: DA, start: at(25, 21, 0), secs: 7.5, scale: 1.0 }]);
@@ -1352,7 +1456,7 @@ try {
     await qTab("analysis");
     const duenn = await q.evaluate(() => ({ eintrag: !!document.querySelector('#wbKenn .find[data-k="gegenBest"]'),
       kenn: document.querySelector("#wbKenn")?.textContent || "", text: document.querySelector("#p-analysis").innerText,
-      pfad: !!document.querySelector("#saeulen path.wbgeist") }));
+      pfad: !!document.querySelector("#a2:not([hidden]) #a2kurve path.a2geist") }));
     assert(!duenn.eintrag && !duenn.pfad && !/noch kein Pull|dein erster Pull/.test(duenn.text) && duenn.kenn.length > 0,
       "Geist: duenner Kampf mit gespeichertem Bezug - kein Eintrag „Gegen deinen besten Pull“, kein „noch kein Pull“", duenn);
     /* Abschlusspruefung I1: der Langbogen-Pull sagt "noch kein Pull mit diesen Waffen" (Ruling 10); in der
@@ -1420,22 +1524,22 @@ try {
     };
     const mAnalyse = async (warte = "") => {
       await m.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
-      await m.waitForFunction((w) => !document.querySelector("#verdict").hidden && !!document.querySelector("#saeulen svg") &&
+      await m.waitForFunction((w) => !!document.querySelector("#a2kurve svg") &&
         (document.querySelector("#mechanikZeile")?.textContent || "").includes(w), warte, { timeout: 5000 }).catch(() => {});
       return m.evaluate(() => ({
         zeile: document.querySelector("#mechanikZeile")?.hidden !== false ? "" : document.querySelector("#mechanikZeile").textContent,
-        mech: [...document.querySelectorAll("#saeulen .mechz")].map((z) => z.dataset.zeit),
-        gaps: [...document.querySelectorAll("#saeulen .gapz")].map((z) => z.dataset.zeit),
-        leg: document.querySelector("#vlegMech")?.hidden === false,
+        mech: [...document.querySelectorAll("#a2kurve .mechz")].map((z) => z.dataset.zeit),
+        gaps: [...document.querySelectorAll("#a2kurve .gapz")].map((z) => z.dataset.zeit),
+        leg: !!document.querySelector("#a2legende .lm"),
         // #218: die Zahl der Luecken steht in der Kennzeile des Kopfs (#wbKenn), die Strecken im Streifen
         luecken: [...document.querySelectorAll('#wbKenn .find[data-k="luecken"]')]
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent).find((x) => /^Lücken/.test(x)) || "",
         px: document.querySelector("#mechanikZeile") ? parseFloat(getComputedStyle(document.querySelector("#mechanikZeile")).fontSize) : 0,
-        urteil: document.querySelector("#verdictText")?.hidden ? "" : document.querySelector("#verdictText")?.textContent || "",
+        urteil: document.querySelector("#a2haelften")?.hidden ? "" : document.querySelector("#a2haelften")?.textContent || "",
         /* #218: "Weitere Befunde" ist entfallen; die Befunde stehen verteilt (Kopf, Streifen, Faecher) -
            gelesen werden alle Eintraege des Bereichs (strenger: nirgends ein Mechanik-Eintrag) */
         weitere: [...document.querySelectorAll("#p-analysis .find")].map((f) => f.textContent).join(" | "),
-        label: document.querySelector("#saeulen")?.getAttribute("aria-label") || "",
+        label: document.querySelector("#a2beschr")?.textContent || "",
         rolle: document.querySelector("#mechanikZeile")?.getAttribute("role") || "",
         mechEintrag: [...document.querySelectorAll('#p-analysis .find[data-k="mechanik"]')]
           .map((f) => f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent),
@@ -1571,8 +1675,8 @@ try {
     r = await mAnalyse("Vulcanus");
     // auch nichts abgeschnitten: Zeile und Legende passen in ihre eigene Breite
     const roll560 = await m.evaluate(() => document.documentElement.scrollWidth > innerWidth ||
-      [...document.querySelectorAll("#verdict *")].some((e) => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1) ||
-      ["#mechanikZeile", "#vlegMech"].some((s) => { const e = document.querySelector(s); return !e || e.scrollWidth > e.clientWidth + 1; }));
+      [...document.querySelectorAll("#a2 .a2zeit *")].some((e) => e.getClientRects().length && e.getBoundingClientRect().right > innerWidth + 1) ||
+      ["#mechanikZeile", "#a2legende"].some((s) => { const e = document.querySelector(s); return !e || e.scrollWidth > e.clientWidth + 1; }));
     assert(!!r.zeile && r.leg && !roll560, "Mechanik: bei 560 px Zeile und Legende sichtbar, kein waagerechtes Rollen", { zeile: r.zeile, leg: r.leg, roll560 });
     await m.setViewportSize({ width: 1280, height: 860 });
     /* Pruefung 01.10., M1: Haelftenvergleich und Schwankung ohne die Mechanik. Die Strecke
@@ -1656,7 +1760,8 @@ try {
       await g.waitForTimeout(300);
       await g.evaluate(() => document.querySelector('[data-tab="analysis"]').click());
       await g.waitForTimeout(300);
-      return g.evaluate(() => [...document.querySelectorAll("#p-analysis .find")].some((x) => /^(Die ersten|The first) 10\u00a0s$/.test(x.querySelector(".k")?.textContent || "")));
+      // #414 (B2): der Start steht als Satz unter dem Opener (#a2start)
+      return g.evaluate(() => { const e = document.querySelector("#a2start"); return !!e && !e.hidden && /^(Die ersten|The first) 10\u00a0s: /.test(e.textContent); });
     };
     let gespeichert = null;
     const g1 = await geoeffnet({}, (b) => { gespeichert = b; });
@@ -1695,9 +1800,13 @@ try {
       try { localStorage.clear(); localStorage.setItem("boroLang", "de"); } catch { /* storage blocked */ }
     });
     await fp.goto("file://" + dist);
+    /* Der Name allein sagt nicht, dass der neue Kampf geladen ist (viele Logs hier heissen gleich): zusaetzlich warten, bis sich die Seite
+       gegenueber vorher geaendert hat (#224: ein Zustand, keine feste Zeit; gleiche Seite = keine Aenderung, dann endet das Warten nach 4 s). */
     const fLoad = async (file, name) => {
+      const vorher = await fp.evaluate(() => document.querySelector("#app")?.innerText || "");
       await fp.setInputFiles("#fileInput", file);
       await fp.waitForFunction((n) => (document.querySelector("#hName")?.textContent || "").includes(n), name);
+      await fp.waitForFunction((v) => (document.querySelector("#app")?.innerText || "") !== v, vorher, { timeout: 4000 }).catch(() => {});
       await fp.waitForTimeout(150);
     };
     const fTab = async (name) => { await fp.evaluate((n) => document.querySelector(`[data-tab="${n}"]`).click(), name); await fp.waitForTimeout(150); };
@@ -1728,17 +1837,29 @@ try {
       .map((f) => f.dataset.k + " | " + f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
         (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
     const fText = () => fp.evaluate(() => document.querySelector("#p-analysis").innerText);
-    /* #218 (Ruling 9): die zeitgebundenen Befunde stehen vollstaendig in #weitereListe im Streifen -
-       die positiven Proben verlangen den Eintrag zusaetzlich dort */
-    const fListe = () => fp.evaluate(() => [...document.querySelectorAll("#weitereListe .find")]
-      .map((f) => f.dataset.k + " | " + f.querySelector(".k").textContent + " | " + f.querySelector(".v").textContent +
-        (f.querySelector(".n") ? " | " + f.querySelector(".n").textContent : "")));
+    /* #414 (B2): die Befundliste ist entfallen; die Saetze stehen in der Analyse (unter Gut hier, Besser moeglich, am Opener, unter der
+       Legende und unter dem Satz des Bereichs). Gelesen wird "Schluessel | Satz" ohne die Knoepfe. */
+    const fListe = () => fp.evaluate(() => {
+      const ohne = (e) => { const c = e.cloneNode(true); c.querySelectorAll("button").forEach((b) => b.remove()); return c.textContent.trim(); };
+      return [...document.querySelectorAll("#a2gut li[data-k], #a2besser li[data-k]")].map((e) => e.dataset.k + " | " + ohne(e)).concat(
+        [["start", "#a2start"], ["unverwundbar", "#a2unv"], ["haelften", "#a2haelften"]].filter(([, sel]) => { const e = document.querySelector(sel); return e && !e.hidden; })
+          .map(([k, sel]) => k + " | " + ohne(document.querySelector(sel))));
+    });
 
+    // Tab-Erreichbarkeit: von der Bereichsleiste aus erreicht Tab das Ziel (die Knoepfe der neuen Saetze, #414 B2)
+    const tabErreicht = async (sel) => {
+      await fp.evaluate(() => document.querySelector('#bereiche [data-tab="analysis"]').focus());
+      for (let i = 0; i < 200; i++) {
+        await fp.keyboard.press("Tab");
+        if (await fp.evaluate((x) => !!document.activeElement?.matches(x), sel)) return true;
+      }
+      return false;
+    };
     // #105: ein gleichmaessiger Kampf - keine schwaechste Stelle, kein "Pruefe"
     await fLoad(flachLog("flach.txt", "Fellinex"), "Fellinex");
     await fTab("analysis");
     let bf = await fBefunde(), alles = await fText();
-    assert(!bf.some((b) => b.startsWith("schwach |")) && !/Schwächste drei Sekunden/.test(alles),
+    assert(!(await fListe()).some((b) => b.startsWith("stelle |")) && !bf.some((b) => b.startsWith("schwach |")) && !/Schwächste drei Sekunden/.test(alles),
       "#105: gleichmaessiger Kampf ohne \"Schwaechste drei Sekunden\"", bf);
     assert(!/Prüfe/.test(alles), "#105: gleichmaessiger Kampf ohne \"Pruefe\"", alles);
     // eine Delle auf 40 %: unter dem halben Median, der Eintrag steht
@@ -1746,13 +1867,18 @@ try {
     await fTab("analysis");
     bf = await fBefunde();
     let fl = await fListe();
-    assert(bf.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)) && fl.some((b) => /^schwach \| Schwächste drei Sekunden \| 0:40–0:43/.test(b)),
-      "#105: eine Strecke unter dem halben Median steht als schwaechste Stelle", bf);
+    assert(fl.some((b) => /^stelle \| Schwächste drei Sekunden 0:40–0:43 bei /.test(b)) && await fp.evaluate(() => !!document.querySelector("#a2marken .a2marke.stelle[data-von='40'][data-bis='43']")),
+      "#105/#414: eine Strecke unter dem halben Median steht als Satz unter Besser moeglich und als Marke der Zeitleiste", fl);
+    // die staerksten 5 s: im ganzen Kampf der Satz mit Anteil und tragender Faehigkeit unter Gut hier, statt des Satzes zur Spitze (nicht beide)
+    const gutText = await fp.evaluate(() => document.querySelector("#a2gut")?.textContent || "");
+    assert(fl.some((b) => /^strecke \| Von \d+:\d\d bis \d+:\d\d kam \d+\u00a0% des Schadens dieses Pulls, das meiste von \S/.test(b)) && !/Stärkste 5\s*s:/.test(gutText),
+      "#414: die staerksten 5 s nennen ihren Anteil und die tragende Faehigkeit, der Satz zur Spitze steht nicht noch einmal da", { fl, gutText });
     // eine Delle auf 70 %: schwaecher als ueblich, aber nicht unter der Haelfte - kein Eintrag
     await fLoad(flachLog("delle70.txt", "Fellinex", { delle: [40, 43, 0.7] }), "Fellinex");
     await fTab("analysis");
     bf = await fBefunde();
-    assert(!bf.some((b) => b.startsWith("schwach |")), "#105: 70 % des Medians ist keine schwaechste Stelle", bf);
+    assert(!bf.some((b) => b.startsWith("schwach |")) && !(await fListe()).some((b) => b.startsWith("stelle |")) && await fp.evaluate(() => !document.querySelector("#a2marken .a2marke.stelle")),
+      "#105: 70 % des Medians ist keine schwaechste Stelle (kein Satz, keine Marke)", bf);
     assert(!/Die Stelle/.test(await fp.evaluate(() => document.querySelector("#analysisCall").textContent)),
       "#105: 70 % des Medians auch nicht im Urteil", await fp.evaluate(() => document.querySelector("#analysisCall").textContent));
 
@@ -1761,12 +1887,17 @@ try {
     await fLoad(flachLog("flach-krit.txt", "Fellinex", { krit: true }), "Fellinex");
     await fTab("analysis");
     alles = await fText();
-    // #218: "Wie triffst du?" ist entfallen; derselbe Satz steht im Kopf des Kampfstreifens (#wbWie)
-    const dWie = await fp.evaluate(() => document.querySelector("#wbWie")?.innerText || "");
-    assert(zaehle(alles, /deines Schadens kamen aus Krits/) === 1 && /deines Schadens kamen aus Krits/.test(dWie),
-      "#106: der Krit-Satz steht genau einmal, unter \"Wie triffst du?\"", alles);
+    // #414 (B3): "Wie triffst du?" und der Kopf des Kampfs (#wbWie, #verdict) sind entfallen; die Rate steht unter "Gut hier",
+    // der Anteil der Krits am Schaden unter dem Satz des Bereichs (#a2treffer), jede Aussage einmal
+    assert(await fp.evaluate(() => !document.querySelector("#wbWie, #verdict, #verdictText, #formTitel, .wbrampe")),
+      "#414 B3: der Kopf des Kampfs mit der Rampe der Trefferarten ist aus der Seite", null);
+    const dRate = await fp.evaluate(() => { const li = document.querySelector('#a2gut li[data-k="raten"]'); return li ? li.textContent.trim() : ""; });
+    const dTreffer = await fp.evaluate(() => { const e = document.querySelector("#a2treffer"); return e && !e.hidden ? e.textContent.trim() : ""; });
+    const dWie = dRate + " | " + dTreffer;
+    assert(zaehle(alles, /deines Schadens kamen aus Krits/) === 1 && /deines Schadens kamen aus Krits/.test(dTreffer) && !/Krits/.test(dRate) && dRate.length > 0,
+      "#106: der Krit-Satz steht genau einmal, unter dem Satz des Bereichs; die Rate steht unter Gut hier", { dRate, dTreffer });
     // #269: die Rate nennt die direkten Treffer; die leise Zeile sagt, woraus gerechnet ist, die Gesamtzahl bleibt
-    assert(/\d+\u00a0% deiner direkten Treffer kritisch, \d+\u00a0% stark\./.test(dWie) && /Treffer, davon \d+\u00a0% kritisch/.test(alles) &&
+    assert(/^\d+\u00a0% deiner direkten Treffer kritisch, \d+\u00a0% stark\.$/.test(dRate) && /Treffer, davon \d+\u00a0% kritisch/.test(alles) &&
       !/Gerechnet/.test(dWie),
       "#106/#269: jeder Krit-Wert sagt, worauf er sich bezieht (direkte Treffer, Schaden); sind alle Treffer direkt, steht keine Basiszeile", dWie);
     // #218: "Hast du durchgedrueckt?" ist entfallen; die Einsaetze je Minute stehen in der Kennzeile
@@ -1776,14 +1907,15 @@ try {
     // eine deutlich staerkere zweite Haelfte steht da
     await fLoad(flachLog("haelften.txt", "Fellinex", { delle: [0, 45, 0.6] }), "Fellinex");
     await fTab("analysis");
-    assert(/Deine zweite Hälfte lief mit [\d.]+k, dem 1,\d-fachen der ersten\./.test(await fText()),
-      "#106: ab dem 1,15-fachen steht der Haelftensatz", await fp.evaluate(() => document.querySelector("#verdictText").textContent));
+    assert((await fListe()).some((b) => /^haelften \| Deine zweite Hälfte lief mit [\d.]+k, dem 1,\d-fachen der ersten\.$/.test(b)),
+      "#106/#414: ab dem 1,15-fachen steht der Haelftensatz, in der Analyse unter dem Satz des Bereichs", await fListe());
+    await themen(["#a2haelften"], "Haelftensatz", fp);
     /* #218 (8.3): hier steht der Satz unter dem Streifen sicher - seine Breite bei 2000 x 1480 wird jetzt
        gemessen und unten mit der Lesezeile geprueft (hoechstens 75 Zeichen) */
     await fp.setViewportSize({ width: 2000, height: 1480 });
     await fp.waitForTimeout(300);
     const formsatzBreit = await fp.evaluate(() => {
-      const e = document.querySelector("#verdictText");
+      const e = document.querySelector("#a2haelften");
       if (!e || !e.getClientRects().length || !e.textContent.trim()) return -1;
       const m = document.createElement("span");
       m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
@@ -1799,10 +1931,9 @@ try {
     alles = await fText();
     bf = await fBefunde();
     fl = await fListe();
-    assert(bf.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)) &&
-      fl.some((b) => /^start \| Die ersten 10\u00a0s \| .*Dein Start war deutlich schwächer/.test(b)),
-      "#106: der schwache Start steht unter Weitere Befunde", bf);
-    assert(zaehle(alles, /Dein Start war deutlich schwächer/) === 1 && !/Start/.test(await fp.evaluate(() => document.querySelector("#verdictText").textContent)),
+    assert(fl.some((b) => /^start \| Die ersten 10\u00a0s: .*Dein Start war deutlich schwächer/.test(b)),
+      "#106/#414: der schwache Start steht als Satz unter dem Opener", fl);
+    assert(zaehle(alles, /Dein Start war deutlich schwächer/) === 1 && !/Start/.test(await fp.evaluate(() => ["#a2satz", "#a2haelften", "#a2gut", "#a2besser", "#a2unv"].map((x) => document.querySelector(x)?.textContent || "").join(" "))),
       "#106: der Start steht genau einmal, nicht unter der Form", alles);
 
     /* #109: ein h2 (der Name des Bereichs; mit Feldern steht er in der Kopfzeile, das h2 im Panel ist
@@ -1813,9 +1944,10 @@ try {
        Faehigkeiten" nur, wenn welche uebrig sind, zuletzt der Fuss. Dieser Kampf hat nur Schnellfeuer und
        Detonierendes Mal, kein Fenster, keine Laufzeit, kein Passiv, ein Ziel. Die Faecher tragen in ihrer
        h3 eine Zusatzzeile (small); verglichen wird der Name. */
-    const faStart = faecherVon(flachLetzter);
-    const sollBaum = ["H2 Analyse", "H3 Urteil", "H3 Der Kampf", "H3 " + faStart.haupt, ...faStart.mittel.map((n) => "H3 " + n),
-      ...(faStart.weitere.length ? ["H3 Weitere Fähigkeiten"] : []), "H3 Was das Log nicht weiß"];
+    /* #414 (Inventur O13): die Werkbank ist abgeloest; unter dem Urteil stehen (das Feld "Der Kampf" entfiel mit #414 B3) die Zeitleiste, die Auswertung (drei Listen),
+       die Faehigkeiten (der Pruefstand, die Karten sind keine Ueberschriften) und der Opener, dann der Fuss. Ohne Fenster und
+       mit einem Ziel kommen keine weiteren Ueberschriften. */
+    const sollBaum = ["H2 Analyse", "H3 Urteil", "H3 Zeitleiste", "H3 Was hier ablief", "H3 Gut hier", "H3 Besser möglich", "H3 Deine Fähigkeiten", "H3 Opener, die ersten 15 s", "H3 Was das Log nicht weiß"];
     const baum = await fp.evaluate(() => [...document.querySelectorAll("#bereichKopf h2, #p-analysis :is(h1,h2,h3,h4)")]
       .filter((h) => h.getClientRects().length > 0).map((h) => { const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove());
         return h.tagName + " " + c.textContent.trim(); }));
@@ -1845,6 +1977,7 @@ try {
         sichtbar: !!r && r.top < innerHeight && r.bottom > 0,
         von: document.querySelector("#p-rotation .vfrom")?.value || "", bis: document.querySelector("#p-rotation .vto")?.value || "",
         ganz: document.querySelector("#analysisCall .ganz")?.textContent || "",
+        bereich: document.querySelector("#a2bereichZeit")?.textContent || "",
       };
     });
     await fLoad(flachLog("luecke.txt", "Fellinex", { delle: [40, 46, 0] }), "Fellinex");
@@ -1855,13 +1988,17 @@ try {
     await fp.evaluate(() => document.querySelector("#analysisCall button.zubeleg").click());
     await fp.waitForTimeout(400);
     let w = await weg();
-    assert(w.tab === "p-analysis" && w.fokus === "#verdict" && w.sichtbar, "#107: \"Zum Beleg\" rollt zur Form und setzt den Fokus darauf", w);
+    assert(w.tab === "p-analysis" && w.fokus === "#a2fokus" && w.sichtbar && /^0:40–0:46 /.test(w.bereich),
+      "#107: \"Zum Beleg\" rollt zur Zeitleiste, setzt die Luecke als Bereich und den Fokus auf die Kurve", w);
     // an "Luecken ab 2 s": die laengste Luecke in der Rotation, mit 2 s Rand
-    const lb = await fp.evaluate(() => { const k = document.querySelector('#weitereListe .find[data-k="luecken"] button.inrot');
+    // #414 (B2, Inventur O10): ein Knopf an der Zeile des Bereichs zeigt den gewaehlten Bereich (hier die Luecke) in der Rotation
+    const lb = await fp.evaluate(() => { const k = document.querySelector("#a2weg button.inrot");
       return k ? { text: k.textContent, label: k.getAttribute("aria-label") } : null; });
-    assert(lb?.text === "In der Rotation zeigen ›" && lb.label === "Längste Lücke 0:40\u20130:46 in der Rotation zeigen",
-      "#107: an den Luecken der Knopf mit der Strecke im Vorlesenamen", lb);
-    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="luecken"] button.inrot').click());
+    assert(lb?.text === "In der Rotation zeigen ›" && lb.label === "Den Bereich 0:40\u20130:46 in der Rotation zeigen",
+      "#107/#414: an der Zeile des Bereichs der Knopf mit der Strecke im Vorlesenamen", lb);
+    assert(await tabErreicht("#a2weg button.inrot"), "#414: der Knopf in die Rotation an der Zeile des Bereichs ist mit Tab erreichbar", null);
+    await themen(["#a2weg button.inrot"], "Knopf an der Zeile des Bereichs", fp);
+    await fp.evaluate(() => document.querySelector("#a2weg button.inrot").click());
     await fp.waitForTimeout(500);
     w = await weg();
     assert(w.tab === "p-rotation" && w.von === "0:38" && w.bis === "0:48" && w.fokus === "#deineRotScroll",
@@ -1881,44 +2018,52 @@ try {
     /* Tastatur: von der Bereichsleiste aus erreicht Tab "Zum Beleg" und die Knoepfe in den Befunden */
     await fTab("analysis");
     await fp.evaluate(() => document.querySelector('#bereiche [data-tab="analysis"]').focus());
-    /* #218: die Werkbank bringt mehr Knoepfe (Fahnen, "Mehr zu ..."), darum bis zu 120 Schritte; die
-       Folge des ersten Erreichens wird mitgeschrieben (Fahne = "fahne", "Mehr zu ..." = "fach") */
+    /* #218: die Werkbank bringt mehr Knoepfe (Zeitleiste, "Mehr zu ..."), darum bis zu 120 Schritte; die
+       Folge des ersten Erreichens wird mitgeschrieben (Zeitleiste = "zeit", "Mehr zu ..." = "fach") */
     const erreicht = new Set(), folge = [];
     for (let i = 0; i < 120; i++) {
       await fp.keyboard.press("Tab");
       const k = await fp.evaluate(() => { const a = document.activeElement;
-        return a?.closest("#p-analysis") ? (a.classList.contains("zubeleg") ? "beleg" : a.classList.contains("wbfahne") ? "fahne" :
-          a.classList.contains("wbauf") ? "fach" : a.closest(".find")?.dataset.k || a.closest("section")?.id || "") : ""; });
+        return a?.closest("#p-analysis") ? (a.classList.contains("zubeleg") ? "beleg" : a.closest(".a2karte") ? "karte" : a.closest(".a2marke") ? "marke" : a.closest("#a2") ? "zeit" :
+          a.closest(".find")?.dataset.k || a.closest("section")?.id || "") : ""; });
       if (k && !erreicht.has(k)) folge.push(k);
       if (k) erreicht.add(k);
     }
     // #218: der Weg zur Folge sitzt an den Einsaetzen je Minute (Kennzeile), nicht mehr im Feld #dDurch
-    assert(erreicht.has("beleg") && erreicht.has("luecken") && erreicht.has("jeMinute"), "#107: alle neuen Wege mit Tab erreichbar", [...erreicht]);
-    // #218 (Spezifikation 8.2, letzte Zeile): Zum Beleg, dann die erste Fahne, dann das erste Fach
-    const iBeleg = folge.indexOf("beleg"), iFahne = folge.indexOf("fahne"), iFach = folge.indexOf("fach");
-    assert(iBeleg >= 0 && iFahne > iBeleg && iFach > iFahne,
-      "#107/#218: Tab erreicht Zum Beleg, die erste Fahne, das erste Fach in dieser Folge", folge);
+    assert(erreicht.has("beleg") && erreicht.has("marke") && erreicht.has("zeit") && erreicht.has("jeMinute"), "#107: alle neuen Wege mit Tab erreichbar", [...erreicht]);
+    /* #218 (Spezifikation 8.2, letzte Zeile), seit #414: Zum Beleg, dann die Zeitleiste; die Karten danach prueft
+       test-pruefstand-page (dieser Kampf hat nur eine Faehigkeit im Sekundentakt, einen Tick, und darum keine Karte). */
+    const iBeleg = folge.indexOf("beleg"), iZeit = folge.indexOf("zeit");
+    assert(iBeleg >= 0 && iZeit > iBeleg,
+      "#107/#414: Tab erreicht Zum Beleg, dann die Zeitleiste in dieser Folge", folge);
     // die schwaechste Stelle: ihr Knopf nennt die Strecke, die Rotation zeigt sie mit Rand
     await fLoad(flachLog("delle40b.txt", "Fellinex", { delle: [40, 43, 0.4] }), "Fellinex");
     await fTab("analysis");
-    const sb = await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="schwach"] button.inrot')?.getAttribute("aria-label") || "");
+    assert(await tabErreicht('#a2besser li[data-k="stelle"] button.inrot') && await tabErreicht("#a2marken .a2marke.stelle"),
+      "#414: der Knopf in die Rotation am Satz der schwaechsten Stelle und ihre Marke sind mit Tab erreichbar", null);
+    await themen(['#a2besser li[data-k="stelle"]', "#a2marken .a2marke.stelle .l"], "schwaechste Stelle (Satz und Marke)", fp);
+    const sb = await fp.evaluate(() => document.querySelector('#a2besser li[data-k="stelle"] button.inrot')?.getAttribute("aria-label") || "");
     assert(sb === "Die Stelle 0:40\u20130:43 in der Rotation zeigen", "#107: an der schwaechsten Stelle der Knopf", sb);
-    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="schwach"] button.inrot').click());
+    await fp.evaluate(() => document.querySelector('#a2besser li[data-k="stelle"] button.inrot').click());
     await fp.waitForTimeout(500);
     w = await weg();
     assert(w.tab === "p-rotation" && w.von === "0:38" && w.bis === "0:45", "#107: die Stelle in der Rotation mit 2 s Rand", w);
     // ein neuer Kampf ohne Von/bis: kein Hinweis; ein ruhiges Urteil: kein "Zum Beleg"
     await fLoad(flachLog("flach2.txt", "Fellinex"), "Fellinex");
     await fTab("analysis");
+    // fLoad wartet nur auf den Namen (derselbe wie vorher): auf den Zustand warten, den die Probe pruefen will (#224), statt auf eine Zeit
+    await fp.waitForFunction(() => !document.querySelector("#analysisCall .ganz"), null, { timeout: 4000 }).catch(() => {});
     w = await weg();
     assert(!w.ganz && !(await fp.evaluate(() => !!document.querySelector("#analysisCall .zubeleg"))),
       "#107: ohne Von/bis kein Hinweis, ohne Urteil kein \"Zum Beleg\"", w);
     // der schwache Start: sein Knopf zeigt die ersten 10 s
     await fLoad(flachLog("start2.txt", "Fellinex", { pulls: [{}], delle: [0, 10, 0.3] }), "Fellinex");
     await fTab("analysis");
-    const st = await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="start"] button.inrot')?.getAttribute("aria-label") || "");
+    assert(await tabErreicht("#a2start button.inrot"), "#414: der Knopf in die Rotation am schwachen Start ist mit Tab erreichbar", null);
+    await themen(["#a2start"], "Start-Satz", fp);
+    const st = await fp.evaluate(() => document.querySelector("#a2start button.inrot")?.getAttribute("aria-label") || "");
     assert(st === "Die ersten 10\u00a0s in der Rotation zeigen", "#107: am schwachen Start der Knopf", st);
-    await fp.evaluate(() => document.querySelector('#weitereListe .find[data-k="start"] button.inrot').click());
+    await fp.evaluate(() => document.querySelector("#a2start button.inrot").click());
     await fp.waitForTimeout(500);
     w = await weg();
     assert(w.tab === "p-rotation" && w.von === "0:00" && w.bis === "0:12", "#107: der Start in der Rotation, 0:00-0:12", w);
@@ -1927,7 +2072,7 @@ try {
     await fp.evaluate(() => document.querySelector("#btnLang").click());
     await fp.waitForTimeout(200);
     const en = await fp.evaluate(() => ({ ganz: document.querySelector("#analysisCall .ganz")?.textContent || "",
-      start: document.querySelector('#weitereListe .find[data-k="start"] button.inrot')?.getAttribute("aria-label") || "" }));
+      start: document.querySelector("#a2start button.inrot")?.getAttribute("aria-label") || "" }));
     assert(en.ganz === "The analysis reads the whole fight. From/to 0:00\u20130:12 only applies in Rotation." &&
       en.start === "Show the first 10\u00a0s in Rotation", "#107 EN: Hinweis und Knopf", en);
     await fp.evaluate(() => document.querySelector("#btnLang").click());
@@ -1989,77 +2134,11 @@ try {
     const wbTr = werkbankTreffer(at(5, 22, 0));
     await fLoad(logFile("werkbank.txt", wbTr), "Fellinex");
     await fTab("analysis");
-    // Faecher und Zeilen: Einsatz-Faehigkeiten nach Schaden, dann Laufzeit, Weitere Faehigkeiten, Passiv
-    const faWb = faecherVon(wbTr.filter((r) => r[1] !== PR[0] && r[1] !== LS[0]));
-    const sollWb = [faWb.haupt, ...faWb.mittel, "Laufzeit", "Weitere Fähigkeiten", "Passiv"];
-    const koepfe = await wbKoepfe();
-    assert(faWb.haupt === "Schnellfeuer" && faWb.weitere.length === 1 && JSON.stringify(koepfe) === JSON.stringify(sollWb),
-      "Werkbank: Hauptfach, mittlere Faecher nach Schaden, dann Laufzeit, Weitere Faehigkeiten, Passiv", { koepfe, soll: sollWb });
-    // Protest aus (5.5): in der Luecke trafen andere Faehigkeiten weiter
-    const aus = ausErwartet(wbTr);
-    let pr = await wbZeile("Protest von Mutter Natur|Mother Nature's Protest");
-    assert(!!pr && pr.unter === "Laufzeit" && pr.text.includes(aus),
-      "Werkbank: Protest steht unter Laufzeit und sagt \"" + aus + "\"", { pr, aus });
-    // Passiv (3.1): Treffer statt Einsaetze, nie Hauptfach - auch mit dem meisten Schaden
-    const nLs = wbTr.filter((r) => r[1] === LS[0]).length;
-    const ls = await wbZeile("Blitzgeschwindigkeit|Lightning Speed");
-    const lsFach = await fp.evaluate(() => [...document.querySelectorAll("#findings .wbfach")].map((f) => f.querySelector("h3")?.textContent || "")
-      .filter((h) => /Blitzgeschwindigkeit/.test(h)));
-    assert(!!ls && ls.unter === "Passiv" && ls.n.includes(nLs + " Treffer") && !/Einsatz|Einsätze/.test(ls.n) && !lsFach.length,
-      "Werkbank: Passiv-Faehigkeit unter Passiv, sie zaehlt Treffer, nicht Einsaetze, und hat kein Fach", { ls, nLs, lsFach });
-    const ersteH = await fp.evaluate(() => { const h = document.querySelector("#findings .wbfach h3"); if (!h) return "";
-      const c = h.cloneNode(true); c.querySelectorAll("small").forEach((s) => s.remove()); return c.textContent.trim(); });
-    assert(ersteH === "Schnellfeuer", "Werkbank: das Hauptfach ist die staerkste Einsatz-Faehigkeit, nie die passive", ersteH);
-
-    // Zeigen auf ein Fach zeichnet seine Einsaetze als Kerben in den Kampfstreifen; Verlassen nimmt sie weg (6)
-    const kerben = () => fp.evaluate(() => document.querySelectorAll("#saeulen .wbkerbe").length);
-    const gezeigt = await versuch(() => fp.locator("#findings .wbfach").first().hover({ timeout: 2000 }));
-    await fp.waitForTimeout(150);
-    const kMit = await kerben();
-    await fp.mouse.move(2, 2);
-    await fp.waitForTimeout(150);
-    const kOhne = await kerben();
-    assert(gezeigt && kMit >= 1 && kOhne === 0, "Werkbank: Zeigen auf ein Fach zeichnet Kerben in den Streifen, Verlassen entfernt sie", { gezeigt, kMit, kOhne });
-    // dasselbe mit dem Fokus (Tastatur)
-    const fokussiert = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().focus({ timeout: 2000 }));
-    await fp.waitForTimeout(150);
-    const kFokus = await kerben();
-    await fp.evaluate(() => document.activeElement?.blur());
-    assert(fokussiert && kFokus >= 1, "Werkbank: Fokus auf ein Fach zeichnet ebenfalls Kerben", { fokussiert, kFokus });
-
-    // "Mehr zu ...": aria-expanded wechselt, der Fokus bleibt auf dem Knopf, die Region ist sichtbar (3.2, 6)
-    const aufKnopf = () => fp.evaluate(() => {
-      const a = document.activeElement, b = document.querySelector("#findings .wbfach .wbauf");
-      const id = b?.getAttribute("aria-controls") || "", r = id ? document.getElementById(id) : null;
-      return { text: (b?.textContent || "").trim(), exp: b?.getAttribute("aria-expanded") || "", id,
-        fokus: !!a && a.classList.contains("wbauf") && a.getAttribute("aria-controls") === id,
-        region: !!r && !r.hidden && r.getClientRects().length > 0 && r.getBoundingClientRect().height > 0,
-        // Spezifikation 6: die Region hat eine Ueberschrift - ein sichtbares h4 oder aria-labelledby auf sichtbaren Text
-        kopf: (() => {
-          if (!r) return "";
-          const h = [...r.querySelectorAll("h4")].find((x) => x.getClientRects().length && x.textContent.trim());
-          if (h) return h.textContent.trim();
-          const l = (r.getAttribute("aria-labelledby") || "").split(/\s+/).map((i) => i && document.getElementById(i))
-            .filter((x) => x && x.getClientRects().length && x.textContent.trim());
-          return l.map((x) => x.textContent.trim()).join(" ");
-        })() };
-    });
-    const zu0 = await aufKnopf();
-    assert(zu0.text === "Mehr zu Schnellfeuer" && zu0.exp === "false" && /-m$/.test(zu0.id) && !zu0.region,
-      "Mehr zu: der Knopf nennt die Faehigkeit, zu, mit aria-controls auf die Region", zu0);
-    const geklickt = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().focus({ timeout: 2000 }));
-    if (geklickt) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(450); }
-    const auf1 = await aufKnopf();
-    assert(geklickt && auf1.exp === "true" && auf1.fokus && auf1.region,
-      "Mehr zu: Enter klappt auf, aria-expanded true, der Fokus bleibt auf dem Knopf, die Region ist sichtbar", auf1);
-    assert(geklickt && auf1.region && auf1.kopf.length > 0,
-      "Mehr zu: die aufgeklappte Region hat eine Ueberschrift (h4 oder aria-labelledby)", auf1);
-    if (geklickt) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(450); }
-    const zu1 = await aufKnopf();
-    assert(geklickt && zu1.exp === "false" && zu1.fokus && !zu1.region,
-      "Mehr zu: noch einmal Enter klappt zu, der Fokus bleibt auf dem Knopf", zu1);
-
-    // Kein Rot und kein Gruen als Urteil (8.3): die Glut-Striche fuellen weder mit --pos noch mit --neg
+    /* #414 (Inventur D01 bis D15): die Faecher, Gruppen, "Mehr zu ..." und Zeilen der Werkbank sind abgeloest. Ihre Aussagen
+       pruefen jetzt test-pruefstand-page (Protest "aus", Passiv, groesster Treffer, Fehlschlaege auf den Karten, #findings ohne
+       Faecher) und test-zeitleiste-page (Kerben beim Waehlen und Zeigen einer Faehigkeit); die Tabelle gegen den besten Pull
+       steht oben bei den Geist-Proben. */
+    // Kein Rot und kein Gruen als Urteil (8.3), seit #414 an den Streifen der Karten: sie fuellen mit der Hitze, nie mit --pos oder --neg
     for (const theme of THEMEN) {
       await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
       await fp.waitForTimeout(150);
@@ -2067,68 +2146,30 @@ try {
         const probe = (v) => { const s = document.createElement("span"); s.style.color = `var(${v})`; document.body.append(s);
           const c = getComputedStyle(s).color; s.remove(); return c; };
         const pos = probe("--pos"), neg = probe("--neg");
-        const h = [1, 2, 3].map((i) => probe("--h" + i));
-        const farbig = (f) => f && f !== "none" && !f.startsWith("url");
-        // Fuellung und Strich jedes Elements der Glut-Bilder (Striche koennen rect, line oder path sein)
-        const teile = [...document.querySelectorAll("#findings .wbglut :is(rect, circle, line, path)")]
-          .map((e) => { const s = getComputedStyle(e); return [s.fill, s.stroke].filter(farbig); }).filter((x) => x.length);
-        const alle = teile.flat();
-        return { pos, neg, n: teile.length, rotGruen: alle.filter((f) => f === pos || f === neg),
-          stufen: h.map((c) => teile.filter((x) => x.includes(c)).length), h };
+        const farben = [...document.querySelectorAll("#a2 .a2karte .streifen i")].map((e) => getComputedStyle(e).backgroundColor);
+        return { pos, neg, n: farben.length, rotGruen: farben.filter((c) => c === pos || c === neg), stufen: new Set(farben).size };
       });
-      assert(fb.n > 0 && fb.rotGruen.length === 0, `Werkbank, Thema ${theme}: die Glut nutzt weder --pos noch --neg`, fb);
-      /* #218 (3.3): der Kampf hat Schnellfeuer in allen Hitzestufen - je Stufe 1-3 mindestens ein Strich in
-         ihrer Farbe (--h1 stark, --h2 kritisch, --h3 kritisch stark), die drei Farben verschieden */
-      assert(fb.stufen.every((n) => n >= 1) && new Set(fb.h).size === 3,
-        `Werkbank, Thema ${theme}: Striche in jeder Hitzestufe 1 bis 3`, { stufen: fb.stufen, h: fb.h });
+      // die Hitzestufen (kritisch, stark) sind an den Streifen zu sehen: mehr als eine Farbe
+      assert(fb.stufen >= 2, `Karten, Thema ${theme}: die Streifen tragen mehrere Hitzestufen`, fb);
+      assert(fb.n > 0 && fb.rotGruen.length === 0, `Karten, Thema ${theme}: der Streifen nutzt weder --pos noch --neg`, fb);
     }
     await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
 
     // 560 px und Kontrast in allen vier Themen (8.3)
     await fp.setViewportSize({ width: 560, height: 900 });
     await fp.waitForTimeout(300);
-    await themen([".wbsatz", ".wbname small", "#wbKenn dt", ".wbzeile .n small"], "Werkbank 560 px: Satz, Fachzeile, Kennzeile, Zeile", fp);
+    await themen(["#wbKenn dt", ".a2karte .satz", ".a2karte .zsatz", ".a2karte .wbfein", ".a2tsatz"], "Analyse 560 px: Kennzeile, Saetze der Karte, Zeile der Ticks", fp);
     for (const theme of THEMEN) {
       await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
       await fp.waitForTimeout(150);
       const breit = await fp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
-      assert(breit, `Werkbank 560 px, Thema ${theme}: kein waagerechtes Rollen`, breit);
+      assert(breit, `Analyse 560 px, Thema ${theme}: kein waagerechtes Rollen`, breit);
     }
     await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
     await fp.setViewportSize({ width: 1280, height: 860 });
     await fp.waitForTimeout(300);
 
-    // 2000 x 1480: keine leere Zelle in der Werkbank, kein Satz breiter als 75 Zeichen (2, 3.4, 8.3)
-    await fp.setViewportSize({ width: 2000, height: 1480 });
-    await fp.waitForTimeout(300);
-    const packung = () => fp.evaluate(() => {
-      const bank = document.querySelector("#findings .wbbank");
-      if (!bank || !bank.getClientRects().length) return null;
-      const b = bank.getBoundingClientRect(), cs = getComputedStyle(bank), px = (v) => parseFloat(v) || 0;
-      const L = b.left + px(cs.borderLeftWidth) + px(cs.paddingLeft), R = b.right - px(cs.borderRightWidth) - px(cs.paddingRight);
-      const O = b.top + px(cs.borderTopWidth) + px(cs.paddingTop), U = b.bottom - px(cs.borderBottomWidth) - px(cs.paddingBottom);
-      const kinder = [...bank.children].filter((e) => e.getClientRects().length).map((e) => e.getBoundingClientRect());
-      const flaeche = kinder.reduce((a, r) => a + r.width * r.height, 0);
-      const cg = px(cs.columnGap), rg = px(cs.rowGap);
-      /* die Fugen je Fach: liegt seine linke (obere) Kante nicht am Rand des Rasters, gehoert ihm eine
-         Fuge in seiner Hoehe (Breite), mit 2 px Toleranz */
-      const fugen = kinder.reduce((a, r) => a + (r.left > L + 1 ? (cg + 2) * r.height : 0) + (r.top > O + 1 ? (rg + 2) * r.width : 0), 0);
-      return { n: kinder.length, leer: Math.round((R - L) * (U - O) - flaeche), fugen: Math.round(fugen) };
-    });
-    let pk = await packung();
-    assert(!!pk && pk.n >= 2 && pk.leer >= -2 && pk.leer <= pk.fugen, "Werkbank 2000 x 1480: keine leere Zelle (geschlossen)", pk);
-    const aufgeklappt = await versuch(() => fp.locator("#findings .wbfach .wbauf").first().click({ timeout: 2000 }));
-    await fp.waitForTimeout(450);
-    pk = await packung();
-    assert(aufgeklappt && !!pk && pk.n >= 2 && pk.leer >= -2 && pk.leer <= pk.fugen, "Werkbank 2000 x 1480: keine leere Zelle (Hauptfach offen)", pk);
-    if (aufgeklappt) { await versuch(() => fp.locator("#findings .wbfach .wbauf").first().click({ timeout: 2000 })); await fp.waitForTimeout(450); }
-    const saetze = await fp.evaluate(() => [...document.querySelectorAll("#findings .wbsatz")].filter((e) => e.getClientRects().length).map((e) => {
-      const m = document.createElement("span");
-      m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
-      e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove();
-      return Math.round(e.getBoundingClientRect().width / ch * 10) / 10;
-    }));
-    assert(saetze.length > 0 && saetze.every((x) => x <= 75.5), "Werkbank 2000 x 1480: kein Satz breiter als 75 Zeichen", saetze);
+    // 2000 x 1480: keine leere Zelle in der Werkbank, kein Satz breiter als 75 Zeichen (#414: entfallen mit der Bank, Inventur D14 und D15)
     await fp.setViewportSize({ width: 1280, height: 860 });
     await fp.waitForTimeout(300);
 
@@ -2136,317 +2177,113 @@ try {
     const stummTr = werkbankTreffer(at(6, 22, 0), { stumm: true });
     await fLoad(logFile("werkbank-stumm.txt", stummTr), "Fellinex");
     await fTab("analysis");
-    pr = await wbZeile("Protest von Mutter Natur|Mother Nature's Protest");
-    assert(!!pr && pr.unter === "Laufzeit" && !/\d+[\s\u00a0]s aus\b/.test(pr.text),
-      "Werkbank: ohne fremde Treffer in der Luecke sagt Protest kein \"aus\"", pr);
-
+    // (Protest ohne fremde Treffer in der Luecke sagt kein "aus": jetzt in test-pruefstand-page, an der Zeile der Ticks)
     // #269: Protest ist Laufzeit - die Rate zaehlt ihn nicht mit, die Gesamtzahl der Treffer schon
-    const wieStumm = await fp.evaluate(() => document.querySelector("#wbWie")?.innerText || "");
+    const wieStumm = await fp.evaluate(() => (document.querySelector('#a2gut li[data-k="raten"]')?.textContent || "") + " " + (document.querySelector("#a2treffer")?.textContent || ""));
     const basisStumm = /Gerechnet über (\S+) von (\S+) Treffern, ohne Laufzeit und Passiv\./.exec(wieStumm);
     assert(/deiner direkten Treffer/.test(wieStumm) && !!basisStumm && basisStumm[1] !== basisStumm[2],
       "#269: mit Laufzeit im Kampf nennt die Rate die direkten Treffer, weniger als alle", wieStumm);
 
-    // Fahnen (5.1, 6): Knopf mit aria-pressed, Enter schaltet, die Lesezeile bekommt den Satz, Escape hebt auf
-    const fahnen = () => fp.evaluate(() => {
-      const f = [...document.querySelectorAll("#verdict .wbfahne")], l = document.querySelector("#wbLese");
-      return { alle: f.map((x) => x.tagName + ":" + x.dataset.k + ":" + x.getAttribute("aria-pressed")),
-        lese: (l?.textContent || "").trim(), live: l?.getAttribute("aria-live") || "", weg: !!l?.querySelector("button.inrot") };
+    /* Der Weg vom Befund in die Zeitleiste (#414; vorher die Fahnen des Kampfstreifens, 5.1, 6): der Knopf
+       "In der Zeitleiste zeigen" am Befund mit Zeit setzt die Strecke als Bereich; der Satz der Auswertung
+       (aria-live) nennt ihn, Escape auf der Kurve hebt ihn auf. Die Fahnen, die Lesezeile #wbLese und das Zeigen
+       von Befund und Kurve (#269) entfallen mit dem Streifen: die Marken der Zeitleiste und ihr Zeigen uebernehmen. */
+    const zeitweg = () => fp.evaluate(() => {
+      const uhr = (s) => Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
+      // #414 (B2): die Befundliste ist entfallen, der Weg in die Zeitleiste ist die Marke der Luecke
+      const b = [...document.querySelectorAll("#a2marken .a2marke.luecke")], s = document.querySelector("#a2satz"), l = b[0];
+      return { alle: b.length, label: b[0]?.getAttribute("aria-label") || "", erwartet: l ? uhr(Number(l.dataset.von)) + "–" + uhr(Number(l.dataset.bis)) : "",
+        bereich: document.querySelector("#a2bereichZeit")?.textContent || "", live: s?.getAttribute("aria-live") || "", satz: (s?.textContent || "").trim(),
+        brush: !!document.querySelector("#a2brush") && !document.querySelector("#a2brush").hidden };
     });
-    const fa0 = await fahnen();
-    assert(fa0.alle.length > 0 && fa0.alle.every((x) => /^BUTTON:[\w-]+:false$/.test(x)) && fa0.alle.some((x) => x.startsWith("BUTTON:luecken:")) &&
-      fa0.live === "polite" && fa0.lese === "",
-      "Fahnen: Knoepfe mit aria-pressed=false, eine fuer die Luecke, die Lesezeile aria-live=polite und leer", fa0);
-    const fahneFokus = await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }));
-    if (fahneFokus) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(200); }
-    const fa1 = await fahnen();
-    assert(fahneFokus && fa1.alle.some((x) => x === "BUTTON:luecken:true") && fa1.lese.length > 0 && fa1.weg,
-      "Fahnen: Enter schaltet die Fahne ein, die Lesezeile bekommt ihren Satz mit dem Weg in die Rotation", fa1);
-    const fahneZu = async () => {
-      if (await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }))) {
-        await fp.keyboard.press("Escape"); await fp.waitForTimeout(200);
-      }
-    };
-    if (fahneFokus) await fahneZu();
-    const fa2 = await fahnen();
-    assert(fahneFokus && fa2.alle.every((x) => x.endsWith(":false")) && fa2.lese === "",
-      "Fahnen: Escape setzt aria-pressed=false und leert die Lesezeile", fa2);
+    const zeitAus = () => fp.evaluate(() => document.querySelector("#a2ganz")?.click());
+    const w0 = await zeitweg();
+    assert(w0.alle > 0 && /^Lücke \d+\u00a0s, \d+:\d\d–\d+:\d\d$/.test(w0.label) && w0.label.endsWith(", " + w0.erwartet) && w0.live === "polite" && w0.satz.length > 0 && !w0.brush,
+      "Zeit-Weg: Marken der Luecken mit Namen, der Satz der Zeitleiste ist aria-live=polite, noch kein Bereich", w0);
+    const wegFokus = await versuch(() => fp.locator("#a2marken .a2marke.luecke").first().focus({ timeout: 2000 }));
+    if (wegFokus) { await fp.keyboard.press("Enter"); await fp.waitForTimeout(200); }
+    const w1 = await zeitweg();
+    assert(wegFokus && w1.brush && w1.erwartet !== "" && w1.bereich.startsWith(w1.erwartet + " ·"),
+      "Zeit-Weg: Enter am Knopf setzt die Luecke als Bereich der Zeitleiste, die Auswertung nennt ihn", w1);
+    // #414 (B3): bei einem gewaehlten Bereich steht weder die Rate unter Gut hier noch der Krit-Anteil: beide gelten dem ganzen Kampf
+    const imBereich = await fp.evaluate(() => ({ rate: !!document.querySelector('#a2gut li[data-k="raten"]'), treffer: document.querySelector("#a2treffer")?.hidden !== false }));
+    assert(!imBereich.rate && imBereich.treffer, "#414 B3: im gewaehlten Bereich keine Rate und kein Krit-Anteil des ganzen Kampfs", imBereich);
+    // Escape auf der Kurve hebt den Bereich auf
+    const kurveFokus = await versuch(() => fp.locator("#a2fokus").focus({ timeout: 2000 }));
+    if (kurveFokus) { await fp.keyboard.press("Escape"); await fp.waitForTimeout(200); }
+    const w2 = await zeitweg();
+    assert(kurveFokus && !w2.brush,
+      "Zeit-Weg: Escape auf der Kurve hebt den Bereich auf", w2);
+    assert(await fp.evaluate(() => !!document.querySelector('#a2gut li[data-k="raten"]') && document.querySelector("#a2treffer")?.hidden === false),
+      "#414 B3: ohne Bereich stehen Rate und Krit-Anteil wieder da", null);
     // Spezifikation 6: auch die Leertaste schaltet
-    const fahneLeer = await versuch(() => fp.locator('#verdict .wbfahne[data-k="luecken"]').first().focus({ timeout: 2000 }));
-    if (fahneLeer) { await fp.keyboard.press(" "); await fp.waitForTimeout(200); }
-    const fa3 = await fahnen();
-    assert(fahneLeer && fa3.alle.some((x) => x === "BUTTON:luecken:true") && fa3.lese.length > 0,
-      "Fahnen: die Leertaste schaltet die Fahne ebenso ein, die Lesezeile bekommt ihren Satz", fa3);
-    /* die Lesezeile in allen vier Themen lesbar (8.3), bei 560 px wie im Brief, solange sie einen Satz traegt:
-       erst je Thema pruefen, dass der Satz den Wechsel uebersteht, dann den Kontrast messen */
+    const wegLeer = await versuch(() => fp.locator("#a2marken .a2marke.luecke").first().focus({ timeout: 2000 }));
+    if (wegLeer) { await fp.keyboard.press(" "); await fp.waitForTimeout(200); }
+    const w3 = await zeitweg();
+    assert(wegLeer && w3.brush && w3.bereich.startsWith(w3.erwartet + " ·"), "Zeit-Weg: die Leertaste setzt den Bereich ebenso", w3);
+    /* der Satz der Zeitleiste in allen vier Themen lesbar (8.3), bei 560 px wie im Brief, solange ein Bereich steht:
+       erst je Thema pruefen, dass der Bereich den Wechsel uebersteht, dann den Kontrast messen */
     await fp.setViewportSize({ width: 560, height: 900 });
     await fp.waitForTimeout(300);
     for (const theme of THEMEN) {
       await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
       await fp.waitForTimeout(150);
-      const l = (await fahnen()).lese;
-      assert(l.length > 0, `Fahnen 560 px, Thema ${theme}: die Lesezeile behaelt ihren Satz beim Themenwechsel`, l);
+      const l = await zeitweg();
+      assert(l.brush && l.satz.length > 0, `Zeit-Weg 560 px, Thema ${theme}: der Bereich bleibt beim Themenwechsel`, l);
     }
     await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
-    await themen(["#wbLese"], "Lesezeile der Fahne", fp);
-    // 2000 x 1480: der Satz unter dem Streifen und die Lesezeile (mit Satz) hoechstens 75 Zeichen breit
+    await themen(["#a2satz"], "Satz der Zeitleiste", fp);
+    // 2000 x 1480: der Satz unter dem Kopf hoechstens 75 Zeichen breit, der Satz der Auswertung hoechstens 80
     await fp.setViewportSize({ width: 2000, height: 1480 });
     await fp.waitForTimeout(300);
     const zeilenBreit = await fp.evaluate(() => {
       const inCh = (e) => { if (!e || !e.getClientRects().length || !e.textContent.trim()) return -1; const m = document.createElement("span");
         m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
         e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return Math.round(e.getBoundingClientRect().width / ch * 10) / 10; };
-      return { verdictText: inCh(document.querySelector("#verdictText")), lese: inCh(document.querySelector("#wbLese")) };
+      return { haelften: inCh(document.querySelector("#a2haelften")), satz: inCh(document.querySelector("#a2satz")) };
     });
-    // #verdictText gemessen am Kampf mit Haelftensatz (oben, "haelften.txt"): dort steht er sicher, also > 0
-    assert(zeilenBreit.lese > 0 && zeilenBreit.lese <= 75.5 && formsatzBreit > 0 && formsatzBreit <= 75.5,
-      "Werkbank 2000 x 1480: #verdictText und die Lesezeile hoechstens 75 Zeichen breit", { ...zeilenBreit, formsatzBreit });
+    // der Haelftensatz (#a2haelften) gemessen am Kampf mit Haelftensatz (oben, "haelften.txt"): dort steht er sicher, also > 0
+    assert(zeilenBreit.satz > 0 && zeilenBreit.satz <= 80.5 && formsatzBreit > 0 && formsatzBreit <= 75.5,
+      "2000 x 1480: der Haelftensatz hoechstens 75, der Satz der Zeitleiste hoechstens 80 Zeichen breit", { ...zeilenBreit, formsatzBreit });
     await fp.setViewportSize({ width: 1280, height: 860 });
     await fp.waitForTimeout(300);
-    if (fahneLeer) await fahneZu();
+    await zeitAus();
 
-    /* #269: die Marke nennt die Dauer ("Luecke 5 s"), und Zeigen oder Fokus verbinden Befund, Marke und
-       Kurve. Gewartet wird auf den Zustand (data-zeig, .wbzeig), nie auf eine Zeit. */
+    /* #269 (#414): die Marke nennt die Dauer ("Luecke 5 s"), dieselbe wie ihr Befund in der Liste, und der Knopf am Befund
+       setzt die Strecke als Bereich - in allen vier Themen, bei 560 Punkt ohne waagerechtes Rollen, bei 2000 x 1480 nichts gestreckt. */
     {
-      const marken = () => fp.evaluate(() => [...document.querySelectorAll("#verdict .wbfahne")].filter((f) => /^luecke/.test(f.dataset.k)).map((f) => {
-        const b = document.querySelector(`#weitereListe .find[data-k="${f.dataset.k}"]${f.dataset.k === "luecke" ? `[data-von="${f.dataset.id.split("@")[1]}"]` : ""}`);
-        return { id: f.dataset.id, text: f.querySelector(".l")?.textContent, label: f.getAttribute("aria-label"), befund: b?.querySelector(".v")?.textContent || "" };
+      const marken = () => fp.evaluate(() => [...document.querySelectorAll("#a2marken .a2marke.luecke")].map((m) => {
+        return { text: m.querySelector(".l")?.textContent, label: m.getAttribute("aria-label") || "", dauer: Number(m.dataset.bis) - Number(m.dataset.von) };
       }));
       const ms = await marken();
-      assert(ms.length > 0 && ms.every((m) => /^Lücke \d+\u00a0s$/.test(m.text) && m.label.startsWith(m.text + ", ") &&
-        m.befund.endsWith(" · " + m.text.slice("Lücke ".length))),
-        "#269: jede Luecken-Marke nennt ihre Dauer, dieselbe wie ihr Befund, auch im Namen fuer den Vorleser", ms);
-      const zeigZustand = () => fp.evaluate(() => {
-        const band = document.querySelector("#saeulen .wbzeig"), r = band && !band.hidden ? band.getBoundingClientRect() : null, box = document.querySelector("#saeulen").getBoundingClientRect();
-        const probe = document.createElement("i"); probe.style.color = "var(--gold)"; document.body.appendChild(probe);
-        const gold = getComputedStyle(probe).color; probe.remove();
-        return { band: !!r, links: r ? Math.round(r.left - box.left) : null, breit: r ? Math.round(r.width) : null, hoch: r ? Math.round(r.height) : null, boxH: Math.round(box.height),
-          drin: r ? r.left >= box.left - 1 && r.right <= box.right + 1 : null,
-          gold: !!band && (getComputedStyle(band).boxShadow + getComputedStyle(band).backgroundColor).includes(gold),
-          befund: [...document.querySelectorAll('#weitereListe .find[data-zeig="true"]')].map((e) => e.dataset.k + ":" + (e.dataset.von || "")),
-          fahne: [...document.querySelectorAll('#verdict .wbfahne[data-zeig="true"]')].map((e) => e.dataset.id),
-          gedrueckt: document.querySelectorAll('#verdict .wbfahne[aria-pressed="true"]').length };
-      });
-      const ruhig = () => fp.waitForFunction(() => !document.querySelector("#saeulen .wbzeig:not([hidden])") &&
-        !document.querySelector('#verdict [data-zeig="true"], #weitereListe [data-zeig="true"]'), null, { timeout: 5000 });
-      const an = (id) => fp.waitForFunction((i) => document.querySelector(`#verdict .wbfahne[data-id="${i}"][data-zeig="true"]`) &&
-        document.querySelector("#saeulen .wbzeig:not([hidden])"), id, { timeout: 5000 });
-      const erste = ms[0].id;
-      // Zeigen auf die Marke hebt Befund und Stelle der Kurve hervor, ohne zu waehlen
-      await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).hover();
-      await an(erste);
-      let z = await zeigZustand();
-      assert(z.band && z.befund.length === 1 && z.fahne.length === 1 && z.gedrueckt === 0 && !z.gold && z.drin && z.breit > 0 && z.hoch <= z.boxH + 1,
-        "#269: Zeigen auf die Marke hebt ihren Befund und die Stelle der Kurve hervor (ohne Gold, ohne Auswahl)", z);
-      await fp.mouse.move(2, 2);
-      await ruhig();
-      // Zeigen auf den Befund hebt Marke und Stelle hervor
-      await fp.locator(`#weitereListe .find[data-k="luecken"]`).hover();
-      await an(ms.find((m) => m.id === "luecken")?.id || erste);
-      z = await zeigZustand();
-      assert(z.band && z.befund.length === 1 && z.fahne.length === 1, "#269: Zeigen auf den Befund hebt seine Marke und die Stelle der Kurve hervor", z);
-      await fp.mouse.move(2, 2);
-      await ruhig();
-      // umgekehrt: Zeigen auf die Stelle der Kurve hebt Befund und Marke hervor
-      const mitte = await fp.evaluate(() => { const g = document.querySelector("#saeulen .gapz"); if (!g) return null; const r = g.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; });
-      if (mitte) {
-        await fp.mouse.move(mitte.x, mitte.y);
-        await fp.waitForFunction(() => document.querySelector("#saeulen .wbzeig:not([hidden])") && document.querySelector('#weitereListe .find[data-zeig="true"]'), null, { timeout: 5000 });
-        z = await zeigZustand();
-        assert(z.band && z.befund.length === 1 && z.fahne.length === 1 && z.gedrueckt === 0, "#269: Zeigen auf die Stelle der Kurve hebt Befund und Marke hervor", z);
-        await fp.mouse.move(2, 2);
-        await ruhig();
-      }
-      assert(!!mitte, "#269: die Kurve traegt eine Luecken-Zone zum Zeigen", mitte);
-      // Tastatur: der Fokus auf die Marke hebt hervor und der Vorleser bekommt es benannt; der Fokus weg nimmt es zurueck
-      // war die Marke schon im Fokus (vorige Proben), fuehrt focus() kein Ereignis aus: erst weg
-      await fp.evaluate(() => document.activeElement?.blur());
-      await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).focus();
-      await an(erste);
-      await fp.waitForFunction(() => /^Auf der Kurve hervorgehoben: Lücke \d+\u00a0s, \d+:\d\d–\d+:\d\d\.$/.test(document.querySelector("#wbZeigLese")?.textContent || ""), null, { timeout: 5000 });
-      const lese = await fp.evaluate(() => ({ text: document.querySelector("#wbZeigLese").textContent, live: document.querySelector("#wbZeigLese").getAttribute("aria-live") }));
-      assert(lese.live === "polite", "#269: die Meldung zur hervorgehobenen Stelle ist aria-live=polite", lese);
-      await fp.evaluate(() => document.activeElement?.blur());
-      await ruhig();
-      assert((await fp.evaluate(() => document.querySelector("#wbZeigLese").textContent)) === "", "#269: ohne Fokus ist die Meldung leer", null);
+      assert(ms.length > 0 && ms.every((m) => m.text === "Lücke " + m.dauer + "\u00a0s" && m.label.startsWith("Lücke " + m.dauer + "\u00a0s, ")),
+        "#269: jede Luecken-Marke nennt ihre Dauer (data-bis minus data-von) und traegt einen Namen fuer den Vorleser", ms);
       // vier Themen, 560 Punkt ohne waagerechtes Rollen, 2000 x 1480 nichts gestreckt
       for (const [breite, hoehe] of [[560, 900], [2000, 1480], [1280, 860]]) {
         await fp.setViewportSize({ width: breite, height: hoehe });
         for (const theme of THEMEN) {
           await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
-          await fp.mouse.move(2, 2);
-          await ruhig();
-          await fp.locator(`#verdict .wbfahne[data-id="${erste}"]`).hover();
-          await an(erste);
-          z = await zeigZustand();
-          const breitOk = await fp.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1);
-          assert(z.band && !z.gold && z.drin && z.hoch <= z.boxH + 1 && breitOk,
-            `#269: ${breite} x ${hoehe}, Thema ${theme}: die Stelle ist hervorgehoben, ohne Gold, nicht gestreckt, ohne waagerechtes Rollen`, { ...z, breitOk });
+          await zeitAus();
+          await fp.evaluate(() => document.querySelector("#a2marken .a2marke.luecke")?.click());
+          await fp.waitForFunction(() => document.querySelector("#a2brush") && !document.querySelector("#a2brush").hidden, null, { timeout: 5000 });
+          const z = await fp.evaluate(() => {
+            const br = document.querySelector("#a2brush").getBoundingClientRect(), box = document.querySelector("#a2kurve").getBoundingClientRect();
+            return { breit: Math.round(br.width), drin: br.left >= box.left - 1 && br.right <= box.right + 1, hoch: Math.round(br.height), boxH: Math.round(box.height),
+              breitOk: document.documentElement.scrollWidth <= window.innerWidth + 1 };
+          });
+          assert(z.breit > 0 && z.drin && z.hoch <= z.boxH + 1 && z.breitOk,
+            `#269: ${breite} x ${hoehe}, Thema ${theme}: der Bereich liegt in der Kurve, nicht gestreckt, ohne waagerechtes Rollen`, z);
         }
       }
+      await zeitAus();
       await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
       await fp.mouse.move(2, 2);
     }
 
-    /* Werkbank fuellt die Flaeche (#270, 22.10.2026, Aufbau B): ein Kampf, in dem eine Faehigkeit fast
-       alles traegt (Schnellfeuer, 99 %), ein mittleres Fach (Detonierendes Mal, 1,5 %) und drei Weitere unter
-       0,8 % (Beschuss, Klingensturm, Agiler Schuss). Bei 2000 x 1480 (ab 1200 Punkt Hoehe) rueckt "Weitere
-       Faehigkeiten" als Zeilen in die rechte Spalte unter das mittlere Fach, bis die Spalte so hoch ist wie das
-       Hauptfach; darunter bleibt nichts leer. Bei 1440 x 900 und 560 Punkt steht alles wie vorher. */
-    {
-      const fStart = at(9, 22, 0), ftr = [];
-      for (let t = 300; t < 60000; t += 3000) { ftr.push([fStart + t, "Decisive Sniping", 964581976, 80000, false, "Fellinex"]); for (const ab of [1000, 1100]) for (const x of [0, 5, 10]) ftr.push([fStart + t + ab + x, "Decisive Sniping", 964581976, 80000, false, "Fellinex"]); }
-      for (let t = 0; t < 60000; t += 6000) ftr.push([fStart + t, DM[0], DM[1], 60000, false, "Fellinex"]);
-      for (let t = 0; t < 60000; t += 2000) ftr.push([fStart + t + 100, ST[0], ST[1], 2000, false, "Fellinex"]);
-      for (let t = 0; t < 60000; t += 5000) ftr.push([fStart + t + 200, BS[0], BS[1], 4000, false, "Fellinex"]);
-      ftr.push([fStart + 50000, AG[0], AG[1], 1000, false, "Fellinex"]);
-      await fLoad(logFile("werkbank-fuellt.txt", ftr), "Fellinex");
-      await fTab("analysis");
-      const fuell = () => fp.evaluate(() => {
-        const bank = document.querySelector("#findings .wbbank"), haupt = bank?.querySelector(".wbfach.haupt");
-        if (!bank || !haupt) return null;
-        const H = haupt.getBoundingClientRect(), sicht = (e) => e.getClientRects().length && !e.closest("[hidden]");
-        const rechts = [...bank.children].filter((e) => e !== haupt && sicht(e) && e.getBoundingClientRect().left >= H.right - 2 && e.getBoundingClientRect().top < H.bottom - 2);
-        // leer: vom tiefsten sichtbaren Inhalt eines Kastens bis zu seinem Boden (ohne Innenabstand)
-        const leer = rechts.map((e) => {
-          const r = e.getBoundingClientRect(), pb = parseFloat(getComputedStyle(e).paddingBottom) || 0;
-          let u = r.top;
-          for (const d of e.querySelectorAll("*")) { const b = d.getBoundingClientRect(); if (b.height && sicht(d)) u = Math.max(u, b.bottom); }
-          return Math.round(r.bottom - pb - u);
-        });
-        const rest = bank.querySelector(".wbrest"), zeilen = [...bank.querySelectorAll(".wbzeile")].filter(sicht);
-        const erstes = bank.querySelector(".wbgruppe:not(.wbrest)");
-        const kopf = rest ? document.getElementById(rest.getAttribute("aria-labelledby") || "") : null;
-        return { rechts: rechts.length, leer, maxLeer: leer.length ? Math.max(...leer) : null, hauptH: Math.round(H.height),
-          rest: !!rest, restZeilen: rest ? [...rest.querySelectorAll(".wbzeile")].map((z) => z.dataset.n) : [],
-          alleZeilen: zeilen.map((z) => z.dataset.n), hoechsteZeile: Math.max(0, ...zeilen.map((z) => Math.round(z.getBoundingClientRect().height))),
-          restVorGruppen: !!rest && !!erstes && !!(rest.compareDocumentPosition(erstes) & Node.DOCUMENT_POSITION_FOLLOWING),
-          restNachFaechern: !!rest && [...bank.querySelectorAll(".wbfach")].every((f) => !!(f.compareDocumentPosition(rest) & Node.DOCUMENT_POSITION_FOLLOWING)),
-          kopf: kopf ? kopf.textContent.trim() : "", knoepfe: rest ? [...rest.querySelectorAll(".wbzeile")].every((z) => z.tagName === "BUTTON") : false,
-          weitereUnten: [...document.querySelectorAll("#findings .wbgruppe:not(.wbrest)")].filter(sicht).map((g) => g.querySelector("h3")?.textContent.trim()),
-          breit: document.documentElement.scrollWidth <= window.innerWidth + 1 };
-      });
-      await fp.setViewportSize({ width: 2000, height: 1480 });
-      await fp.waitForFunction(() => document.documentElement.classList.contains("h-min-1200") && !!document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
-      let fz = await fuell();
-      assert(!!fz && fz.rest && fz.restZeilen.length >= 1, "Werkbank #270, 2000 x 1480: Weitere Faehigkeiten rueckt als Zeilen in die rechte Spalte", fz);
-      assert(!!fz && fz.maxLeer !== null && fz.maxLeer <= 60, "Werkbank #270, 2000 x 1480: rechts neben dem Hauptfach bleibt hoechstens eine Zeile leer", fz);
-      assert(!!fz && fz.hoechsteZeile <= 44, "Werkbank #270, 2000 x 1480: jede Zeile hoechstens 44 Punkt hoch (nie gestreckt)", fz);
-      assert(!!fz && new Set(fz.alleZeilen).size === fz.alleZeilen.length && fz.alleZeilen.length === 3,
-        "Werkbank #270, 2000 x 1480: jede der drei Weiteren steht genau einmal (keine doppelt, keine verloren)", fz);
-      assert(!!fz && fz.restVorGruppen && fz.restNachFaechern && fz.knoepfe && fz.kopf === "Weitere Fähigkeiten",
-        "Werkbank #270, 2000 x 1480: die Zeilen stehen in der Lesefolge vor den Gruppen, sind Knoepfe, die Gruppe hat ihre Ueberschrift", fz);
-      // Tastatur: nach dem letzten Knopf des mittleren Fachs kommt die erste Zeile der rechten Spalte
-      const tab1 = await versuch(() => fp.locator("#findings .wbfach.mittel .wbauf").last().focus({ timeout: 2000 }));
-      if (tab1) await fp.keyboard.press("Tab");
-      const fokusRest = await fp.evaluate(() => !!document.activeElement?.closest(".wbrest") && document.activeElement.classList.contains("wbzeile"));
-      assert(tab1 && fokusRest, "Werkbank #270: Tab geht vom mittleren Fach in die Zeilen der rechten Spalte", { tab1, fokusRest });
-      await fp.evaluate(() => document.activeElement?.blur());
-      // vier Themen: kein waagerechtes Rollen, nichts gestreckt, Kontrast der Zeilen
-      for (const theme of THEMEN) {
-        await fp.evaluate((th) => document.querySelector(`#themeRow [data-theme="${th}"]`)?.click(), theme);
-        await fp.waitForFunction((th) => document.documentElement.dataset.theme === th, theme, { timeout: 5000 });
-        const f2 = await fuell();
-        assert(!!f2 && f2.rest && f2.breit && f2.hoechsteZeile <= 44 && f2.maxLeer <= 60, `Werkbank #270, 2000 x 1480, Thema ${theme}: gefuellt, ohne waagerechtes Rollen, nichts gestreckt`, f2);
-      }
-      await themen([".wbrest .wbzeile .n small", ".wbrest .wbzeile .nn", ".wbrest > h3"], "Werkbank #270 2000 x 1480: Zeile, Name, Ueberschrift", fp);
-      // 1440 x 900: wie vorher, nichts rueckt auf
-      await fp.setViewportSize({ width: 1440, height: 900 });
-      await fp.waitForFunction(() => !document.documentElement.classList.contains("h-min-1200") && !document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
-      fz = await fuell();
-      assert(!!fz && !fz.rest && fz.weitereUnten.includes("Weitere Fähigkeiten") && fz.alleZeilen.length === 3,
-        "Werkbank #270, 1440 x 900: unveraendert, Weitere Faehigkeiten steht unten", fz);
-      // 560 Punkt: untereinander, nichts verschoben, kein waagerechtes Rollen
-      await fp.setViewportSize({ width: 560, height: 900 });
-      await fp.waitForFunction(() => !document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
-      fz = await fuell();
-      assert(!!fz && !fz.rest && fz.breit && fz.weitereUnten.includes("Weitere Fähigkeiten"), "Werkbank #270, 560 Punkt: unveraendert und ohne waagerechtes Rollen", fz);
-      // zurueck auf gross: die Zeilen ruecken wieder auf (nach dem Wechsel der Fenstergroesse)
-      await fp.setViewportSize({ width: 2000, height: 1480 });
-      await fp.waitForFunction(() => !!document.querySelector("#findings .wbrest"), null, { timeout: 5000 }).catch(() => {});
-      fz = await fuell();
-      assert(!!fz && fz.rest && fz.maxLeer <= 60, "Werkbank #270: nach dem Wechsel zurueck auf 2000 x 1480 ruecken die Zeilen wieder auf", fz);
-      await fp.evaluate(() => document.querySelector('#themeRow [data-theme="dark"]')?.click());
-      await fp.waitForFunction(() => document.documentElement.dataset.theme === "dark", null, { timeout: 5000 });
-      await fp.setViewportSize({ width: 1280, height: 860 });
-      await fp.waitForFunction(() => window.innerWidth === 1280, null, { timeout: 5000 });
-    }
+    /* #270 "Werkbank fuellt die Flaeche": entfallen mit der Werkbank (Inventur D15), das Kartenlayout prueft analyse-layout-probe. */
 
-    /* Werkbank-Zeilen sagen, was auffaellt (#270, Stufe 2): drei mittlere Faecher (Detonierendes Mal, Beschuss,
-       Klingensturm) und als vierte Faehigkeit mit Gewicht (3 %) der Agile Schuss in "Weitere Faehigkeiten". Er
-       fehlt von 0:20 bis 0:45 (25 s bei einem Takt von 5 s): eine Pause, die nur ihm gehoert, solange die
-       anderen weitertreffen. Fehlen auch die anderen (eine Luecke des ganzen Kampfes), ist es keine Pause. Dazu
-       die Legende ueber den Zeilen (Satz, vier Hitzestufen, Pause), die Achse mit Beginn und Ende, Hinweise
-       je Strich und eine gemeinsame Zeitachse: alle Striche einer Gruppe beginnen bei derselben Stelle. */
-    {
-      const pStart = at(9, 23, 0);
-      const pauseLog = (name, { luecke = false } = {}) => {
-        const tr = [], still = (t) => luecke && t > 20000 && t < 45000;
-        for (let t = 0; t < 60000; t += 700) if (!still(t)) tr.push([pStart + t, QF[0], QF[1], 10000, false, "Fellinex"]);
-        for (let t = 0; t < 60000; t += 6000) if (!still(t)) tr.push([pStart + t, DM[0], DM[1], 30000, false, "Fellinex"]);
-        for (let t = 0; t < 60000; t += 2000) if (!still(t)) tr.push([pStart + t + 100, ST[0], ST[1], 15000, false, "Fellinex"]);
-        for (let t = 0; t < 60000; t += 5000) if (!still(t)) tr.push([pStart + t + 200, BS[0], BS[1], 20000, false, "Fellinex"]);
-        for (let t = 0; t < 60000; t += 5000) if (t <= 20000 || t >= 45000) tr.push([pStart + t + 300, AG[0], AG[1], 8000, false, "Fellinex"]);
-        return logFile(name, tr);
-      };
-      const zeilen = () => fp.evaluate(() => {
-        const sicht = (e) => e.getClientRects().length && !e.closest("[hidden]");
-        const z = [...document.querySelectorAll("#findings .wbzeile")].filter(sicht).map((b) => {
-          const s = b.querySelector(".wbstrich");
-          return { n: b.dataset.n, satz: b.querySelector(".n small")?.textContent || "", befund: b.classList.contains("befund"),
-            schraffur: !!s?.querySelector("pattern"), titel: [...(s?.querySelectorAll("rect > title") || [])].map((x) => x.textContent),
-            links: Math.round(s?.getBoundingClientRect().left || 0), rechts: Math.round(s?.getBoundingClientRect().right || 0),
-            hoch: Math.round(b.getBoundingClientRect().height), gruppe: b.closest(".wbgruppe")?.querySelector("h3")?.textContent || "" };
-        });
-        const kopf = [...document.querySelectorAll("#findings .wbzkopf")].filter(sicht).map((k) => ({
-          satz: k.querySelector(".wbzleg")?.textContent || "", stufen: k.querySelectorAll(".wbsw i").length, pause: k.querySelector(".wbsw span:last-child")?.textContent || "",
-          achse: k.querySelectorAll(".ach, .wbkopf2").length }));
-        return { z, kopf };
-      });
-      await fp.setViewportSize({ width: 2000, height: 1480 });
-      await fLoad(pauseLog("werkbank-pause.txt"), "Fellinex");
-      await fTab("analysis");
-      let zs = await zeilen();
-      const ag = zs.z.find((x) => x.n === "Agile Shot");
-      assert(!!ag && ag.satz === "Pause 0:20–0:45 (25 s), sonst alle 5,0 s" && ag.befund,
-        "Werkbank-Zeile #270: Agiler Schuss nennt seine Pause 0:20–0:45 und ist ein Befund", ag);
-      assert(!!ag && ag.schraffur && ag.titel.length >= 3 && ag.titel[0] === ag.satz && ag.titel.slice(1).every((x) => /^[0-9]+:[0-9][0-9] · [^ ]+ · [^ ]+/.test(x)),
-        "Werkbank-Zeile #270: die Pause ist im Strich schraffiert, jeder Strich hat seinen Hinweis (Zeit, Schaden, Hitze)", ag);
-      assert(zs.z.length >= 1 && zs.z.every((x) => x.hoch <= 44 && x.satz.length > 0),
-        "Werkbank-Zeile #270: jede Zeile hat einen Satz und ist hoechstens 44 Punkt hoch", zs.z);
-      assert(zs.z.filter((x) => x.befund).length === 1, "Werkbank-Zeile #270: ohne Abweichung kein Befund (genau eine Zeile mit Befund)", zs.z);
-      for (const g of [...new Set(zs.z.map((x) => x.gruppe))]) {
-        const in_ = zs.z.filter((x) => x.gruppe === g);
-        assert(new Set(in_.map((x) => x.links)).size === 1 && new Set(in_.map((x) => x.rechts)).size === 1,
-          `Werkbank-Zeile #270: alle Striche der Gruppe "${g}" beginnen und enden an derselben Stelle (eine Zeitachse)`, in_);
-      }
-      assert(zs.kopf.length >= 1 && zs.kopf.every((k) => k.satz === "Strich = Einsatz, Höhe = Schaden; ohne Strich kein Einsatz." && k.stufen === 1 && k.pause === "auffällige Pause" && k.achse === 0),
-        "Werkbank-Zeile #270: die Legende nennt in einem Satz, was ein Strich ist und warum manchmal keiner steht, dazu die Pause (eine Zeile, keine Achse)", zs.kopf);
-      // die Legende kostet keine Hoehe: bei einer Gruppe ab 760 Punkt steht sie in der Zeile der Ueberschrift
-      const kopfZeile = await fp.evaluate(() => { const g = [...document.querySelectorAll("#findings .wbgruppe")].find((x) => x.querySelector(":scope > .wbzkopf") && x.getClientRects().length);
-        if (!g) return null; const h = g.querySelector(":scope > h3").getBoundingClientRect(), k = g.querySelector(":scope > .wbzkopf").getBoundingClientRect();
-        return { breit: Math.round(g.getBoundingClientRect().width), gleicheZeile: Math.abs((h.top + h.bottom) / 2 - (k.top + k.bottom) / 2) < 12, kopfH: Math.round(k.height) }; });
-      assert(!!kopfZeile && (kopfZeile.breit < 760 || kopfZeile.gleicheZeile), "Werkbank-Zeile #270: ab 760 Punkt Gruppenbreite steht die Legende in der Zeile der Ueberschrift", kopfZeile);
-      // dieselbe Pause in einer Luecke des ganzen Kampfes: keine Pause, keine Schraffur
-      await fLoad(pauseLog("werkbank-pause-luecke.txt", { luecke: true }), "Fellinex");
-      await fTab("analysis");
-      zs = await zeilen();
-      const ag2 = zs.z.find((x) => x.n === "Agile Shot");
-      assert(!!ag2 && !ag2.befund && !ag2.schraffur && /^\d+ Einsätze, alle /.test(ag2.satz),
-        "Werkbank-Zeile #270: fehlt in der Pause auch alles andere (Luecke des Kampfes), ist es kein Befund", ag2);
-      // 560 Punkt: nichts rollt waagerecht, die Zeilen bleiben hoechstens 44 Punkt
-      await fp.setViewportSize({ width: 560, height: 900 });
-      await fp.waitForFunction(() => document.documentElement.classList.contains("w-max-560"), null, { timeout: 5000 }).catch(() => {});
-      const schmal = await fp.evaluate(() => ({ breit: document.documentElement.scrollWidth <= window.innerWidth + 1,
-        hoch: Math.max(0, ...[...document.querySelectorAll("#findings .wbzeile")].filter((e) => e.getClientRects().length).map((e) => Math.round(e.getBoundingClientRect().height))) }));
-      assert(schmal.breit && schmal.hoch > 0 && schmal.hoch <= 44, "Werkbank-Zeile #270, 560 Punkt: kein waagerechtes Rollen, Zeilen hoechstens 44 Punkt", schmal);
-      // vier Themen: der Satz der Zeile und die Legende halten den Kontrast
-      await fp.setViewportSize({ width: 2000, height: 1480 });
-      await fLoad(pauseLog("werkbank-pause.txt"), "Fellinex");
-      await fTab("analysis");
-      await themen([".wbzeile .n small", ".wbzleg"], "Werkbank-Zeile #270: Satz, Legende", fp);
-      await fp.setViewportSize({ width: 1280, height: 860 });
-      await fp.waitForFunction(() => window.innerWidth === 1280, null, { timeout: 5000 });
-    }
+    /* #270 "Werkbank-Zeilen sagen, was auffaellt": entfallen mit den Zeilen (Inventur D13). Die Pause im eigenen Takt und das
+       Warten zeigt die Karte als "Bereit, nicht gedrueckt" und Takt (test-pruefstand-page); die Zeitachse gemeinsam hat die Zeitleiste. */
 
     /* Ventius mit wechselnden Salven (3.3, 8.3): jede dritte Salve nur eine Welle zu drei, die anderen zwei.
        Der Bestwert des Kampfes (ventiusMix().top) ist 2: je Saeule so viele gefuellte Perlen wie Nachbeben,
@@ -2461,57 +2298,17 @@ try {
     for (let t = 700; t < 60000; t += 1000) vTr.push([vStart + t, ST[0], ST[1], 20000, false, "Fellinex"]);
     await fLoad(logFile("salven-mix.txt", vTr), "Fellinex");
     await fTab("analysis");
-    const vSaeulen = await fp.evaluate(() => {
-      const spalten = new Map();
-      for (const e of document.querySelectorAll('#findings .vfeld svg [data-welle]')) {
-        const r = e.getBoundingClientRect(), x = Math.round((r.left + r.width / 2) * 2) / 2;
-        const s = spalten.get(x) || { voll: 0, leer: 0 }; spalten.set(x, s);
-        if (e.getAttribute("data-welle") === "1") s.voll++; else s.leer++;
-      }
-      return [...spalten.entries()].sort((a, b) => a[0] - b[0]).map(([, s]) => s.voll + "/" + s.leer);
-    });
+    // #414: die Perlen sind das Raster der Ventius-Karte (erst gebaut, wenn aufgeklappt): je Salve volle Punkte = Nachbeben, hohle bis zum Bestwert
+    await fp.evaluate(() => { document.querySelector("#a2vent").open = true; });
+    await fp.waitForFunction(() => document.querySelectorAll("#a2vinnen .a2salve").length > 0, null, { timeout: 5000 });
+    const vSaeulen = await fp.evaluate(() => [...document.querySelectorAll("#a2vinnen .a2salve")].map((e) => e.querySelectorAll(".voll").length + "/" + e.querySelectorAll(".leer").length));
     const vSoll = vWellen.map((w) => w + "/" + (2 - w));
     assert(JSON.stringify(vSaeulen) === JSON.stringify(vSoll),
-      "Ventius: gefuellte Perlen je Saeule gleich den Nachbeben, leere bis zum Bestwert", { ist: vSaeulen, soll: vSoll });
-    // #270: Achse unter den Perlen (Beginn, Ende), Legende statt der Leserichtung
-    const vVorher = fp.viewportSize();
-    await fp.setViewportSize({ width: 2000, height: 1480 });
-    await fp.waitForFunction(() => window.innerWidth === 2000, null, { timeout: 5000 });
-    const vBeschrift = await fp.evaluate(() => {
-      const f = document.querySelector("#findings .vfeld");
-      const a = f?.querySelector(".vachse");
-      return { zeit: a?.querySelector(".vzeit")?.textContent || "", lese: a?.querySelector(".wbachse")?.textContent || "", leg: [...(a?.querySelectorAll(".perlleg > span") || [])].map((x) => x.textContent), hoch: Math.round(a?.getBoundingClientRect().height || 0) };
-    });
-    assert(/^0:00 – [0-9]+:[0-9][0-9]$/.test(vBeschrift.zeit) && vBeschrift.lese === "Von links nach rechts in Einsatzreihenfolge." && vBeschrift.leg.length === 4 && vBeschrift.hoch > 0 && vBeschrift.hoch <= 24,
-      "Ventius #270, 2000 x 1480: unter den Perlen eine Zeile mit Zeitraum, Leserichtung und vier Eintraegen der Legende", vBeschrift);
-    await fp.setViewportSize(vVorher);
-    await fp.waitForFunction((w) => window.innerWidth === w, vVorher.width, { timeout: 5000 });
+      "Ventius: volle Punkte je Salve gleich den Nachbeben, hohle bis zum Bestwert (Raster der Karte)", { ist: vSaeulen, soll: vSoll });
+    // #270 "Achse unter den Perlen": entfallen (Inventur E02); die Legende der Karte (fuenf Zeichen) prueft test-pruefstand-page.
 
-    /* Ruling 19 (Fix-Runde 3 von Task 9): am Beispielkampf hat jede Zeile der Werkbank ihren Strich
-       (mindestens 80 Punkt) und ist hoechstens 44 Punkt hoch - bei 2000 x 1480, 1300 und 1100 Punkt Breite */
-    await fp.evaluate(() => document.querySelector("#btnSample")?.click());
-    await fp.waitForFunction(() => /Ramux/.test(document.querySelector("#hName")?.textContent || ""), null, { timeout: 5000 }).catch(() => {});
-    await fTab("analysis");
-    const zeilenMass = () => fp.evaluate(() => ({
-      striche: [...document.querySelectorAll("#findings .wbstrich")].map((e) => Math.round(e.getBoundingClientRect().width * 10) / 10),
-      hoehen: [...document.querySelectorAll("#findings .wbzeile")].map((e) => Math.round(e.getBoundingClientRect().height * 10) / 10),
-      // der Inhalt passt in die Zeile: gekappter Inhalt (max-height) zeigte sich nur hier
-      ueber: [...document.querySelectorAll("#findings .wbzeile")].map((e) => ({ n: e.dataset.n, s: e.scrollHeight, c: e.clientHeight }))
-        .filter((x) => x.s > x.c + 1),
-    }));
-    for (const [breite, hoehe] of [[2000, 1480], [1300, 860], [1100, 860]]) {
-      await fp.setViewportSize({ width: breite, height: hoehe });
-      await fp.waitForTimeout(400);
-      const zm = await zeilenMass();
-      assert(zm.striche.length > 0 && zm.striche.every((w) => w >= 80),
-        `Werkbank ${breite} x ${hoehe}, Beispielkampf: jeder Strich einer Zeile mindestens 80 Punkt breit`, zm.striche);
-      assert(zm.hoehen.length > 0 && zm.hoehen.every((h) => h <= 44.5),
-        `Werkbank ${breite} x ${hoehe}, Beispielkampf: jede Zeile hoechstens 44 Punkt hoch`, zm.hoehen);
-      assert(zm.hoehen.length > 0 && zm.ueber.length === 0,
-        `Werkbank ${breite} x ${hoehe}, Beispielkampf: der Inhalt jeder Zeile passt hinein (scrollHeight <= clientHeight + 1)`, zm.ueber);
-    }
-    await fp.setViewportSize({ width: 1280, height: 860 });
-    await fp.waitForTimeout(300);
+    /* Ruling 19 (Zeilen der Werkbank mit ihrem Strich, mindestens 80 Punkt, hoechstens 44 Punkt hoch): entfallen mit den Zeilen
+       (Inventur D13, D16); jede Faehigkeit hat ihre Bahn in der Zeitleiste, das prueft test-zeitleiste-page. */
 
     assert(!fErrors.length, "Feinschliff: keine Fehler in der Seite", fErrors);
     await fp.close();

@@ -402,7 +402,7 @@ nichts.
 Ein Reiter je Charakter, bis zu sechs: der Raid als Raster aus Flügeln und
 Schwierigkeiten, das Geheimdungeon, Events, die Dimensionsprüfung und die
 Händler, jeweils mit Zähler. Ein Band zeigt, wo die Woche steht und wann der
-nächste Wochen-Reset (Donnerstag, 10:00 deutscher Zeit) und der nächste
+nächste Wochen-Reset (Mittwoch, 06:00 UTC) und der nächste
 tägliche Reset kommen. **Nichts davon wird aus dem Spiel gelesen; du hakst es
 selbst ab.** Pro Charakter lassen sich Punkte ausblenden, umbenennen und eigene
 anlegen (*Anpassen*); *Nur Offenes zeigen* blendet Erledigtes aus.

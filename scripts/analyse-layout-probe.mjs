@@ -28,9 +28,9 @@ function messen() {
   const ov = (a, b) => a.left < b.right - 1.5 && b.left < a.right - 1.5 && a.top < b.bottom - 1.5 && b.top < a.bottom - 1.5;
   const aus = {};
 
-  // 1 - Faecher und Gruppen der Werkbank: nicht ueber dem Streifen, nicht ineinander
-  const faecher = [...document.querySelectorAll("#findings .wbfach, #findings .wbgruppe")].filter(sichtbar);
-  const streifen = document.querySelector("#verdict");
+  // 1 - die Karten des Pruefstands (seit #414 statt der Faecher der Werkbank): nicht ueber dem Kopf (Urteil, Kennzeile), nicht ineinander
+  const faecher = [...document.querySelectorAll("#a2 .a2karte")].filter(sichtbar);
+  const streifen = document.querySelector("#analysisCall");
   aus.faecherUeberStreifen = streifen && sichtbar(streifen) ? faecher.filter((f) => ov(R(f), R(streifen))).map(name) : [];
   aus.faecherIneinander = [];
   for (let i = 0; i < faecher.length; i++) for (let j = i + 1; j < faecher.length; j++)
@@ -44,7 +44,7 @@ function messen() {
   for (let n = lauf.nextNode(); n; n = lauf.nextNode()) {
     if (!n.textContent.trim()) continue;
     const e = n.parentElement;
-    if (!e || e.closest("#saeulen, svg, .vh, script, style, [hidden]") || !sichtbar(e)) continue;
+    if (!e || e.closest("#a2kurve, svg, .vh, script, style, [hidden]") || !sichtbar(e)) continue;
     const rg = document.createRange(); rg.selectNodeContents(n);
     const zeilen = [...rg.getClientRects()].filter((r) => r.width > 2 && r.height > 2)
       .map((r) => ({ left: r.left, right: r.right, top: r.top + r.height * 0.2, bottom: r.bottom - r.height * 0.2 }));
@@ -73,7 +73,7 @@ function messen() {
   }
   // und kein Name schmaler als sein laengstes Wort
   const cv = document.createElement("canvas").getContext("2d");
-  aus.nameZuSchmal = [...panel.querySelectorAll(".wbname, .wbzeile .nn")].filter(sichtbar).filter((e) => {
+  aus.nameZuSchmal = [...panel.querySelectorAll(".a2karte .nmt")].filter(sichtbar).filter((e) => {
     if (getComputedStyle(e).textOverflow === "ellipsis") return false;
     // Wort fuer Wort je Textknoten, in der Schrift seines eigenen Elements (der Name und sein <small> haben zwei)
     let wort = 0;
@@ -89,7 +89,7 @@ function messen() {
 
   // 4 - nichts abgeschnitten, ohne dass man rollen kann (Ellipse mit title ausgenommen)
   aus.abgeschnitten = [...panel.querySelectorAll("*")].filter((e) => {
-    if (e.closest("svg, #saeulen, .vh, [hidden]") || e.classList.contains("vh") || !sichtbar(e)) return false;
+    if (e.closest("svg, #a2kurve, .vh, [hidden]") || e.classList.contains("vh") || !sichtbar(e)) return false;
     const cs = getComputedStyle(e);
     if (cs.textOverflow === "ellipsis") return false;
     const kappt = (o) => o === "hidden" || o === "clip";
@@ -106,7 +106,7 @@ function messen() {
   } else aus.fussUnerreichbar = ["kein Fuss"];
 
   // 6 - kein waagerechtes Rollen, nichts ragt rechts hinaus
-  aus.ragtHinaus = [...panel.querySelectorAll("#verdict, #findings > *, #findings .wbfach, #findings .wbgruppe, .urteil, #afuss")]
+  aus.ragtHinaus = [...panel.querySelectorAll("#findings > *, #a2, #a2 .a2karte, .urteil, #afuss")]
     .filter(sichtbar).filter((e) => R(e).right > innerWidth + 1.5).map(name);
   return aus;
 }
@@ -133,14 +133,14 @@ export async function layoutProbe(browser, dist, pruefe, { sprache = "de", thema
         await page.keyboard.press(jetzt < z ? "Control+=" : "Control+-");
         await page.waitForTimeout(60);
       }
-      for (const zustand of ["ruhig", "Fahne gedrueckt"]) {
-        await page.evaluate(() => document.querySelector("#wbFahnen .wbfahne[aria-pressed='true']")?.click());
-        if (zustand !== "ruhig") await page.evaluate(() => document.querySelector("#wbFahnen .wbfahne")?.click());
+      for (const zustand of ["ruhig", "Bereich gesetzt"]) {
+        await page.evaluate(() => document.querySelector("#a2ganz")?.click());
+        if (zustand !== "ruhig") await page.evaluate(() => document.querySelector("#a2marken .a2marke.luecke")?.click());
         await page.waitForTimeout(500);
         const r = await page.evaluate(messen);
         const wo = `Analyse ${w} x ${h}, Zoom ${z} %, ${zustand}` + (sprache !== "de" || thema !== "dark" ? ` (${sprache}, ${thema})` : "");
         if (zustand !== "ruhig")
-          pruefe(await page.evaluate(() => !!document.querySelector("#wbFahnen .wbfahne[aria-pressed='true']")), wo + ": die Fahne ist gedrueckt (die Probe misst den Zustand)");
+          pruefe(await page.evaluate(() => !!document.querySelector("#a2brush") && !document.querySelector("#a2brush").hidden), wo + ": der Bereich steht (die Probe misst den Zustand)");
         pruefe(r.faecherUeberStreifen.length === 0, wo + ": kein Fach ueber dem Streifen", r.faecherUeberStreifen);
         pruefe(r.faecherIneinander.length === 0, wo + ": kein Fach in einem anderen", r.faecherIneinander);
         pruefe(r.faecherInhaltUeber.length === 0, wo + ": der Inhalt jedes Fachs passt hinein", r.faecherInhaltUeber);

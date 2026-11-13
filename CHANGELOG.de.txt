@@ -1,6 +1,25 @@
 BOROMETER — ÄNDERUNGSPROTOKOLL
 ==============================
 
+v2.2
+----
+Hinzugefügt
+  - Analyse: Zeitleiste mit Schaden je Sekunde, der Kurve des besten Pulls und Marken für Lücken, die stärksten 5s und Zielwechsel; einen Bereich aufziehen und lesen, was dort ablief (#414)
+  - Analyse: Checkliste, Opener der ersten 15s gegen den besten Pull und eine Karte je Fähigkeit; der beste Pull hält jetzt die Salven von Auge von Ventius für den Vergleich fest (#414)
+  - Weeklies: Reiter „Turm der Gier“ mit 28-Tage-Saison, vier Stufen zu je fünf Ebenen und „Alle abhaken“ je Stufe (#423)
+Angepasst
+  - Analyse: Werkbank und Kampfstreifen sind weg; was sie zeigten, steht jetzt an den Karten der Fähigkeiten und in der Zeitleiste (#414)
+  - Analyse: Die Befundliste ist weg; ihre Sätze stehen unter „Gut hier“ und „Besser möglich“ und an den Marken der Zeitleiste (#414)
+  - Analyse: Das Feld „Der Kampf“ ist weg; die Rate der direkten Treffer steht unter „Gut hier“, die Leiste der vier Trefferarten entfällt (#414)
+  - Analyse: Das Urteil oben nennt, was am meisten Schaden gekostet hat, etwa Leerlauf oder fehlende Treffer (#414)
+  - Weeklies: Alle Resets um 06:00 UTC; der wöchentliche liegt jetzt am Mittwoch 06:00 UTC (im Winter 07:00 Berliner Zeit), bisher Donnerstag 10:00 Berliner Zeit (#420)
+  - Info: Der Eintrag Netz unter Sicherheit nennt auch Gilde online (#356)
+Behoben
+  - Waffenpaar: Ein Kampf ohne Waffenschaden zeigt nicht mehr das Paar des Kampfs davor (#405)
+  - Glutring: Der Hinweis auf weitere Ziele steht oben links und läuft bei kleinem Ring nicht mehr aus der Mitte (#401)
+  - Eigenes Fenster: „In eigenem Fenster“ holt ein minimiertes Fenster zurück, und es öffnet nie größer als der Arbeitsbereich (#353)
+  - Tödlicher Zorn und Spaltendes Mondlicht tragen in beiden Log-Sprachen ihren Namen (#400)
+
 v2.1
 ------
 Hinzugefügt

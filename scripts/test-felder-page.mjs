@@ -410,7 +410,7 @@ try {
         breit: k.map((x) => Math.abs(x.r.left - pr.left) < 1 && Math.abs(x.r.right - pr.right) < 1),
         fugen: k.slice(1).map((x, i) => +(x.r.top - k[i].r.bottom).toFixed(2)),
         autoIn: k.findIndex((x) => x.el.contains(document.querySelector("#drAutoKasten"))),
-        verdictIn: k.findIndex((x) => x.el.contains(document.querySelector("#verdict"))),
+        kopfDa: !!document.querySelector("#verdict, #wbWie"),
         findingsIn: k.findIndex((x) => x.el.contains(document.querySelector("#findings"))),
         // die Ueberschrift jedes Feldes (h2/h3, die erste darin), sichtbar und nicht leer
         koepfe: k.map((x) => { const h = x.el.querySelector("h2:not(.vh), h3");
@@ -450,10 +450,13 @@ try {
       assert(a.ids[0] === "analysisCall" && a.callIn === 0 && !a.callKarte && a.breit[0],
         `${breite}: Analyse - das Urteil ist das erste Feld, oben, volle Breite, nicht in der Karte`, a);
       assert(a.callRolle === "region" && a.callName === (lang === "de" ? "Urteil" : "Verdict"), `${breite}: Analyse - das Urteilsfeld hat einen Namen`, a);
-      assert(a.verdictIn > 0 && a.findingsIn >= a.verdictIn && a.breit.every(Boolean) && a.fugen.every((f) => f >= -0.5 && f <= 1),
-        `${breite}: Analyse - darunter Form und Befunde, Fugen 1 Punkt`, a);
+      // #414: unter dem Kopf der Kampf, die neue Analyse (#a2) und, wo es etwas gibt (Fenster, Ziele), die Befunde; leer ist #findings kein Feld
+      assert(!a.kopfDa && a.ids.includes("a2") && a.ids.indexOf("a2") > a.callIn && !a.ids.includes("verdict") && (a.findingsIn === -1 || a.findingsIn > a.ids.indexOf("a2")) &&
+        a.breit.every(Boolean) && a.fugen.every((f) => f >= -0.5 && f <= 1),
+        `${breite}: Analyse - unter dem Urteil (der Kopf des Kampfs ist seit #414 B3 entfallen) die neue Analyse, dann die Befunde, Fugen 1 Punkt`, a);
       const call = await p.evaluate(() => ({ uv: document.querySelector("#analysisCall .uv")?.textContent || "",
-        un: document.querySelector("#analysisCall .un")?.textContent || "" }));
+        // der Satz ohne den Knopf "Zum Beleg" an seinem Ende (der steht nur in der Analyse, seit das Urteil ein echter Posten ist, #414)
+        un: (() => { const e = document.querySelector("#analysisCall .un")?.cloneNode(true); e?.querySelectorAll("button").forEach((k) => k.remove()); return (e?.textContent || "").trim(); })() }));
       assert(!!call.uv && call.uv === tafelUrteil.uv && call.un === tafelUrteil.un, `${breite}: Analyse - der Text des Urteils wie in der Tafel (urteilHtml)`, { call, tafelUrteil });
       assert(!a.quer, `${breite}: Analyse - kein Querrollen`, a);
       assert(!s.fehler.length, `${breite}: Rotation und Analyse - keine Fehler`, s.fehler);

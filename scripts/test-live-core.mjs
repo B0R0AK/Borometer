@@ -112,7 +112,8 @@ const p = await bundle(`
   export { segment } from "./src/renderer/app/05-fights";
   export { knownBoss, histKey } from "./src/renderer/app/06-blocks-and-places";
   export { bossIcon } from "./src/renderer/app/12-boss-images";
-  export { SAMPLE_LOG } from "./src/renderer/app/40-sample-fight";`);
+  export { SAMPLE_LOG } from "./src/renderer/app/40-sample-fight";
+  export { analyseDaten } from "./src/renderer/app/78-analyse-daten";`);
 p.setup15(); p.setup18(); p.setup19(); p.setup32();
 const { state } = p;
 state.ventiusTop = {};
@@ -528,6 +529,35 @@ function ablauf(teile) {
   const namen = [...new Set(state.events.flatMap((e) => [e.skill, e.source, e.target]))].sort();
   eq(namen, ["Quick Fire", "Spieler B", "Vagamont"], "Ziel, Quelle und Faehigkeit ohne ^<...> und ^</...>");
   eq([state.encounters.length, state.encounters[0]?.stats.name], [1, "Vegamor"], "der Kampf gegen Vagamont heisst Vegamor");
+}
+
+// --- 4. Woerterbuch und Waffen (#400): IDs aus einem englischen und einem deutschen Log
+{
+  const w = await bundle('export { SKILL_ID_NAME } from "./src/renderer/app/10-skill-names"; export { weaponByName } from "./src/renderer/app/14-questlog-weapons";');
+  const IDS = { "950313055": ["Mortal Wrath", "Tödlicher Zorn"],
+    "940593713": ["Cleaving Moonlight", "Spaltendes Mondlicht"], "940790340": ["Cleaving Moonlight", "Spaltendes Mondlicht"] };
+  for (const id in IDS) eq(w.SKILL_ID_NAME[id] ?? null, { en: IDS[id][0], de: IDS[id][1] }, "ID " + id + " loest in beiden Sprachen auf");
+  eq(w.weaponByName("Tödlicher Zorn"), "Spear", "Tödlicher Zorn findet die Waffe Speer");
+  for (const [n, waffe] of [["Spiral Slash", "Spear"], ["Spiralhieb", "Spear"], ["Venomous Edge", "Dagger"], ["Giftige Schneide", "Dagger"],
+    ["Mutilation", "Dagger"], ["Verstümmelung", "Dagger"]]) eq(w.weaponByName(n), waffe, n + " hat die Waffe " + waffe);
+}
+
+// --- 5. Die Daten der neuen Analyse (#414): der Stempel merkt jede Aenderung, die die Baender ändert
+// Ein weiteres Log desselben Bosses ändert Strecken, nicht die Zahl der Ereignisse; ohne die Strecken im
+// Stempel blieben alte Baender und Luecken stehen.
+{
+  const a = p;
+  frisch(8, true);
+  ganz(p.SAMPLE_LOG + "\n");
+  const seg = state.encounters[0];
+  seg.unverwundbar = [{ von: 2000, bis: 5000 }];
+  const eins = a.analyseDaten(seg, null);
+  eq(eins.baender.unv.map((u) => [u.von, u.bis]), [[2, 5]], "die Baender kennen das unverwundbare Ziel");
+  eq(a.analyseDaten(seg, null), eins, "unveraendert: dieselbe Rechnung aus dem Gedaechtnis");
+  seg.unverwundbar = [{ von: 2000, bis: 9000 }];
+  eq(a.analyseDaten(seg, null).baender.unv.map((u) => [u.von, u.bis]), [[2, 9]], "dieselbe Zahl Strecken, laenger: die Baender rechnen neu");
+  seg.unverwundbar = [{ von: 2000, bis: 9000 }, { von: 20000, bis: 24000 }];
+  eq(a.analyseDaten(seg, null).baender.unv.length, 2, "eine Strecke mehr: die Baender rechnen neu");
 }
 
 rmSync(work, { recursive: true, force: true });

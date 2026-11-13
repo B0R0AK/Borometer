@@ -265,11 +265,22 @@ export function castsOk(c: unknown): boolean {
     Array.isArray(l.c) && l.c.every((x: any) => Array.isArray(x) && x.length === 5 && x.every(zahl))));
 }
 
+/** Salven von Auge von Ventius (#414): [Beginn ms, Nachbeben (-1 unlesbar, 0 nur Oeffner), Treffer], alles Zahlen.
+    Fehlt das Feld (ein aelterer Pull), ist das in Ordnung; nie wird es nachgerechnet. */
+export function ventiusOk(v: unknown): boolean {
+  return v === undefined || (Array.isArray(v) && v.every((x: any) => Array.isArray(x) && x.length === 3 && x.every(zahl)));
+}
+
+/** Die Salven eines Pulls bis zur Klassenlaenge einer Puppe (wie cutCasts fuer die Einsaetze). */
+export function cutVentius(v: [number, number, number][], ms: number): [number, number, number][] {
+  return v.filter(s => s[0] < ms);
+}
+
 /** Ein Eintrag der Datei. isRun ist looksLikeRun der Seite (34-menus-drop-and-tabs.ts),
     die ihrerseits runPartsOk fragt; hier noch einmal, damit der Test ohne Seite traegt. */
 export function looksLikeBestEntry(e: any, isRun: (r: unknown) => boolean): e is BestEntry {
   const pull = (p: any): p is BestPull => !!p && typeof p === "object" && zahl(p.at) &&
     typeof p.file === "string" && typeof p.ver === "string" &&
-    isRun(p.run) && runPartsOk(p.run) && castsOk(p.run.casts);
+    isRun(p.run) && runPartsOk(p.run) && castsOk(p.run.casts) && ventiusOk(p.run.ventius);
   return !!e && typeof e === "object" && pull(e.best) && (e.second === undefined || pull(e.second));
 }

@@ -18,7 +18,7 @@ import { catOf, HIT_CATS, mitgliederMerken, mitgliedIndex, mitgliedName, notePar
 import { renderHead } from "./20-meter-head";
 import { renderBars } from "./21-damage-table";
 import { renderRotation } from "./25-rotation";
-import { persistConfig, renderWeapons } from "./27-weapons-tab";
+import { merkePaar, paarNachAussen, persistConfig, renderWeapons } from "./27-weapons-tab";
 import { renderAll } from "./32-history";
 import { setGroup, switchTab } from "./34-menus-drop-and-tabs";
 import { askConfirm } from "./36-dialog";
@@ -189,7 +189,8 @@ export function sendReport(force: boolean){
      no fight", and the whole point of showing a party's make-up is seeing who
      tanks and who heals BEFORE the pull, while everyone is still waiting. The
      weapons are a property of the player, not of a fight. */
-  const w = (state.mainWeapon && state.offWeapon) ? [state.mainWeapon, state.offWeapon] : null;
+  const pn = paarNachAussen();
+  const w = (pn.main && pn.off) ? [pn.main, pn.off] : null;
   /* Beside the weapons for the same reason they sit beside the payload: which
      build you are actually playing is a property of you, not of a fight, and
      the board is read while everyone is still waiting. A reader on an older
@@ -531,9 +532,19 @@ export function readWeaponPair(){
   if(hand){
     state.mainWeapon = hand.main || "";
     state.offWeapon = hand.off || "";
+    merkePaar(state.mainWeapon || "", state.offWeapon || "");
   } else if(state.autoRead){
     state.mainWeapon = state.autoRead.main;
     state.offWeapon = state.autoRead.off;
+    merkePaar(state.mainWeapon || "", state.offWeapon || "");
+  } else if(seg){
+    /* Ein Kampf ohne Waffenschaden (nur Passive oder Unzugewiesenes) liest kein
+       Paar. Das Paar des Vorkampfs bleibt dann nicht in der Anzeige stehen: es
+       hiesse, dieser Kampf sei mit Waffen gespielt, die er nie gezeigt hat
+       (#406). Nach aussen (Gruppe, config.json) geht weiter das letzte Paar,
+       siehe paarNachAussen(). */
+    state.mainWeapon = "";
+    state.offWeapon = "";
   }
   meldeCharwechsel();
 }

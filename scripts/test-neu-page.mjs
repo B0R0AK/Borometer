@@ -1821,7 +1821,7 @@ try {
   const zurAnalyse = async (s, datei = ANA_LOG) => {
     if (datei) await mitLog(s, datei); else await beispiel(s.page);
     await bereich(s.page, "analysis");
-    await s.page.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
+    await s.page.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#a2kurve svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
   };
   /* Was die Analyse zeigt: Urteil, Weitere Befunde, Form, drei Felder, Ventius, Fuss.
      #218 (Spezifikation 2026-10-07, 8.2): "Weitere Befunde" ist entfallen - die Befunde stehen in der
@@ -1829,11 +1829,11 @@ try {
      Kampfstreifen (#weitereListe: Luecken, groesster Treffer, Fehlschlaege, schwaechste Stelle); gelesen
      werden beide, die Kennzeile zuletzt (sie traegt "Luecken ab 2 s"). Die Form ist der Kampfstreifen
      #verdict mit der Glutkurve (ein Punkt je Sekunde, 2 s geglaettet) statt der Saeulen. Von den drei
-     Feldern ist "Wer traegt?" das Hauptfach der Werkbank (#findings .wbfach.haupt: Name, Anteil, darunter
+     Feldern ist "Wer traegt?" seit #414 die erste Karte des Pruefstands (#a2 .a2karte: Name, Anteil, darunter
      leise woraus und wer danach), "Wie triffst du?" ist #wbWie im Kopf des Streifens,
      "Hast du durchgedrueckt?" der Eintrag "Einsaetze je Minute" der Kennzeile. Der groesste Treffer und
-     die Fehlschlaege stehen im Fach ihrer Faehigkeit (#findings .wbbefunde .find), der Kasten Auge von
-     Ventius ist das Fach .vfeld (Perlen je Salve als g.wbsalve mit data-best und data-lesbar). */
+     die Fehlschlaege stehen an der Karte ihrer Faehigkeit (#a2 .a2karte .find), Auge von Ventius ist die
+     Karte .a2karte.vent (je Salve ein Streifen .a2salve im aufgeklappten Raster, #a2vinnen). */
   /* #218 Etappe 3 (Entscheidung vom 08.10.2026): die Tabelle "Bester Einsatz je Boss" steht im Bereich Rekorde als
      eigener Abschnitt "Auge von Ventius" (#rks-ventius), nicht mehr in der Analyse. rkVent liest ihn: Ueberschrift,
      Zeilen (Name, Nachbeben, Treffer, "x von y" mit der Spur), Rollen der Tabelle, Folge der Ueberschriften. */
@@ -1862,7 +1862,11 @@ try {
       note: txt(q(".ventnote", sek || document.createElement("i"))),
     };
   });
-  const anaBlick = (p) => p.evaluate(() => {
+  const anaBlick = async (p) => {
+    // #414: das Raster der Ventius-Karte ist erst gebaut, wenn es aufgeklappt ist
+    await p.evaluate(() => { const d = document.querySelector("#a2vent"); if (d && !d.open) d.open = true; });
+    await p.waitForFunction(() => !document.querySelector("#a2vent") || document.querySelectorAll("#a2vinnen .a2salve").length > 0, null, { timeout: 4000 }).catch(() => {});
+    return p.evaluate(() => {
     const q = (x) => document.querySelector(x);
     const r = (e) => e && e.getClientRects().length ? e.getBoundingClientRect().toJSON() : null;
     const txt = (x) => (q(x)?.textContent || "").trim();
@@ -1876,61 +1880,60 @@ try {
       const g = parseFloat(getComputedStyle(e).fontSize);
       if (g < 11) klein.push(n.textContent.trim().slice(0, 24) + ":" + g);
     }
-    const sa = q("#saeulen");
+    const sa = q("#a2kurve");
     return {
       kopf: q("#bereichKopf")?.innerText || "",
       // der Satz ohne den Knopf "Zum Beleg" an seinem Ende (#107)
       urteil: { uv: txt("#analysisCall .uv"), un: ohneKnopf(q("#analysisCall .un")), r: r(q("#analysisCall")), uk: !!q("#analysisCall .uk") },
-      titel: document.querySelectorAll("#wbKenn [title], #weitereListe [title], #findings .wbbefunde [title]").length,
-      weitereText: (q("#wbKenn")?.innerText || "") + "\n" + (q("#weitereListe")?.innerText || "") + "\n" +
-        [...document.querySelectorAll("#findings .wbbefunde")].map((d) => d.innerText).join("\n"),
-      // die Liste steht im Streifen unter seiner h3; r ist das Feld des Streifens, kenn die Kennzeile im Kopf
-      weitere: { h: (q("#weitereListe")?.closest("#verdict")?.querySelector("h3")?.textContent || "").trim(), r: r(q("#verdict")),
-        liste: r(q("#weitereListe")), kenn: r(q("#wbKenn")),
-        items: [...document.querySelectorAll("#weitereListe .find"), ...document.querySelectorAll("#findings .wbbefunde .find"),
-          ...document.querySelectorAll("#wbKenn .find")].map((f) => ({ k: f.dataset.k, dt: (f.querySelector(".k")?.textContent || "").trim(),
+      zeit: r(q("#a2")), mitte: r(q(".a2mitte")),
+      titel: document.querySelectorAll("#wbKenn [title], #a2besser [title], #a2 .a2karte .find [title]").length,
+      weitereText: (q("#wbKenn")?.innerText || "") + "\n" + (q("#a2besser")?.innerText || "") + "\n" +
+        [...document.querySelectorAll("#a2 .a2karte .find")].map((d) => d.innerText).join("\n"),
+      /* r ist das Feld des Streifens (h3 "Der Kampf"), kenn die Kennzeile im Kopf. Die Befundliste ist seit #414 (B2) entfallen: liste ist
+         der Block rechts neben "Wie triffst du?" (Definition der Luecke, Mechanik); die schwaechste Stelle ist ein Satz unter Besser moeglich. */
+      // #414 (B3): auch der Kopf des Kampfs (#verdict mit der Rampe, #wbWie) ist entfallen; die Kennzeile steht im Kopf neben dem Urteil
+      weitere: { kopfDa: !!q("#verdict, #wbWie, #formTitel"), kenn: r(q("#wbKenn")), listeDa: !!q("#weitereListe"),
+        items: [...document.querySelectorAll("#a2 .a2karte .find"), ...document.querySelectorAll("#wbKenn .find")].map((f) => ({ k: f.dataset.k, dt: (f.querySelector(".k")?.textContent || "").trim(),
           v: (f.querySelector(".v")?.textContent || "").trim(),
           // in der Kennzeile ist der leise Satz von "je Minute" ein eigenes .fein; die Zahl der Einsaetze steht davor
-          n: (f.querySelector(".n")?.textContent || "").trim(), fach: f.closest(".wbfach")?.dataset.n || "", r: r(f) })) },
-      form: { h: txt("#formTitel"), def: txt("#lueckeDef"), leg: txt("#verdict .vlegend"), r: r(q("#verdictForm")),
+          n: (f.querySelector(".n")?.textContent || "").trim(), fach: f.closest(".a2karte")?.dataset.skill || "", r: r(f) }))
+          .concat([...document.querySelectorAll('#a2besser li[data-k="stelle"]')].map((li) => {
+            const m = /^(Schwächste drei Sekunden) (.+? DPS)\. (.*)$/.exec(ohneKnopf(li));
+            return { k: "schwach", dt: m ? m[1] : "", v: m ? m[2] : "", n: m ? m[3] : "", fach: "", r: r(li) };
+          })) },
+      form: { h: txt("#a2zeitT"), marke: txt("#a2marken .a2marke.stelle .l"), def: txt("#lueckeDef"), leg: txt("#a2legende"), r: r(sa),
         // die Glutkurve: je Sekunde ein Punkt (x = Sekunde + 0,5), y von oben in Hundertsteln der Hoehe
-        balken: (() => { const d = sa?.querySelector("svg path.wblinie")?.getAttribute("d") || "";
-          return [...d.matchAll(/L([\d.]+) ([\d.]+)/g)].map((m) => [+m[1], +m[2]]).filter(([x]) => x % 1 !== 0); })(),
-        svg: r(sa?.querySelector("svg")), sa: r(sa), label: sa?.getAttribute("aria-label") || "", rolle: sa?.getAttribute("role") || "",
+        balken: (() => { const d = sa?.querySelector("svg path.a2linie")?.getAttribute("d") || "";
+          return [...d.matchAll(/L([\d.]+) ([\d.]+)/g)].map((m) => [+m[1], +m[2]]).slice(0, -1); })(),
+        svg: r(sa?.querySelector("svg")), sa: r(sa), label: q("#a2beschr")?.textContent || "", beschr: q("#a2fokus")?.getAttribute("aria-describedby") || "",
         zonen: sa ? [...sa.querySelectorAll(".gapz")].map((z) => z.dataset.zeit) : [],
         med: sa?.querySelector(".med") ? parseFloat(sa.querySelector(".med").style.bottom) : -1,
         medStrich: sa?.querySelector(".med") ? getComputedStyle(sa.querySelector(".med")).borderTopStyle : "" },
       // die Knoepfe in den leisen Saetzen (Wege in die Rotation, #107) gehoeren nicht zum Satz
       drei: (() => {
         const ohne = (x) => { const c = x.cloneNode(true); c.querySelectorAll("button").forEach((k) => k.remove()); return c.textContent.trim(); };
-        const t1 = q("#findings .wbfach.haupt"), t2 = q("#wbWie"), t3 = q('#wbKenn .find[data-k="jeMinute"]');
-        // im Hauptfach: der Name ohne die Zusatzzeile, der Anteil ohne "des Schadens", leise die Zeilen .wbfein
+        const t1 = q("#a2 .a2karte"), t3 = q('#wbKenn .find[data-k="jeMinute"]');
+        // an der ersten Karte: der Name, der Anteil ohne die Zeile des besten Pulls (small), leise die Zeilen .wbfein
         const nurText = (x) => { if (!x) return ""; const c = x.cloneNode(true); c.querySelectorAll("small").forEach((k) => k.remove()); return c.textContent.trim(); };
         return [
-          t1 && { id: "haupt", h: nurText(t1.querySelector("h3")), ant: nurText(t1.querySelector(".wbanteil")),
-            leise: [...t1.querySelectorAll(".wbfein:not(.salvenwort)")].map(ohne).join(" | "), r: r(t1),
-            zweit: (() => { const z = document.querySelectorAll("#findings .wbfach")[1]; return z ? { h: nurText(z.querySelector("h3")), ant: nurText(z.querySelector(".wbanteil")) } : null; })() },
-          t2 && { id: t2.id, h: (t2.closest("#verdict")?.querySelector("h3")?.textContent || "").trim(), ant: (t2.querySelector(".ant")?.textContent || "").trim(),
-            leise: [...t2.querySelectorAll(".fein")].map(ohne).join(" | "), r: r(t2) },
+          t1 && { id: "haupt", h: nurText(t1.querySelector(".nmt")), ant: nurText(t1.querySelector(".ant")),
+            leise: [...t1.querySelectorAll(".wbfein")].map(ohne).join(" | "), r: r(t1),
+            zweit: (() => { const z = document.querySelectorAll("#a2 .a2karte")[1]; return z ? { h: nurText(z.querySelector(".nmt")), ant: nurText(z.querySelector(".ant")) } : null; })() },
           t3 && { id: "jeMinute", h: (t3.querySelector(".k")?.textContent || "").trim(), ant: (t3.querySelector(".wbein")?.textContent || "").trim(),
             leise: [...t3.querySelectorAll(".fein")].map(ohne).join(" | "), r: r(t3) },
         ].filter(Boolean);
       })(),
-      stapel: [...document.querySelectorAll("#wbWie .wbrampe i")].map((i) => ({ art: i.dataset.art, w: parseFloat(i.style.width) })),
-      lg: [...document.querySelectorAll("#wbWie .lg > span")].map((x) => x.textContent.trim()),
-      // #218: der Kasten ist das Fach Auge von Ventius (.vfeld); eine Saeule je Salve ist g.wbsalve in seinem Bild
-      vent: { h: (() => { const x = q("#findings .vfeld h3")?.cloneNode(true); x?.querySelectorAll("small").forEach((k) => k.remove()); return (x?.textContent || "").trim(); })(),
-        /* Designpruefung 08.10.: der Satz zur optimalen Entfernung steht einmal, als Unterschrift der Perlen
-           (.salvenwort), darueber leise die Leserichtung (.wbachse); links nur, was ein Nachbeben ist */
-        achse: txt("#findings .vfeld .wbachse"), nachbeben: txt("#findings .vfeld .wbteile > div:first-child > .wbfein"),
-        text: q("#findings .vfeld")?.innerText || "", r: r(q("#findings .vfeld")),
-        salven: [...document.querySelectorAll("#findings .vfeld svg g.wbsalve")].map((g) => g.dataset.best === "1"),
-        leer: document.querySelectorAll('#findings .vfeld svg g.wbsalve[data-lesbar="0"]').length, wort: txt("#findings .vfeld .salvenwort"),
-        vorbehalt: txt("#findings .vfeld .kvorbehalt"),
-        boss: [...document.querySelectorAll("#findings .vfeld .vtabzeile")].map((z) => [(z.querySelector(".bn")?.textContent || "").trim(),
-          (z.querySelector(".vpips b")?.textContent || "").trim(), (z.querySelector(".tr")?.textContent || "").trim()]),
-        vkz: [...document.querySelectorAll("#findings .vfeld .vkz > div")].map((d) => [...d.children].map((c) => c.textContent.trim())),
-        tab: !!q("#findings .vfeld .vtab"),
+      // #414 (B3): die Rate der direkten Treffer steht unter "Gut hier", der Anteil der Krits am Schaden unter dem Satz des Bereichs; die Rampe der vier Trefferarten gibt es nicht mehr
+      rampe: document.querySelectorAll(".wbrampe, .wbwie").length,
+      rate: { text: (q('#a2gut li[data-k="raten"]')?.textContent || "").trim(), treffer: q("#a2treffer") && !q("#a2treffer").hidden ? q("#a2treffer").textContent.trim() : "" },
+      // #414: Ventius ist die Karte .a2karte.vent; eine Salve ist ein Streifen .a2salve im aufgeklappten Raster (Ring = unter der Decke, hohl-tot = nicht lesbar)
+      vent: { h: (q("#a2 .a2karte.vent .nmt")?.textContent || "").trim(),
+        text: q("#a2 .a2karte.vent")?.innerText || "", r: r(q("#a2 .a2karte.vent")),
+        salven: [...document.querySelectorAll("#a2vinnen .a2salve")].map((g) => !g.querySelector(".ring") && !g.querySelector(".tot")),
+        leer: document.querySelectorAll("#a2vinnen .a2salve .tot").length ? [...document.querySelectorAll("#a2vinnen .a2salve")].filter((g) => g.querySelector(".tot")).length : 0,
+        stand: txt("#a2 .a2karte.vent .vsatz"), details: q("#a2vinnen")?.innerText || "",
+        gefehlt: txt("#a2vinnen .a2vzahlen > div:nth-child(3) dd"),
+        vorbehalt: txt("#a2 .a2karte.vent .kvorbehalt"),
         // #218 Etappe 3: in der ganzen Analyse keine Tabelle je Boss und kein Aufklapper mehr
         jeBossIn: document.querySelectorAll("#p-analysis .vtab, #p-analysis .wbjeboss, #p-analysis .vtabzeile").length,
         /* Entscheidung vom 11.10.2026: der Wortlaut steht gewollt im Knopf zu den Rekorden (.wbrk, eigene Probe mit
@@ -1940,7 +1943,8 @@ try {
       status: r(q("#statusleiste")), rollY: scrollY + (q("#app")?.scrollTop || 0) + (q(".stage")?.scrollTop || 0),
       klein, quer: document.documentElement.scrollWidth > innerWidth,
     };
-  });
+    });
+  };
   // --- 4.1 bis 4.12 an einem erzeugten Kampf (Deutsch, 1280 x 860)
   {
     const s = await oeffne({ app: true, lang: "de" }); const p = s.page;
@@ -1950,32 +1954,31 @@ try {
     await p.waitForFunction(() => /\d/.test(document.querySelector("#bkRotZahl")?.textContent || ""));
     const rotZahl = +(await p.evaluate(() => document.querySelector("#bkRotZahl").textContent)).replace(/\D/g, "");
     await bereich(p, "analysis");
-    await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#saeulen svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
+    await p.waitForFunction(() => !!document.querySelector("#analysisCall .uv") && document.querySelectorAll("#a2kurve svg path").length > 0, null, { timeout: 5000 }).catch(() => {});
     const b = await anaBlick(p);
     // 4.1-4.3: der Kopf nennt Bereich und Kampf; die Leerzeit nach Median ist der teuerste Kandidat - Form des Entwurfs
     /* Fixrunde 1 (Pruefung Befund 4): die Analyse sagt "Luecke" (nach dem Median), der Zeitverlauf und der
        Vergleich "Pause" (ohne Treffer ueber 1,5 s) - vorher "10 Sekunden ohne Treffer" */
-    assert(/Analyse/.test(b.kopf) && /Vulcanus/.test(b.kopf) && b.urteil.uv === "10 Sekunden in Lücken",
-      "4.1/4.3 Kopf mit dem Kampf, Urteil: 10 Sekunden in Luecken (drei Luecken nach dem Median: 6 + 2 + 2 s)", { kopf: b.kopf, urteil: b.urteil });
-    // Fixrunde 1 (Pruefung Befund 3 und 9): kein Kicker, der Satz beginnt die Erklaerung; in der Analyse mit der Linie in den Saeulen
-    assert(!b.urteil.uk && b.urteil.un.startsWith("Das kostet dich am meisten: Gemessen an deiner gewöhnlichen Sekunde \u2013 dem Median der Sekunden mit Treffern, " +
-      kurz(ANA.med) + ", wie die Linie in den Säulen \u2013 fehlen"),
-      "4.2 Urteil in der Form des Entwurfs: „Das kostet dich am meisten:“ eroeffnet die Erklaerung, mit „wie die Linie in den Saeulen“", b.urteil);
-    assert(b.urteil.un.includes("dem Median der Sekunden mit Treffern, " + kurz(ANA.med)) && b.urteil.un.includes("rund " + kurz(10 * ANA.med) + " Schaden") &&
-      b.urteil.un.includes("Die längste Lücke liegt bei 0:20\u20130:26.") && b.urteil.un.endsWith("Ob der Boss da nicht zu treffen war, steht nicht im Log."),
-      "4.3 Urteil: gemessen am Median, Kosten = Leerzeit mal Median, die laengste Luecke, was das Log nicht weiss", { un: b.urteil.un, med: kurz(ANA.med) });
+    /* #414 (Inventur A01 bis A03): das Urteil kommt aus dem Kopf-Befund; die Schlagzeile ist sein Satz, die Erklaerung sein Anfang und
+       seine Notiz. Der Wortlaut ist neu (Leerlauf in Sekunden und Luecken, Kosten = Leerzeit mal Median); die laengste Luecke
+       steht als Zone der Zeitleiste (4.5) und in der Befundliste (4.4), "wie die Linie in den Saeulen" entfaellt mit den Saeulen. */
+    assert(/Analyse/.test(b.kopf) && /Vulcanus/.test(b.kopf) && /^10\u00a0s Leerlauf in 3\u00a0Lücken, etwa \S+\.$/.test(b.urteil.uv),
+      "4.1/4.3 Kopf mit dem Kampf, Urteil: 10 s Leerlauf in 3 Luecken (drei Luecken nach dem Median: 6 + 2 + 2 s)", { kopf: b.kopf, urteil: b.urteil });
+    assert(!b.urteil.uk && b.urteil.un === "Das kostet dich am meisten: Sekunden unter 2\u00a0% des Medians, bewertet mit dem Median. Ob das Ziel zu treffen war, weiß das Log nicht.",
+      "4.2 Urteil: „Das kostet dich am meisten:“ eroeffnet die Erklaerung, Sekunden unter 2 % des Medians, bewertet mit dem Median", b.urteil);
+    assert(Math.abs(parseFloat((/etwa ([0-9.]+)k[.]/.exec(b.urteil.uv) || [])[1]) * 1000 - 10 * ANA.med) <= 0.01 * 10 * ANA.med && b.urteil.un.includes("Ob das Ziel zu treffen war, weiß das Log nicht."),
+      "4.3 Urteil: Kosten = Leerzeit mal Median, und was das Log nicht weiss", { uv: b.urteil.uv, med: kurz(ANA.med), rohmed: ANA.med });
     // 4.4: Weitere Befunde als Zeile unter dem Urteil
     /* #218 (8.2): die Kennzeile steht im Kopf neben dem Urteil, die Liste im Streifen unter der Kurve: das Feld des
        Streifens (h3 "Der Kampf") unter dem Urteil, gleich breit, die Kennzeile im Kopf ueber dem Streifen, die Liste
        unter der Kurve in der Breite des Streifens */
     const w = Object.fromEntries(b.weitere.items.map((x) => [x.k, x]));
-    assert(b.weitere.h === "Der Kampf" && b.weitere.r && b.urteil.r && b.weitere.r.top >= b.urteil.r.bottom - 1 &&
-      Math.abs(b.weitere.r.left - b.urteil.r.left) < 1 && Math.abs(b.weitere.r.width - b.urteil.r.width) < 1 && b.form.r && b.form.r.top >= b.weitere.r.top &&
-      b.weitere.kenn && b.weitere.kenn.top >= b.urteil.r.top && b.weitere.kenn.bottom <= b.weitere.r.top + 1 &&
-      b.weitere.liste && b.weitere.liste.top >= b.form.r.bottom - 1 && b.weitere.liste.right <= b.weitere.r.right + 1 &&
-      b.weitere.liste.left >= b.form.r.left - 1 && b.weitere.liste.width >= b.form.r.width - 1,
-      "4.4 Weitere Befunde: eine Zeile unter dem Urteil, ueber der Form, volle Breite", { w: b.weitere.r, u: b.urteil.r, f: b.form.r, kenn: b.weitere.kenn, liste: b.weitere.liste });
-    assert(w.luecken?.dt === "Lücken ab 2\u00a0s" && w.luecken.v === "3" && w.luecken.n === "zusammen 10\u00a0s" &&
+    assert(!b.weitere.kopfDa && !b.weitere.listeDa && b.urteil.r && b.form.r && b.zeit && b.zeit.top >= b.urteil.r.bottom - 1 &&
+      Math.abs(b.zeit.left - b.urteil.r.left) < 1 && Math.abs(b.zeit.width - b.urteil.r.width) < 1 &&
+      b.weitere.kenn && b.weitere.kenn.top >= b.urteil.r.top && b.weitere.kenn.bottom <= b.urteil.r.bottom + 1,
+      "4.4 Kopf: weder die Befundliste (#414, B2) noch das Feld \"Der Kampf\" (B3) gibt es noch; unter dem Urteil mit der Kennzeile steht die Zeitleiste in voller Breite", { u: b.urteil.r, z: b.zeit, kenn: b.weitere.kenn, da: b.weitere });
+    // #414 (B2): die Luecken stehen als Marken der Zeitleiste (drei) und mit Zahl und Summe in der Kennzeile
+    assert(b.form.zonen.length === 3 && w.luecken?.dt === "Lücken ab 2\u00a0s" && w.luecken.v === "3" && w.luecken.n === "zusammen 10\u00a0s" &&
       w.groesster?.dt === "Größter Treffer" && w.groesster.v === "250.0k" && w.groesster.fach === "Detonation Mark" &&
       w.fehl?.dt === "Fehlschläge" && /^2 \u00b7 /.test(w.fehl.v) && w.jeMinute?.dt === "Einsätze je Minute" && /^\d+,\d$/.test(w.jeMinute.v) && !!w.skillung,
       "4.4/4.14 Weitere Befunde: Luecken ab 2 s (3, zusammen 10 s), groesster Treffer im Fach seiner Faehigkeit ohne ihren Namen (DECISION 2.3, Designpruefung 08.10.), Fehlschlaege, Einsaetze je Minute, Rhythmus verdichtet",
@@ -1983,9 +1986,11 @@ try {
     /* Eine Luecke ist schon benannt: die schwaechste Stelle liegt nicht in einer Luecke nach dem Median und
        haelt ihre drei Sekunden Abstand (vorher lag sie bei 0:33-0:36, mitten in der Luecke 0:33-0:35) */
     const sek = (u) => { const [m, x] = u.split(":"); return +m * 60 + +x; };
-    const stelle = /^(\d+:\d+)\u2013(\d+:\d+) /.exec(w.schwach?.v || "");
+    const stelle = /^(\d+:\d+)\u2013(\d+:\d+) /.exec(w.schwach?.v || "");   // "0:47\u20130:50 bei ... DPS" (der Satz unter Besser moeglich)
     assert(!!stelle && stelle[1] === "0:47" && [[20, 26], [33, 35], [40, 42]].every(([a, e]) => sek(stelle[2]) <= a - 3 || sek(stelle[1]) >= e + 3),
       "4.14 die schwaechste Stelle liegt nicht in oder an einer Luecke nach dem Median", w.schwach);
+    // #414 (B3): die Marke der schwaechsten Stelle heisst so (Wortlaut, DE; EN unten) und steht in der Zeitleiste
+    assert(b.form.marke === "Schwächste Stelle", "#414 B3: die Marke der schwaechsten Stelle nennt ihren Namen", b.form.marke);
     // Fixrunde 1 (Pruefung Befund 2): die Erklaersaetze stehen sichtbar unter dem Wert, nicht im title
     assert(b.titel === 0 && !!w.skillung?.n && !!w.schwach?.n && /Ein Fehlschlag steht im Log als Treffer ohne Schaden\./.test(w.fehl?.n || "") &&
       [w.skillung?.n, w.schwach?.n, w.fehl?.n].every((x) => b.weitereText.includes(x)),
@@ -1999,26 +2004,27 @@ try {
        gemessen an der hoechsten geglaetteten Sekunde (92 % der Hoehe) */
     const glatt = ANA.sek.map((v, i) => ((i ? ANA.sek[i - 1] : v) / 2 + v + (i + 1 < ANA.T ? ANA.sek[i + 1] : v) / 2) / 2);
     const gMax = Math.max(...glatt);
-    assert(b.form.h === "Der Kampf" && b.form.balken.length === ANA.T && Math.min(...b.form.balken.map(([, y]) => y)) === 8 &&
-      b.form.balken.every(([x, y], i) => x === i + 0.5 && Math.abs(y - (100 - 92 * glatt[i] / gMax)) < 0.01),
-      "4.5 Form: eine Saeule je Sekunde (60), Hoehe = Schaden der Sekunde am hoechsten gemessen", { n: b.form.balken.length, balken: b.form.balken.slice(0, 12) });
+    assert(b.form.h === "Zeitleiste" && b.form.balken.length === ANA.T && Math.min(...b.form.balken.map(([, y]) => y)) === 6 &&
+      b.form.balken.every(([x, y], i) => x === i + 0.5 && Math.abs(y - (100 - 94 * glatt[i] / gMax)) < 0.01),
+      "4.5 Zeitleiste: ein Punkt der Kurve je Sekunde (60), Hoehe = Schaden der Sekunde am hoechsten gemessen", { n: b.form.balken.length, balken: b.form.balken.slice(0, 12) });
     assert(JSON.stringify(b.form.zonen) === JSON.stringify(["0:20\u20130:26", "0:33\u20130:35", "0:40\u20130:42"]),
       "4.3/4.5 Luecken nach dem Median: 20-26 und 40-42 s ohne Treffer, 33-35 s unter 2 % - nicht die ersten 3 und nicht die letzten 5 s", b.form.zonen);
-    assert(Math.abs(b.form.med - 92 * ANA.med / gMax) < 0.2 && b.form.medStrich === "dashed" && b.form.leg.includes("Median der Sekunden mit Treffern (" + kurz(ANA.med) + ")"),
-      "4.5 der Median gestrichelt auf seiner Hoehe, die Legende nennt ihn", { med: b.form.med, soll: 92 * ANA.med / gMax, strich: b.form.medStrich, leg: b.form.leg });
+    assert(Math.abs(b.form.med - 94 * ANA.med / gMax) < 0.2 && b.form.medStrich === "dashed" && b.form.leg.includes("Median der Sekunden mit Treffern (" + kurz(ANA.med) + ")"),
+      "4.5 der Median gestrichelt auf seiner Hoehe, die Legende nennt ihn", { med: b.form.med, soll: 94 * ANA.med / gMax, strich: b.form.medStrich, leg: b.form.leg });
     assert(b.form.def === "Eine Lücke: mindestens 2\u00a0s, in denen weniger als 2\u00a0% einer gewöhnlichen Sekunde ankam; die ersten 3 und letzten 5\u00a0s zählen nicht.",
       "4.5 die Definition der Luecke steht als Satz dabei (gewuenscht)", b.form.def);
-    assert(b.form.rolle === "img" && b.form.label.includes("0:20\u20130:26") && b.form.label.includes("3 Lücken"), "4.5 Vorleser: die Saeulen als Bild mit den Luecken", b.form.label);
+    assert(/\ba2beschr\b/.test(b.form.beschr) && b.form.label.includes("0:20\u20130:26") && b.form.label.includes("3 Lücken"), "4.5 Vorleser: die Kurve der Zeitleiste hat eine Beschreibung mit den Luecken", { beschr: b.form.beschr, label: b.form.label });
     // 4.7 bis 4.9: die drei Felder
     const leer = { h: "", ant: "", leise: "", r: null };
-    const [d1 = leer, d2 = leer, d3 = leer] = b.drei;
+    const [d1 = leer, d3 = leer] = b.drei;
+    const d2 = { ant: b.rate.text };
     const [erst, zweit] = ANA.reihe;
     /* #218: "Wer traegt?" unter dem Streifen, "Wie triffst du?" (#wbWie) im Kopf des Streifens neben der Kurve,
        "Hast du durchgedrueckt?" als "Einsaetze je Minute" in der Kennzeile ueber dem Streifen.
        Task 9: "Wer traegt?" ist das Hauptfach der Werkbank - seine Ueberschrift ist die staerkste Faehigkeit */
-    assert(b.drei.length === 3 && d1.h === "Schnellfeuer" && erst[0] === "Quick Fire" && d2.h === "Der Kampf" && d3.h === "Einsätze je Minute" &&
-      d1.r.top >= b.weitere.r.bottom - 1 && d2.r.top >= b.weitere.r.top && d2.r.right <= b.form.r.left + 1 && d3.r.bottom <= b.weitere.r.top + 1,
-      "4.7-4.9 drei Felder nebeneinander unter der Form", b.drei.map((x) => [x.h, x.r?.top]));
+    assert(b.drei.length === 2 && d1.h === "Schnellfeuer" && erst[0] === "Quick Fire" && d3.h === "Einsätze je Minute" &&
+      d1.r.top >= b.urteil.r.bottom - 1 && d3.r.bottom <= b.zeit.top + 1 && b.rate.text.length > 0,
+      "4.7-4.9 die Kennzeile im Kopf, die erste Karte darunter (#414); \"Wie triffst du?\" ist als Rate unter Gut hier umgezogen (B3)", b.drei.map((x) => [x.h, x.r?.top]));
     /* Task 9: der Name steht als Ueberschrift des Hauptfachs, der Anteil daneben; "Danach ..." leise darunter,
        und das zweite Fach ist die zweite Faehigkeit mit demselben Anteil */
     assert(d1.h === "Schnellfeuer" && erst[0] === "Quick Fire" && d1.ant === prozDe(erst[1] / ANA.gesamt, 1) &&
@@ -2029,11 +2035,9 @@ try {
     // #106: der Satz sagt, worauf sich der Anteil bezieht (die Treffer)
     assert(d2.ant === prozDe(ANA.kritDirekt) + " deiner direkten Treffer kritisch, " + prozDe(ANA.stark / N) + " stark." && ANA.nieZahl === 1 && ANA.kritDirekt > ANA.krit / N,
       "4.8 Wie triffst du: Anteil der direkten Treffer kritisch und stark (#269, ohne die nie kritische Faehigkeit)", d2.ant);
-    assert(JSON.stringify(b.stapel.map((x) => x.art)) === JSON.stringify(["normal", "crit", "heavy", "critheavy"]) &&
-      b.stapel.every((x) => Math.abs(x.w - 100 * ANA.arten[x.art] / N) < 0.2) &&
-      JSON.stringify(b.lg) === JSON.stringify(["normal " + prozDe(ANA.arten.normal / N), "kritisch " + prozDe(ANA.arten.crit / N),
-        "stark " + prozDe(ANA.arten.heavy / N), "kritisch stark " + prozDe(ANA.arten.critheavy / N)]),
-      "4.8 die vier Trefferarten als geteilter Balken mit Legende", { stapel: b.stapel, lg: b.lg, soll: ANA.arten });
+    // #414 (B3, O4): der Balken der vier Trefferarten mit Legende ist entfallen; der Krit-Anteil am Schaden steht unter dem Satz des Bereichs
+    assert(b.rampe === 0 && /deines Schadens kamen aus Krits/.test(b.rate.treffer),
+      "4.8 keine Rampe der Trefferarten mehr; der Anteil der Krits am Schaden steht unter dem Satz des Bereichs", { rampe: b.rampe, rate: b.rate });
     const m3 = /^(\d+) Einsätze in .+\.$/.exec(d3.ant), m3b = /^Ohne die Lücken (\d+,\d) je Minute, mit ihnen (\d+,\d)\.$/.exec(d3.leise);
     const zahl = (x) => +x.replace(",", ".");
     assert(!!m3 && +m3[1] === rotZahl && !!m3b && Math.abs(zahl(m3b[2]) - rotZahl / 59.5 * 60) < 0.06 && Math.abs(zahl(m3b[1]) - rotZahl / 49.5 * 60) < 0.06 &&
@@ -2042,21 +2046,14 @@ try {
     // 4.10/4.11: Ventius-Kasten
     /* Fixrunde 1 (Pruefung Befund 1): auch die unlesbare Salve steht als leere Saeule an ihrer Stelle (16 s),
        und "Salven" zaehlt genau die Saeulen */
+    /* #414 (Inventur E01 bis E04, O14): die Perlen sind das Raster der Karte (ein Punkt = ein Nachbeben), die Zahlen und Saetze
+       stehen an der Karte: die Decke, die Salven unter ihr, die fehlenden Treffer; auch die unlesbare Salve steht als Streifen an ihrer Stelle */
     assert(b.vent.h === "Auge von Ventius" &&
-      JSON.stringify(b.vent.salven) === JSON.stringify([true, false, false, true, true, false, true]) && b.vent.leer === 1 &&
-      b.vent.wort.endsWith(" 1 lie\u00df sich nicht lesen."),
-      "4.10 Ventius: Kopf, eine Saeule je Salve in Einsatzreihenfolge, die besten hervorgehoben, die unlesbare leer", b.vent);
-    assert(b.vent.h === "Auge von Ventius" && b.vent.achse === "Von links nach rechts in Einsatzreihenfolge." &&
-      JSON.stringify(b.vent.salven) === JSON.stringify([true, false, false, true, true, false, true]) && b.vent.leer === 1 &&
-      b.vent.wort === "2 Salven nicht auf der optimalen Entfernung verwendet, zwischen 0:13 und 0:45. Sie erreichten 2 statt 3 Nachbeben, 6 Treffer weniger. 1 lie\u00df sich nicht lesen." &&
-      b.vent.nachbeben.startsWith("Jedes Nachbeben trifft bis zu dreimal") && !b.vent.text.includes("besten Stelle") &&
-      b.vent.text.split("nicht auf der optimalen Entfernung").length === 2 && b.vent.text.split("Nachbeben\nbis").length === 2,
-      "4.10 Ventius: Kopf, eine Saeule je Salve in Einsatzreihenfolge, die besten hervorgehoben, die unlesbare leer; der Satz zur Entfernung einmal unter den Perlen", b.vent);
-    // Designpruefung 08.10.: alle Zahlen in einem Raster, der Median nennt seine Grundlage
-    assert(JSON.stringify(b.vent.vkz.slice(0, 4)) === JSON.stringify([["Treffer je Einsatz", "8,1"], ["Fehlende Treffer", "6", "bis zur optimalen Entfernung in diesem Kampf"],
-      ["Salven", "7", "57 Treffer"], ["Nachbeben", "bis 3"]]) && b.vent.vkz.length === 5 && b.vent.vkz[4][0] === "Median je Salve" &&
-      /^über 7 Salven, Spanne \S+ bis \S+$/.test(b.vent.vkz[4][2] || "") && +b.vent.vkz[2][1] === b.vent.salven.length,
-      "4.10 Ventius: Treffer je Einsatz, fehlende Treffer, Salven - so viele wie Saeulen -, Nachbeben, Median je Salve ueber 7 Salven", b.vent.vkz);
+      JSON.stringify(b.vent.salven) === JSON.stringify([true, false, false, true, true, false, true]) && b.vent.leer === 1,
+      "4.10 Ventius: die Karte, eine Salve je Streifen in Einsatzreihenfolge, die an der Decke erkennbar, die unlesbare hohl", b.vent);
+    assert(/^\d+ Nachbeben|Decke 3 Nachbeben = 10 Treffer je Salve/.test(b.vent.text) && /2\u00a0Salven von Ventius unter der Decke: 6 Treffer fehlen/.test(b.vent.text) &&
+      b.vent.gefehlt === "6" && b.vent.salven.length === 7 && /7 Salven im Kampf/.test(b.vent.details.replace(/\u00a0/g, " ")),
+      "4.10 Ventius: Decke 3 Nachbeben, zwei Salven darunter mit 6 fehlenden Treffern, sieben Salven", { text: b.vent.text, gefehlt: b.vent.gefehlt, details: b.vent.details.slice(0, 300) });
     /* #218 Etappe 3 (Entscheidung vom 08.10.2026): die Zeile je Boss steht in den Rekorden, Abschnitt "Auge von Ventius";
        die Analyse zeigt keine anderen Bosse mehr. Danach zurueck in die Analyse (4.12 und Englisch lesen dort). */
     await zuRekorden(p);
@@ -2066,13 +2063,13 @@ try {
     /* #218 Etappe 3 (Entscheidung vom 11.10.2026): das Ventius-Fach sagt, wo die Tabelle je Boss jetzt steht - ein Knopf,
        der die Rekorde oeffnet, zum Abschnitt rollt und den Fokus auf dessen Ueberschrift setzt */
     const hin = await p.evaluate(() => {
-      const k = [...document.querySelectorAll("#findings .vfeld button.wbrk")];
+      const k = [...document.querySelectorAll("#a2 .a2karte.vent button.wbrk")];
       return { n: k.length, t: (k[0]?.textContent || "").replace(/\s+/g, " ").trim(), typ: k[0]?.getAttribute("type") || "" };
     });
     assert(hin.n === 1 && hin.t === "Bester Einsatz je Boss: in den Rekorden ›" && hin.typ === "button",
-      "#218 Etappe 3: das Ventius-Fach nennt die Rekorde als Ort der Tabelle je Boss, als Knopf", hin);
+      "#218 Etappe 3: die Ventius-Karte nennt die Rekorde als Ort der Tabelle je Boss, als Knopf", hin);
     if (hin.n === 1) {
-      await p.focus("#findings .vfeld button.wbrk");
+      await p.focus("#a2 .a2karte.vent button.wbrk");
       await p.keyboard.press("Enter");
       const sprung = await p.waitForFunction(() => {
         const s = document.querySelector("#rks-ventius"), r = s?.getBoundingClientRect();
@@ -2090,7 +2087,7 @@ try {
       "4.10/4.11 Ventius: der Vorbehalt nennt beide Trefferwerte und die fehlenden Treffer, je Boss Vulcanus mit 3 Nachbeben", { vent: b.vent, rekorde: rv });
     /* Task 9: der Kasten ist ein Fach der Werkbank neben (breit) oder unter (schmal) dem Hauptfach, unter dem Streifen;
        #218 Etappe 3: die Tabelle je Boss steht nicht mehr im Kasten, sondern in den Rekorden */
-    assert(rv.tab && !b.vent.tab && b.vent.jeBossIn === 0 && b.vent.r && d1.r && b.vent.r.top >= b.weitere.r.bottom - 1 &&
+    assert(rv.tab && !b.vent.tab && b.vent.jeBossIn === 0 && b.vent.r && d1.r && b.vent.r.top >= b.urteil.r.bottom - 1 &&
       (b.vent.r.top >= d1.r.bottom - 1 || (b.vent.r.left >= d1.r.right - 1 && b.vent.r.top >= d1.r.top - 1)),
       "4.11 Ventius je Boss steht im Kasten, der Kasten unter den drei Feldern", { vent: b.vent, haupt: d1.r, rekorde: rv.tab });
     assert(rv.tab && !b.vent.tab, "#218 Etappe 3: Ventius je Boss steht in den Rekorden, nicht mehr im Kasten", { kasten: b.vent.tab, rekorde: rv.tab });
@@ -2122,11 +2119,11 @@ try {
     await p.evaluate(() => document.querySelector("#btnLang")?.click());
     await p.waitForFunction(() => document.documentElement.lang === "en" && /in gaps/.test(document.querySelector("#analysisCall .uv")?.textContent || ""), null, { timeout: 4000 }).catch(() => {});
     const e = await anaBlick(p);
-    assert(e.urteil.uv === "10 seconds in gaps" && e.urteil.un.startsWith("What cost you most: Measured against your ordinary second") &&
-      e.titel === 0 && e.weitere.h === "The fight" && e.form.h === "The fight" &&
-      e.fuss.h === "What the log does not know" && e.fuss.li.length === 7 && e.fuss.li[6] === "crits depend on buffs, and the log does not record those" && e.drei.map((x) => x.h).join("|") === "Quick Fire|The fight|Casts per minute" &&
+    assert(/^10\u00a0s idle in 3\u00a0gaps, about \S+\.$/.test(e.urteil.uv) && e.urteil.un.startsWith("This costs you the most: Seconds under 2") &&
+      e.titel === 0 && !e.weitere.kopfDa && e.form.h === "Timeline" && e.form.marke === "Weakest stretch" &&
+      e.fuss.h === "What the log does not know" && e.fuss.li.length === 7 && e.fuss.li[6] === "crits depend on buffs, and the log does not record those" && e.drei.map((x) => x.h).join("|") === "Quick Fire|Casts per minute" &&
       e.form.def === "A gap: at least 2\u00a0s in which less than 2% of an ordinary second landed; the first 3 and last 5\u00a0s do not count.",
-      "4 Englisch: Urteil, Weitere Befunde, Form mit Definition, drei Felder, Fuss", { uv: e.urteil.uv, h: e.weitere.h, form: e.form.h, def: e.form.def, drei: e.drei.map((x) => x.h), fuss: e.fuss.h });
+      "4 Englisch: Urteil, Kopf des Kampfs, Form mit Definition, drei Felder, Fuss", { uv: e.urteil.uv, kopfDa: e.weitere.kopfDa, form: e.form.h, marke: e.form.marke, def: e.form.def, drei: e.drei.map((x) => x.h), fuss: e.fuss.h });
     await p.close();
   }
   /* --- Fixrunde 1 (Pruefung Befund 6, Entscheidung vom 29.09. (an Claude uebertragen)): die schwaechste
@@ -2175,41 +2172,40 @@ try {
         if (datei) hoehen[breite + "x" + hoehe] = b.form.sa?.height;
         /* #218: von den drei Feldern steht "Wie triffst du?" (#wbWie) im Kopf des Streifens - breit neben der Kurve,
            schmal (unter 760 Punkt Bereich) darueber; die Kennzeile mit "je Minute" ueber dem Streifen, "Wer traegt?" darunter */
-        const [w1, w2, w3] = b.drei;
-        const rahmen = b.drei.length === 3 && w3.r.bottom <= b.weitere.r.top + 1 && w1.r.top >= b.weitere.r.bottom - 1;
-        const nebeneinander = rahmen && w2.r.right <= b.form.r.left + 1 && w2.r.top < b.form.r.bottom;
-        const untereinander = rahmen && w2.r.bottom <= b.form.r.top + 1;
-        assert(!b.quer && !b.klein.length && !s.fehler.length && (breite >= 1000 ? nebeneinander : untereinander) &&
-          b.weitere.r && b.urteil.r && b.weitere.r.top >= b.urteil.r.bottom - 1 && b.form.svg && b.form.sa && Math.abs(b.form.svg.width - b.form.sa.width) < 1,
-          `4 ${wo}: kein waagerechtes Rollen, Text mindestens 11 Punkt, Befunde unter dem Urteil, Saeulen in voller Breite, drei Felder ${breite >= 1000 ? "nebeneinander" : "untereinander"}; keine Fehler`,
+        const [w1, w3] = b.drei;
+        const rahmen = b.drei.length === 2 && w3.r.bottom <= b.zeit.top + 1 && w1.r.top >= b.urteil.r.bottom - 1;
+        assert(!b.quer && !b.klein.length && !s.fehler.length && rahmen &&
+          b.urteil.r && b.zeit.top >= b.urteil.r.bottom - 1 && b.form.svg && b.form.sa && Math.abs(b.form.svg.width - b.form.sa.width) < 1,
+          `4 ${wo}: kein waagerechtes Rollen, Text mindestens 11 Punkt, die Zeitleiste unter dem Urteil, die Kurve in voller Breite, die Kennzeile im Kopf, die erste Karte darunter; keine Fehler`,
           { quer: b.quer, klein: b.klein, fehler: s.fehler, drei: b.drei.map((x) => x.r && [x.r.top, x.r.bottom]) });
-        if (breite === 2000)
-          assert(b.fuss.r && b.status && b.fuss.r.bottom <= b.status.top + 0.5 && b.rollY === 0,
-            `4 ${wo}: „Was das Log nicht weiß“ ist ohne Rollen im Blick (gewuenscht)`, { fuss: b.fuss.r, status: b.status, rollY: b.rollY });
+        if (breite === 2000) {
+          /* #414 (Entscheidung 08.11.2026): mit den Karten je Faehigkeit ist die Seite laenger als das Fenster; Kopf,
+             Zeitleiste und Auswertung stehen im Blick, der Fuss liegt unter den Karten und ist durch Rollen erreichbar */
+          const unten = await p.evaluate(() => {
+            window.scrollTo(0, 1e7);
+            for (const e of document.querySelectorAll("#app, .stage, #p-analysis")) e.scrollTop = 1e7;
+            const f = document.querySelector("#afuss").getBoundingClientRect(), st = document.querySelector("#statusleiste").getBoundingClientRect();
+            return { fuss: f.bottom, status: st.top };
+          });
+          assert(b.fuss.r && b.status && unten.fuss <= unten.status + 0.5,
+            `4 ${wo}: „Was das Log nicht weiß“ ist durch Rollen erreichbar`, { unten, fuss: b.fuss.r });
+          assert(b.mitte && b.mitte.top >= 0 && b.mitte.bottom <= b.status.top + 0.5,
+            `4 ${wo}: Kopf, Zeitleiste und Auswertung stehen im Blick, ohne zu rollen`, { mitte: b.mitte, status: b.status });
+        }
         /* Issue #110: Weitere Befunde als Raster mit der Ueberschrift darueber, die Erklaersaetze hoechstens
            70 Zeichen breit, die Ventius-Tabelle hoechstens 900 Punkt - in jeder Groesse */
-        /* Issue #110: ab 1200 Punkt Hoehe nimmt die Form den Platz, der da ist - der Fuss endet 8 Punkt ueber
-           der Statusleiste, ausser die Form steht an ihrer Grenze (112 oder 320 Punkt) */
-        if (hoehe >= 1200) {
-          const frei = b.status.top - b.fuss.r.bottom - 8, h = b.form.sa.height;
-          assert(Math.abs(frei) <= 2 || (frei > 2 && Math.abs(h - 320) < 1) || (frei < -2 && Math.abs(h - 112) < 1),
-            `#110 ${wo}: die Form nimmt den freien Platz (112 bis 320 Punkt), der Fuss bleibt im Blick`, { frei, h });
-        }
         if (datei) {
           const m = await p.evaluate(() => {
             const inCh = (e) => { if (!e || !e.getClientRects().length) return -1; const m = document.createElement("span");
           m.textContent = "0".repeat(100); m.style.cssText = "position:absolute;visibility:hidden;white-space:nowrap;font:inherit";
           e.appendChild(m); const ch = m.getBoundingClientRect().width / 100; m.remove(); return e.getBoundingClientRect().width / ch; };
-            // #218: die Liste steht im Streifen unter seiner h3 ("Der Kampf")
-            const h = document.querySelector("#formTitel").getBoundingClientRect(), dl = document.querySelector("#weitereListe");
-            const items = [...dl.children].map((x) => x.getBoundingClientRect());
-            return { ueber: h.bottom <= dl.getBoundingClientRect().top + 0.5, raster: getComputedStyle(dl).display === "grid",
-              links: items.length > 0 && Math.abs(items[0].left - dl.getBoundingClientRect().left) < 1,
-              /* im Raster beginnt jede Reihe links; ein Eintrag allein in seiner Reihe steht nur in der letzten
-                 (bei einer Spalte steht jeder allein, das ist dann richtig) */
-              allein: new Set(items.map((r) => Math.round(r.left))).size < 2 ? 0
-                : items.filter((r, i) => i < items.length - 1 && !items.some((o, j) => j !== i && Math.abs(o.top - r.top) < 1)).length,
-              def: inCh(document.querySelector("#lueckeDef")), salven: inCh(document.querySelector(".salvenwort")) };
+            // #414 (B2): die Befundliste (ein Raster unter der h3 "Der Kampf") ist entfallen
+            // die neuen Saetze der Analyse (Gut hier, Besser moeglich, Start, Haelften, unverwundbares Ziel): hoechstens 70 Zeichen breit, wo sie stehen
+            const sichtbar = [...document.querySelectorAll("#a2gut li[data-k], #a2besser li[data-k], #a2start, #a2unv, #a2haelften")].filter((e) => !e.hidden && e.getClientRects().length);
+            return { liste: !!document.querySelector("#weitereListe"),
+              saetze: sichtbar.map((e) => (e.dataset.k || e.id) + ":" + inCh(e).toFixed(1)), saetzeBreit: Math.max(-1, ...sichtbar.map((e) => inCh(e))),
+              strecke: !!document.querySelector("#a2gut li[data-k=strecke]"),
+              def: inCh(document.querySelector("#lueckeDef")), salven: inCh(document.querySelector(".a2karte.vent .satz")) };
           });
           /* #218 Etappe 3: die Ventius-Tabelle steht in den Rekorden (#rks-ventius) - dort gemessen, in jeder Groesse */
           await zuRekorden(p);
@@ -2231,7 +2227,8 @@ try {
               zahlSchrift: z[0] ? [".tr", ".vpips b"].map((x) => getComputedStyle(z[0].querySelector(x)).fontFamily) : [] };
           });
           m.vtab = rk.vtab;
-          assert(m.ueber && m.raster && m.links && m.allein === 0, `#110 ${wo}: Weitere Befunde als Raster, die Ueberschrift darueber`, m);
+          assert(!m.liste && m.strecke && m.saetze.length > 0 && m.saetzeBreit > 0 && m.saetzeBreit <= 70.5,
+            `#110/#414 ${wo}: keine Befundliste mehr; die Saetze der Analyse (staerkste 5 s unter Gut hier u. a.) stehen und sind hoechstens 70 Zeichen breit`, m);
           assert(m.def > 0 && m.def <= 70.5 && m.salven > 0 && m.salven <= 70.5 && m.vtab > 0 && m.vtab <= 900.5,
             `#110 ${wo}: Erklaersaetze hoechstens 70 Zeichen, Ventius-Tabelle hoechstens 900 Punkt`, m);
           assert(!rk.quer && rk.zeilen.length === 1, `#218 Etappe 3 ${wo}: Rekorde mit dem Abschnitt Auge von Ventius ohne waagerechtes Rollen`, rk);
@@ -2243,11 +2240,10 @@ try {
         await p.close();
       }
     }
-    /* Entscheidung vom 04.10.2026 (Issue #110): ab 1200 Punkt Fensterhoehe nimmt die Form den freien Platz
-       (112 bis 320 Punkt), geprueft je Groesse oben; im vollen Kampf kann sie dann flacher sein als vorher,
-       der Fuss bleibt im Blick. Vorher hier: bei 2000 x 1480 mindestens 40 Punkt hoeher als bei 1280 x 860. */
+    /* Die Form fuellte frueher das grosse Fenster (Entscheidung 04.10.2026, Issue #110); seit #414 steht die Kurve der
+       Zeitleiste in fester Hoehe und die Seite rollt (Entscheidung 08.11.2026, oben geprueft). Die Kurve bleibt gut lesbar. */
     assert(hoehen["1280x860"] >= 120 && hoehen["2000x1480"] >= 112,
-      "4.5 die Saeulen: bei 1280 x 860 mindestens 120 Punkt, im grossen Fenster nie unter 112", hoehen);
+      "4.5 die Kurve der Zeitleiste: bei 1280 x 860 mindestens 120 Punkt, im grossen Fenster nie unter 112", hoehen);
 
   }
   /* --- #218 Etappe 3: der Abschnitt "Auge von Ventius" in den Rekorden - ohne gemerkte Bosse gar nicht (keine
@@ -3659,6 +3655,49 @@ try {
     await s.page.close();
   }
 
+  /* 7.15 (#406): ein Kampf ohne Waffenschaden leert die Anzeige (Felder, Statusleiste), aber nicht, was nach
+     aussen geht. Das Paar gehoert dem Spieler und nicht dem Kampf: die Gruppe behaelt das letzte Paar, und
+     config.json bekommt kein leeres. Erfundene Kaempfe, nur IDs und Zahlen: A Speer + Dagger, C nur Passiv
+     (dazu eine Faehigkeit ohne Waffe, an der sich im Reiter Waffen speichern laesst). */
+  {
+    const roh = ["CombatLogVersion,4"];
+    const hit = (ms, ziel, name, sid) => roh.push(`${stamp(ms)},DamageDone,${name},${sid},1000,0,0,kNormalHit,Tester,${ziel}`);
+    for (let k = 0; k < 80; k++) hit(at(22, 0) + k * 500, "Probe Boss A", k % 5 < 3 ? "Probe Speer" : "Probe Dagger", k % 5 < 3 ? 948156706 : 939780553);
+    for (let k = 0; k < 80; k++) hit(at(22, 10) + k * 500, "Probe Boss C", k % 10 ? "Probe Passiv" : "Probe Ohne Waffe", k % 10 ? 940584840 : 999000001);
+    const datei = join(work, "paar-nach-aussen.txt");
+    writeFileSync(datei, roh.join("\n") + "\n");
+    const s = await oeffne({ app: true, gruppe: { role: "host", code: "QX7K", board: [], target: "", error: "" } });
+    const p = s.page;
+    await mitLog(s);
+    // der Bericht traegt immer den neuesten Kampf (partyPayload); das Paar daneben gehoert zum gewaehlten
+    const berichte = () => s.party.filter((x) => x.path === "/api/party/report" && x.body.payload);
+    const istAD = (w) => !!w && w[0] === "Spear" && w[1] === "Dagger";
+    const waehle = async (boss) => {
+      await p.evaluate((b) => [...document.querySelectorAll("#fightList .fight")].find((r) => (r.textContent || "").includes(b)).click(), boss);
+      await p.waitForFunction((b) => (document.querySelector("#hName")?.textContent || "").includes(b), boss);
+    };
+    await p.setInputFiles("#fileInput", datei);
+    await p.waitForFunction(() => document.querySelectorAll("#fightList .fight").length === 2);
+    await p.evaluate(() => document.querySelector('[data-tab="weapons"]').click());
+    await waehle("Probe Boss A");
+    await bis(() => berichte().some((x) => istAD(x.body.weapons)), 6000);
+    const ab = s.party.length;
+    assert(berichte().some((x) => istAD(x.body.weapons)), "7.15 Kampf A: die Gruppe bekommt Speer und Dagger", berichte().map((x) => x.body.weapons));
+    await waehle("Probe Boss C");
+    await p.waitForFunction(() => document.querySelector("#wMain").value === "" && document.querySelector("#wOff").value === "");
+    // etwas speichern lassen: eine Faehigkeit ohne Waffe auf Passiv setzen schreibt die Konfiguration
+    const vorher = s.posts.length;
+    await p.evaluate(() => document.querySelector('#assign .assign[data-skill="Probe Ohne Waffe"] .wbtn-passive').click());
+    await bis(() => s.posts.length > vorher, 4000);
+    const danach = s.party.slice(ab).filter((x) => x.path === "/api/party/report").map((x) => x.body.weapons);
+    assert(danach.every(istAD), "7.15 Kampf nur mit Passiv: an die Gruppe geht kein leeres Paar, sie behaelt das letzte", danach);
+    const gespeichert = s.posts.slice(vorher).filter((b) => "mainWeapon" in b);
+    assert(gespeichert.length >= 1 && gespeichert.every((b) => b.mainWeapon === "Spear" && b.offWeapon === "Dagger"),
+      "7.15 Kampf nur mit Passiv: config.json bekommt kein leeres Paar", gespeichert.map((b) => [b.mainWeapon, b.offWeapon]));
+    assert(!s.fehler.length, "7.15 Paar nach aussen: keine Fehler", s.fehler);
+    await p.close();
+  }
+
   // ===== Abschnitt 8: Builds (Luecken 8) =====
   /* Die Karte eines erkannten Builds mit Stufe, Erkannt an, Trefferquoten und Kaempfen je Boss, die Ausruestung
      aus dem Plan und "Planer oeffnen / Plan schliessen" entfielen mit Aufgabe 12 (Entscheidung 29.09.: Builds als
@@ -3873,7 +3912,7 @@ try {
         skelett: x ? x.querySelectorAll("ul,ol,li,table,[class*=skel],[class*=zeile],.zr,[role=list],[role=row]").length : -1,
         texte: x ? [...x.querySelectorAll("*")].filter((e) => [...e.childNodes].some((n) => n.nodeType === 3 && n.textContent.trim())).map((e) => e.tagName + ":" + e.textContent.trim()) : [] };
     });
-    assert(/^Weeklies Erinnerungen\d+ Täglicher Reset 10:00 deutsche Zeit \u00b7 in \d.*$/.test(w.kopf) && w.kopfR && w.w && Math.abs(w.kopfR.top - w.w.top) < 1,
+    assert(/^Weeklies Erinnerungen\d+ Täglicher Reset 06:00 UTC \u00b7 in \d.*$/.test(w.kopf) && w.kopfR && w.w && Math.abs(w.kopfR.top - w.w.top) < 1,
       "9.1 Kopf (folgt Weeklies neu): „Weeklies“, die Glocke „Erinnerungen“ mit Zahl und der tägliche Reset oben; der Wochen-Reset steht im Band", { kopf: w.kopf, kopfR: w.kopfR });
     assert(w.skelett === 0 && JSON.stringify(w.texte.map((x) => x.split(":")[0])) === JSON.stringify(["H2", "SPAN", "SPAN", "SPAN", "P", "BUTTON"]),
       "9.1 ruhig: keine Skelettzeilen, nur Ueberschrift, Glocke (Name und Zahl), Reset-Anzeige, Satz und „+ Charakter“", w.texte);
@@ -5264,12 +5303,12 @@ const BEDIENUNG = "#btnCompact, #btnPin, #btnDurch, #btnMore";
       // Abschnitt 14 (Aufgabe 11)
       "deinerot.ansicht", "deinerot.leiste", "deinerot.reihe", "deinerot.reiheBuehne", "deinerot.reiheSatz",
       // Abschnitt 4
-      "analysis.call.leer.value", "analysis.call.leer.note", "analysis.weitere", "analysis.wb.luecken", "analysis.wb.lueckenSumme",
-      "analysis.wb.groesster", "analysis.wb.fehl", "analysis.wb.keine", "analysis.wb.jeMinute", "analysis.form", "analysis.lueckeDef",
-      "analysis.legendBalken", "analysis.legendMedian", "analysis.saeulenLabel", "analysis.d1", "analysis.d1.ant", "analysis.d1.leise",
-      "analysis.d2", "analysis.d2.ant", "analysis.art.normal", "analysis.art.crit", "analysis.art.heavy", "analysis.art.critheavy",
-      "analysis.art.shield", "analysis.d3", "analysis.d3.ant", "analysis.d3.leise", "analysis.vent.jeEinsatz",
-      "analysis.vent.fehlend", "analysis.vent.fehlendNote", "analysis.vent.salven", "analysis.vent.treffer", "analysis.fuss",
+      "analysis.call.leer.value", "analysis.call.leer.note", "analysis.wb.luecken", "analysis.wb.lueckenSumme",
+      "analysis.wb.groesster", "analysis.wb.fehl", "analysis.wb.keine", "analysis.wb.jeMinute", "analysis.lueckeDef",
+      "analysis.legendMedian", "analysis.d1.leise",
+      "analysis.d2.ant",
+      "analysis.d3.ant", "analysis.d3.leise",
+      "analysis.fuss",
       "analysis.fuss.1", "analysis.fuss.2", "analysis.fuss.3", "analysis.fuss.4", "analysis.call.leer.noteForm",
       // Abschnitt 5
       "vgl.mit", "vgl.best", "vgl.letzt", "vgl.letztFehlt", "vgl.letztOhneUhr", "vgl.letztName", "vgl.treffer", "vgl.summe",

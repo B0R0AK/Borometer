@@ -696,7 +696,7 @@
               <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="5" y="10.5" width="14" height="9.5" rx="2"/><path d="M8.5 10.5V8a3.5 3.5 0 0 1 7 0v2.5"/><path d="M12 14.5v2"/></svg><span data-i18n="einst.sichServer">Local server</span></dt>
                 <dd data-i18n-html="einst.sichServerSatz">Listens only on <code>127.0.0.1</code>. Only while you host a party is the party access reachable from outside.</dd></div>
               <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M3.5 12h17"/><path d="M12 3.5c2.4 2.4 3.6 5.2 3.6 8.5s-1.2 6.1-3.6 8.5c-2.4-2.4-3.6-5.2-3.6-8.5s1.2-6.1 3.6-8.5z"/></svg><span data-i18n="einst.sichNetz">Network</span></dt>
-                <dd data-i18n="einst.sichNetzSatz">Only when you use a party, ask Questlog with a click, or turn on the update notice.</dd></div>
+                <dd data-i18n="einst.sichNetzSatz">Only when you use a party, turn on the update notice, or a lead turns on guild online and enters a server address (https:// only).</dd></div>
               <div><dt><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l7 3v5c0 4.6-3 8.4-7 10-4-1.6-7-5.4-7-10V6z"/><path d="M9 12l2 2 4-4"/></svg><span data-i18n="einst.sichSpiel">Game</span></dt>
                 <dd data-i18n="einst.sichSpielSatz">No access: nothing hooks into the game, nothing reads its memory.</dd></div>
             </dl>
@@ -1199,7 +1199,7 @@
 
       <!-- Die Analyse (seit #218 die Werkbank je Faehigkeit): jedes Kind
            des Panels ist ein Feld mit 1-Punkt-Fuge (body.felder). Oben der
-           Kopf mit Urteil und Kennzeile, darunter der Kampfstreifen, dann
+           Kopf mit Urteil und Kennzeile, darunter der Kopf des Kampfs, die Zeitleiste (#a2), dann
            #findings, ganz unten der Fuss. -->
       <div class="panel" id="p-analysis">
         <!-- Der Kopf: das eine Urteil (welcher Befund am meisten gekostet
@@ -1209,43 +1209,14 @@
              Element und als unsichtbares h3 darin (Issue #109: unter dem h2
              des Bereichs stehen alle Felder als h3 auf einer Ebene). -->
         <div class="urteil" id="analysisCall" role="region" aria-label="Verdict" data-i18n-aria-label="tafel.urteil" hidden></div>
-        <!-- Der Kampf (#218, 70-kampfstreifen.ts): links der Kopf mit der
-             Glut-Rampe und dem Satz, wie du triffst (#wbWie); rechts die
-             Fahnen der Zeit-Befunde, die Glutkurve (Schaden je Sekunde, 2 s
-             geglaettet) mit den Luecken nach dem Median, den unverwundbaren
-             Strecken und der erkannten Mechanik (61-mechanik.ts), die
-             Lesezeile der gedrueckten Fahne, die Saetze darunter und die
-             Befundliste (#weitereListe). Ohne Uhr nur Kopf und Liste. -->
-        <section class="verdict form wbstreifen" id="verdict" aria-labelledby="formTitel" hidden>
-          <div class="wbskopf">
-            <h3 id="formTitel" data-i18n="analysis.wb.kampf">The fight</h3>
-            <div class="wbwie" id="wbWie"></div>
-          </div>
-          <div class="wbbahn">
-            <div id="wbGraf">
-              <div class="fkx"><span class="vlegend">
-                <span data-i18n="analysis.legendBalken">damage per second</span>
-                <span class="vleg" id="vlegGap" hidden><i class="lpause"></i><span data-i18n="analysis.legendGap">gap</span></span>
-                <span class="vleg" id="vlegAvg" hidden><i class="lschnitt"></i><span id="vlegAvgText"></span></span>
-                <span class="vleg" id="vlegInvuln" hidden><i class="linvuln"></i><span data-i18n="analysis.legendInvuln">target invulnerable</span></span>
-                <span class="vleg" id="vlegMech" hidden><i class="lmech"></i><span data-i18n="mechanik.legend">mechanic</span></span>
-                <span class="vleg" id="vlegGeist" hidden><i class="lgeist"></i><span id="vlegGeistText"></span></span>
-              </span></div>
-              <div class="wbfahnen" id="wbFahnen" role="group" aria-label="Findings in the fight" data-i18n-aria-label="analysis.wb.fahnen"></div>
-              <div class="vform" id="verdictForm"><div class="saeulen" id="saeulen" role="img"></div></div>
-              <div class="fachse" id="formAchse" aria-hidden="true"></div>
-              <p class="wblese" id="wbLese" aria-live="polite"></p>
-              <p class="vh" id="wbZeigLese" aria-live="polite"></p>
-              <p class="fein" id="verdictText"></p>
-              <p class="fein" id="lueckeDef"></p>
-              <p class="fein" id="mechanikZeile" role="note" hidden></p>
-            </div>
-            <dl class="wbbefunde" id="weitereListe"></dl>
-            <!-- Ein eigener Satz, nicht der geteilte: Zeitverlauf und Rotation
-                 zeigen ohne Uhr wirklich nichts, die Analyse zeigt einiges. -->
-            <p class="needrole warn noclock" data-i18n="analysis.noClock">Without a column set as Time there is no clock and no seconds, so the findings that need them are missing here &mdash; set one under Log setup.</p>
-          </div>
-        </section>
+        <!-- Seit #414 (B3) gibt es das Feld "Der Kampf" nicht mehr: "Wie triffst du?" steht als Rate unter "Gut hier" und
+             als leise Zeile unter dem Satz des Bereichs, die Definition der Luecke und die Zeile zur Mechanik stehen bei der
+             Zeitleiste (#a2, 79-zeitleiste.ts). Ein eigener Satz, nicht der geteilte: Zeitverlauf und Rotation zeigen ohne Uhr
+             wirklich nichts, die Analyse zeigt einiges. -->
+        <p class="needrole warn noclock" id="aNoClock" data-i18n="analysis.noClock">Without a column set as Time there is no clock and no seconds, so the findings that need them are missing here &mdash; set one under Log setup.</p>
+        <!-- Die neue Analyse (#414, 79-zeitleiste.ts, 70-pruefstand.ts): Zeitleiste mit
+             markierbarem Bereich, Auswertung dieses Bereichs, Pruefstand je Faehigkeit. -->
+        <div class="a2" id="a2" hidden></div>
         <div id="findings"></div>
         <section class="afuss" id="afuss" aria-labelledby="afussTitel">
           <h3 id="afussTitel" data-i18n="analysis.fuss">What the log does not know</h3>

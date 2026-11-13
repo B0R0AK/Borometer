@@ -54,9 +54,10 @@ const dictMod = await esbuild.build({ stdin: { contents: 'export { I18N } from "
 const { I18N } = await import("data:text/javascript;base64," + Buffer.from(dictMod.outputFiles[0].text).toString("base64"));
 
 const browser = await chromium.launch(process.env.PARITY_CHROMIUM ? { executablePath: process.env.PARITY_CHROMIUM } : {});
-/* Mi 23.09.2026 09:55 in Berlin (Sommerzeit, UTC+2) */
-const berlin = (tag, h, m = 0) => Date.UTC(2026, 8, tag, h - 2, m);
-const MI_0955 = berlin(23, 9, 55);
+/* Zeitpunkte im alten Gefuege der Tests (Do 10:00 Berlin, Sommerzeit UTC+2), um 26 Stunden auf den neuen Reset Mi 06:00 UTC
+   verschoben (Issue 420): zeit(23, 9, 55) ist Di 22.09.2026 05:55 UTC, einen Tag vor dem Wochen-Reset. */
+const zeit = (tag, h, m = 0) => Date.UTC(2026, 8, tag - 1, h - 4, m);
+const MI_0955 = zeit(23, 9, 55);
 const profil = (id, name, mehr = {}) => ({ id, name, zaehler: {}, aus: [], namen: {}, eigene: [], ...mehr });
 const seitenUhr = (s) => s.uhr.basis + (performance.now() - s.uhr.echt);
 /* Fristen mit performance.now(), nie mit Date.now(): auf den Linux-Runnern springt die Wanduhr um rund 8 s vor und zurueck, eine Frist nach
@@ -204,9 +205,9 @@ try {
   const WOCHE = kern.GRUNDLISTE.filter((g) => g.takt !== "tag");
   const wocheVoll = (seit) => Object.fromEntries(WOCHE.map((g) => [g.schluessel, { stand: g.menge, seit }]));
   const data = { v: 1, profile: [
-    profil("werin00001", "Eins", { zaehler: { zitadelleNormal: { stand: 1, seit: berlin(22, 20) } } }),
+    profil("werin00001", "Eins", { zaehler: { zitadelleNormal: { stand: 1, seit: zeit(22, 20) } } }),
     profil("werin00002", "Zwei"),
-    profil("werin00003", "Fertig", { zaehler: wocheVoll(berlin(21, 12)) }),
+    profil("werin00003", "Fertig", { zaehler: wocheVoll(Date.UTC(2026, 8, 21, 6)) }),
   ] };
 
   // ===== Glocke, Dialog, ehrlicher Hinweis, anlegen, bearbeiten, loesen
@@ -220,9 +221,9 @@ try {
     const dlg = await p.evaluate(() => { const d = document.querySelector('#wkErinSchein [role="dialog"]'); return { da: !!d && !d.closest("[hidden]"), modal: d?.getAttribute("aria-modal"), fokusIn: !!d?.contains(document.activeElement),
       name: document.getElementById(d?.getAttribute("aria-labelledby") || "")?.textContent, hinweis: document.querySelector(".wkehrlich")?.textContent || "", knopfImHinweis: !!document.querySelector(".wkehrlich button") }; });
     assert(dlg.da && dlg.modal === "true" && dlg.fokusIn && dlg.name === "Erinnerungen", "Dialog: modal, mit Namen, der Fokus liegt darin", dlg);
-    assert(/solange Borometer l\u00e4uft/.test(dlg.hinweis) && /Ortszeit/.test(dlg.hinweis) && /10:00 deutscher Zeit/.test(dlg.hinweis) && /Infobereich/.test(dlg.hinweis)
+    assert(/solange Borometer l\u00e4uft/.test(dlg.hinweis) && /Ortszeit/.test(dlg.hinweis) && /06:00\u00a0UTC/.test(dlg.hinweis) && /Infobereich/.test(dlg.hinweis)
       && /nicht nachgeholt/.test(dlg.hinweis) && !/Im Browser gibt es keine/.test(dlg.hinweis) && !dlg.knopfImHinweis,
-      "Hinweis, immer da: l\u00e4uft nur, solange Borometer l\u00e4uft (Infobereich), Ortszeit gegen den Reset in deutscher Zeit, nichts wird nachgeholt; im Fenster der App kein Browser-Satz", dlg.hinweis);
+      "Hinweis, immer da: l\u00e4uft nur, solange Borometer l\u00e4uft (Infobereich), Ortszeit gegen den Reset um 06:00 UTC, nichts wird nachgeholt; im Fenster der App kein Browser-Satz", dlg.hinweis);
     // anlegen
     let n = nPosts(s);
     await p.click("[data-er-neu]");

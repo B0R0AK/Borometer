@@ -68,6 +68,27 @@ eq(k.fensterNeu(undefined, "abriss", { ...G, w: 5 }), null, "fensterNeu: unguelt
 eq(k.platzAbriss(G, [HAUPT], HAUPT), k.platzGross(G, [HAUPT], HAUPT), "platzAbriss: wie platzGross, auf dem Monitor");
 eq(k.platzAbriss({ ...G, x: 90000 }, [HAUPT], HAUPT), null, "platzAbriss: ausserhalb der Grenzen kein Platz");
 
+// --- Abriss-Fenster: Platz, Groesse, maximiert, minimiert (#353)
+// Merken: minimiert nichts (Windows setzt es auf -32000), maximiert die
+// normale Lage mit max, sonst die Lage wie sie ist
+const NORMAL = { x: 200, y: 100, w: 900, h: 640 };
+eq(k.abrissMerken({ x: -32000, y: -32000, w: 160, h: 28 }, NORMAL, false, true), null, "abrissMerken: minimiert merkt nichts");
+eq(k.abrissMerken({ x: -8, y: -8, w: 1936, h: 1056 }, NORMAL, true, false), { ...NORMAL, max: true }, "abrissMerken: maximiert merkt die normale Lage mit max");
+eq(k.abrissMerken({ x: -8, y: -8, w: 1936, h: 1056 }, NORMAL, true, true), null, "abrissMerken: minimiert aus maximiert merkt nichts");
+eq(k.abrissMerken({ x: 210, y: 110, w: 880, h: 600 }, NORMAL, false, false), { x: 210, y: 110, w: 880, h: 600, max: false }, "abrissMerken: sonst die Lage selbst");
+eq(k.pruefen(k.abrissMerken({ x: 1, y: 2, w: 900, h: 640 }, NORMAL, false, false), "gross") !== null, true, "abrissMerken: Ergebnis besteht pruefen");
+// Oeffnen: gemerktes max bleibt, Groesse passt in den Arbeitsbereich
+eq(k.platzAbriss({ ...G, max: true }, [HAUPT], HAUPT), { ...G, max: true }, "platzAbriss: max bleibt erhalten");
+eq(k.platzAbriss({ x: 100, y: 50, w: 3000, h: 2000, max: false }, [HAUPT], HAUPT), { x: 0, y: 0, w: 1920, h: 1040, max: false }, "platzAbriss: zu gross wird auf den Arbeitsbereich begrenzt");
+eq(k.platzAbriss({ x: 1500, y: 800, w: 900, h: 640, max: false }, [HAUPT], HAUPT), { x: 1020, y: 400, w: 900, h: 640, max: false }, "platzAbriss: ragt hinaus, wird hineingeschoben");
+eq(k.platzAbriss({ x: 100, y: 50, w: 3000, h: 2000, max: false }, [LINKS, HAUPT], HAUPT), { x: 0, y: 0, w: 1920, h: 1040, max: false }, "platzAbriss: der Monitor, auf dem das meiste liegt");
+eq(k.platzAbriss({ x: 5000, y: 5000, w: 900, h: 640, max: true }, [HAUPT], HAUPT), { x: 510, y: 200, w: 900, h: 640, max: true }, "platzAbriss: Monitor weg, Mitte des Hauptmonitors, max bleibt");
+eq(k.platzAbriss({ x: 5000, y: 5000, w: 900, h: 640, max: false }, [], null), null, "platzAbriss: kein Monitor, kein Platz");
+// Standardgroesse ohne gemerkten Platz
+eq(k.abrissGroesse(HAUPT), { w: 900, h: 640 }, "abrissGroesse: Standard 900 x 640");
+eq(k.abrissGroesse({ x: 0, y: 0, width: 800, height: 600 }), { w: 800, h: 600 }, "abrissGroesse: nicht ueber den Arbeitsbereich");
+eq(k.abrissGroesse(null), { w: 900, h: 640 }, "abrissGroesse: ohne Monitor die Standardgroesse");
+
 // --- 2. sichtbar: 64 x 64 der Titelleiste auf einem Monitor
 eq(k.sichtbar(G, [HAUPT]), true, "ganz auf dem Hauptmonitor");
 const aufRechts = { x: 2200, y: 100, w: 1600, h: 900 };

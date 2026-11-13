@@ -304,7 +304,7 @@ try {
     assert(gesehen.every((k) => k.fokus === "rgWeiter"), "bei jedem Schritt geht der Fokus auf „Weiter“", gesehen.map((k) => k.fokus));
     assert(gesehen.slice(1).every((k) => k.zurueck) && gesehen[5].weiter === "Fertig" && gesehen.slice(0, 5).every((k) => k.weiter === "Weiter"),
       "ab Schritt 2 „Zurück“, im letzten „Fertig“", gesehen.map((k) => [k.zurueck, k.weiter]));
-    assert(/Wochenaufgaben je Charakter/.test(gesehen[4].satz) && /Donnerstag um 10:00/.test(gesehen[4].satz), "Schritt 5: Weeklies mit dem Reset am Donnerstag", gesehen[4].satz);
+    assert(/Wochenaufgaben je Charakter/.test(gesehen[4].satz) && /Mittwoch um 06:00 UTC/.test(gesehen[4].satz), "Schritt 5: Weeklies mit dem Reset am Mittwoch", gesehen[4].satz);
     assert(/ohne dein Kampflog/.test(gesehen[5].satz), "Schritt 6: der Bericht ohne Kampflog", gesehen[5].satz);
     assert(/Strg\+K/.test(gesehen[2].satz), "Schritt 3: Strg+K", gesehen[2].satz);
     assert(/beim Kampfende/.test(gesehen[1].satz), "Schritt 2: Live liest beim Kampfende", gesehen[1].satz);

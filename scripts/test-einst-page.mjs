@@ -737,6 +737,21 @@ try {
       "Sicherheit „Netz“: Gruppe und der Update-Hinweis; Questlog steht nicht mehr da (Abruf entfallen, #207)", si.dd[3]);
     assert(/Kampflog-Ordner/.test(si.dd[0] || "") && /nur lesend/.test(si.dd[0] || "") && /eigenen Dateien/.test(si.dd[0] || ""),
       "Sicherheit „Liest“: den Kampflog-Ordner, nur lesend, und die eigenen Dateien", si.dd[0]);
+    /* #356: die dritte Stelle, an der etwas nach aussen geht - Gilde online, nur wenn ein Lead es eingeschaltet hat
+       (und eine Adresse eingetragen); DE und EN, derselbe Schluessel */
+    assert(/Gilde online/.test(si.dd[3] || "") && /Lead/.test(si.dd[3] || ""),
+      "Sicherheit „Netz“ (DE): nennt Gilde online und dass ein Lead es einschalten muss (#356)", si.dd[3]);
+    {
+      const en = await oeffne({ app: true, lang: "en" });
+      en.page.setDefaultTimeout(5000);
+      await en.page.click('#bereiche [data-tab="settings"]');
+      await en.page.click('#einstNav button[data-gruppe="info"]');
+      await gruppeIst(en.page, "info");
+      const netz = await en.page.evaluate(() => document.querySelector('#eg-info [data-i18n="einst.sichNetzSatz"]')?.textContent.trim() ?? "");
+      assert(/guild online/i.test(netz) && /\blead\b/i.test(netz) && /party/i.test(netz) && /update notice/i.test(netz),
+        "Sicherheit „Netz“ (EN): nennt Gruppe, Update-Hinweis und Gilde online mit dem Lead (#356)", netz);
+      await en.page.close();
+    }
     // Ueber: Name und Version, drei Handlungen
     await p.click('#einstNav button[data-gruppe="dev"]');
     await gruppeIst(p, "dev");

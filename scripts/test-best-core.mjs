@@ -115,6 +115,24 @@ eq([{ best: bp(lauf([gut])) }, { best: bp(lauf([null])) }, { best: bp(lauf([gut]
    .map(e => core.looksLikeBestEntry(e, huelle)),
    [true, false, false, false, false, false], "looksLikeBestEntry: ein kaputter Eintrag wird uebergangen, nie geworfen");
 
+// Salven von Auge von Ventius im besten Pull (#414): ein optionales Feld, alte Eintraege bleiben, wie sie sind
+eq([undefined, [], [[0, 3, 10]], [[1200, -1, 6], [5000, 0, 1]], [[0, 3]], [[0, 3, 10, 1]], [[0, "3", 10]], [null], "x", [[0, NaN, 10]]].map(core.ventiusOk),
+   [true, true, true, true, false, false, false, false, false, false], "ventiusOk: fehlt oder Beginn, Nachbeben (-1 unlesbar, 0 nur Oeffner), Treffer");
+eq(core.cutVentius([[0, 3, 10], [59999, 2, 7], [60000, 3, 10], [90000, 0, 1]], 60000), [[0, 3, 10], [59999, 2, 7]],
+   "cutVentius: nur die Salven vor der Klassenlaenge einer Puppe");
+eq(core.cutVentius([], 60000), [], "cutVentius: ohne Salven nichts");
+const mitV = (v) => ({ best: bp({ ...lauf([gut]), ventius: v }) });
+eq([mitV([[0, 3, 10]]), mitV(undefined), mitV([[0, 3]]), mitV("x")].map(e => core.looksLikeBestEntry(e, huelle)),
+   [true, true, false, false], "looksLikeBestEntry: mit und ohne Salven gueltig, ein falsches Feld nicht");
+// ein Pull ohne das Feld bleibt Byte fuer Byte, wie er war: nichts wird nachgerechnet oder umgeschrieben
+const altPull = bp(lauf([gut]));
+eq(JSON.stringify(core.mergeBest(undefined, altPull).best), JSON.stringify(altPull), "mergeBest: ein Pull ohne Salven bleibt unveraendert");
+eq(core.sameEntry({ best: altPull }, { best: JSON.parse(JSON.stringify(altPull)) }), true, "sameEntry: ein gelesener alter Eintrag ist derselbe");
+// derselbe Kampf erneut geladen: der Kandidat mit Salven ersetzt den alten Eintrag ohne sie (gleiches at), geloescht wird nichts
+const neuPull = { ...altPull, run: { ...altPull.run, ventius: [[0, 3, 10]] } };
+eq(core.mergeBest({ best: altPull }, neuPull).best.run.ventius, [[0, 3, 10]], "mergeBest: derselbe Kampf bekommt die Salven dazu");
+eq(core.sameEntry({ best: altPull }, core.mergeBest({ best: altPull }, neuPull)), false, "sameEntry: der Eintrag mit Salven ist ein neuer Stand, wird einmal geschrieben");
+
 // Ursache oder verteilt: eine Regel fuer den Antwortsatz und "Woher der Unterschied kommt"
 const dl = (...d) => d.map((x) => ({ d: x }));
 eq([core.groessterAnteil(dl(-300, 100, -100)), core.groessterAnteil([]), core.URSACHE_AB], [0.6, 0, 0.4],

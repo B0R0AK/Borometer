@@ -558,6 +558,10 @@ export type SavedRun = ReturnType<typeof summarise> & {
   /** the casts of the top twelve skills (partyEinsaetze): a fight of the
       loaded log and a best pull carry them, a saved run does not */
   casts?: PartyCasts[] | undefined;
+  /** Eye of Ventius, only in a best pull and only if the fight had volleys (#414): per volley
+      [start in ms from the fight's start, aftershocks (-1 unreadable, 0 opener only), hits].
+      An older best pull has none; nothing is ever recomputed into it. */
+  ventius?: [number, number, number][] | undefined;
 };
 
 /** A pull kept as the best or second best on one boss or dummy length (boro-best.json, 46-best-pull.ts). */

@@ -1841,9 +1841,10 @@ function auditMain() {
   // abriss.win is set to the new one and cleared when it closes. In "chrome"
   // it sets its own buttons and material and leaves full view's header be.
   const OPEN_ABRISS = "\n  if (!currentWindow() || !seite.origin) return false;\n  const offen = abrissWindow();\n"
-    + "  if (offen && abriss.teil === teil) {\n    offen.show();\n    offen.focus();\n    return true;\n  }\n  offen?.close();\n"
+    + "  if (offen && abriss.teil === teil) {\n    \n    vorholen(offen);\n    return true;\n  }\n  offen?.close();\n"
     + "  const cfg = loadConfig();\n  \n  const p = platzAbriss(teilAus(loadConfig().fenster, \"abriss\"), monitore(), hauptmonitor());\n"
-    + "  const aw = new BrowserWindow({\n    title: \"Borometer\",\n    width: p ? p.w : 900,\n    height: p ? p.h : 640,\n"
+    + "  const standard = abrissGroesse(hauptmonitor());\n"
+    + "  const aw = new BrowserWindow({\n    title: \"Borometer\",\n    width: p ? p.w : standard.w,\n    height: p ? p.h : standard.h,\n"
     + "    ...(p ? { x: p.x, y: p.y } : {}),\n    minWidth: 320,\n    minHeight: 240,\n    titleBarStyle: \"hidden\",\n"
     + "    titleBarOverlay: overlayFor(cfg.themeResolved),\n    backgroundColor: backgroundFor(cfg.themeResolved),\n"
     + "    icon: seite.icon,\n    show: false,\n    \n    webPreferences: SEITE,\n  });\n"
@@ -1851,6 +1852,8 @@ function auditMain() {
     + "  const zeigen = (): void => {\n    if (!aw.isDestroyed() && !aw.isVisible()) aw.show();\n  };\n"
     + "  aw.webContents.once(\"did-finish-load\", zeigen);\n  aw.webContents.once(\"did-fail-load\", zeigen);\n"
     + "  aw.on(\"move\", () => abrissMerker.ereignis());\n  aw.on(\"resize\", () => abrissMerker.ereignis());\n"
+    + "  aw.on(\"maximize\", () => abrissMerker.ereignis());\n  aw.on(\"unmaximize\", () => abrissMerker.ereignis());\n"
+    + "  aw.on(\"restore\", () => abrissMerker.ereignis());\n"
     + "  aw.on(\"close\", () => abrissMerker.jetzt());\n"
     + "  aw.on(\"closed\", () => {\n    if (abriss.win === aw) {\n      abriss.win = null;\n      abriss.teil = null;\n    }\n  });\n"
     + "  nurEigeneSeite(aw, seite.origin);\n  void aw.loadURL(`${seite.origin}/?win=1&teil=${teil}`);\n  return true;";
@@ -2560,7 +2563,9 @@ function auditMain() {
       + " if (!Object.keys(old.zaehler).every((k) => Object.hasOwn(p.zaehler, k))) return null;"
       + " if (!old.eigene.every((e) => p.eigene.some((f) => f.schluessel === e.schluessel))) return null;"
       + " if (old.vorwoche) { const week = p.vorwoche; if (!week || week.reset < old.vorwoche.reset) return null;"
-      + " if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null; } }"
+      + " if (week.reset === old.vorwoche.reset && !Object.keys(old.vorwoche.zaehler).every((k) => Object.hasOwn(week.zaehler, k))) return null; }"
+      + " if (old.vorsaison) { const season = p.vorsaison; if (!season || season.reset < old.vorsaison.reset) return null;"
+      + " if (season.reset === old.vorsaison.reset && !Object.keys(old.vorsaison.zaehler).every((k) => Object.hasOwn(season.zaehler, k))) return null; } }"
       + " return { v: 1, profile, ...(erinnerungen === undefined ? {} : { erinnerungen }), ...(ignoriert === undefined ? {} : { ignoriert }) };";
     check(chk === CHK && [...wkBare.matchAll(/\bcheckWeeklies\b/g)].length === 4,
       "checkWeeklies refuses a state that leaves out a stored character, own point, counter or last week, and keeps detached ones",
@@ -2572,7 +2577,7 @@ function auditMain() {
     const WK_TWINK = [
       'const NAME_RX = /^[^\\p{Cc}\\p{Cf}\\p{Zl}\\p{Zp}]{1,24}$/u;',
       'const textOk = (x: unknown, rx: RegExp): x is string => typeof x === "string" && rx.test(x) && x.trim() === x;',
-      'const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "zu"];',
+      'const PROFILE_KEYS = ["id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "vorsaison", "zu"];',
       "if (x.log !== undefined && !textOk(x.log, NAME_RX)) return null;",
       "if (x.main !== undefined && x.main !== true) return null;",
       "...(x.log === undefined ? {} : { log: x.log as string }), ...(x.main === undefined ? {} : { main: true as const }),"];
@@ -2635,7 +2640,7 @@ function auditMain() {
       "weeklies.ts removes for good only through loescheWeekliesGeloest: a real request, a thing the person detached, the right name, and the backup in sicherungen (written wx, never removed) before it saves",
       "found: " + WLOE + " | " + WSIC);
     const WEEKLIES_STRINGS = new Set(["node:fs", "./paths", "boro-weeklies.json", ".tmp", "utf8", "ENOENT", "wx",
-      "woche", "tag", "v", "profile", "id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche",
+      "woche", "tag", "v", "profile", "id", "name", "log", "main", "geloest", "zaehler", "aus", "namen", "eigene", "vorwoche", "vorsaison",
       "schluessel", "menge", "takt", "stand", "seit", "reset",
       "was", "profil", "charakter", "eigen", "abgelehnt", "nicht-geloest", "sicherung", "sicherungen", "weeklies-vor-loeschen-", "", "-", ".json", "/", "EEXIST",
       "erinnerungen", "zu", "bei", "an", "tage", "zeit", "text", "nurOffen", "ignoriert",
@@ -3797,6 +3802,20 @@ async function auditPage() {
   check(kompaktKern.length > 0 && !kompaktGriffe.length,
     "kompakt-core.ts is a pure core: it imports and re-exports nothing and touches no page or network",
     `found: ${kompaktGriffe.join(" | ")}`);
+  // the cores of the new analysis (#414, Spezifikation 2026-11-08): pure like the others, and they import only each other
+  // (a sibling *-core.ts, no page part, no state, no node); read without block comments and whole // lines
+  const analyseKerne = ["kampfdaten-core.ts", "ventius-core.ts", "pruefstand-core.ts", "bereich-core.ts", "befund-core.ts"];
+  const analyseFehlt = [], analyseGriffe = [];
+  for (const f of analyseKerne) {
+    const pfad = join(rendererDir, f);
+    if (!existsSync(pfad)) { analyseFehlt.push(f); continue; }
+    const code = readFileSync(pfad, "utf8").replace(/\/\*[\s\S]*?\*\/|^\s*\/\/[^\n]*/gm, "");
+    for (const m of code.matchAll(/\bfrom\s*["'\x60]([^"'\x60]*)["'\x60]/g)) if (!/^\.\/[a-z-]+-core$/.test(m[1])) analyseGriffe.push(f + ": import " + m[1]);
+    for (const m of code.matchAll(/\brequire\s*\(|\bimport\s*\(|\bfetch\b|\bdocument\b|\bwindow\b|\blocalStorage\b|\bsessionStorage\b|\bindexedDB\b|\bglobalThis\b|\bnavigator\b|\bXMLHttpRequest\b|\bsendBeacon\b|\bEventSource\b|\bWebSocket\b|\blocation\b|\beval\b|\bnew Function\b|\bprocess\b/g)) analyseGriffe.push(f + ": " + m[0].trim());
+  }
+  check(!analyseFehlt.length && !analyseGriffe.length,
+    "the analysis cores (kampfdaten, ventius, pruefstand, bereich, befund) are pure: they import only a sibling *-core.ts and touch no page, state, node or network",
+    "missing: " + analyseFehlt.join(", ") + "; found: " + analyseGriffe.join(" | "));
   // the weapon pair and the reference of the comparisons (47-paar.ts, #207)
   // ask nothing: no fetch, no /api/ address, no beacon, no request object, no link
   const shown = part("47-paar.ts");
@@ -3975,6 +3994,18 @@ async function auditPage() {
     .filter(([, text]) => /[\u00a0\u00b7]/.test(text)).map(([n]) => n);
   check(!rohZeichen.length, "the guild's part, its core and the class table write the protected space and the middle dot as escapes, never raw",
     `raw in: ${rohZeichen.join(" | ")}`);
+  // the same for the analysis: its words, cores and parts write the protected space as an escape (#414)
+  const ANALYSE_DATEIEN = ["analyse-woerter.ts", "kampfdaten-core.ts", "bereich-core.ts", "befund-core.ts", "pruefstand-core.ts"];
+  const ANALYSE_TEILE = ["69-faehigkeiten.ts", "70-pruefstand.ts", "78-analyse-daten.ts", "79-zeitleiste.ts"];
+  const rohAnalyse = [...ANALYSE_DATEIEN.map((n) => [n, outer["../" + n] ?? ""]), ...ANALYSE_TEILE.map((n) => [n, part(n)])]
+    .filter(([, text]) => /\u00a0/.test(text)).map(([n]) => n);
+  check(ANALYSE_DATEIEN.every((n) => (outer["../" + n] ?? "").length > 0) && ANALYSE_TEILE.every((n) => part(n).length > 0) && !rohAnalyse.length,
+    "the analysis' words, cores and parts write the protected space as an escape, never raw",
+    `raw in: ${rohAnalyse.join(" | ")}`);
+  // the changelog too: raw U+00A0 slipped through there unnoticed (#437)
+  check(part("02-changelog.ts").length > 0 && !/ /.test(part("02-changelog.ts")),
+    "the changelog writes the protected space as an escape, never raw",
+    "raw U+00A0 in 02-changelog.ts");
   const REACH = /XMLHttpRequest|sendBeacon|WebSocket|EventSource|window\.open|\blocation\s*(\.\s*href\s*)?=|\bimport\(|<img\b|<iframe\b|navigator\.share\b/g;
   const gildeFetch = [...gildePart.matchAll(/\bfetch\b\s*(?:\(\s*([^,)]*))?/g)].map((m) => (m[1] ?? "").trim());
   const gildeReach = [...(gildePart.match(REACH) || []), ...(gildeCore.match(REACH) || []),
@@ -4586,8 +4617,8 @@ function auditSpielbilder() {
     }).map((l) => `${f}: ${l.slice(0, 60)}`);
   });
   const sameNames = data.every(([, s]) => names(s) === names(empty))
-    && names(empty) === "BOSS_ICON_BILD,KERN_BILD,SKILL_ICON_BILD,WK_BOSS_BILD,WK_GEGENSTAND_BILD";
-  check(!odd.length && sameNames, "spielbilder.ts is data only: exported string tables, nothing else, the same five in both",
+    && names(empty) === "BOSS_ICON_BILD,KERN_BILD,SKILL_ICON_BILD,WK_BOSS_BILD,WK_GEGENSTAND_BILD,WK_TURM_BILD";
+  check(!odd.length && sameNames, "spielbilder.ts is data only: exported string tables, nothing else, the same six in both",
     `found: ${odd.join(" | ")}${sameNames ? "" : " | other tables"}`);
 
   // the switch: one onResolve for exactly ../spielbilder onto exactly the two files, one plugin in the build

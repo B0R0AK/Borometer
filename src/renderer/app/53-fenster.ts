@@ -319,24 +319,12 @@ function startSatz(st: StartStand): string {
   if(st.art === "staerker") return t(st.zweit ? "analysis.start.strongerSecond" : "analysis.start.stronger");
   return t(st.zweit ? "analysis.start.weakerSecond" : "analysis.start.weaker", {p: pct(st.q)});
 }
-/* Ein Weg in die Rotation (Issue #107): Von/bis auf die Strecke, der Klick
-   laeuft ueber den Hoerer der Analyse (data-weg, 26-analysis-tab.ts). */
-/** Der Knopf in die Rotation fuer die Strecke von-bis (Sekunden), mit der Strecke im Vorlesenamen. */
-export function inRotationKnopf(von: number, bis: number, label: string): string {
-  return '<dd class="w"><button type="button" class="inrot" data-weg="rot" data-von="'+von+'" data-bis="'+bis+'" aria-label="'+
-    esc(t(label, {z: clock(von)+"\u2013"+clock(bis)}))+'">'+esc(t("analysis.inRotation"))+"</button></dd>";
-}
-/** Der Eintrag in der Befundliste des Kampfstreifens (seit #218; vorher
-    unter "Weitere Befunde", DECISION 4.14: der Rhythmus verdichtet): Wert,
-    Vergleichswert und ein Satz - nur mit Vergleichspull. Begriff und Werte
-    fuer die Liste #weitereListe. */
-export function startZeile(seg: Fight | undefined): string {
+/** Der Satz zum Start (#414, B2): die ersten 10 s gegen den Bezug, nur mit Bezug. Ein deutlich schwaecherer Start fuehrt in die Rotation,
+    auf die ersten 10 s (Issue #107); der Knopf dazu steht in 79-zeitleiste.ts unter dem Opener. */
+export function startSatzText(seg: Fight | undefined): { text: string; schwaecher: boolean } | null {
   const st = startStand(seg);
-  if(!st) return "";
+  if(!st) return null;
   const bp = t(st.zweit ? "analysis.ref.second" : "analysis.ref.best");
-  // ein deutlich schwaecherer Start fuehrt in die Rotation, auf die ersten 10 s (Issue #107)
-  // data-von/data-bis: die Zeit fuer die Fahne im Kampfstreifen (70)
-  return '<div class="find" data-k="start" data-von="0" data-bis="' + START_S + '"><dt class="k">' + esc(t("analysis.start.label")) + '</dt><dd class="v">' + esc(fmt(st.dps)) +
-    '</dd><dd class="n">' + esc(t("analysis.start.ref", {bp, x: fmt(st.bezug)}) + " \u00b7 " + startSatz(st)) + "</dd>" +
-    (st.art === "schwaecher" ? inRotationKnopf(0, START_S, "analysis.inRotation.start") : "") + "</div>";
+  return {text: t("analysis.start.label") + ": " + fmt(st.dps) + " \u00b7 " + t("analysis.start.ref", {bp, x: fmt(st.bezug)}) + " \u00b7 " + startSatz(st),
+    schwaecher: st.art === "schwaecher"};
 }

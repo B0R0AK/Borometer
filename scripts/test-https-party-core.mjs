@@ -15,11 +15,12 @@
 
 import * as esbuild from "esbuild";
 import { spawnSync } from "node:child_process";
-import { generateKeyPairSync, randomBytes, sign } from "node:crypto";
+import { generateKeyPairSync, randomBytes, randomInt, sign } from "node:crypto";
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import * as http from "node:http";
 import * as https from "node:https";
 import { tmpdir } from "node:os";
+import { createSecureContext } from "node:tls";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -34,6 +35,9 @@ const oid = (n) => { const out = [40 * n[0] + n[1]];
   for (const v of n.slice(2)) { const b = [v & 127]; let x = v >> 7; while (x) { b.unshift((x & 127) | 128); x >>= 7; } out.push(...b); }
   return tlv(0x06, Buffer.from(out)); };
 const ganz = (buf) => tlv(0x02, buf[0] & 0x80 ? Buffer.concat([Buffer.from([0]), buf]) : buf);
+// Seriennummer: erstes Byte 1..0x7f, also immer positiv und ohne ueberfluessige fuehrende Null
+// (eine 0x00 vorn ist in DER kein gueltiges INTEGER, OpenSSL meldet "illegal padding", #403)
+const neueSeriennr = () => Buffer.concat([Buffer.from([1 + randomInt(0x7f)]), randomBytes(7)]);
 const zeit = (d) => { const z = d.toISOString().replace(/[-:T]/g, "").slice(0, 14) + "Z";
   return d.getUTCFullYear() < 2050 ? tlv(0x17, Buffer.from(z.slice(2))) : tlv(0x18, Buffer.from(z)); };
 const name = (cn) => seq(tlv(0x31, seq(oid([2, 5, 4, 3]), tlv(0x0c, Buffer.from(cn)))));
@@ -41,14 +45,14 @@ const ext = (id, kritisch, wert) => seq(oid(id), ...(kritisch ? [tlv(0x01, Buffe
 const ECDSA_SHA256 = seq(oid([1, 2, 840, 10045, 4, 3, 2]));
 const pem = (der) => "-----BEGIN CERTIFICATE-----\n" + der.toString("base64").match(/.{1,64}/g).join("\n") + "\n-----END CERTIFICATE-----\n";
 /** Ein Zertifikat: cn, Aussteller (cn und Schluessel; ohne = selbst), von/bis, ca, san (IP oder DNS-Name). */
-function zertifikat({ cn, aussteller, von, bis, ca = false, san }) {
+function zertifikat({ cn, aussteller, von, bis, ca = false, san, seriennr = neueSeriennr() }) {
   const paar = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
   const exts = [ext([2, 5, 29, 19], true, ca ? seq(tlv(0x01, Buffer.from([0xff]))) : seq()),
     ext([2, 5, 29, 15], true, ca ? tlv(0x03, Buffer.from([1, 0x06])) : tlv(0x03, Buffer.from([7, 0x80])))];
   if (san) exts.push(ext([2, 5, 29, 17], false, seq(/^\d+\.\d+\.\d+\.\d+$/.test(san)
     ? tlv(0x87, Buffer.from(san.split(".").map(Number))) : tlv(0x82, Buffer.from(san)))));
   if (!ca) exts.push(ext([2, 5, 29, 37], false, seq(oid([1, 3, 6, 1, 5, 5, 7, 3, 1]))));
-  const tbs = seq(tlv(0xa0, ganz(Buffer.from([2]))), ganz(randomBytes(8)), ECDSA_SHA256, name(aussteller?.cn ?? cn),
+  const tbs = seq(tlv(0xa0, ganz(Buffer.from([2]))), ganz(seriennr), ECDSA_SHA256, name(aussteller?.cn ?? cn),
     seq(zeit(von), zeit(bis)), name(cn), paar.publicKey.export({ type: "spki", format: "der" }), tlv(0xa3, seq(...exts)));
   const sig = sign("sha256", tbs, aussteller?.key ?? paar.privateKey);
   return { cn, key: paar.privateKey, keyPem: paar.privateKey.export({ type: "pkcs8", format: "pem" }),
@@ -57,6 +61,18 @@ function zertifikat({ cn, aussteller, von, bis, ca = false, san }) {
 
 // Der Elternprozess baut die Kette, der Kindprozess vertraut ihr - und nur er.
 if (!process.env.BORO_TLS_DIR) {
+  // Probe der Seriennummer (#403): feste erste Bytes durch den Zertifikatsbau und in OpenSSL laden.
+  const probeEq = (got, want, n) => { if (got === want) console.log("  ok    " + n); else { console.log("  FAIL  " + n + "\n        bekommen " + got + "\n        erwartet " + want); process.exit(1); } };
+  const ladeFehler = (serienBytes) => { const z = zertifikat({ cn: "probe", san: "127.0.0.1", von: new Date(Date.now() - 864e5), bis: new Date(Date.now() + 864e5), seriennr: Buffer.from(serienBytes) });
+    try { createSecureContext({ key: z.keyPem, cert: z.certPem }); return "ok"; } catch (e) { return e.code || e.message; } };
+  const rest = [1, 2, 3, 4, 5, 6, 7];
+  probeEq(ladeFehler([0x00, ...rest]), "ERR_OSSL_ASN1_ILLEGAL_PADDING", "Seriennummer mit erstem Byte 0x00 (Ursache von #403): OpenSSL lehnt ab");
+  probeEq(ladeFehler([0x80, ...rest]), "ok", "Seriennummer mit erstem Byte 0x80: ganz() stellt eine Null voran, das Zertifikat laedt");
+  probeEq(ladeFehler([0xff, ...rest]), "ok", "Seriennummer mit erstem Byte 0xff: laedt");
+  probeEq(ladeFehler([0x01, ...rest]), "ok", "Seriennummer mit erstem Byte 0x01: laedt");
+  probeEq(ladeFehler([0x7f, ...rest]), "ok", "Seriennummer mit erstem Byte 0x7f: laedt");
+  let schlecht = 0; for (let i = 0; i < 20000; i++) { const s = neueSeriennr(); if (s.length !== 8 || s[0] < 1 || s[0] > 0x7f) schlecht++; }
+  probeEq(schlecht, 0, "neueSeriennr(): erstes Byte immer 0x01..0x7f (20000 Ziehungen)");
   const dir = mkdtempSync(join(tmpdir(), "boro-tls-"));
   const jetzt = Date.now(), tag = 864e5;
   const ca = zertifikat({ cn: "Borometer Testkette", von: new Date(jetzt - tag), bis: new Date(jetzt + 30 * tag), ca: true });
@@ -76,6 +92,7 @@ if (!process.env.BORO_TLS_DIR) {
   rmSync(dir, { recursive: true, force: true });
   process.exit(r.status ?? 1);
 }
+
 const tls = process.env.BORO_TLS_DIR;
 
 const built = await esbuild.build({ entryPoints: [join(root, "src", "main", "http.ts")], bundle: true, format: "esm",

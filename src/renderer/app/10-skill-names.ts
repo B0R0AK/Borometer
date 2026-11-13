@@ -51,6 +51,8 @@ export const SKILL_ID_NAME: Record<string, SkillNames> = {
   // dagger
   "940612462":{en:"Cleaving Moonlight", de:"Spaltendes Mondlicht"},
   "940614907":{en:"Cleaving Moonlight", de:"Spaltendes Mondlicht"},
+  "940593713":{en:"Cleaving Moonlight", de:"Spaltendes Mondlicht"},
+  "940790340":{en:"Cleaving Moonlight", de:"Spaltendes Mondlicht"},
   "940729956":{en:"Inject Venom", de:"Giftspritze"},
   "955956838":{en:"Inject Venom", de:"Giftspritze"},
   "940795465":{en:"Inject Venom", de:"Giftspritze"},
@@ -252,6 +254,7 @@ export const SKILL_ID_NAME: Record<string, SkillNames> = {
   "950232540":{en:"Rising Slash", de:"Ansteigender Hieb"},
   "950294052":{en:"Rising Slash", de:"Ansteigender Hieb"},
   "950272669":{en:"Spiral Slash", de:"Spiralhieb"},
+  "950313055":{en:"Mortal Wrath", de:"Tödlicher Zorn"},
   "950277937":{en:"Bloodleech Aura", de:"Blutsaugeraura"},
   "950311148":{en:"Cyclonic Fury", de:"Stürmischer Zorn"},
   "950314950":{en:"Cataclysm", de:"Verheerung"},

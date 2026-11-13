@@ -3,6 +3,21 @@
 // short, skimmable bullets, newest first
 export const BORO_CHANGELOG = {
   en: [
+    {v:"2.2", notes:[
+      "Added: Analysis: timeline with damage per second, the best pull's curve and markers for gaps, the strongest 5s and target switches; drag a range and read what happened there (#414)",
+      "Added: Analysis: checklist, the opener of the first 15s against the best pull, and a card per skill; the best pull now keeps its Eye of Ventius volleys for comparison (#414)",
+      "Added: Weeklies: Tower of Greed tab with a 28-day season, four tiers of five floors each and “Tick all” per tier (#423)",
+      "Changed: Analysis: the workbench and the fight strip are gone; what they showed is on the skill cards and in the timeline now (#414)",
+      "Changed: Analysis: the findings list is gone; its sentences sit under “Good here” and “Room to gain” and on the timeline markers (#414)",
+      "Changed: Analysis: the “The fight” panel is gone; the rate of direct hits sits under “Good here”, and the bar of the four hit types is gone (#414)",
+      "Changed: Analysis: the verdict at the top names what cost the most damage, such as idle time or missing hits (#414)",
+      "Changed: Weeklies: every reset is at 06:00\u00a0UTC; the weekly one is now on Wednesday 06:00\u00a0UTC (07:00 Berlin time in winter); it was Thursday 10:00 Berlin time (#420)",
+      "Changed: Info: the Network entry under security also names guild online (#356)",
+      "Fixed: Weapon pair: a fight without weapon damage no longer shows the pair from the fight before (#405)",
+      "Fixed: Glow ring: the note on other targets sits top left and no longer spills out of a small ring (#401)",
+      "Fixed: Own window: “Open in its own window” brings a minimised window back, and it never opens larger than the work area (#353)",
+      "Fixed: Mortal Wrath and Cleaving Moonlight get their names in both log languages (#400)",
+    ]},
     {v:"2.1", notes:[
       "Added: Compact: the Weeklies list scrolls with the mouse wheel; drag the window taller to see more skills and Weeklies (#328)",
       "Added: Compact: in a group, a click on a member opens their four strongest skills; Esc closes (#328)",
@@ -684,6 +699,21 @@ export const BORO_CHANGELOG = {
     ]},
   ],
   de: [
+    {v:"2.2", notes:[
+      "Hinzugefügt: Analyse: Zeitleiste mit Schaden je Sekunde, der Kurve des besten Pulls und Marken für Lücken, die stärksten 5s und Zielwechsel; einen Bereich aufziehen und lesen, was dort ablief (#414)",
+      "Hinzugefügt: Analyse: Checkliste, Opener der ersten 15s gegen den besten Pull und eine Karte je Fähigkeit; der beste Pull hält jetzt die Salven von Auge von Ventius für den Vergleich fest (#414)",
+      "Hinzugefügt: Weeklies: Reiter „Turm der Gier“ mit 28-Tage-Saison, vier Stufen zu je fünf Ebenen und „Alle abhaken“ je Stufe (#423)",
+      "Angepasst: Analyse: Werkbank und Kampfstreifen sind weg; was sie zeigten, steht jetzt an den Karten der Fähigkeiten und in der Zeitleiste (#414)",
+      "Angepasst: Analyse: Die Befundliste ist weg; ihre Sätze stehen unter „Gut hier“ und „Besser möglich“ und an den Marken der Zeitleiste (#414)",
+      "Angepasst: Analyse: Das Feld „Der Kampf“ ist weg; die Rate der direkten Treffer steht unter „Gut hier“, die Leiste der vier Trefferarten entfällt (#414)",
+      "Angepasst: Analyse: Das Urteil oben nennt, was am meisten Schaden gekostet hat, etwa Leerlauf oder fehlende Treffer (#414)",
+      "Angepasst: Weeklies: Alle Resets um 06:00\u00a0UTC; der wöchentliche liegt jetzt am Mittwoch 06:00\u00a0UTC (im Winter 07:00 Berliner Zeit), bisher Donnerstag 10:00 Berliner Zeit (#420)",
+      "Angepasst: Info: Der Eintrag Netz unter Sicherheit nennt auch Gilde online (#356)",
+      "Behoben: Waffenpaar: Ein Kampf ohne Waffenschaden zeigt nicht mehr das Paar des Kampfs davor (#405)",
+      "Behoben: Glutring: Der Hinweis auf weitere Ziele steht oben links und läuft bei kleinem Ring nicht mehr aus der Mitte (#401)",
+      "Behoben: Eigenes Fenster: „In eigenem Fenster“ holt ein minimiertes Fenster zurück, und es öffnet nie größer als der Arbeitsbereich (#353)",
+      "Behoben: Tödlicher Zorn und Spaltendes Mondlicht tragen in beiden Log-Sprachen ihren Namen (#400)",
+    ]},
     {v:"2.1", notes:[
       "Hinzugef\u00fcgt: Kompakt: Die Weeklies-Liste rollt mit dem Mausrad; wer das Fenster h\u00f6her zieht, sieht mehr F\u00e4higkeiten und Weeklies (#328)",
       "Hinzugef\u00fcgt: Kompakt: In der Gruppe klappt ein Klick auf ein Mitglied seine vier st\u00e4rksten F\u00e4higkeiten auf, Esc schlie\u00dft (#328)",
@@ -1160,11 +1190,11 @@ export const BORO_CHANGELOG = {
       "Die Schild-Marke ist Text auf einer Karte, nicht Füllung auf einer Zeile, also hat sie eine eigene Tinte, statt sich die der Füllung zu leihen: --shield-ink, dunkel #9fc3cd und hell #2c5762 — dieselbe Trennung wie --gold gegen --gold-ink",
     ]},
     {v:"0.44", notes:[
-      "Der Zeitverlauf sagte „gestapelt nach Skill“ und zeichnete eine Farbe. Ein Skill trägt in diesem Kampf 91 %, also versprachen acht gleich große Kästchen unter dem Diagramm eine Aufteilung, die in den Balken nicht steckt. Jetzt gibt es einen Streifen, geteilt nach dem, was jeder Skill wirklich beigetragen hat, und die Liste darunter nennt weiterhin jeden Skill — mit seinem Anteil daneben",
+      "Der Zeitverlauf sagte „gestapelt nach Skill“ und zeichnete eine Farbe. Ein Skill trägt in diesem Kampf 91\u00a0%, also versprachen acht gleich große Kästchen unter dem Diagramm eine Aufteilung, die in den Balken nicht steckt. Jetzt gibt es einen Streifen, geteilt nach dem, was jeder Skill wirklich beigetragen hat, und die Liste darunter nennt weiterhin jeden Skill — mit seinem Anteil daneben",
       "Das Diagramm hat eine Linie, gegen die man es lesen kann. Eine Achse von 0 bis 2,5M kann nicht sagen, ob eine Spitze gut war, also war „hohe Stapel sind deine Burst-Fenster“ ein Adjektiv ohne Bezug. Die eigene Rate des Kampfes liegt jetzt quer über der Fläche — dieselbe Zahl, die oben im Kopf steht — und der Satz über dem Diagramm zählt die Sekunden, die darüber lagen, und was sie wert waren",
       "Das Diagramm ist so hoch, wie das Fenster es zulässt. Es waren 240 Pixel in einer Seite, die auf gar nichts festgelegt ist; darunter blieb noch einmal etwa so viel leer, und eine 400k-Sekunde stand acht Pixel neben einer mit 600k",
-      "Abschnitte, in denen nichts traf, werden gezeichnet und beziffert — in derselben Tönung und aus demselben Durchgang wie im Rotations-Reiter, damit ein Aussetzer überall dasselbe ist und gleich aussieht. Sie sind seltener als gedacht: von den zwei echten Kämpfen im Beispiel hat einer gar keine Pause über 1,5 s und der andere genau eine von 1,8 s",
-      "Der Vergleichs-Reiter sagt jetzt, welcher Durchlauf gewonnen hat — in einem Satz, über zwei Balken, deren Längen die beiden Zahlen sind. Vorher stand oben eine Überschrift, drei Zeilen Erklärung, wie man die Seite benutzt, die man gerade benutzt, und ein nicht angehaktes Kästchen — das Ergebnis stand nirgends. Unter 5 % Unterschied wird kein Sieger genannt, und es steht da, warum",
+      "Abschnitte, in denen nichts traf, werden gezeichnet und beziffert — in derselben Tönung und aus demselben Durchgang wie im Rotations-Reiter, damit ein Aussetzer überall dasselbe ist und gleich aussieht. Sie sind seltener als gedacht: von den zwei echten Kämpfen im Beispiel hat einer gar keine Pause über 1,5\u00a0s und der andere genau eine von 1,8\u00a0s",
+      "Der Vergleichs-Reiter sagt jetzt, welcher Durchlauf gewonnen hat — in einem Satz, über zwei Balken, deren Längen die beiden Zahlen sind. Vorher stand oben eine Überschrift, drei Zeilen Erklärung, wie man die Seite benutzt, die man gerade benutzt, und ein nicht angehaktes Kästchen — das Ergebnis stand nirgends. Unter 5\u00a0% Unterschied wird kein Sieger genannt, und es steht da, warum",
       "Ob ein Vergleich fair ist, steht dort, wo verglichen wird. Zwei unterschiedlich lange Durchläufe bekommen eine bernsteinfarbene Zeile über der Tabelle, mit der Korrektur als Knopf — statt eines Satzes unter der Tabelle, die er entwertet. Gekürzt wird nicht mehr auf sechzig Sekunden, sondern auf die Länge des kürzeren Durchlaufs, und die Zeilen, die sich aus einem gespeicherten Durchlauf nicht neu berechnen lassen — die Raten, der größte Treffer, die Standzeit — sagen das an der Zeile",
     ]},
     {v:"0.43", notes:[

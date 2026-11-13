@@ -4,6 +4,7 @@ import { histKey, knownBoss, practiceTarget } from "./06-blocks-and-places";
 import { t } from "./08-translation";
 import { skillMark } from "./11-skill-icons";
 import { skillLabel } from "./14-questlog-weapons";
+import { ventiusSalven } from "./15-weapons-and-ventius";
 import { clip, perSecond, secs1, summarise } from "./16-fight-analysis";
 import { $, esc } from "./18-interface-basics";
 import { renderCompare } from "./28-compare";
@@ -16,10 +17,11 @@ import { bauHinweisSatz, bezugVonRef, type Bezug } from "./47-paar";
 import { renderKurve, renderTafelUrteil, tafelGilt } from "./56-tafel";
 import { leerKnopf } from "./58-felder";
 import {
-  BEST_KEY_RX, besterPull, castOrder, classDps, cutCasts, dummyClass, looksLikeBestEntry, mergeBest, mergeEntries,
+  BEST_KEY_RX, besterPull, castOrder, classDps, cutCasts, cutVentius, dummyClass, looksLikeBestEntry, mergeBest, mergeEntries,
   mindestLaenge, pullWhen, rangfolge, rotLanes, sameEntry, verteilt, type Pull,
 } from "../best-pull-core";
 import { gleicherBezug } from "../build-core";
+import { ventiusForm } from "../ventius-core";
 import { mitDatum } from "../verlauf-core";
 import type { Encounter, Fight, SavedRun } from "../types";
 
@@ -255,9 +257,16 @@ function bestRun(seg: Fight, cls: number | null): SavedRun {
   run.mainWeapon = "";
   run.offWeapon = "";
   run.casts = partyEinsaetze(seg, true);
+  /* Auge von Ventius (#414): die Salven mit ihren Nachbeben, damit die Analyse sie gegen
+     diesen Pull stellen kann. Nur wenn der Kampf Salven hat; ein Pull von frueher hat das
+     Feld nicht und behaelt seine Form, bis derselbe Kampf wieder geladen wird. */
+  const salven = ventiusSalven(seg).map((s): [number, number, number] => [Math.max(0, s.t - seg.start), ventiusForm(s.wellen), s.hits]);
+  run.ventius = salven.length ? salven : undefined;
   if(cls){
     run = clip(run, cls);
     run.casts = run.casts && cutCasts(run.casts, cls * 1000);
+    const bis = salven.length ? cutVentius(salven, cls * 1000) : [];
+    run.ventius = bis.length ? bis : undefined;
   }
   return run;
 }

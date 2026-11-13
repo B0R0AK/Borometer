@@ -58,6 +58,10 @@ jobs:
       - run: npm run test:builds-core
       - run: npm run test:live-core
       - run: npm run test:analyse-core
+      - run: npm run test:ventius-core
+      - run: npm run test:pruefstand-core
+      - run: npm run test:bereich-core
+      - run: npm run test:befund-core
       - run: npm run test:mechanik-core
       - run: npm run test:rotation-core
       - run: npm run test:lage-core
@@ -88,6 +92,8 @@ jobs:
       - run: npm run test:best-page
       - run: npm run test:live-page
       - run: npm run test:analyse-page
+      - run: npm run test:zeitleiste-page
+      - run: npm run test:pruefstand-page
       - run: npm run test:rotation-page
       - run: npm run test:extras-page
       - run: npm run test:rahmen-page
@@ -96,6 +102,7 @@ jobs:
       - run: npm run test:felder-page
       - run: npm run test:neu-page
       - run: npm run test:weeklies-page
+      - run: npm run test:turm-page
       - run: npm run test:charaktere-page
       - run: npm run test:erinnerung-page
       - run: npm run test:tage-page
@@ -144,6 +151,10 @@ jobs:
       - run: npm run test:builds-core
       - run: npm run test:live-core
       - run: npm run test:analyse-core
+      - run: npm run test:ventius-core
+      - run: npm run test:pruefstand-core
+      - run: npm run test:bereich-core
+      - run: npm run test:befund-core
       - run: npm run test:mechanik-core
       - run: npm run test:rotation-core
       - run: npm run test:lage-core
@@ -174,6 +185,8 @@ jobs:
       - run: npm run test:best-page
       - run: npm run test:live-page
       - run: npm run test:analyse-page
+      - run: npm run test:zeitleiste-page
+      - run: npm run test:pruefstand-page
       - run: npm run test:rotation-page
       - run: npm run test:extras-page
       - run: npm run test:rahmen-page
@@ -182,6 +195,7 @@ jobs:
       - run: npm run test:felder-page
       - run: npm run test:neu-page
       - run: npm run test:weeklies-page
+      - run: npm run test:turm-page
       - run: npm run test:charaktere-page
       - run: npm run test:erinnerung-page
       - run: npm run test:tage-page

@@ -9,7 +9,7 @@ import { ventiusTargetKey } from "./15-weapons-and-ventius";
 import { $ } from "./18-interface-basics";
 import { renderHead } from "./20-meter-head";
 import { istLivePausiert, streifenFolgt, syncKwKnopf, tagAnsichtVerlassen } from "./23-kampfwahl";
-import { persistPref, renderWeapons } from "./27-weapons-tab";
+import { merkePaar, persistPref, renderWeapons } from "./27-weapons-tab";
 import { renderCompare } from "./28-compare";
 import { renderRuns } from "./30-fight-list";
 import { histCollect, histRecord, loadTail, loadText, refreshPlayers, renderAll, setLoadOrigin } from "./32-history";
@@ -345,6 +345,7 @@ export function setup(): void {
          seit 0.65 zu einem Charakter und steht in weaponPick. */
       if(c.mainWeapon) state.mainWeapon = c.mainWeapon;
       if(c.offWeapon) state.offWeapon = c.offWeapon;
+      merkePaar(state.mainWeapon || "", state.offWeapon || "");
       if(c.weaponPick && typeof c.weaponPick === "object") state.weaponPick = c.weaponPick;
       // the same gate on the way back in, or a config poisoned before the
       // check was widened keeps killing the tab on every restart

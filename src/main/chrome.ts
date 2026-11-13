@@ -16,8 +16,10 @@ import * as os from "node:os";
 export const CHROME_HEIGHT = 36;
 /* The page scales its header with its own size setting (10-200 %) and sends
    the height it ends up with. Only a whole number in this range reaches
-   Windows: a page value can move the buttons' height, nothing else. */
-const MIN_HEADER = 20;
+   Windows: a page value can move the buttons' height, nothing else.
+   The floor is 36 pt (CHROME_HEIGHT) at the smallest useful size setting,
+   50 %: 18 (#389; 20 was the floor of the old 40 pt header). */
+const MIN_HEADER = 18;
 const MAX_HEADER = 96;
 
 function headerHeight(height: unknown): number {
